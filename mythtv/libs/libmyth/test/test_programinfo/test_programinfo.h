@@ -23,6 +23,9 @@
 #include "programinfo.h"
 #include "programtypes.h"
 
+#include <iostream>
+using namespace std;
+
 class TestProgramInfo : public QObject
 {
     Q_OBJECT
@@ -222,20 +225,30 @@ class TestProgramInfo : public QObject
 
     void programToStringList_test(void)
     {
+        uint kInvalidDateTime = (uint)-1;
+        quint32 *ptr = &kInvalidDateTime;
+        cout << "Sizeof uint is " << sizeof(uint) << endl;
+        cout << "Value of kInvalidDateTime is " << kInvalidDateTime << endl;
+        cout << qPrintable(QString("0x%1").arg(ptr[0], 8, 16, QChar('0'))) << " "
+             << qPrintable(QString("0x%1").arg(ptr[1], 8, 16, QChar('0'))) << endl;
+
         QStringList program_list;
         dracula.ToStringList(program_list);
+        cout << qPrintable(program_list.join('|')) << endl;
         QVERIFY(program_list.join('|') == draculalist);
         ProgramInfo alucard(program_list);
         QVERIFY(dracula == alucard);
 
         program_list.clear();
         flash34.ToStringList(program_list);
+        cout << qPrintable(program_list.join('|')) << endl;
         QVERIFY(program_list.join('|') == flash34list);
         ProgramInfo hsalf34(program_list);
         QVERIFY(flash34 == hsalf34);
 
         program_list.clear();
         supergirl23.ToStringList(program_list);
+        cout << qPrintable(program_list.join('|')) << endl;
         QVERIFY(program_list.join('|') == supergirl23list);
         ProgramInfo lrigrepus23(program_list);
         QVERIFY(supergirl23 == lrigrepus23);
