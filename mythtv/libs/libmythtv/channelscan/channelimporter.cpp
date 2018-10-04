@@ -87,13 +87,12 @@ void ChannelImporter::Process(const ScanDTVTransportList &_transports)
     FixUpOpenCable(transports);
 
     // if scan was not aborted prematurely..
-    uint deleted_count = 0;
     if (do_delete)
     {
         ScanDTVTransportList trans = transports;
         for (uint i = 0; i < db_trans.size(); i++)
             trans.push_back(db_trans[i]);
-        deleted_count = DeleteChannels(trans);
+        uint deleted_count = DeleteChannels(trans);
         if (deleted_count)
             transports = trans;
     }
@@ -540,7 +539,7 @@ ScanDTVTransportList ChannelImporter::InsertChannels(
                         chan.hidden, chan.hidden_in_guide,
                         chan.freqid,
                         QString(),
-                        QString(),
+                        chan.format,
                         QString(),
                         chan.default_authority);
 
@@ -701,7 +700,7 @@ ScanDTVTransportList ChannelImporter::UpdateChannels(
                     chan.hidden, chan.hidden_in_guide,
                     chan.freqid,
                     QString(),
-                    QString(),
+                    chan.format,
                     QString(),
                     chan.default_authority);
             }
@@ -1571,7 +1570,7 @@ OkCancelType ChannelImporter::ShowManualChannelPopup(
     else
     {
         delete popup;
-        popup = NULL;
+        popup = nullptr;
     }
 
     if (1 == dc)

@@ -11,11 +11,10 @@
 
 // MythTV headers
 #include "audiooutput.h"
-// external/libsamplerate
-#include "samplerate.h"
-
 #include "mythlogging.h"
 #include "mthread.h"
+
+#include "samplerate.h"
 
 #define VBAUDIO(str)   LOG(VB_AUDIO, LOG_INFO, LOC + str)
 #define VBAUDIOTS(str) LOG(VB_AUDIO | VB_TIMESTAMP, LOG_INFO, LOC + str)
@@ -146,7 +145,7 @@ class AudioOutputBase : public AudioOutput, public MThread
     virtual void StopOutputThread(void);
 
     int GetAudioData(uchar *buffer, int buf_size, bool fill_buffer,
-                     volatile uint *local_raud = NULL);
+                     volatile uint *local_raud = nullptr);
 
     void OutputAudioLoop(void);
 

@@ -94,8 +94,8 @@ void PrivateDecoderOMX::GetDecoders(render_opts &opts)
 
 PrivateDecoderOMX::PrivateDecoderOMX() :
     m_videc(gCoreContext->GetSetting("OMXVideoDecode", VIDEO_DECODE), *this),
-    m_filter(0), m_bStartTime(false),
-    m_avctx(0),
+    m_filter(nullptr), m_bStartTime(false),
+    m_avctx(nullptr),
     m_lock(QMutex::Recursive), m_bSettingsChanged(false),
     m_bSettingsHaveChanged(false)
 {
@@ -481,21 +481,6 @@ bool PrivateDecoderOMX::CreateFilter(AVCodecContext *avctx)
         return false;
     }
 
-    // Test the filter
-    static const uint8_t test[] = { 0U,0U,0U,2U,0U,0U };
-    int outbuf_size = 0;
-    uint8_t *outbuf = NULL;
-    int res = av_bitstream_filter_filter(m_filter, avctx, NULL, &outbuf,
-                                         &outbuf_size, test, sizeof test, 0);
-    if (res < 0)
-    {
-        LOG(VB_PLAYBACK, LOG_ERR, LOC + "h264_mp4toannexb filter test failed");
-        av_bitstream_filter_close(m_filter);
-        m_filter = NULL;
-        return false;
-    }
-
-    av_freep(&outbuf);
     LOG(VB_GENERAL, LOG_INFO, LOC + "Installed h264_mp4toannexb filter");
     return true;
 }
@@ -631,7 +616,7 @@ OMX_ERRORTYPE PrivateDecoderOMX::AllocOutputBuffersCB()
     {
         OMX_BUFFERHEADERTYPE *hdr;
         OMX_ERRORTYPE e = OMX_AllocateBuffer(m_videc.Handle(), &hdr,
-            m_videc.Base() + index, 0, pdef->nBufferSize);
+            m_videc.Base() + index, nullptr, pdef->nBufferSize);
         if (e != OMX_ErrorNone)
         {
             LOG(VB_PLAYBACK, LOG_ERR, LOC + QString(
@@ -714,7 +699,7 @@ OMX_ERRORTYPE PrivateDecoderOMX::UseBuffersCB()
         assert(frame == HDR2FRAME(hdr));
         FRAMESETHDR(frame, hdr);
         FRAMESETREF(frame, picture->buf[0]);
-        picture->buf[0] = 0;
+        picture->buf[0] = nullptr;
 
         hdr->nFilledLen = 0;
         hdr->nOffset = 0;
@@ -738,12 +723,12 @@ bool PrivateDecoderOMX::Reset(void)
 
     // Flush input
     OMX_ERRORTYPE e;
-    e = m_videc.SendCommand(OMX_CommandFlush, m_videc.Base(), 0, 50);
+    e = m_videc.SendCommand(OMX_CommandFlush, m_videc.Base(), nullptr, 50);
     if (e != OMX_ErrorNone)
         return false;
 
     // Flush output
-    e = m_videc.SendCommand(OMX_CommandFlush, m_videc.Base() + 1, 0, 50);
+    e = m_videc.SendCommand(OMX_CommandFlush, m_videc.Base() + 1, nullptr, 50);
     if (e != OMX_ErrorNone)
         return false;
 
@@ -811,7 +796,7 @@ int PrivateDecoderOMX::GetFrame(
 // Submit a packet for decoding
 int PrivateDecoderOMX::ProcessPacket(AVStream *stream, AVPacket *pkt)
 {
-    uint8_t *buf = pkt->data, *free_buf = NULL;
+    uint8_t *buf = pkt->data, *free_buf = nullptr;
     int size = pkt->size;
     int ret = pkt->size;
 
@@ -820,8 +805,8 @@ int PrivateDecoderOMX::ProcessPacket(AVStream *stream, AVPacket *pkt)
     {
         AVCodecContext *avctx = gCodecMap->getCodecContext(stream);
         int outbuf_size = 0;
-        uint8_t *outbuf = NULL;
-        int res = av_bitstream_filter_filter(m_filter, avctx, NULL, &outbuf,
+        uint8_t *outbuf = nullptr;
+        int res = av_bitstream_filter_filter(m_filter, avctx, nullptr, &outbuf,
                                              &outbuf_size, buf, size, 0);
         if (res <= 0)
         {
@@ -949,7 +934,7 @@ int PrivateDecoderOMX::GetBufferedFrame(AVStream *stream, AVFrame *picture)
         AVPixelFormat in_fmt  = AV_PIX_FMT_NONE;
         int pitches[3]; // Y, U, & V pitches
         int offsets[3]; // Y, U, & V offsets
-        unsigned char *buf = 0;
+        unsigned char *buf = nullptr;
 
         const OMX_VIDEO_PORTDEFINITIONTYPE &vdef = m_videc.PortDef(1).format.video;
         switch (vdef.eColorFormat)

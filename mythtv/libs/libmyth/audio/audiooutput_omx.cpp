@@ -178,6 +178,7 @@ static const char *toString(OMX_AUDIO_DDPBITSTREAMID id)
     {
         CASE2STR(OMX_AUDIO_DDPBitStreamIdAC3);
         CASE2STR(OMX_AUDIO_DDPBitStreamIdEAC3);
+        default: break;
     }
     static char buf[32];
     return strcpy(buf, qPrintable(QString("DDPBitStreamId 0x%1").arg(id,0,16)));
@@ -602,7 +603,7 @@ AudioOutputSettings* AudioOutputOMX::GetOutputSettings(bool /*passthrough*/)
     if (!m_audiorender.IsValid())
     {
         LOG(VB_GENERAL, LOG_ERR, LOC + __func__ + " No audio render");
-        return NULL;
+        return nullptr;
     }
 
     m_audiorender.Shutdown();
@@ -618,7 +619,7 @@ AudioOutputSettings* AudioOutputOMX::GetOutputSettings(bool /*passthrough*/)
         LOG(VB_AUDIO, LOG_ERR, LOC + QString(
                 "SetParameter AudioPortFormat PCM error %1")
             .arg(Error2String(e)));
-        return NULL;
+        return nullptr;
     }
 
     OMX_AUDIO_PARAM_PCMMODETYPE pcm;
@@ -630,13 +631,12 @@ AudioOutputSettings* AudioOutputOMX::GetOutputSettings(bool /*passthrough*/)
         LOG(VB_AUDIO, LOG_ERR, LOC + QString(
                 "GetParameter AudioPcm error %1")
             .arg(Error2String(e)));
-        return NULL;
+        return nullptr;
     }
 
     AudioOutputSettings *settings = new AudioOutputSettings();
 
-    int rate;
-    while ((rate = settings->GetNextRate()))
+    while (int rate = settings->GetNextRate())
     {
         pcm.nSamplingRate = rate;
         if (OMX_ErrorNone == m_audiorender.SetParameter(OMX_IndexParamAudioPcm, &pcm))

@@ -45,10 +45,6 @@ MusicGenericTree::MusicGenericTree(MusicGenericTree *parent,
     }
 }
 
-MusicGenericTree::~MusicGenericTree(void)
-{
-}
-
 void MusicGenericTree::setDrawArrow(bool flag)
 {
     m_showArrow = flag;
@@ -95,8 +91,8 @@ PlaylistEditorView::PlaylistEditorView(MythScreenStack *parent, MythScreenType *
                                        const QString &layout, bool restorePosition)
          :MusicCommon(parent, parentScreen, "playlisteditorview"),
             m_layout(layout), m_restorePosition(restorePosition),
-            m_rootNode(NULL), m_playlistTree(NULL), m_breadcrumbsText(NULL),
-            m_positionText(NULL)
+            m_rootNode(nullptr), m_playlistTree(nullptr), m_breadcrumbsText(nullptr),
+            m_positionText(nullptr)
 {
     gCoreContext->addListener(this);
     gCoreContext->SaveSetting("MusicPlaylistEditorView", layout);
@@ -219,7 +215,7 @@ void PlaylistEditorView::customEvent(QEvent *event)
     }
     else if (event->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = dynamic_cast<MythEvent*>(event);
+        MythEvent *me = static_cast<MythEvent*>(event);
 
         if (!me)
             return;
@@ -381,9 +377,8 @@ bool PlaylistEditorView::keyPressEvent(QKeyEvent *event)
     if (!m_moveTrackMode && GetFocusWidget() && GetFocusWidget()->keyPressEvent(event))
         return true;
 
-    bool handled = false;
     QStringList actions;
-    handled = GetMythMainWindow()->TranslateKeyPress("Music", event, actions);
+    bool handled = GetMythMainWindow()->TranslateKeyPress("Music", event, actions);
 
     for (int i = 0; i < actions.size() && !handled; i++)
     {
@@ -652,7 +647,7 @@ void PlaylistEditorView::ShowMenu(void)
         m_playlistOptions.playPLOption = PL_CURRENT;
         m_playlistOptions.insertPLOption = PL_REPLACE;
 
-        MythMenu *menu = NULL;
+        MythMenu *menu = nullptr;
         MusicGenericTree *mnode = dynamic_cast<MusicGenericTree*>(m_playlistTree->GetCurrentNode());
 
         if (mnode)
@@ -684,7 +679,7 @@ void PlaylistEditorView::ShowMenu(void)
 
         if (menu)
         {
-            menu->AddItem(tr("More Options"), NULL, createMainMenu());
+            menu->AddItem(tr("More Options"), nullptr, createMainMenu());
 
             MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
@@ -704,14 +699,14 @@ void PlaylistEditorView::ShowMenu(void)
 
 MythMenu* PlaylistEditorView::createPlaylistMenu(void)
 {
-    MythMenu *menu = NULL;
+    MythMenu *menu = nullptr;
 
     if (GetFocusWidget() == m_playlistTree)
     {
         MusicGenericTree *mnode = dynamic_cast<MusicGenericTree*>(m_playlistTree->GetCurrentNode());
 
         if (!mnode)
-            return NULL;
+            return nullptr;
 
         if (mnode->getAction() == "playlist")
         {
@@ -727,14 +722,14 @@ MythMenu* PlaylistEditorView::createPlaylistMenu(void)
 
 MythMenu* PlaylistEditorView::createSmartPlaylistMenu(void)
 {
-    MythMenu *menu = NULL;
+    MythMenu *menu = nullptr;
 
     if (GetFocusWidget() == m_playlistTree)
     {
         MusicGenericTree *mnode = dynamic_cast<MusicGenericTree*>(m_playlistTree->GetCurrentNode());
 
         if (!mnode)
-            return NULL;
+            return nullptr;
 
         if (mnode->getAction() == "smartplaylists" || mnode->getAction() == "smartplaylistcategory")
         {
@@ -763,7 +758,7 @@ MythMenu* PlaylistEditorView::createSmartPlaylistMenu(void)
 void PlaylistEditorView::createRootNode(void )
 {
     if (!m_rootNode)
-        m_rootNode = new MusicGenericTree(NULL, "Root Music Node");
+        m_rootNode = new MusicGenericTree(nullptr, "Root Music Node");
 
     MusicGenericTree *node = new MusicGenericTree(m_rootNode, tr("All Tracks"), "all tracks");
     node->setDrawArrow(true);

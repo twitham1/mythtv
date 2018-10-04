@@ -86,6 +86,16 @@ enum JobTypes {
     JOB_USERJOB4     = 0x0800
 };
 
+static QMap< QString, int > JobNameToType {
+    { "Transcode", JOB_TRANSCODE },
+    { "Commflag",  JOB_COMMFLAG },
+    { "Metadata",  JOB_METADATA },
+    { "UserJob1",  JOB_USERJOB1 },
+    { "UserJob2",  JOB_USERJOB2 },
+    { "UserJob3",  JOB_USERJOB3 },
+    { "UserJob4",  JOB_USERJOB4 }
+};
+
 typedef struct jobqueueentry {
     int id;
     uint chanid;
@@ -142,6 +152,7 @@ class MTV_PUBLIC JobQueue : public QObject, public QRunnable
                                  uint &chanid, QDateTime &recstartts);
     static bool GetJobInfoFromID(int jobID, int &jobType,
                                  uint &chanid, QString &recstartts);
+    static int GetJobTypeFromName(const QString &name);
 
     static bool ChangeJobCmds(int jobID, int newCmds);
     static bool ChangeJobCmds(int jobType, uint chanid,
@@ -169,6 +180,8 @@ class MTV_PUBLIC JobQueue : public QObject, public QRunnable
     static bool RestartJob(int jobID);
     static bool StopJob(int jobID);
     static bool DeleteJob(int jobID);
+    static bool SafeDeleteJob(int jobID, int jobType, int chanid,
+                              QDateTime recstartts);
 
     static enum JobCmds GetJobCmd(int jobID);
     static enum JobFlags GetJobFlags(int jobID);
@@ -199,6 +212,8 @@ class MTV_PUBLIC JobQueue : public QObject, public QRunnable
     static void RecoverOldJobsInQueue()
                                       { RecoverQueue(true); }
     static void CleanupOldJobsInQueue();
+
+    static bool InJobRunWindow(QDateTime jobstarttsRaw);
 
   private:
     typedef struct jobthreadstruct

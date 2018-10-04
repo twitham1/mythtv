@@ -88,7 +88,7 @@ QString ChannelScanSM::loc(const ChannelScanSM *siscan)
 class ScannedChannelInfo
 {
   public:
-    ScannedChannelInfo() : mgt(NULL) {}
+    ScannedChannelInfo() : mgt(nullptr) {}
 
     bool IsEmpty() const
     {
@@ -165,9 +165,9 @@ ChannelScanSM::ChannelScanSM(ScanMonitor *_scan_monitor,
       m_currentTestingDecryption(false),
       // Misc
       m_channelsFound(999),
-      m_currentInfo(NULL),
+      m_currentInfo(nullptr),
       m_analogSignalHandler(new AnalogSignalHandler(this)),
-      m_scannerThread(NULL)
+      m_scannerThread(nullptr)
 {
     m_inputName.detach();
 
@@ -222,7 +222,7 @@ ChannelScanSM::~ChannelScanSM(void)
     StopScanner();
     LOG(VB_CHANSCAN, LOG_INFO, LOC + "ChannelScanSM Stopped");
 
-    ScanStreamData *sd = NULL;
+    ScanStreamData *sd = nullptr;
     if (GetDTVSignalMonitor())
     {
         sd = GetDTVSignalMonitor()->GetScanStreamData();
@@ -232,7 +232,7 @@ ChannelScanSM::~ChannelScanSM(void)
     {
         m_signalMonitor->RemoveListener(m_analogSignalHandler);
         delete m_signalMonitor;
-        m_signalMonitor = NULL;
+        m_signalMonitor = nullptr;
     }
 
     delete sd;
@@ -240,7 +240,7 @@ ChannelScanSM::~ChannelScanSM(void)
     if (m_analogSignalHandler)
     {
         delete m_analogSignalHandler;
-        m_analogSignalHandler = NULL;
+        m_analogSignalHandler = nullptr;
     }
 
     teardown_frequency_tables();
@@ -262,8 +262,6 @@ void ChannelScanSM::HandleAllGood(void)
     QStringList list = cur_chan.split(" ", QString::SkipEmptyParts);
     QString freqid = (list.size() >= 2) ? list[1] : cur_chan;
 
-    bool ok = false;
-
     QString msg = QObject::tr("Updated Channel %1").arg(cur_chan);
 
     if (!ChannelUtil::FindChannel(m_sourceID, freqid))
@@ -273,7 +271,7 @@ void ChannelScanSM::HandleAllGood(void)
         QString callsign = QString("%1-%2")
             .arg(ChannelUtil::GetUnknownCallsign()).arg(chanid);
 
-        ok = ChannelUtil::CreateChannel(
+        bool ok = ChannelUtil::CreateChannel(
             0      /* mplexid */,
             m_sourceID,
             chanid,
@@ -625,11 +623,11 @@ bool ChannelScanSM::TestNextProgramEncryption(void)
             continue;
         }
 
-        const ProgramMapTable *pmt = NULL;
+        const ProgramMapTable *pmt = nullptr;
         for (uint i = 0; !pmt && (i < m_currentInfo->pmts.size()); i++)
         {
             pmt = (m_currentInfo->pmts[i]->ProgramNumber() == pnum) ?
-                m_currentInfo->pmts[i] : NULL;
+                m_currentInfo->pmts[i] : nullptr;
         }
 
         if (pmt)
@@ -978,12 +976,12 @@ bool ChannelScanSM::UpdateChannelInfo(bool wait_until_complete)
             }
 
             m_channelList << ChannelListItem(m_current, m_currentInfo);
-            m_currentInfo = NULL;
+            m_currentInfo = nullptr;
         }
         else
         {
             delete m_currentInfo;
-            m_currentInfo = NULL;
+            m_currentInfo = nullptr;
         }
 
         SignalMonitor *sm = GetSignalMonitor();
@@ -1071,8 +1069,7 @@ static void update_info(ChannelInsertInfo &info,
     info.atsc_major_channel = vct->MajorChannel(i);
     info.atsc_minor_channel = vct->MinorChannel(i);
 
-    info.use_on_air_guide = !vct->IsHidden(i) ||
-        (vct->IsHidden(i) && !vct->IsHiddenInGuide(i));
+    info.use_on_air_guide = !vct->IsHidden(i) || !vct->IsHiddenInGuide(i);
 
     info.hidden           = vct->IsHidden(i);
     info.hidden_in_guide  = vct->IsHiddenInGuide(i);
@@ -1437,7 +1434,7 @@ ChannelScanSM::GetChannelList(transport_scan_items_it_t trans_info,
     return pnum_to_dbchan;
 }
 
-ScanDTVTransportList ChannelScanSM::GetChannelList(void) const
+ScanDTVTransportList ChannelScanSM::GetChannelList(bool addFullTS) const
 {
     ScanDTVTransportList list;
 
@@ -1463,7 +1460,41 @@ ScanDTVTransportList ChannelScanSM::GetChannelList(void) const
         }
 
         if (item.channels.size())
+        {
+            if (addFullTS)
+            {
+                /* If addFullTS, then add a 'MPTS' channel
+                   which can be used to record the entire MPTS from
+                   the transport. */
+                dbchan_it = pnum_to_dbchan.begin();
+                ChannelInsertInfo info = *dbchan_it;
+
+                if (tuner_type == DTVTunerType::kTunerTypeASI)
+                    info.callsign = QString("MPTS_%1")
+                                    .arg(CardUtil::GetDisplayName(cardid));
+                else if (info.si_standard == "mpeg" ||
+                         info.si_standard == "scte" ||
+                         info.si_standard == "opencable")
+                    info.callsign = QString("MPTS_%1").arg(info.freqid);
+                else if (info.atsc_major_channel > 0)
+                    info.callsign =
+                        QString("MPTS_%1").arg(info.atsc_major_channel);
+                else if (info.service_id > 0)
+                    info.callsign = QString("MPTS_%1").arg(info.service_id);
+                else if (!info.chan_num.isEmpty())
+                    info.callsign = QString("MPTS_%1").arg(info.chan_num);
+                else
+                    info.callsign = "MPTS_UNKNOWN";
+
+                info.service_name = info.callsign;
+                info.service_id = 0;
+                info.atsc_minor_channel = 0;
+                info.format = "MPTS";
+                item.channels.push_back(info);
+            }
+
             list.push_back(item);
+        }
     }
 
     return list;
@@ -1480,7 +1511,7 @@ DVBSignalMonitor* ChannelScanSM::GetDVBSignalMonitor(void)
 #ifdef USING_DVB
     return dynamic_cast<DVBSignalMonitor*>(m_signalMonitor);
 #else
-    return NULL;
+    return nullptr;
 #endif
 }
 
@@ -1499,7 +1530,7 @@ HDHRChannel *ChannelScanSM::GetHDHRChannel(void)
 #ifdef USING_HDHOMERUN
     return dynamic_cast<HDHRChannel*>(m_channel);
 #else
-    return NULL;
+    return nullptr;
 #endif
 }
 
@@ -1508,7 +1539,7 @@ DVBChannel *ChannelScanSM::GetDVBChannel(void)
 #ifdef USING_DVB
     return dynamic_cast<DVBChannel*>(m_channel);
 #else
-    return NULL;
+    return nullptr;
 #endif
 }
 
@@ -1517,7 +1548,7 @@ const DVBChannel *ChannelScanSM::GetDVBChannel(void) const
 #ifdef USING_DVB
     return dynamic_cast<const DVBChannel*>(m_channel);
 #else
-    return NULL;
+    return nullptr;
 #endif
 }
 
@@ -1526,7 +1557,7 @@ V4LChannel *ChannelScanSM::GetV4LChannel(void)
 #ifdef USING_V4L2
     return dynamic_cast<V4LChannel*>(m_channel);
 #else
-    return NULL;
+    return nullptr;
 #endif
 }
 
@@ -1541,7 +1572,7 @@ void ChannelScanSM::StartScanner(void)
         if (m_scannerThread->wait(1000))
         {
             delete m_scannerThread;
-            m_scannerThread = NULL;
+            m_scannerThread = nullptr;
         }
     }
     m_threadExit = false;
@@ -1604,7 +1635,7 @@ bool ChannelScanSM::HasTimedOut(void)
     if (m_timer.elapsed() > (int)m_channelTimeout)
     {
         // the channelTimeout alone is only valid if we have seen no tables..
-        const ScanStreamData *sd = NULL;
+        const ScanStreamData *sd = nullptr;
         if (GetDTVSignalMonitor())
             sd = GetDTVSignalMonitor()->GetScanStreamData();
 
@@ -1626,7 +1657,7 @@ bool ChannelScanSM::HasTimedOut(void)
     if ((m_timer.elapsed() > (int)(*m_current).timeoutTune) &&
         sm && !sm->HasSignalLock())
     {
-        const ScanStreamData *sd = NULL;
+        const ScanStreamData *sd = nullptr;
         if (GetDTVSignalMonitor())
             sd = GetDTVSignalMonitor()->GetScanStreamData();
 
@@ -1828,7 +1859,7 @@ void ChannelScanSM::StopScanner(void)
         if (m_scannerThread->wait(1000))
         {
             delete m_scannerThread;
-            m_scannerThread = NULL;
+            m_scannerThread = nullptr;
         }
     }
 
@@ -2004,8 +2035,6 @@ bool ChannelScanSM::ScanIPTVChannels(uint sourceid,
 bool ChannelScanSM::ScanTransportsStartingOn(
     int sourceid, const QMap<QString,QString> &startChan)
 {
-    QMap<QString,QString>::const_iterator it;
-
     if (startChan.find("std")        == startChan.end() ||
         startChan.find("type")       == startChan.end())
     {

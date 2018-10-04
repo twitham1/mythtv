@@ -11,15 +11,17 @@ using namespace std;
 #include "iso639.h"
 #include "DVD/dvdringbuffer.h"
 #include "Bluray/bdringbuffer.h"
+#include "mythcodeccontext.h"
 
 #define LOC QString("Dec: ")
 
 DecoderBase::DecoderBase(MythPlayer *parent, const ProgramInfo &pginfo)
     : m_parent(parent), m_playbackinfo(new ProgramInfo(pginfo)),
-      m_audio(m_parent->GetAudio()), ringBuffer(NULL),
+      m_audio(m_parent->GetAudio()), ringBuffer(nullptr),
 
       current_width(640), current_height(480),
       current_aspect(1.33333), fps(29.97),
+      fpsMultiplier(1), fpsSkip(0),
       bitrate(4000),
 
       framesPlayed(0), framesRead(0),
@@ -44,7 +46,9 @@ DecoderBase::DecoderBase(MythPlayer *parent, const ProgramInfo &pginfo)
       video_inverted(false),
       decodeAllSubtitles(false),
       // language preference
-      languagePreference(iso639_get_language_key_list())
+      languagePreference(iso639_get_language_key_list()),
+      // this will be deleted and recreated once decoder is set up
+      m_mythcodecctx(new MythCodecContext())
 {
     ResetTracks();
     tracks[kTrackTypeAudio].push_back(StreamInfo(0, 0, 0, 0, 0));
@@ -80,6 +84,7 @@ void DecoderBase::Reset(bool reset_video_data, bool seek_reset, bool reset_file)
     {
         ResetPosMap();
         framesPlayed = 0;
+        fpsSkip = 0;
         framesRead = 0;
         totalDuration = AVRationalInit(0);
         dontSyncPositionMap = false;
@@ -581,6 +586,7 @@ bool DecoderBase::DoRewind(long long desiredFrame, bool discardFrames)
         return false;
 
     framesPlayed = lastKey;
+    fpsSkip = 0;
     framesRead = lastKey;
 
     // Do any Extra frame-by-frame seeking for exactseeks mode
@@ -880,6 +886,7 @@ void DecoderBase::DoFastForwardSeek(long long desiredFrame, bool &needflush)
         ringBuffer->Seek(e.pos, SEEK_SET);
         needflush    = true;
         framesPlayed = lastKey;
+        fpsSkip = 0;
         framesRead = lastKey;
     }
 }

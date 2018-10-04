@@ -47,7 +47,7 @@ QMutex MythSocket::s_loopbackCacheLock;
 QHash<QString, QHostAddress::SpecialAddress> MythSocket::s_loopbackCache;
 
 QMutex MythSocket::s_thread_lock;
-MThread *MythSocket::s_thread = NULL;
+MThread *MythSocket::s_thread = nullptr;
 int MythSocket::s_thread_cnt = 0;
 
 Q_DECLARE_METATYPE ( const QStringList * );
@@ -83,7 +83,7 @@ MythSocket::MythSocket(
     qt_socket_fd_t socket, MythSocketCBs *cb, bool use_shared_thread) :
     ReferenceCounter(QString("MythSocket(%1)").arg(socket)),
     m_tcpSocket(new QTcpSocket()),
-    m_thread(NULL),
+    m_thread(nullptr),
     m_socketDescriptor(-1),
     m_peerPort(-1),
     m_callback(cb),
@@ -183,13 +183,13 @@ MythSocket::~MythSocket()
             s_thread->quit();
             s_thread->wait();
             delete s_thread;
-            s_thread = NULL;
+            s_thread = nullptr;
         }
     }
-    m_thread = NULL;
+    m_thread = nullptr;
 
     delete m_tcpSocket;
-    m_tcpSocket = NULL;
+    m_tcpSocket = nullptr;
 }
 
 void MythSocket::ConnectHandler(void)
@@ -785,7 +785,7 @@ void MythSocket::WriteStringListReal(const QStringList *list, bool *ret)
                 written_since_timer_restart = 0;
             }
         }
-        else if (temp <= 0)
+        else
         {
             errorcount++;
             if (timer.elapsed() > 1000)
@@ -1003,8 +1003,11 @@ void MythSocket::ResetReal(void)
     do
     {
         uint avail = m_tcpSocket->bytesAvailable();
-        trash.resize(max((uint)trash.size(),avail));
-        m_tcpSocket->read(&trash[0], avail);
+        if (avail)
+        {
+            trash.resize(max((uint)trash.size(),avail));
+            m_tcpSocket->read(trash.data(), avail);
+        }
 
         LOG(VB_NETWORK, LOG_INFO, LOC + "Reset() " +
             QString("%1 bytes available").arg(avail));

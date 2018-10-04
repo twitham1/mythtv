@@ -1,7 +1,5 @@
+MAIN_MAKEFILE=1
 include ffbuild/config.mak
-
-SRC_PATH = ${SRC_PATH_BARE}/external/FFmpeg
-SRC_DIR = $(SRC_PATH)
 
 vpath %.c    $(SRC_PATH)
 vpath %.cpp  $(SRC_PATH)
@@ -47,12 +45,11 @@ FF_DEP_LIBS  := $(DEP_LIBS)
 FF_STATIC_DEP_LIBS := $(STATIC_DEP_LIBS)
 
 $(TOOLS): %$(EXESUF): %.o
-	$(LD) $(LDFLAGS) $(LDEXEFLAGS) $(LD_O) $^ $(ELIBS)
+	$(LD) $(LDFLAGS) $(LDEXEFLAGS) $(LD_O) $^ $(EXTRALIBS-$(*F)) $(EXTRALIBS) $(ELIBS)
 
 target_dec_%_fuzzer$(EXESUF): target_dec_%_fuzzer.o $(FF_DEP_LIBS)
 	$(LD) $(LDFLAGS) $(LDEXEFLAGS) $(LD_O) $^ $(ELIBS) $(FF_EXTRALIBS) $(LIBFUZZER_PATH)
 
-tools/cws2fws$(EXESUF): ELIBS = $(ZLIB)
 tools/sofa2wavs$(EXESUF): ELIBS = $(FF_EXTRALIBS)
 tools/uncoded_frame$(EXESUF): $(FF_DEP_LIBS)
 tools/uncoded_frame$(EXESUF): ELIBS = $(FF_EXTRALIBS)
@@ -84,11 +81,10 @@ endef
 define DOSUBDIR
 $(foreach V,$(SUBDIR_VARS),$(eval $(call RESET,$(V))))
 SUBDIR := $(1)/
-include $(SRC_PATH_BARE)/external/FFmpeg/$(1)/Makefile
--include $(SRC_PATH_BARE)/external/FFmpeg/$(1)/$(ARCH)/Makefile
--include $(SRC_PATH_BARE)/external/FFmpeg/$(1)/$(INTRINSICS)/Makefile
-include $(SRC_PATH_BARE)/external/FFmpeg/ffbuild/library.mak
-
+include $(SRC_PATH)/$(1)/Makefile
+-include $(SRC_PATH)/$(1)/$(ARCH)/Makefile
+-include $(SRC_PATH)/$(1)/$(INTRINSICS)/Makefile
+include $(SRC_PATH)/ffbuild/library.mak
 endef
 
 $(foreach D,$(FFLIBS),$(eval $(call DOSUBDIR,lib$(D))))
@@ -110,8 +106,8 @@ endif
 %$(PROGSSUF)_g$(EXESUF): $(FF_DEP_LIBS)
 	$(LD) $(LDFLAGS) $(LDEXEFLAGS) $(LD_O) $(OBJS-$*) $(FF_EXTRALIBS)
 
-VERSION_SH  = $(SRC_PATH_BARE)/external/FFmpeg/ffbuild/version.sh
-GIT_LOG     = $(SRC_PATH_BARE)/.git/logs/HEAD
+VERSION_SH  = $(SRC_PATH)/ffbuild/version.sh
+GIT_LOG     = $(SRC_PATH)/.git/logs/HEAD
 
 .version: $(wildcard $(GIT_LOG)) $(VERSION_SH) ffbuild/config.mak
 .version: M=@
@@ -131,25 +127,24 @@ install-data: $(DATA_FILES)
 	$(Q)mkdir -p "$(DATADIR)"
 	$(INSTALL) -m 644 $(DATA_FILES) "$(DATADIR)"
 
-uninstall: uninstall-libs uninstall-headers uninstall-data
+uninstall: uninstall-data uninstall-headers uninstall-libs uninstall-pkgconfig
 
 uninstall-data:
 	$(RM) -r "$(DATADIR)"
 
 clean::
 	$(RM) $(CLEANSUFFIXES)
-	$(RM) $(CLEANSUFFIXES:%=compat/msvcrt/%)
-	$(RM) $(CLEANSUFFIXES:%=compat/atomics/pthread/%)
-	$(RM) $(CLEANSUFFIXES:%=compat/%)
+	$(RM) $(addprefix compat/,$(CLEANSUFFIXES)) $(addprefix compat/*/,$(CLEANSUFFIXES))
 	$(RM) -r coverage-html
 	$(RM) -rf coverage.info coverage.info.in lcov
 
-distclean::
-	$(RM) $(DISTCLEANSUFFIXES)
+distclean:: clean
 	$(RM) .version avversion.h config.asm config.h mapfile  \
 		ffbuild/.config ffbuild/config.* libavutil/avconfig.h \
 		version.h libavutil/ffversion.h libavcodec/codec_names.h \
-		libavcodec/bsf_list.c libavformat/protocol_list.c
+		libavcodec/bsf_list.c libavformat/protocol_list.c \
+		libavcodec/codec_list.c libavcodec/parser_list.c \
+		libavformat/muxer_list.c libavformat/demuxer_list.c
 ifeq ($(SRC_LINK),src)
 	$(RM) src
 endif
@@ -158,9 +153,10 @@ endif
 config:
 	$(SRC_PATH)/configure $(value FFMPEG_CONFIGURATION)
 
-#check: all alltools examples testprogs fate
+build: all alltools examples testprogs
+check: all alltools examples testprogs fate
 
-#include $(SRC_PATH)/tests/Makefile
+include $(SRC_PATH)/tests/Makefile
 
 $(sort $(OBJDIRS)):
 	$(Q)mkdir -p $@
@@ -173,4 +169,5 @@ $(sort $(OBJDIRS)):
 # so this saves some time on slow systems.
 .SUFFIXES:
 
-.PHONY: all all-yes alltools check *clean config install* testprogs uninstall*
+.PHONY: all all-yes alltools build check config testprogs
+.PHONY: *clean install* uninstall*

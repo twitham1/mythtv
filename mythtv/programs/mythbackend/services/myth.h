@@ -37,7 +37,7 @@ class Myth : public MythServices
 
     public:
 
-        Q_INVOKABLE explicit Myth( QObject *parent = 0 ) : MythServices( parent ) {}
+        Q_INVOKABLE explicit Myth( QObject *parent = nullptr ) : MythServices( parent ) {}
 
     public:
 
@@ -140,6 +140,15 @@ class Myth : public MythServices
         QString             ProfileText         ( void );
 
         DTC::BackendInfo*   GetBackendInfo      ( void );
+
+        bool                ManageDigestUser    ( const QString &Action,
+                                                  const QString &UserName,
+                                                  const QString &Password,
+                                                  const QString &NewPassword,
+                                                  const QString &AdminPassword );
+
+        bool                ManageUrlProtection  ( const QString &Services,
+                                                   const QString &AdminPassword );
 };
 
 // --------------------------------------------------------------------------
@@ -168,7 +177,7 @@ class ScriptableMyth : public QObject
 
     public:
 
-        Q_INVOKABLE ScriptableMyth( QScriptEngine *pEngine, QObject *parent = 0 ) : QObject( parent )
+        Q_INVOKABLE ScriptableMyth( QScriptEngine *pEngine, QObject *parent = nullptr ) : QObject( parent )
         {
             m_pEngine = pEngine;
         }
@@ -177,7 +186,7 @@ class ScriptableMyth : public QObject
 
         QObject* GetConnectionInfo  ( const QString   &Pin )
         {
-            SCRIPT_CATCH_EXCEPTION( NULL,
+            SCRIPT_CATCH_EXCEPTION( nullptr,
                 return m_obj.GetConnectionInfo( Pin );
             )
         }
@@ -206,7 +215,7 @@ class ScriptableMyth : public QObject
         QObject* GetStorageGroupDirs ( const QString   &GroupName,
                                        const QString   &HostName )
         {
-            SCRIPT_CATCH_EXCEPTION( NULL,
+            SCRIPT_CATCH_EXCEPTION( nullptr,
                 return m_obj.GetStorageGroupDirs( GroupName, HostName );
             )
         }
@@ -231,7 +240,7 @@ class ScriptableMyth : public QObject
 
         QObject* GetTimeZone()
         {
-            SCRIPT_CATCH_EXCEPTION( NULL,
+            SCRIPT_CATCH_EXCEPTION( nullptr,
                 return m_obj.GetTimeZone( );
             )
         }
@@ -279,7 +288,7 @@ class ScriptableMyth : public QObject
                           const QString   &Level,
                           const QString   &MsgContains )
         {
-            SCRIPT_CATCH_EXCEPTION( NULL,
+            SCRIPT_CATCH_EXCEPTION( nullptr,
                 return m_obj.GetLogs( HostName, Application, PID, TID, Thread,
                                   Filename, Line, Function, FromTime, ToTime,
                                   Level, MsgContains );
@@ -288,7 +297,7 @@ class ScriptableMyth : public QObject
 
         QObject* GetFrontends( bool OnLine )
         {
-            SCRIPT_CATCH_EXCEPTION( NULL,
+            SCRIPT_CATCH_EXCEPTION( nullptr,
                 return m_obj.GetFrontends( OnLine );
             )
         }
@@ -304,7 +313,7 @@ class ScriptableMyth : public QObject
 
         QObject* GetSettingList ( const QString   &HostName )
         {
-            SCRIPT_CATCH_EXCEPTION( NULL,
+            SCRIPT_CATCH_EXCEPTION( nullptr,
                 return m_obj.GetSettingList( HostName );
             )
         }
@@ -391,8 +400,29 @@ class ScriptableMyth : public QObject
 
         QObject* GetBackendInfo( void )
         {
-            SCRIPT_CATCH_EXCEPTION( NULL,
+            SCRIPT_CATCH_EXCEPTION( nullptr,
                 return m_obj.GetBackendInfo();
+            )
+        }
+        bool ManageDigestUser( const QString &Action,
+                               const QString &UserName,
+                               const QString &Password,
+                               const QString &NewPassword,
+                               const QString &AdminPassword )
+        {
+            SCRIPT_CATCH_EXCEPTION( false,
+                return m_obj.ManageDigestUser( Action,
+                                               UserName,
+                                               Password,
+                                               NewPassword,
+                                               AdminPassword );
+            )
+        }
+        bool ManageUrlProtection( const QString &Services,
+                                  const QString &AdminPassword )
+        {
+            SCRIPT_CATCH_EXCEPTION( false,
+                return m_obj.ManageUrlProtection( Services, AdminPassword );
             )
         }
 };

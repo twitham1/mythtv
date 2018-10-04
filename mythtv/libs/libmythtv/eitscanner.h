@@ -19,7 +19,7 @@ class ProgramMapTable;
 class EITSource
 {
   protected:
-    virtual ~EITSource() {}
+    virtual ~EITSource() = default;
   public:
     virtual void SetEITHelper(EITHelper*) = 0;
     virtual void SetEITRate(float rate) = 0;
@@ -65,6 +65,7 @@ class EITScanner : public QRunnable
     uint             activeScanTrigTime;
     QStringList      activeScanChannels;
     QStringList::iterator activeScanNextChan;
+    uint             activeScanNextChanIndex;
 
     uint             cardnum;
 

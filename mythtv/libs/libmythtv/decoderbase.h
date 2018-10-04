@@ -18,6 +18,7 @@ class RingBuffer;
 class TeletextViewer;
 class MythPlayer;
 class AudioPlayer;
+class MythCodecContext;
 
 const int kDecoderProbeBufferSize = 256 * 1024;
 
@@ -212,7 +213,7 @@ class DecoderBase
     virtual QString GetCodecDecoderName(void) const = 0;
     virtual QString GetRawEncodingType(void) { return QString(); }
     virtual MythCodecID GetVideoCodecID(void) const = 0;
-    virtual void *GetVideoCodecPrivate(void) { return NULL; }
+    virtual void *GetVideoCodecPrivate(void) { return nullptr; }
 
     virtual void ResetPosMap(void);
     virtual bool SyncPositionMap(void);
@@ -269,6 +270,8 @@ class DecoderBase
     void SaveTotalFrames(void);
     bool GetVideoInverted(void) const { return video_inverted; }
     void TrackTotalDuration(bool track) { trackTotalDuration = track; }
+    int GetfpsMultiplier(void) { return fpsMultiplier; }
+    MythCodecContext *GetMythCodecContext(void) { return m_mythcodecctx; }
 
   protected:
     virtual int  AutoSelectTrack(uint type);
@@ -301,6 +304,8 @@ class DecoderBase
     int current_height;
     float current_aspect;
     double fps;
+    int fpsMultiplier;
+    int fpsSkip;
     uint bitrate;
 
     long long framesPlayed;
@@ -356,6 +361,7 @@ class DecoderBase
     StreamInfo  selectedTrack[(uint)kTrackTypeCount];
     /// language preferences for auto-selection of streams
     vector<int> languagePreference;
+    MythCodecContext *m_mythcodecctx;
 };
 
 inline int DecoderBase::IncrementTrack(uint type)

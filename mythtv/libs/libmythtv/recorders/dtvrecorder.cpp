@@ -29,10 +29,6 @@
 #include "tv_rec.h"
 #include "mythsystemevent.h"
 
-extern "C" {
-#include "libavcodec/mpegvideo.h"
-}
-
 #define LOC ((tvrec) ? \
     QString("DTVRec[%1]: ").arg(tvrec->GetInputId()) : \
     QString("DTVRec(0x%1): ").arg(intptr_t(this),0,16))
@@ -69,17 +65,18 @@ DTVRecorder::DTVRecorder(TVRec *rec) :
     _has_written_other_keyframe(false),
     // state
     _error(),
-    _stream_data(NULL),
+    _stream_data(nullptr),
     // TS packet buffer
     // keyframe TS buffer
     _buffer_packets(false),
     // general recorder stuff
     _pid_lock(QMutex::Recursive),
-    _input_pat(NULL),
-    _input_pmt(NULL),
+    _input_pat(nullptr),
+    _input_pmt(nullptr),
     _has_no_av(false),
     // record 'raw' mpts?
-    _record_mpts(false),
+    _record_mpts(0),
+    _record_mpts_only(false),
     // statistics
     _use_pts(false),
     _packet_count(0),
@@ -110,18 +107,18 @@ DTVRecorder::~DTVRecorder(void)
 {
     StopRecording();
 
-    SetStreamData(NULL);
+    SetStreamData(nullptr);
 
     if (_input_pat)
     {
         delete _input_pat;
-        _input_pat = NULL;
+        _input_pat = nullptr;
     }
 
     if (_input_pmt)
     {
         delete _input_pmt;
-        _input_pmt = NULL;
+        _input_pmt = nullptr;
     }
 }
 
@@ -144,7 +141,7 @@ void DTVRecorder::SetOption(const QString &name, int value)
     if (name == "wait_for_seqstart")
         _wait_for_keyframe_option = (value == 1);
     else if (name == "recordmpts")
-        _record_mpts = (value == 1);
+        _record_mpts = value;
     else
         RecorderBase::SetOption(name, value);
 }
@@ -458,13 +455,12 @@ bool DTVRecorder::FindMPEG2Keyframes(const TSPacket* tspacket)
     //   (there are others that we don't care about)
     const uint8_t *bufptr = tspacket->data() + tspacket->AFCOffset();
     const uint8_t *bufend = tspacket->data() + TSPacket::kSize;
-    int ext_type, bytes_left;
     _repeat_pict = 0;
 
     while (bufptr < bufend)
     {
         bufptr = avpriv_find_start_code(bufptr, bufend, &_start_code);
-        bytes_left = bufend - bufptr;
+        int bytes_left = bufend - bufptr;
         if ((_start_code & 0xffffff00) == 0x00000100)
         {
             // At this point we have seen the start code 0 0 1
@@ -495,7 +491,7 @@ bool DTVRecorder::FindMPEG2Keyframes(const TSPacket* tspacket)
             {
                 if (bytes_left >= 1)
                 {
-                    ext_type = (bufptr[0] >> 4);
+                    int ext_type = (bufptr[0] >> 4);
                     switch(ext_type)
                     {
                     case 0x1: /* sequence extension */
@@ -1118,10 +1114,9 @@ void DTVRecorder::FindPSKeyFrames(const uint8_t *buffer, uint len)
             if (PESStreamID::PictureStartCode == stream_id)
             { // pes_packet_length is meaningless
                 pes_packet_length = -1;
-                uint frmtypei = 1;
                 if (bufend-bufptr >= 4)
                 {
-                    frmtypei = (bufptr[1]>>3) & 0x7;
+                    uint frmtypei = (bufptr[1]>>3) & 0x7;
                     if ((1 <= frmtypei) && (frmtypei <= 5))
                         hasFrame = true;
                 }
@@ -1306,7 +1301,7 @@ void DTVRecorder::HandlePMT(uint progNum, const ProgramMapTable *_pmt)
     QMutexLocker change_lock(&_pid_lock);
 
     LOG(VB_RECORD, LOG_INFO, LOC + QString("SetPMT(%1, %2)").arg(progNum)
-        .arg(_pmt == 0 ? "NULL" : "valid"));
+        .arg(_pmt == nullptr ? "NULL" : "valid"));
 
 
     if ((int)progNum == _stream_data->DesiredProgram())
@@ -1489,6 +1484,26 @@ bool DTVRecorder::ProcessTSPacket(const TSPacket &tspacket)
     {
         FindOtherKeyframes(&tspacket);
         _buffer_packets = false;
+    }
+    else if (_record_mpts_only)
+    {
+        /* When recording the full, unfiltered, MPTS, trigger a write
+         * every 0.5 seconds.  Since the packets are unfiltered and
+         * unprocessed we cannot wait for a keyframe to trigger the
+         * writes. */
+
+        static MythTimer timer;
+
+        if (_frames_seen_count++ == 0)
+            timer.start();
+
+        if (timer.elapsed() > 500) // 0.5 seconds
+        {
+            UpdateFramesWritten();
+            _last_keyframe_seen = _frames_seen_count;
+            HandleKeyframe(_payload_buffer.size());
+            timer.addMSecs(-500);
+        }
     }
     else if (_stream_id[pid] == 0)
     {

@@ -31,8 +31,6 @@ class QTimer;
 class MythUIButtonList;
 class MythUIGuideGrid;
 
-#define MAX_DISPLAY_TIMES 36
-
 typedef vector<ChannelInfo>   db_chan_list_t;
 typedef vector<db_chan_list_t> db_chan_list_list_t;
 typedef ProgramInfo *ProgInfoGuideArray[MAX_DISPLAY_CHANS][MAX_DISPLAY_TIMES];
@@ -41,7 +39,7 @@ class JumpToChannel;
 class JumpToChannelListener
 {
   public:
-    virtual ~JumpToChannelListener() {}
+    virtual ~JumpToChannelListener() = default;
     virtual void GoTo(int start, int cur_row) = 0;
     virtual void SetJumpToChannel(JumpToChannel *ptr) = 0;
     virtual int  FindChannel(uint chanid, const QString &channum,
@@ -65,7 +63,7 @@ class JumpToChannel : public QObject
     virtual void deleteLater(void);
 
   private:
-    ~JumpToChannel() {}
+    ~JumpToChannel() = default;
     bool Update(void);
 
   private:
@@ -111,7 +109,7 @@ class GuideGrid : public ScheduleCommon, public JumpToChannelListener
     static void RunProgramGuide(uint           startChanId,
                                 const QString &startChanNum,
                                 const QDateTime &startTime,
-                                TV            *player = NULL,
+                                TV            *player = nullptr,
                                 bool           embedVideo = false,
                                 bool           allowFinder = true,
                                 int            changrpid = -1);
@@ -162,7 +160,7 @@ class GuideGrid : public ScheduleCommon, public JumpToChannelListener
     GuideGrid(MythScreenStack *parentStack,
               uint chanid, const QString &channum,
               const QDateTime &startTime,
-              TV *player = NULL,
+              TV *player = nullptr,
               bool embedVideo = false,
               bool allowFinder = true,
               int changrpid = -1);

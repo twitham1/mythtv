@@ -60,7 +60,7 @@ using namespace std;
 
 #define LOC      QString("MythContext: ")
 
-MythContext *gContext = NULL;
+MythContext *gContext = nullptr;
 
 static const QString _Location = "MythContext";
 
@@ -240,16 +240,16 @@ static void eject_cb(void)
 MythContextPrivate::MythContextPrivate(MythContext *lparent)
     : parent(lparent),
       m_gui(false),
-      m_pConfig(NULL),
+      m_pConfig(nullptr),
       disableeventpopup(false),
-      m_ui(NULL),
+      m_ui(nullptr),
       m_sh(new MythContextSlotHandler(this)),
-      m_guiStartup(0),
+      m_guiStartup(nullptr),
       needsBackend(false),
       m_settingsCacheDirty(false),
-      MBEversionPopup(NULL),
+      MBEversionPopup(nullptr),
       m_registration(-1),
-      m_socket(0)
+      m_socket(nullptr)
 {
     m_loop = new QEventLoop(this);
     InitializeMythDirs();
@@ -292,8 +292,6 @@ void MythContextPrivate::TempMainWindow(bool languagePrompt)
 
     SilenceDBerrors();
 
-    loadSettingsCacheOverride();
-
 #ifdef Q_OS_MAC
     // Qt 4.4 has window-focus problems
     gCoreContext->OverrideSettingForSession("RunFrontendInWindow", "1");
@@ -321,7 +319,7 @@ void MythContextPrivate::EndTempWindow(void)
             MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
             if (mainStack) {
                 mainStack->PopScreen(m_guiStartup, false);
-                m_guiStartup = 0;
+                m_guiStartup = nullptr;
             }
         }
     }
@@ -353,6 +351,7 @@ bool MythContextPrivate::Init(const bool gui,
 {
     gCoreContext->GetDB()->IgnoreDatabase(ignoreDB);
     m_gui = gui;
+    loadSettingsCacheOverride();
 
     if (gCoreContext->IsFrontend())
         needsBackend = true;
@@ -390,7 +389,7 @@ bool MythContextPrivate::Init(const bool gui,
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
         if (mainStack)
             mainStack->PopScreen(m_guiStartup, false);
-        m_guiStartup=0;
+        m_guiStartup=nullptr;
     }
     EndTempWindow();
 
@@ -639,15 +638,16 @@ bool MythContextPrivate::LoadDatabaseSettings(void)
 #else
         hostname = localhostname;
 #endif
-        LOG(VB_GENERAL, LOG_NOTICE, "Empty LocalHostName.");
+        LOG(VB_GENERAL, LOG_INFO, "Empty LocalHostName. This is typical.");
     }
     else
     {
         m_DBparams.localEnabled = true;
     }
 
-    LOG(VB_GENERAL, LOG_INFO, QString("Using localhost value of %1")
-            .arg(hostname));
+    LOG(VB_GENERAL, LOG_INFO, QString("Using a profile name of: '%1' (Usually the "
+                                      "same as this host's name.)")
+                                      .arg(hostname));
     gCoreContext->SetLocalHostname(hostname);
 
     return ok;
@@ -805,7 +805,7 @@ bool MythContextPrivate::PromptForDatabaseParams(const QString &error)
                                               params.wolReconnect);
             params.wolRetry     = intResponse("Number of times to retry:",
                                               params.wolRetry);
-            params.wolCommand   = getResponse("Command to use to wake server:",
+            params.wolCommand   = getResponse("Command to use to wake server or server MAC address:",
                                               params.wolCommand);
         }
 
@@ -847,8 +847,13 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
         {"start","dbAwake","dbStarted","dbConnects","beWOL","beAwake",
             "success" };
 
+    int msStartupScreenDelay = gCoreContext->GetNumSetting("StartupScreenDelay",2);
+    if (msStartupScreenDelay > 0)
+        msStartupScreenDelay *= 1000;
     do
     {
+        QElapsedTimer timer;
+        timer.start();
         if (m_DBparams.dbHostName.isNull() && m_DBhostCp.length())
             host = m_DBhostCp;
         else
@@ -891,8 +896,8 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
             // After that show the GUI (if this is a GUI program)
 
             LOG(VB_GENERAL, LOG_INFO,
-                 QString("Start up testing connections. DB %1, BE %2, attempt %3, status %4")
-                      .arg(host).arg(backendIP).arg(attempt).arg(guiStatuses[startupState]));
+                 QString("Start up testing connections. DB %1, BE %2, attempt %3, status %4, Delay: %5")
+                      .arg(host).arg(backendIP).arg(attempt).arg(guiStatuses[startupState]).arg(msStartupScreenDelay) );
 
             int useTimeout = wakeupTime;
             if (attempt == 0)
@@ -900,7 +905,7 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
 
             if (m_gui && !m_guiStartup)
             {
-                if (attempt > 0)
+                if (msStartupScreenDelay==0 || timer.hasExpired(msStartupScreenDelay))
                 {
                     ShowGuiStartup();
                     if (m_guiStartup)
@@ -919,7 +924,7 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
                 if (m_DBparams.wolEnabled)
                 {
                     if (attempt > 0)
-                        myth_system(m_DBparams.wolCommand);
+                        MythWakeup(m_DBparams.wolCommand);
                     if (!checkPort(host, port, useTimeout))
                         break;
                 }
@@ -983,7 +988,7 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
             case st_beWOL:
                 if (!beWOLCmd.isEmpty()) {
                     if (attempt > 0)
-                        myth_system(beWOLCmd);
+                        MythWakeup(beWOLCmd);
                     if (!checkPort(backendIP, backendPort, useTimeout))
                         break;
                 }
@@ -1016,6 +1021,13 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
         LOG(VB_GENERAL, LOG_INFO,
              QString("Start up failure. host %1, status %2")
                   .arg(host).arg(stateMsg));
+
+        if (m_gui && !m_guiStartup)
+        {
+            ShowGuiStartup();
+            if (m_guiStartup)
+                m_guiStartup->setTotal(progressTotal);
+        }
 
         if (m_guiStartup
           && !m_guiStartup->m_Exit
@@ -1074,7 +1086,7 @@ void MythContextPrivate::ShowGuiStartup(void)
             m_guiStartup = new GUIStartup(mainStack,m_loop);
             if (!m_guiStartup->Create()) {
                 delete m_guiStartup;
-                m_guiStartup = 0;
+                m_guiStartup = nullptr;
             }
             if (m_guiStartup) {
                 mainStack->AddScreen(m_guiStartup, false);
@@ -1221,7 +1233,7 @@ int MythContextPrivate::UPnPautoconf(const int milliSeconds)
     // Get this backend's location:
     DeviceLocation *BE = backends->GetFirst();
     backends->DecrRef();
-    backends = NULL;
+    backends = nullptr;
 
     // We don't actually know the backend's access PIN, so this will
     // only work for ones that have PIN access disabled (i.e. 0000)
@@ -1263,7 +1275,7 @@ bool MythContextPrivate::DefaultUPnP(QString &error)
     // We need to give the server time to respond...
     // ----------------------------------------------------------------------
 
-    DeviceLocation *pDevLoc = NULL;
+    DeviceLocation *pDevLoc = nullptr;
     MythTimer totalTime; totalTime.start();
     MythTimer searchTime; searchTime.start();
     while (totalTime.elapsed() < timeout_ms)
@@ -1363,7 +1375,7 @@ bool MythContextPrivate::event(QEvent *e)
             m_registration = GetNotificationCenter()->Register(this);
         }
 
-        MythEvent *me = (MythEvent*)e;
+        MythEvent *me = static_cast<MythEvent*>(e);
         if (me->Message() == "VERSION_MISMATCH" && (1 == me->ExtraDataCount()))
             ShowVersionMismatchPopup(me->ExtraData(0).toUInt());
         else if (me->Message() == "CONNECTION_FAILURE")
@@ -1471,7 +1483,8 @@ void MythContextPrivate::processEvents(void)
 const QString MythContextPrivate::settingsToSave[] =
 { "Theme", "Language", "Country", "GuiHeight",
   "GuiOffsetX", "GuiOffsetY", "GuiWidth", "RunFrontendInWindow",
-  "AlwaysOnTop", "HideMouseCursor", "ThemePainter", "libCECEnabled" };
+  "AlwaysOnTop", "HideMouseCursor", "ThemePainter", "libCECEnabled",
+  "StartupScreenDelay" };
 
 
 bool MythContextPrivate::saveSettingsCache(void)
@@ -1513,7 +1526,7 @@ void MythContextPrivate::loadSettingsCacheOverride(void)
             gCoreContext->OverrideSettingForSession(settingsToSave[ix], value);
     }
     // Prevent power off TV after temporary window
-    gCoreContext->OverrideSettingForSession("PowerOffTVAllowed", 0);
+    gCoreContext->OverrideSettingForSession("PowerOffTVAllowed", nullptr);
 
     QString language = gCoreContext->GetSetting("Language",QString());
     MythTranslation::load("mythfrontend");
@@ -1537,12 +1550,12 @@ void MythContextPrivate::clearSettingsCacheOverride(void)
 
 void MythContextSlotHandler::VersionMismatchPopupClosed(void)
 {
-    d->MBEversionPopup = NULL;
+    d->MBEversionPopup = nullptr;
     qApp->exit(GENERIC_EXIT_SOCKET_ERROR);
 }
 
 MythContext::MythContext(const QString &binversion, bool needsBackend)
-    : d(NULL), app_binary_version(binversion)
+    : d(nullptr), app_binary_version(binversion)
 {
 #ifdef _WIN32
     static bool WSAStarted = false;
@@ -1643,7 +1656,9 @@ bool MythContext::Init(const bool gui,
     saveSettingsCache();
     if (d->m_settingsCacheDirty)
     {
+#ifndef Q_OS_ANDROID
         DestroyMythMainWindow();
+#endif
         d->m_settingsCacheDirty = false;
     }
     gCoreContext->ActivateSettingsCache(true);
@@ -1663,7 +1678,7 @@ MythContext::~MythContext()
     TaskQueue::Shutdown();
 
     delete gCoreContext;
-    gCoreContext = NULL;
+    gCoreContext = nullptr;
 
     delete d;
 }

@@ -17,11 +17,11 @@ extern "C" {
 AvFormatDecoderDVD::AvFormatDecoderDVD(
     MythPlayer *parent, const ProgramInfo &pginfo, PlayerFlags flags)
   : AvFormatDecoder(parent, pginfo, flags)
-  , m_curContext(NULL)
-  , m_lastVideoPkt(NULL)
+  , m_curContext(nullptr)
+  , m_lastVideoPkt(nullptr)
   , m_lbaLastVideoPkt(INVALID_LBA)
   , m_framesReq(0)
-  , m_returnContext(NULL)
+  , m_returnContext(nullptr)
 {
 }
 
@@ -42,7 +42,7 @@ void AvFormatDecoderDVD::ReleaseLastVideoPkt()
     {
         av_packet_unref(m_lastVideoPkt);
         delete m_lastVideoPkt;
-        m_lastVideoPkt = NULL;
+        m_lastVideoPkt = nullptr;
         m_lbaLastVideoPkt = INVALID_LBA;
     }
 }
@@ -52,7 +52,7 @@ void AvFormatDecoderDVD::ReleaseContext(MythDVDContext *&context)
     if (context)
     {
         context->DecrRef();
-        context = NULL;
+        context = nullptr;
     }
 }
 
@@ -89,7 +89,7 @@ int AvFormatDecoderDVD::ReadPacket(AVFormatContext *ctx, AVPacket* pkt, bool& st
 
         if (m_lastVideoPkt)
         {
-            av_copy_packet(pkt, m_lastVideoPkt);
+            av_packet_ref(pkt, m_lastVideoPkt);
 
             if (m_lastVideoPkt->pts != AV_NOPTS_VALUE)
                 m_lastVideoPkt->pts += pkt->duration;
@@ -149,7 +149,8 @@ int AvFormatDecoderDVD::ReadPacket(AVFormatContext *ctx, AVPacket* pkt, bool& st
 
                                 // Return the first buffered packet
                                 AVPacket *storedPkt = storedPackets.takeFirst();
-                                av_copy_packet(pkt, storedPkt);
+                                av_packet_ref(pkt, storedPkt);
+                                av_packet_unref(storedPkt);
                                 delete storedPkt;
 
                                 return 0;
@@ -266,7 +267,7 @@ void AvFormatDecoderDVD::CheckContext(int64_t pts)
                         ringBuffer->DVD()->SectorSeek(lastVideoSector);
 
                         m_returnContext = m_curContext;
-                        m_curContext = NULL;
+                        m_curContext = nullptr;
                     }
                     else
                     {
@@ -318,7 +319,7 @@ bool AvFormatDecoderDVD::ProcessVideoPacket(AVStream *stream, AVPacket *pkt)
         }
 
         av_init_packet(m_lastVideoPkt);
-        av_copy_packet(m_lastVideoPkt, pkt);
+        av_packet_ref(m_lastVideoPkt, pkt);
         m_lbaLastVideoPkt = m_curContext->GetLBA();
 
         if (m_returnContext)
@@ -356,7 +357,7 @@ bool AvFormatDecoderDVD::ProcessVideoFrame(AVStream *stream, AVFrame *mpa_pic)
 {
     bool ret = true;
 
-    if (m_returnContext == NULL)
+    if (m_returnContext == nullptr)
     {
         // Only process video frames if we're not searching for
         // the previous video frame after seeking in a slideshow.
@@ -378,7 +379,7 @@ bool AvFormatDecoderDVD::ProcessDataPacket(AVStream *curstream, AVPacket *pkt,
         if (context)
             m_contextList.append(context);
 
-        if ((m_curContext == NULL) && (m_contextList.size() > 0))
+        if ((m_curContext == nullptr) && (m_contextList.size() > 0))
         {
             // If we don't have a current context, use
             // the first in the list
@@ -631,8 +632,6 @@ long long AvFormatDecoderDVD::DVDFindPosition(long long desiredFrame)
     if (!ringBuffer->IsDVD())
         return 0;
 
-    int diffTime = 0;
-    long long desiredTimePos;
     int ffrewSkip = 1;
     int current_speed = 0;
     if (m_parent)
@@ -643,8 +642,8 @@ long long AvFormatDecoderDVD::DVDFindPosition(long long desiredFrame)
 
     if (ffrewSkip == 1 || ffrewSkip == 0)
     {
-        diffTime = (int)ceil((desiredFrame - framesPlayed) / fps);
-        desiredTimePos = ringBuffer->DVD()->GetCurrentTime() +
+        int diffTime = (int)ceil((desiredFrame - framesPlayed) / fps);
+        long long desiredTimePos = ringBuffer->DVD()->GetCurrentTime() +
                         diffTime;
         if (diffTime <= 0)
             desiredTimePos--;

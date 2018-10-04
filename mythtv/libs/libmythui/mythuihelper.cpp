@@ -43,7 +43,7 @@
 
 #define LOC      QString("MythUIHelper: ")
 
-static MythUIHelper *mythui = NULL;
+static MythUIHelper *mythui = nullptr;
 static QMutex uiLock;
 QString MythUIHelper::x11_display;
 
@@ -75,7 +75,7 @@ void MythUIHelper::destroyMythUI(void)
     mythui->PruneCacheDir(GetThumbnailDir());
     uiLock.lock();
     delete mythui;
-    mythui = NULL;
+    mythui = nullptr;
     uiLock.unlock();
 }
 
@@ -181,15 +181,15 @@ MythUIHelperPrivate::MythUIHelperPrivate(MythUIHelper *p)
       m_cacheLock(new QMutex(QMutex::Recursive)),
       m_cacheSize(0), m_maxCacheSize(30 * 1024 * 1024),
       m_screenxbase(0), m_screenybase(0), m_screenwidth(0), m_screenheight(0),
-      screensaver(NULL), screensaverEnabled(false), display_res(NULL),
+      screensaver(nullptr), screensaverEnabled(false), display_res(nullptr),
       screenSetup(false), m_imageThreadPool(new MThreadPool("MythUIHelper")),
       parent(p), m_fontStretch(100)
 {
-    callbacks.exec_program = NULL;
-    callbacks.exec_program_tv = NULL;
-    callbacks.configplugin = NULL;
-    callbacks.plugin = NULL;
-    callbacks.eject = NULL;
+    callbacks.exec_program = nullptr;
+    callbacks.exec_program_tv = nullptr;
+    callbacks.configplugin = nullptr;
+    callbacks.plugin = nullptr;
+    callbacks.eject = nullptr;
 }
 
 MythUIHelperPrivate::~MythUIHelperPrivate()
@@ -582,7 +582,7 @@ MythImage *MythUIHelper::GetImageFromCache(const QString &url)
         }
     */
 
-    return NULL;
+    return nullptr;
 }
 
 void MythUIHelper::IncludeInCacheSize(MythImage *im)
@@ -609,7 +609,7 @@ MythImage *MythUIHelper::CacheImage(const QString &url, MythImage *im,
                                     bool nodisk)
 {
     if (!im)
-        return NULL;
+        return nullptr;
 
     if (!nodisk)
     {
@@ -1402,188 +1402,6 @@ bool MythUIHelper::FindThemeFile(QString &path)
     return foundit;
 }
 
-QImage *MythUIHelper::LoadScaleImage(QString filename)
-{
-    LOG(VB_GUI | VB_FILE, LOG_INFO,  LOC +
-        QString("LoadScaleImage(%1)").arg(filename));
-
-    if (filename.isEmpty())
-        return NULL;
-
-    if ((!filename.startsWith("http://")) &&
-        (!filename.startsWith("https://")) &&
-        (!filename.startsWith("ftp://")) &&
-        (!filename.startsWith("myth://")) &&
-        (!FindThemeFile(filename)))
-    {
-        LOG(VB_GENERAL, LOG_ERR, LOC + QString("LoadScaleImage(%1) ")
-            .arg(filename) + "Unable to find image file");
-
-        return NULL;
-    }
-
-    QImage *ret = NULL;
-    QImage tmpimage;
-    int width, height;
-    float wmult, hmult;
-
-    GetScreenSettings(width, wmult, height, hmult);
-
-    if (filename.startsWith("myth://"))
-    {
-        RemoteFile *rf = new RemoteFile(filename, false, false, 0);
-
-        QByteArray data;
-        bool loaded = rf->SaveAs(data);
-        delete rf;
-
-        if (loaded)
-            tmpimage.loadFromData(data);
-        else
-        {
-            LOG(VB_GENERAL, LOG_ERR, LOC +
-                QString("LoadScaleImage(%1) failed to load remote image")
-                .arg(filename));
-        }
-    }
-    else if ((filename.startsWith("http://")) ||
-             (filename.startsWith("https://")) ||
-             (filename.startsWith("ftp://")))
-    {
-        QByteArray data;
-
-        if (GetMythDownloadManager()->download(filename, &data))
-            tmpimage.loadFromData(data);
-        else
-        {
-            LOG(VB_GENERAL, LOG_ERR, LOC +
-                QString("LoadScaleImage(%1) failed to load remote image")
-                .arg(filename));
-        }
-    }
-    else
-    {
-        tmpimage.load(filename);
-    }
-
-    if (tmpimage.isNull())
-    {
-        LOG(VB_GENERAL, LOG_ERR, LOC +
-            QString("LoadScaleImage(%1) failed to load image")
-            .arg(filename));
-
-        return NULL;
-    }
-
-    if (width != d->m_baseWidth || height != d->m_baseHeight)
-    {
-        QImage tmp2 = tmpimage.scaled(
-                          (int)(tmpimage.width() * wmult),
-                          (int)(tmpimage.height() * hmult),
-                          Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-
-        ret = new QImage(tmp2);
-    }
-    else
-    {
-        ret = new QImage(tmpimage);
-
-        if (!ret->width() || !ret->height())
-        {
-            LOG(VB_GENERAL, LOG_ERR, LOC +
-                QString("LoadScaleImage(%1) invalid image dimensions")
-                .arg(filename));
-
-            delete ret;
-            return NULL;
-        }
-    }
-
-    return ret;
-}
-
-QPixmap *MythUIHelper::LoadScalePixmap(QString filename)
-{
-    LOG(VB_GUI | VB_FILE, LOG_INFO, LOC +
-        QString("LoadScalePixmap(%1)").arg(filename));
-
-    if (filename.isEmpty())
-        return NULL;
-
-    if (!FindThemeFile(filename) && (!filename.startsWith("myth:")))
-    {
-        LOG(VB_GENERAL, LOG_ERR, LOC + QString("LoadScalePixmap(%1)")
-            .arg(filename) + "Unable to find image file");
-
-        return NULL;
-    }
-
-    QPixmap *ret = NULL;
-    QImage tmpimage;
-    int width, height;
-    float wmult, hmult;
-
-    GetScreenSettings(width, wmult, height, hmult);
-
-    if (filename.startsWith("myth://"))
-    {
-        RemoteFile *rf = new RemoteFile(filename, false, false, 0);
-
-        QByteArray data;
-        bool loaded = rf->SaveAs(data);
-        delete rf;
-
-        if (loaded)
-        {
-            tmpimage.loadFromData(data);
-        }
-        else
-        {
-            LOG(VB_GENERAL, LOG_ERR, LOC +
-                QString("LoadScalePixmap(%1): failed to load remote image")
-                .arg(filename));
-        }
-    }
-    else
-    {
-        tmpimage.load(filename);
-    }
-
-    if (width != d->m_baseWidth || height != d->m_baseHeight)
-    {
-        if (tmpimage.isNull())
-        {
-            LOG(VB_GENERAL, LOG_ERR, LOC +
-                QString("LoadScalePixmap(%1) failed to load image")
-                .arg(filename));
-
-            return NULL;
-        }
-
-        QImage tmp2 = tmpimage.scaled((int)(tmpimage.width() * wmult),
-                                      (int)(tmpimage.height() * hmult),
-                                      Qt::IgnoreAspectRatio,
-                                      Qt::SmoothTransformation);
-        ret = new QPixmap(QPixmap::fromImage(tmp2));
-    }
-    else
-    {
-        ret = new QPixmap(QPixmap::fromImage(tmpimage));
-
-        if (!ret->width() || !ret->height())
-        {
-            LOG(VB_GENERAL, LOG_ERR, LOC +
-                QString("LoadScalePixmap(%1) invalid image dimensions")
-                .arg(filename));
-
-            delete ret;
-            return NULL;
-        }
-    }
-
-    return ret;
-}
-
 MythImage *MythUIHelper::LoadCacheImage(QString srcfile, QString label,
                                         MythPainter *painter,
                                         ImageCacheMode cacheMode)
@@ -1592,7 +1410,7 @@ MythImage *MythUIHelper::LoadCacheImage(QString srcfile, QString label,
         QString("LoadCacheImage(%1,%2)").arg(srcfile).arg(label));
 
     if (srcfile.isEmpty() || label.isEmpty())
-        return NULL;
+        return nullptr;
 
     if (!(kCacheForceStat & cacheMode))
     {
@@ -1621,7 +1439,7 @@ MythImage *MythUIHelper::LoadCacheImage(QString srcfile, QString label,
         }
     }
 
-    MythImage *ret = NULL;
+    MythImage *ret = nullptr;
 
     // Check Memory Cache
     ret = GetImageFromCache(label);
@@ -1639,7 +1457,7 @@ MythImage *MythUIHelper::LoadCacheImage(QString srcfile, QString label,
         // If the file isn't in the disk cache, then we don't want to bother
         // checking the last modified times of the original
         if (!cacheFileInfo.exists())
-            return NULL;
+            return nullptr;
 
         // Now compare the time on the source versus our cached copy
         QDateTime srcLastModified;
@@ -1667,7 +1485,7 @@ MythImage *MythUIHelper::LoadCacheImage(QString srcfile, QString label,
         else
         {
             if (!FindThemeFile(srcfile))
-                return NULL;
+                return nullptr;
 
             QFileInfo original(srcfile);
 
@@ -1705,14 +1523,14 @@ MythImage *MythUIHelper::LoadCacheImage(QString srcfile, QString label,
 
                         ret->SetIsInCache(false);
                         ret->DecrRef();
-                        ret = NULL;
+                        ret = nullptr;
                     }
                 }
             }
         }
         else
         {
-            ret = NULL;
+            ret = nullptr;
             // If file has changed on disk, then remove it from the memory
             // and disk cache
             RemoveFromCacheByURL(label);

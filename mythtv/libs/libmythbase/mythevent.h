@@ -52,7 +52,7 @@ class MBASE_PUBLIC MythEvent : public QEvent
     }
 
 
-    virtual ~MythEvent() {}
+    virtual ~MythEvent() = default;
 
     const QString& Message() const { return m_message; }
     const QString& ExtraData(int idx = 0) const { return m_extradata[idx]; }
@@ -67,8 +67,6 @@ class MBASE_PUBLIC MythEvent : public QEvent
     static Type kUpdateTvProgressEventType;
     static Type kExitToMainMenuEventType;
     static Type kMythPostShowEventType;
-    static Type kEnableDrawingEventType;
-    static Type kDisableDrawingEventType;
     static Type kPushDisableDrawingEventType;
     static Type kPopDisableDrawingEventType;
     static Type kLockInputDevicesEventType;

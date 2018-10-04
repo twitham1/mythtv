@@ -164,7 +164,7 @@ bool PBHEventHandler::event(QEvent *e)
     }
     else if (e->type() == (QEvent::Type) MythEvent::MythEventMessage)
     {
-        MythEvent *me = (MythEvent*)e;
+        MythEvent *me = static_cast<MythEvent*>(e);
         if (me->Message() == "UPDATE_FREE_SPACE")
         {
             UpdateFreeSpaceEvent();
@@ -340,7 +340,7 @@ PlaybackBoxHelper::~PlaybackBoxHelper()
 {
     // delete the event handler
     m_eventHandler->deleteLater();
-    m_eventHandler = NULL;
+    m_eventHandler = nullptr;
 
     MThread::exit();
     wait();

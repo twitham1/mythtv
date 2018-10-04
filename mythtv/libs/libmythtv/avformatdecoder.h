@@ -24,7 +24,6 @@ extern "C" {
 #include "mythframe.h"
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
-#include "libavcodec/audioconvert.h"
 }
 
 #include "avfringbuffer.h"
@@ -207,6 +206,8 @@ class AvFormatDecoder : public DecoderBase
 
     friend int get_avf_buffer(struct AVCodecContext *c, AVFrame *pic,
                               int flags);
+    friend int get_avf_buffer_vaapi2(struct AVCodecContext *c, AVFrame *pic,
+                              int flags);
     friend void release_avf_buffer(void *opaque, uint8_t *data);
 
     friend int open_avf(URLContext *h, const char *filename, int flags);
@@ -323,6 +324,9 @@ class AvFormatDecoder : public DecoderBase
     bool pts_detected;
     bool reordered_pts_detected;
     bool pts_selected;
+    // set use_frame_timing true to utilize the pts values in returned
+    // frames. Set fale to use deprecated method.
+    bool use_frame_timing;
 
     bool force_dts_timestamps;
 

@@ -85,13 +85,13 @@ bool getUptime(time_t &uptime)
     len    = sizeof(bootTime);
     mib[0] = CTL_KERN;
     mib[1] = KERN_BOOTTIME;
-    if (sysctl(mib, 2, &bootTime, &len, NULL, 0) == -1)
+    if (sysctl(mib, 2, &bootTime, &len, nullptr, 0) == -1)
     {
         LOG(VB_GENERAL, LOG_ERR, "sysctl() error");
         return false;
     }
     else
-        uptime = time(NULL) - bootTime.tv_sec;
+        uptime = time(nullptr) - bootTime.tv_sec;
 #elif defined(_WIN32)
     uptime = ::GetTickCount() / 1000;
 #else
@@ -112,7 +112,7 @@ bool getUptime(time_t &uptime)
 bool getMemStats(int &totalMB, int &freeMB, int &totalVM, int &freeVM)
 {
 #ifdef __linux__
-    size_t MB = (1024*1024);
+    const size_t MB = (1024*1024);
     struct sysinfo sinfo;
     if (sysinfo(&sinfo) == -1)
     {
@@ -120,11 +120,11 @@ bool getMemStats(int &totalMB, int &freeMB, int &totalVM, int &freeVM)
             "getMemStats(): Error, sysinfo() call failed.");
         return false;
     }
-    else
-        totalMB = (int)((sinfo.totalram  * sinfo.mem_unit)/MB),
-        freeMB  = (int)((sinfo.freeram   * sinfo.mem_unit)/MB),
-        totalVM = (int)((sinfo.totalswap * sinfo.mem_unit)/MB),
-        freeVM  = (int)((sinfo.freeswap  * sinfo.mem_unit)/MB);
+
+    totalMB = (int)((sinfo.totalram  * sinfo.mem_unit)/MB);
+    freeMB  = (int)((sinfo.freeram   * sinfo.mem_unit)/MB);
+    totalVM = (int)((sinfo.totalswap * sinfo.mem_unit)/MB);
+    freeVM  = (int)((sinfo.freeswap  * sinfo.mem_unit)/MB);
 
 #elif CONFIG_DARWIN
     mach_port_t             mp;
@@ -162,6 +162,10 @@ bool getMemStats(int &totalMB, int &freeMB, int &totalVM, int &freeVM)
     freeVM = (int)(free >> 10);
 
 #else
+    Q_UNUSED(totalMB);
+    Q_UNUSED(freeMB);
+    Q_UNUSED(totalVM);
+    Q_UNUSED(freeVM);
     LOG(VB_GENERAL, LOG_NOTICE, "getMemStats(): Unknown platform. "
         "How do I get the memory stats?");
     return false;
@@ -316,7 +320,7 @@ long long copy(QFile &dst, QFile &src, uint block_size)
     long long total_bytes = 0LL;
     while (ok)
     {
-        long long rlen, wlen, off = 0;
+        long long rlen, off = 0;
         rlen = src.read(buf, buflen);
         if (rlen<0)
         {
@@ -331,7 +335,7 @@ long long copy(QFile &dst, QFile &src, uint block_size)
 
         while ((rlen-off>0) && ok)
         {
-            wlen = dst.write(buf + off, rlen - off);
+            long long wlen = dst.write(buf + off, rlen - off);
             if (wlen>=0)
                 off+= wlen;
             if (wlen<0)
@@ -547,7 +551,6 @@ bool IsMACAddress(QString MAC)
 
     int y;
     bool ok;
-    int value;
     for (y = 0; y < 6; y++)
     {
         if (tokens[y].isEmpty())
@@ -558,7 +561,7 @@ bool IsMACAddress(QString MAC)
             return false;
         }
 
-        value = tokens[y].toInt(&ok, 16);
+        int value = tokens[y].toInt(&ok, 16);
         if (!ok)
         {
             LOG(VB_NETWORK, LOG_ERR,
@@ -661,6 +664,16 @@ bool WakeOnLAN(QString MAC)
     QUdpSocket udp_socket;
     return udp_socket.writeDatagram(
         msg, msglen, QHostAddress::Broadcast, 32767) == msglen;
+}
+
+// Wake up either by command or by MAC address
+// return true = success
+bool MythWakeup(const QString &wakeUpCommand, uint flags, uint timeout)
+{
+    if (!IsMACAddress(wakeUpCommand))
+        return !myth_system(wakeUpCommand, flags, timeout);
+
+    return WakeOnLAN(wakeUpCommand);
 }
 
 bool IsPulseAudioRunning(void)
@@ -1127,7 +1140,7 @@ int naturalCompare(const QString &_a, const QString &_b, Qt::CaseSensitivity cas
         {
             // one digit-sequence starts with 0 -> assume we are in a fraction part
             // do left aligned comparison (numbers are considered left aligned)
-            while (1)
+            while (true)
             {
                 if (!currA->isDigit() && !currB->isDigit())
                 {
@@ -1165,7 +1178,7 @@ int naturalCompare(const QString &_a, const QString &_b, Qt::CaseSensitivity cas
             bool isFirstRun = true;
             int weight = 0;
 
-            while (1)
+            while (true)
             {
                 if (!currA->isDigit() && !currB->isDigit())
                 {

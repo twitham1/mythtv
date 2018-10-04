@@ -34,11 +34,6 @@
 // Application local headers
 #include "mpegutils.h"
 
-extern "C" {
-#include "libavcodec/mpegvideo.h"
-}
-
-
 static QHash<uint,bool> extract_pids(const QString &pidsStr, bool required)
 {
     QHash<uint,bool> use_pid;
@@ -739,7 +734,7 @@ static int pid_printer(const MythUtilCommandLineParser &cmdline)
         extract_pids(cmdline.toString("ptspids"), false);
 
     QString dest = cmdline.toString("outfile");
-    RingBuffer *out = NULL;
+    RingBuffer *out = nullptr;
     if (!dest.isEmpty())
     {
         out = RingBuffer::Create(dest, true);

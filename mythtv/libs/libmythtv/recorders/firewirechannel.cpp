@@ -20,7 +20,7 @@ FirewireChannel::FirewireChannel(TVRec *parent, const QString &_videodevice,
     DTVChannel(parent),
     videodevice(_videodevice),
     fw_opts(firewire_opts),
-    device(NULL),
+    device(nullptr),
     current_channel(0),
     isopen(false)
 {
@@ -61,7 +61,7 @@ bool FirewireChannel::Open(void)
         return false;
 
     if (!FirewireDevice::IsSTBSupported(fw_opts.model) &&
-        m_externalChanger.isEmpty())
+        !IsExternalChannelChangeInUse())
     {
         LOG(VB_GENERAL, LOG_ERR, LOC +
             QString("Model: '%1' is not supported.").arg(fw_opts.model));

@@ -34,7 +34,7 @@ using namespace std;
 #include "format.h"
 #include "cc608decoder.h"
 #include "filter.h"
-#include "minilzo.h"
+#include "lzo/lzo1x.h"
 #include "mthread.h"
 
 #include "mythtvexp.h"
@@ -53,7 +53,7 @@ class NVRWriteThread : public MThread
   public:
     explicit NVRWriteThread(NuppelVideoRecorder *parent) :
         MThread("NVRWrite"), m_parent(parent) {}
-    virtual ~NVRWriteThread() { wait(); m_parent = NULL; }
+    virtual ~NVRWriteThread() { wait(); m_parent = nullptr; }
     virtual void run(void);
   private:
     NuppelVideoRecorder *m_parent;
@@ -64,7 +64,7 @@ class NVRAudioThread : public MThread
   public:
     explicit NVRAudioThread(NuppelVideoRecorder *parent) :
         MThread("NVRAudio"), m_parent(parent) {}
-    virtual ~NVRAudioThread() { wait(); m_parent = NULL; }
+    virtual ~NVRAudioThread() { wait(); m_parent = nullptr; }
     virtual void run(void);
   private:
     NuppelVideoRecorder *m_parent;

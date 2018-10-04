@@ -9,7 +9,7 @@ int AVFRingBuffer::AVF_Open(URLContext *h, const char *filename, int flags)
     (void)filename;
     (void)flags;
 
-    h->priv_data = NULL;
+    h->priv_data = nullptr;
     return 0;
 }
 
@@ -20,7 +20,11 @@ int AVFRingBuffer::AVF_Read(URLContext *h, uint8_t *buf, int buf_size)
     if (!avfr)
         return 0;
 
-    return avfr->GetRingBuffer()->Read(buf, buf_size);
+    int ret = avfr->GetRingBuffer()->Read(buf, buf_size);
+
+    if (ret == 0)
+        ret = AVERROR_EOF;
+    return ret;
 }
 
 int AVFRingBuffer::AVF_Write(URLContext *h, const uint8_t *buf, int buf_size)

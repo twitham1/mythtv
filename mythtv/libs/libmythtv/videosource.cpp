@@ -60,7 +60,11 @@ using namespace std;
 #endif
 
 #ifdef USING_HDHOMERUN
-#include "hdhomerun.h"
+#ifdef HDHOMERUN_LIBPREFIX
+#include "libhdhomerun/hdhomerun.h"
+#else
+#include "hdhomerun/hdhomerun.h"
+#endif
 #endif
 
 static const uint kDefaultMultirecCount = 2;
@@ -824,7 +828,7 @@ class VideoDevice : public CaptureCardComboBoxSetting
         uint cnt = 0;
 
         QFileInfoList il = dir.entryInfoList();
-        QRegExp *driverExp = NULL;
+        QRegExp *driverExp = nullptr;
         if (!driver.isEmpty())
             driverExp = new QRegExp(driver);
 
@@ -1881,7 +1885,7 @@ class ASIDevice : public CaptureCardComboBoxSetting
 
     /// \brief Adds all available cards to list
     /// If current is >= 0 it will be considered available even
-    /// if no device exists for it in /dev/dvb/adapter*
+    /// if no device exists for it in /dev/asi*
     void fillSelections(const QString &current)
     {
         clearSelections();
@@ -1904,7 +1908,7 @@ class ASIDevice : public CaptureCardComboBoxSetting
         // for new configs (preferring non-conflicing devices).
         QMap<QString,bool> in_use;
         QString sel = current;
-        for (uint i = 0; i < (uint)sdevs.size(); i++)
+        for (uint i = 0; i < (uint)sdevs.size(); ++i)
         {
             const QString dev = sdevs[i];
             in_use[sdevs[i]] = find(db.begin(), db.end(), dev) != db.end();
@@ -1921,7 +1925,7 @@ class ASIDevice : public CaptureCardComboBoxSetting
 
         // Add the devices to the UI
         bool found = false;
-        for (uint i = 0; i < (uint)sdevs.size(); i++)
+        for (uint i = 0; i < (uint)sdevs.size(); ++i)
         {
             const QString dev = sdevs[i];
             QString desc = dev + (in_use[sdevs[i]] ? usestr : "");
@@ -1955,11 +1959,13 @@ ASIConfigurationGroup::ASIConfigurationGroup(CaptureCard& a_parent,
     cardinfo(new TransTextEditSetting())
 {
     setVisible(false);
+    cardinfo->setLabel(tr("Status"));
     cardinfo->setEnabled(false);
-    cardType.addChild(device);
-    cardType.addChild(new EmptyAudioDevice(parent));
-    cardType.addChild(new EmptyVBIDevice(parent));
-    cardType.addChild(cardinfo);
+
+    cardType.addTargetedChild("ASI", device);
+    cardType.addTargetedChild("ASI", new EmptyAudioDevice(parent));
+    cardType.addTargetedChild("ASI", new EmptyVBIDevice(parent));
+    cardType.addTargetedChild("ASI", cardinfo);
 
     connect(device, SIGNAL(valueChanged(const QString&)),
             this,   SLOT(  probeCard(   const QString&)));
@@ -2201,7 +2207,7 @@ bool HDHomeRunConfigurationGroup::ProbeCard(HDHomeRunDevice &tmpdevice)
 #ifdef USING_HDHOMERUN
     hdhomerun_device_t *thisdevice =
         hdhomerun_device_create_from_str(
-            tmpdevice.mythdeviceid.toLocal8Bit().constData(), NULL);
+            tmpdevice.mythdeviceid.toLocal8Bit().constData(), nullptr);
 
     if (thisdevice)
     {
@@ -2228,6 +2234,7 @@ bool HDHomeRunConfigurationGroup::ProbeCard(HDHomeRunDevice &tmpdevice)
         return true;
     }
 #endif // USING_HDHOMERUN
+    Q_UNUSED(tmpdevice);
     return false;
 }
 
@@ -2386,6 +2393,7 @@ void CetonDeviceID::UpdateValues(void)
     }
 }
 
+#ifdef USING_CETON
 static void CetonConfigurationGroup(CaptureCard& parent, CardType& cardtype)
 {
     CetonDeviceID *deviceid = new CetonDeviceID(parent);
@@ -2416,6 +2424,7 @@ static void CetonConfigurationGroup(CaptureCard& parent, CardType& cardtype)
     QObject::connect(deviceid, SIGNAL(LoadedTuner(const QString&)),
                      tuner,    SLOT(  LoadValue(const QString&)));
 }
+#endif
 
 V4LConfigurationGroup::V4LConfigurationGroup(CaptureCard& a_parent,
                                              CardType& a_cardtype) :
@@ -2464,7 +2473,7 @@ void V4LConfigurationGroup::probeCard(const QString &device)
 MPEGConfigurationGroup::MPEGConfigurationGroup(CaptureCard &a_parent,
                                                CardType &a_cardtype) :
     parent(a_parent),
-    device(NULL), vbidevice(NULL),
+    device(nullptr), vbidevice(nullptr),
     cardinfo(new TransTextEditSetting())
 {
     setVisible(false);
@@ -2617,7 +2626,7 @@ HDPVRConfigurationGroup::HDPVRConfigurationGroup(CaptureCard &a_parent,
                                                  CardType &a_cardtype) :
     parent(a_parent), cardinfo(new GroupSetting()),
     audioinput(new TunerCardAudioInput(parent, QString(), "HDPVR")),
-    vbidevice(NULL)
+    vbidevice(nullptr)
 {
     setVisible(false);
 
@@ -2725,6 +2734,8 @@ void V4L2encGroup::probeCard(const QString &device_name)
         m_device->addTargetedChild(m_DriverName,
                                    new ChannelTimeout(m_parent, 15000, 2000));
     }
+#else
+    Q_UNUSED(device_name);
 #endif // USING_V4L2
 }
 
@@ -3369,8 +3380,8 @@ CardInput::CardInput(const QString & cardtype, const QString & device,
     externalInputSettings(new DiSEqCDevSettings()),
     inputgrp0(new InputGroup(*this, 0)),
     inputgrp1(new InputGroup(*this, 1)),
-    instancecount(NULL),
-    schedgroup(NULL)
+    instancecount(nullptr),
+    schedgroup(nullptr)
 {
     addChild(id);
 
@@ -3457,7 +3468,7 @@ CardInput::~CardInput()
     if (externalInputSettings)
     {
         delete externalInputSettings;
-        externalInputSettings = NULL;
+        externalInputSettings = nullptr;
     }
 }
 
@@ -3613,6 +3624,7 @@ void CardInput::sourceFetch(void)
         if (!CardUtil::IsCableCardPresent(crdid, cardtype) &&
             !CardUtil::IsUnscanable(cardtype) &&
             !CardUtil::IsEncoder(cardtype)    &&
+            cardtype != "HDHOMERUN"           &&
             !num_channels_before)
         {
             LOG(VB_GENERAL, LOG_ERR, "Skipping channel fetch, you need to "
@@ -4187,7 +4199,7 @@ DVBConfigurationGroup::~DVBConfigurationGroup()
     if (diseqc_tree)
     {
         delete diseqc_tree;
-        diseqc_tree = NULL;
+        diseqc_tree = nullptr;
     }
 }
 

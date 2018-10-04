@@ -41,7 +41,7 @@ extern QString dvb_decode_text(const unsigned char *src, uint length,
 
 inline QString dvb_decode_text(const unsigned char *src, uint length)
 {
-    return dvb_decode_text(src, length, NULL, 0);
+    return dvb_decode_text(src, length, nullptr, 0);
 }
 
 QString dvb_decode_short_name(const unsigned char *src, uint raw_length);
@@ -91,26 +91,26 @@ class LinkageDescriptor : public MPEGDescriptor
             return;
         if (DescriptorLength() < 7)
         {
-            _data = NULL;
+            _data = nullptr;
         }
         else if (kMobileHandOver == LinkageType())
         {
             uint end = 8;
             if (DescriptorLength() < end)
             {
-                _data = NULL;
+                _data = nullptr;
                 return;
             }
             end += (HasMobileNetworkID()) ? 2 : 0;
             end += (HasMobileInitialServiceID()) ? 2 : 0;
             if (DescriptorLength() < end)
-                _data = NULL;
+                _data = nullptr;
             m_offset = end + 2;
         }
         else if (kEventLinkage == LinkageType())
         {
             if (DescriptorLength() < 10)
-                _data = NULL;
+                _data = nullptr;
             m_offset = 12;
         }
     }
@@ -2078,7 +2078,6 @@ class DVBContentIdentifierDescriptor : public MPEGDescriptor
     DVBContentIdentifierDescriptor(const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::dvb_content_identifier)
     {
-        size_t length;
         size_t count  = 0;
         uint8_t position = 2; /// position points to the first byte of the "sub"descriptor
 
@@ -2086,7 +2085,7 @@ class DVBContentIdentifierDescriptor : public MPEGDescriptor
 
         while (_data[1] >= position)
         {
-           length = _data[position+1];
+           size_t length = _data[position+1];
            m_crid[count] = &_data[position];
            count++;
            position+=length+2;

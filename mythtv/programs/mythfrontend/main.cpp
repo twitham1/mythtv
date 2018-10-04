@@ -20,6 +20,10 @@ using namespace std;
 #include <QProcessEnvironment>
 #endif
 
+#ifdef Q_OS_ANDROID
+#include <QtAndroidExtras>
+#endif
+
 #include "previewgeneratorqueue.h"
 #include "referencecounter.h"
 #include "mythmiscutil.h"
@@ -113,12 +117,12 @@ using namespace std;
 #include "bonjourregister.h"
 #endif
 
-static ExitPrompter   *exitPopup = NULL;
+static ExitPrompter   *exitPopup = nullptr;
 static MythThemedMenu *menu;
 
 static QString         logfile;
-static MediaRenderer  *g_pUPnp   = NULL;
-static MythPluginManager *pmanager = NULL;
+static MediaRenderer  *g_pUPnp   = nullptr;
+static MythPluginManager *pmanager = nullptr;
 
 static void handleExit(bool prompt);
 static void resetAllKeys(void);
@@ -161,7 +165,7 @@ namespace
             }
         }
 
-        ~RunSettingsCompletion() {}
+        ~RunSettingsCompletion() = default;
 
       private slots:
         void OnPasswordResultReady(bool passwordValid,
@@ -271,7 +275,7 @@ namespace
 #endif
 
         delete exitPopup;
-        exitPopup = NULL;
+        exitPopup = nullptr;
 
         AudioOutput::Cleanup();
 
@@ -280,17 +284,17 @@ namespace
             // This takes a few seconds, so inform the user:
             LOG(VB_GENERAL, LOG_INFO, "Shutting down UPnP client...");
             delete g_pUPnp;
-            g_pUPnp = NULL;
+            g_pUPnp = nullptr;
         }
 
         if (pmanager)
         {
             delete pmanager;
-            pmanager = NULL;
+            pmanager = nullptr;
         }
 
         delete gContext;
-        gContext = NULL;
+        gContext = nullptr;
 
         ReferenceCounter::PrintDebug();
 
@@ -340,7 +344,7 @@ static void startAppearWiz(void)
         }
 
         delete wizard;
-        wizard = NULL;
+        wizard = nullptr;
     }
 
     if (reload)
@@ -364,7 +368,7 @@ static void startGuide(void)
     uint chanid = 0;
     QString channum = gCoreContext->GetSetting("DefaultTVChannel");
     QDateTime startTime;
-    GuideGrid::RunProgramGuide(chanid, channum, startTime, NULL, false, true, -2);
+    GuideGrid::RunProgramGuide(chanid, channum, startTime, nullptr, false, true, -2);
 }
 
 static void startFinder(void)
@@ -604,7 +608,7 @@ static bool isLiveTVAvailable(void)
 static void startTVNormal(void)
 {
     if (isLiveTVAvailable())
-        TV::StartTV(NULL, kStartTVNoFlags);
+        TV::StartTV(nullptr, kStartTVNoFlags);
 }
 
 static void showStatus(void)
@@ -1209,7 +1213,7 @@ static bool RunMenu(QString themedir, QString themename)
     LOG(VB_GENERAL, LOG_ERR,
         QString("Couldn't find mainmenu.xml for theme '%1'") .arg(themename));
     delete menu;
-    menu = NULL;
+    menu = nullptr;
 
     return false;
 }
@@ -1396,6 +1400,58 @@ static bool resetTheme(QString themedir, const QString &badtheme)
 
 static int reloadTheme(void)
 {
+
+#ifdef Q_OS_ANDROID
+
+    // jni code to launch the application again
+    // reinitializing the main windows causes a segfault
+    // with android
+
+    auto activity = QtAndroid::androidActivity();
+    auto packageManager = activity.callObjectMethod
+        (   "getPackageManager",
+            "()Landroid/content/pm/PackageManager;"  );
+
+    auto activityIntent = packageManager.callObjectMethod
+        (   "getLaunchIntentForPackage",
+            "(Ljava/lang/String;)Landroid/content/Intent;",
+            activity.callObjectMethod("getPackageName",
+            "()Ljava/lang/String;").object()  );
+
+    auto pendingIntent = QAndroidJniObject::callStaticObjectMethod
+        (   "android/app/PendingIntent",
+            "getActivity",
+            "(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;",
+            activity.object(),
+            jint(0),
+            activityIntent.object(),
+            QAndroidJniObject::getStaticField<jint>("android/content/Intent",
+            "FLAG_ACTIVITY_CLEAR_TOP")  );
+
+    auto alarmManager = activity.callObjectMethod
+        (   "getSystemService",
+            "(Ljava/lang/String;)Ljava/lang/Object;",
+            QAndroidJniObject::getStaticObjectField("android/content/Context",
+            "ALARM_SERVICE",
+            "Ljava/lang/String;").object()  );
+
+    alarmManager.callMethod<void>
+        (   "set",
+            "(IJLandroid/app/PendingIntent;)V",
+            QAndroidJniObject::getStaticField<jint>("android/app/AlarmManager", "RTC"),
+            jlong(QDateTime::currentMSecsSinceEpoch() + 100),
+            pendingIntent.object()  );
+
+    qApp->quit();
+    // QString title = QObject::tr("Your change will take effect the next time "
+    //                     "mythfrontend is started.");
+    //     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");    MythConfirmationDialog *okPopup =
+    //         new MythConfirmationDialog(popupStack, title, false);
+    // if (okPopup->Create())
+    //     popupStack->AddScreen(okPopup);
+    return 0;
+#else
+
     QString themename = gCoreContext->GetSetting("Theme", DEFAULT_UI_THEME);
     QString themedir = GetMythUI()->FindThemeDir(themename);
     if (themedir.isEmpty())
@@ -1437,6 +1493,7 @@ static int reloadTheme(void)
     }
 
     return 0;
+#endif // Q_OS_ANDROID else
 }
 
 static void reloadTheme_void(void)
@@ -1898,7 +1955,7 @@ int main(int argc, char **argv)
         if (!g_pUPnp->isInitialized())
         {
             delete g_pUPnp;
-            g_pUPnp = NULL;
+            g_pUPnp = nullptr;
         }
     }
 
@@ -1915,9 +1972,9 @@ int main(int argc, char **argv)
 
         gCoreContext->SaveSetting("Theme", DEFAULT_UI_THEME);
         gCoreContext->GetDB()->ClearSetting("Language");
-        gCoreContext->GetDB()->ClearSettingOnHost("Language", NULL);
+        gCoreContext->GetDB()->ClearSettingOnHost("Language", nullptr);
         gCoreContext->GetDB()->ClearSetting("Country");
-        gCoreContext->GetDB()->ClearSettingOnHost("Country", NULL);
+        gCoreContext->GetDB()->ClearSettingOnHost("Country", nullptr);
 
         LOG(VB_GENERAL, LOG_NOTICE, "Appearance settings and language have "
                                     "been reset to defaults. You will need to "
@@ -2042,7 +2099,7 @@ int main(int argc, char **argv)
         mainWindow->installEventFilter(mon);
     }
 
-    NetworkControl *networkControl = NULL;
+    NetworkControl *networkControl = nullptr;
     if (gCoreContext->GetNumSetting("NetworkControlEnabled", 0))
     {
         int port = gCoreContext->GetNumSetting("NetworkControlPort", 6546);
@@ -2064,7 +2121,7 @@ int main(int argc, char **argv)
     {
         return GENERIC_EXIT_NO_THEME;
     }
-    ThemeUpdateChecker *themeUpdateChecker = NULL;
+    ThemeUpdateChecker *themeUpdateChecker = nullptr;
     if (gCoreContext->GetNumSetting("ThemeUpdateNofications", 1))
         themeUpdateChecker = new ThemeUpdateChecker();
 

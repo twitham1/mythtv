@@ -43,7 +43,7 @@ Synaesthesia::Synaesthesia(void) :
     m_outWidth(0),
     m_outHeight(0),
 
-    m_outputImage(NULL),
+    m_outputImage(nullptr),
 
     m_fgRedSlider(0.0),  m_fgGreenSlider(0.5),
     m_bgRedSlider(0.75), m_bgGreenSlider(0.4),
@@ -188,10 +188,10 @@ int Synaesthesia::bitReverser(int i)
 
 void Synaesthesia::fft(double *x, double *y)
 {
-    int n2 = NumSamples, n1;
+    int n2 = NumSamples;
     for (int twoToTheK = 1; twoToTheK < NumSamples; twoToTheK *= 2)
     {
-        n1 = n2;
+        int n1 = n2;
         n2 /= 2;
         for (int j = 0; j < n2; j++)
         {

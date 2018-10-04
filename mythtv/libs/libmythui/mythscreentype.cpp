@@ -61,10 +61,10 @@ MythScreenType::MythScreenType(
     MythUIComposite(parent, name), m_LoadLock(1)
 {
     m_FullScreen = fullscreen;
-    m_CurrentFocusWidget = NULL;
+    m_CurrentFocusWidget = nullptr;
 
     m_ScreenStack = parent;
-    m_BusyPopup = NULL;
+    m_BusyPopup = nullptr;
     m_IsDeleting = false;
     m_IsLoading = false;
     m_IsLoaded = false;
@@ -83,10 +83,10 @@ MythScreenType::MythScreenType(
     MythUIComposite(parent, name), m_LoadLock(1)
 {
     m_FullScreen = fullscreen;
-    m_CurrentFocusWidget = NULL;
+    m_CurrentFocusWidget = nullptr;
 
-    m_ScreenStack = NULL;
-    m_BusyPopup = NULL;
+    m_ScreenStack = nullptr;
+    m_BusyPopup = nullptr;
     m_IsDeleting = false;
     m_IsLoading = false;
     m_IsLoaded = false;
@@ -108,7 +108,7 @@ MythScreenType::~MythScreenType()
     // locking ensures background screen load can finish running
     SemaphoreLocker locker(&m_LoadLock);
 
-    m_CurrentFocusWidget = NULL;
+    m_CurrentFocusWidget = nullptr;
     emit Exiting();
 }
 
@@ -129,7 +129,7 @@ MythUIType *MythScreenType::GetFocusWidget(void) const
 
 bool MythScreenType::SetFocusWidget(MythUIType *widget)
 {
-    if (!widget || !widget->IsVisible())
+    if (!widget || !widget->IsVisible(true))
     {
         QMap<int, MythUIType *>::iterator it = m_FocusWidgetList.begin();
         MythUIType *current;
@@ -138,7 +138,7 @@ bool MythScreenType::SetFocusWidget(MythUIType *widget)
         {
             current = *it;
 
-            if (current->CanTakeFocus() && current->IsVisible())
+            if (current->CanTakeFocus() && current->IsVisible(true))
             {
                 widget = current;
                 break;
@@ -171,7 +171,7 @@ bool MythScreenType::SetFocusWidget(MythUIType *widget)
 bool MythScreenType::NextPrevWidgetFocus(bool up)
 {
     if (!m_CurrentFocusWidget || m_FocusWidgetList.isEmpty())
-        return SetFocusWidget(NULL);
+        return SetFocusWidget(nullptr);
 
     bool reachedCurrent = false;
     bool looped = false;
@@ -188,7 +188,7 @@ bool MythScreenType::NextPrevWidgetFocus(bool up)
             current = *it;
 
             if ((looped || reachedCurrent) &&
-                current->IsVisible() && current->IsEnabled())
+                current->IsVisible(true) && current->IsEnabled())
                 return SetFocusWidget(current);
 
             if (current == m_CurrentFocusWidget)
@@ -216,7 +216,7 @@ bool MythScreenType::NextPrevWidgetFocus(bool up)
             current = *it;
 
             if ((looped || reachedCurrent) &&
-                current->IsVisible() && current->IsEnabled())
+                current->IsVisible(true) && current->IsEnabled())
                 return SetFocusWidget(current);
 
             if (current == m_CurrentFocusWidget)
@@ -243,7 +243,7 @@ bool MythScreenType::NextPrevWidgetFocus(bool up)
 void MythScreenType::BuildFocusList(void)
 {
     m_FocusWidgetList.clear();
-    m_CurrentFocusWidget = NULL;
+    m_CurrentFocusWidget = nullptr;
 
     AddFocusableChildrenToList(m_FocusWidgetList);
 
@@ -376,7 +376,7 @@ void MythScreenType::CloseBusyPopup(void)
 {
     if (m_BusyPopup)
         m_BusyPopup->Close();
-    m_BusyPopup = NULL;
+    m_BusyPopup = nullptr;
 }
 
 void MythScreenType::SetBusyPopupMessage(const QString &message)

@@ -32,19 +32,17 @@ class AirPlayPictureScreen : public MythScreenType
 AirPlayPictureScreen::AirPlayPictureScreen(MythScreenStack *parent)
               :MythScreenType(parent, "airplaypicture"),
               m_imageFilename(""), m_imageDescription(""),
-              m_airplayImage(NULL), m_airplayText(NULL)
+              m_airplayImage(nullptr), m_airplayText(nullptr)
 {
 }
 
 bool AirPlayPictureScreen::Create(void)
 {
-    bool foundtheme = false;
-
     // Load the theme for this screen
     // The xml file containing the screen definition is airplay-ui.xml in this
     // example, the name of the screen in the xml is airplaypicture. This
     // should make sense when you look at the xml below
-    foundtheme = LoadWindowFromXML("airplay-ui.xml", "airplaypicture", this);
+    bool foundtheme = LoadWindowFromXML("airplay-ui.xml", "airplaypicture", this);
 
     if (!foundtheme) // If we cannot load the theme for any reason ...
         return false;

@@ -31,17 +31,9 @@ MythXMLClient::MythXMLClient( const QUrl &url )
 //
 /////////////////////////////////////////////////////////////////////////////
 
-MythXMLClient::~MythXMLClient()
-{
-}
-
-/////////////////////////////////////////////////////////////////////////////
-//
-/////////////////////////////////////////////////////////////////////////////
-
 UPnPResultCode MythXMLClient::GetConnectionInfo( const QString &sPin, DatabaseParams *pParams, QString &sMsg )
 {
-    if (pParams == NULL)
+    if (pParams == nullptr)
         return UPnPResult_InvalidArgs;
 
     int           nErrCode = 0;
@@ -115,6 +107,7 @@ UPnPResultCode MythXMLClient::GetConnectionInfo( const QString &sPin, DatabasePa
 
     if (( nErrCode == UPnPResult_HumanInterventionRequired ) || 
         ( nErrCode == UPnPResult_ActionNotAuthorized       ) ||
+        ( nErrCode == UPnPResult_MythTV_XmlParseError      ) ||
         ( nErrCode == 501                                  ) )
     {
         // Service calls no longer return UPnPResult codes, 
