@@ -1,7 +1,6 @@
 
-// c
+// c++
 #include <cstdlib>
-#include <stdlib.h>
 #include <unistd.h>
 
 // qt
@@ -40,7 +39,7 @@ class GetRecordingListThread : public MThread
         start();
     }
 
-    virtual void run(void)
+    void run(void) override // MThread
     {
         RunProlog();
         m_parent->getRecordingList();
@@ -50,29 +49,9 @@ class GetRecordingListThread : public MThread
     RecordingSelector *m_parent;
 };
 
-RecordingSelector::RecordingSelector(
-    MythScreenStack *parent, QList<ArchiveItem *> *archiveList) :
-    MythScreenType(parent, "RecordingSelector"),
-    m_archiveList(archiveList),
-    m_recordingList(nullptr),
-    m_recordingButtonList(nullptr),
-    m_okButton(nullptr),
-    m_cancelButton(nullptr),
-    m_categorySelector(nullptr),
-    m_titleText(nullptr),
-    m_datetimeText(nullptr),
-    m_filesizeText(nullptr),
-    m_descriptionText(nullptr),
-    m_previewImage(nullptr),
-    m_cutlistImage(nullptr)
-{
-}
-
 RecordingSelector::~RecordingSelector(void)
 {
-    if (m_recordingList)
-        delete m_recordingList;
-
+    delete m_recordingList;
     while (!m_selectedList.isEmpty())
         delete m_selectedList.takeFirst();
 }
@@ -183,7 +162,7 @@ bool RecordingSelector::keyPressEvent(QKeyEvent *event)
 
         if (action == "MENU")
         {
-            showMenu();
+            ShowMenu();
         }
         else
             handled = false;
@@ -195,7 +174,7 @@ bool RecordingSelector::keyPressEvent(QKeyEvent *event)
     return handled;
 }
 
-void RecordingSelector::showMenu()
+void RecordingSelector::ShowMenu()
 {
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
@@ -416,7 +395,7 @@ void RecordingSelector::updateRecordingList(void)
                     p->GetScheduledStartTime().toLocalTime()
                     .toString("dd MMM yy (hh:mm)"));
                 item->setCheckable(true);
-                if (m_selectedList.indexOf((ProgramInfo *) p) != -1)
+                if (m_selectedList.indexOf(p) != -1)
                 {
                     item->setChecked(MythUIButtonListItem::FullChecked);
                 }
@@ -538,7 +517,7 @@ void RecordingSelector::updateSelectedList()
     for (int x = 0; x < m_archiveList->size(); x++)
     {
         ArchiveItem *a = m_archiveList->at(x);
-        for (uint y = 0; y < m_recordingList->size(); y++)
+        for (size_t y = 0; y < m_recordingList->size(); y++)
         {
             ProgramInfo *p = m_recordingList->at(y);
             if (p->GetPlaybackURL(false, true) == a->filename)

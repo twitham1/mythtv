@@ -8,12 +8,13 @@
 
 // C++/C headers
 #include <cerrno>
-#include <unistd.h>
-#include <stdlib.h>
+#include <csignal>  // for kill()
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <fcntl.h>
-#include <time.h>
-#include <signal.h>  // for kill()
-#include <string.h>
+#include <unistd.h>
 
 // QT headers
 #include <QCoreApplication>
@@ -31,7 +32,6 @@
 // Windows headers
 #include <windows.h>
 #include <tchar.h>
-#include <stdio.h>
 
 #define CLOSE(x) \
 if( (x) ) { \
@@ -185,7 +185,7 @@ bool MythSystemLegacyIOHandler::HandleWrite(HANDLE h, QBuffer *buff)
         return false;
     }
 
-    else if( rlen != len )
+    if( rlen != len )
         buff->seek(pos+rlen);
 
     return true;
@@ -229,14 +229,6 @@ void MythSystemLegacyIOHandler::wake()
     m_pWait.wakeAll();
 }
 
-
-MythSystemLegacyManager::MythSystemLegacyManager() :
-    MThread("SystemManager")
-{
-    m_jumpAbort = false;
-    m_childCount = 0;
-    m_children = nullptr;
-}
 
 MythSystemLegacyManager::~MythSystemLegacyManager()
 {
@@ -460,12 +452,6 @@ void MythSystemLegacyManager::jumpAbort(void)
 }
 
 // spawn separate thread for signals to prevent manager
-// thread from blocking in some slot
-MythSystemLegacySignalManager::MythSystemLegacySignalManager() :
-    MThread("SystemSignalManager")
-{
-}
-
 void MythSystemLegacySignalManager::run(void)
 {
     RunProlog();
@@ -529,8 +515,7 @@ void MythSystemLegacySignalManager::run(void)
  ******************************/
 
 MythSystemLegacyWindows::MythSystemLegacyWindows(MythSystemLegacy *parent) :
-    MythSystemLegacyPrivate("MythSystemLegacyWindows"),
-    m_child(nullptr), m_timeout(0)
+    MythSystemLegacyPrivate("MythSystemLegacyWindows")
 {
     m_parent = parent;
 

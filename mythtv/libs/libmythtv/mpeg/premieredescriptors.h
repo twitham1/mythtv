@@ -2,10 +2,9 @@
 #ifndef _PRIVATE_DESCRIPTORS_H_
 #define _PRIVATE_DESCRIPTORS_H_
 
-#include <stdint.h>
-#include <inttypes.h>
-
 // C++ headers
+#include <cinttypes>
+#include <cstdint>
 #include <vector>
 using namespace std;
 
@@ -25,7 +24,7 @@ class PremiereContentTransmissionDescriptor : public MPEGDescriptor
                          PrivateDescriptorID::premiere_content_transmission),
           _transmission_count(0)
     {
-        if (_data && !Parse())
+        if (_data && !PremiereContentTransmissionDescriptor::Parse())
             _data = nullptr;
     }
 

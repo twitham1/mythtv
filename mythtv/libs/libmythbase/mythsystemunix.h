@@ -3,8 +3,8 @@
 #ifndef _MYTHSYSTEM_UNIX_H_
 #define _MYTHSYSTEM_UNIX_H_
 
+#include <csignal>
 #include <sys/select.h>
-#include <signal.h>
 
 #include <QObject>
 #include <QString>
@@ -32,7 +32,7 @@ class MythSystemLegacyIOHandler: public MThread
     public:
         explicit MythSystemLegacyIOHandler(bool read);
         ~MythSystemLegacyIOHandler() { wait(); }
-        void   run(void);
+        void   run(void) override; // MThread
 
         void   insert(int fd, QBuffer *buff);
         void   Wait(int fd);
@@ -50,23 +50,26 @@ class MythSystemLegacyIOHandler: public MThread
         PMap_t          m_pMap;
 
         fd_set m_fds;
-        int    m_maxfd;
+        int    m_maxfd {-1};
         bool   m_read;
         char   m_readbuf[65536];
 };
 
+// spawn separate thread for signals to prevent manager
+// thread from blocking in some slot
 class MythSystemLegacyManager : public MThread
 {
     public:
-        MythSystemLegacyManager();
+        MythSystemLegacyManager()
+            : MThread("SystemManager") {}
         ~MythSystemLegacyManager() { wait(); }
-        void run(void);
+        void run(void) override; // MThread
         void append(MythSystemLegacyUnix *);
         void jumpAbort(void);
     private:
         MSMap_t    m_pMap;
         QMutex     m_mapLock;
-        bool       m_jumpAbort;
+        bool       m_jumpAbort {false};
         QMutex     m_jumpLock;
         QWaitCondition m_wait;
 };
@@ -74,9 +77,10 @@ class MythSystemLegacyManager : public MThread
 class MythSystemLegacySignalManager : public MThread
 {
     public:
-        MythSystemLegacySignalManager();
+        MythSystemLegacySignalManager()
+            : MThread("SystemSignalManager") {}
         ~MythSystemLegacySignalManager() { wait(); }
-        void run(void);
+        void run(void) override; // MThread
     private:
 };
 
@@ -89,23 +93,23 @@ class MBASE_PUBLIC MythSystemLegacyUnix : public MythSystemLegacyPrivate
         explicit MythSystemLegacyUnix(MythSystemLegacy *parent);
         ~MythSystemLegacyUnix() = default;
 
-        virtual void Fork(time_t timeout) MOVERRIDE;
-        virtual void Manage(void) MOVERRIDE;
+        void Fork(time_t timeout) override; // MythSystemLegacyPrivate
+        void Manage(void) override; // MythSystemLegacyPrivate
 
-        virtual void Term(bool force=false) MOVERRIDE;
-        virtual void Signal(int sig) MOVERRIDE;
-        virtual void JumpAbort(void) MOVERRIDE;
+        void Term(bool force=false) override; // MythSystemLegacyPrivate
+        void Signal(int sig) override; // MythSystemLegacyPrivate
+        void JumpAbort(void) override; // MythSystemLegacyPrivate
 
-        virtual bool ParseShell(const QString &cmd, QString &abscmd,
-                                QStringList &args) MOVERRIDE;
+        bool ParseShell(const QString &cmd, QString &abscmd,
+                        QStringList &args) override; // MythSystemLegacyPrivate
 
         friend class MythSystemLegacyManager;
         friend class MythSystemLegacySignalManager;
         friend class MythSystemLegacyIOHandler;
 
     private:
-        pid_t       m_pid;
-        time_t      m_timeout;
+        pid_t       m_pid     {0};
+        time_t      m_timeout {0};
 
         int         m_stdpipe[3];
 };

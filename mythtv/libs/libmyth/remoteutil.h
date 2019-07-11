@@ -1,7 +1,7 @@
 #ifndef REMOTEUTIL_H_
 #define REMOTEUTIL_H_
 
-#include <time.h>
+#include <ctime>
 
 #include <QStringList>
 #include <QDateTime>
@@ -45,7 +45,7 @@ MPUBLIC int RemoteGetRecordingStatus(const ProgramInfo *pginfo, int overrecsecs,
                                      int underrecsecs);
 MPUBLIC vector<ProgramInfo *> *RemoteGetCurrentlyRecordingList(void);
 
-MPUBLIC bool RemoteGetFileList(QString host, QString path, QStringList* list,
+MPUBLIC bool RemoteGetFileList(const QString& host, const QString& path, QStringList* list,
                        QString sgroup, bool fileNamesOnly = false);
 MPUBLIC bool RemoteGetActiveBackends(QStringList *list);
 

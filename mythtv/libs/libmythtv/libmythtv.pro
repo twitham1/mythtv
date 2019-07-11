@@ -175,10 +175,6 @@ SOURCES += recordingfile.cpp
 HEADERS += diseqc.h                 diseqcsettings.h
 SOURCES += diseqc.cpp               diseqcsettings.cpp
 
-# Listings downloading classes
-HEADERS += datadirect.h
-SOURCES += datadirect.cpp
-
 # File/FIFO Writer classes
 HEADERS += filewriterbase.h         avformatwriter.h
 HEADERS += fifowriter.h
@@ -513,6 +509,12 @@ using_frontend {
         SOURCES += vaapi2context.cpp
     }
 
+    using_nvdec {
+        DEFINES += USING_NVDEC
+        HEADERS += nvdeccontext.h
+        SOURCES += nvdeccontext.cpp
+    }
+
     using_mediacodec {
         DEFINES += USING_MEDIACODEC
         HEADERS += mediacodeccontext.h
@@ -585,7 +587,6 @@ using_backend {
     HEADERS += channelscan/channelscanner_cli.h
     HEADERS += channelscan/frequencytablesetting.h
     HEADERS += channelscan/inputselectorsetting.h
-    HEADERS += channelscan/loglist.h
     HEADERS += channelscan/channelscanmiscsettings.h
     HEADERS += channelscan/modulationsetting.h
     HEADERS += channelscan/multiplexsetting.h
@@ -608,11 +609,15 @@ using_backend {
     SOURCES += channelscan/channelscanner_cli.cpp
     SOURCES += channelscan/frequencytablesetting.cpp
     SOURCES += channelscan/inputselectorsetting.cpp
-    SOURCES += channelscan/loglist.cpp
     SOURCES += channelscan/multiplexsetting.cpp
     SOURCES += channelscan/paneanalog.cpp
     SOURCES += channelscan/scanmonitor.cpp
     SOURCES += channelscan/scanwizardconfig.cpp
+
+#if !defined( USING_MINGW ) && !defined( _MSC_VER )
+    HEADERS += channelscan/externrecscanner.h
+    SOURCES += channelscan/externrecscanner.cpp
+#endif
 
     # EIT stuff
     HEADERS += eithelper.h                 eitscanner.h
@@ -789,6 +794,9 @@ using_backend {
         SOURCES *= recorders/streamhandler.cpp
 
         DEFINES += USING_HDHOMERUN
+        DEFINES += HDHOMERUN_HEADERFILE=\\\"$${HDHOMERUN_PREFIX}hdhomerun.h\\\"
+        contains(HDHOMERUN_V2, yes): DEFINES += HDHOMERUN_V2
+        contains(HDHOMERUN_DEVICE_SELECTOR_LOAD_FROM_STR, yes): DEFINES += NEED_HDHOMERUN_DEVICE_SELECTOR_LOAD_FROM_STR
     }
 
     # Support for VBox
@@ -834,6 +842,8 @@ using_backend {
     # External recorder
     HEADERS += recorders/ExternalChannel.h
     SOURCES += recorders/ExternalChannel.cpp
+    HEADERS += recorders/ExternalRecChannelFetcher.h
+    SOURCES += recorders/ExternalRecChannelFetcher.cpp
     HEADERS += recorders/ExternalRecorder.h
     SOURCES += recorders/ExternalRecorder.cpp
     HEADERS += recorders/ExternalStreamHandler.h

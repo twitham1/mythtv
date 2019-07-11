@@ -34,8 +34,10 @@ using namespace omxcontext;
 
 // VideoFrame <> OMX_BUFFERHEADERTYPE
 #define FRAMESETHDR(f,h) ((f)->priv[2] = reinterpret_cast<unsigned char* >(h))
+#define FRAMESETHDRNONE(f) ((f)->priv[2] = nullptr)
 #define FRAME2HDR(f) ((OMX_BUFFERHEADERTYPE*)((f)->priv[2]))
 #define FRAMESETREF(f,r) ((f)->priv[1] = reinterpret_cast<unsigned char* >(r))
+#define FRAMESETREFNONE(f) ((f)->priv[1] = nullptr)
 #define FRAME2REF(f) ((AVBufferRef*)((f)->priv[1]))
 #define HDR2FRAME(h) ((VideoFrame*)((h)->pAppPrivate))
 
@@ -70,7 +72,7 @@ static const char *H264Profile2String(int profile);
 // Convert PTS <> OMX ticks
 static inline OMX_TICKS Pts2Ticks(AVStream *stream, int64_t pts)
 {
-    if (pts == int64_t(AV_NOPTS_VALUE))
+    if (pts == AV_NOPTS_VALUE)
         return S64_TO_TICKS(0);
 
     return S64_TO_TICKS( int64_t(
@@ -109,7 +111,9 @@ PrivateDecoderOMX::PrivateDecoderOMX() :
     for (unsigned port = 0; port < m_videc.Ports(); ++port)
     {
         m_videc.ShowPortDef(port, LOG_DEBUG);
-        if (0) m_videc.ShowFormats(port, LOG_DEBUG);
+#if 0
+        m_videc.ShowFormats(port, LOG_DEBUG);
+#endif
     }
 }
 
@@ -578,12 +582,12 @@ OMX_ERRORTYPE PrivateDecoderOMX::FreeOutputBuffersCB()
         VideoFrame *frame = HDR2FRAME(hdr);
         if (frame && FRAME2HDR(frame) == hdr)
         {
-            FRAMESETHDR(frame, 0);
+            FRAMESETHDRNONE(frame);
 
             AVBufferRef *ref = FRAME2REF(frame);
             if (ref)
             {
-                FRAMESETREF(frame, 0);
+                FRAMESETREFNONE(frame);
                 av_buffer_unref(&ref);
             }
         }
@@ -785,12 +789,10 @@ int PrivateDecoderOMX::GetFrame(
         *got_picture_ptr = 0;
         return -1;
     }
-    else 
-    {
-        // Submit a packet for decoding
-        lock.unlock();
-        return (pkt && pkt->size) ? ProcessPacket(stream, pkt) : 0;
-    }
+
+    // Submit a packet for decoding
+    lock.unlock();
+    return (pkt && pkt->size) ? ProcessPacket(stream, pkt) : 0;
 }
 
 // Submit a packet for decoding
@@ -852,7 +854,6 @@ int PrivateDecoderOMX::ProcessPacket(AVStream *stream, AVPacket *pkt)
         hdr->nFilledLen += cnt;
         buf += cnt;
         size -= cnt;
-        free -= cnt;
 
         hdr->nTimeStamp = Pts2Ticks(stream, pkt->pts);
         if (!m_bStartTime && (pkt->flags & AV_PKT_FLAG_KEY))
@@ -998,7 +999,7 @@ int PrivateDecoderOMX::GetBufferedFrame(AVStream *stream, AVFrame *picture)
 
             // Indicate the buffered frame from the completed OMX buffer
             picture->buf[0] = FRAME2REF(frame);
-            FRAMESETREF(frame, 0);
+            FRAMESETREFNONE(frame);
             picture->opaque = frame;
         }
         else if (in_fmt == avctx->pix_fmt)
@@ -1022,7 +1023,7 @@ int PrivateDecoderOMX::GetBufferedFrame(AVStream *stream, AVFrame *picture)
 
             AVFrame img_in, img_out;
             av_image_fill_arrays(img_out.data, img_out.linesize,
-                (uint8_t *)vf.buf, out_fmt, out_width,
+                vf.buf, out_fmt, out_width,
                 out_height, IMAGE_ALIGN);
             av_image_fill_arrays(img_in.data, img_in.linesize,
                 src, in_fmt, in_width, in_height, IMAGE_ALIGN);
@@ -1231,7 +1232,7 @@ OMX_ERRORTYPE PrivateDecoderOMX::Event(OMXComponent &cmpnt, OMX_EVENTTYPE eEvent
 
 // virtual
 OMX_ERRORTYPE PrivateDecoderOMX::EmptyBufferDone(
-    OMXComponent&, OMX_BUFFERHEADERTYPE *hdr)
+    OMXComponent& /*cmpnt*/, OMX_BUFFERHEADERTYPE *hdr)
 {
     assert(hdr->nSize == sizeof(OMX_BUFFERHEADERTYPE));
     assert(hdr->nVersion.nVersion == OMX_VERSION);
@@ -1249,7 +1250,7 @@ OMX_ERRORTYPE PrivateDecoderOMX::EmptyBufferDone(
 
 // virtual
 OMX_ERRORTYPE PrivateDecoderOMX::FillBufferDone(
-    OMXComponent&, OMX_BUFFERHEADERTYPE *hdr)
+    OMXComponent& /*cmpnt*/, OMX_BUFFERHEADERTYPE *hdr)
 {
     assert(hdr->nSize == sizeof(OMX_BUFFERHEADERTYPE));
     assert(hdr->nVersion.nVersion == OMX_VERSION);
@@ -1265,7 +1266,7 @@ OMX_ERRORTYPE PrivateDecoderOMX::FillBufferDone(
 }
 
 // virtual
-void PrivateDecoderOMX::ReleaseBuffers(OMXComponent &)
+void PrivateDecoderOMX::ReleaseBuffers(OMXComponent & /*cmpnt*/)
 {
     // Free all output buffers
     FreeOutputBuffersCB();

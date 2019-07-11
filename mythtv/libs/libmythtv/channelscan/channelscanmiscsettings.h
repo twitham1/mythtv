@@ -30,7 +30,6 @@
 #ifndef _MISC_SETTINGS_H_
 #define _MISC_SETTINGS_H_
 
-#include "settings.h"
 #include "standardsettings.h"
 #include "channelscantypes.h"
 
@@ -121,6 +120,40 @@ class FreeToAirOnly : public TransMythUICheckBoxSetting
     };
 };
 
+class ChannelNumbersOnly : public TransMythUICheckBoxSetting
+{
+  public:
+    ChannelNumbersOnly()
+    {
+        setValue(false);
+        setLabel(QObject::tr("Logical Channel Numbers required"));
+        setHelpText(
+            QObject::tr(
+                "If set, only services with a Logical Channel Number will "
+                "be added during the scan. This will filter out services "
+                "for set-top-box firmware download and video-on-demand "
+                "that can be present on DVB-C networks."));
+    };
+};
+
+class CompleteChannelsOnly : public TransMythUICheckBoxSetting
+{
+  public:
+    CompleteChannelsOnly()
+    {
+        setValue(false);
+        setLabel(QObject::tr("Complete scan data required"));
+        setHelpText(
+            QObject::tr(
+                "If set, only services that are present in the PAT, the PMT "
+                "and the SDT and that have a name will be added during the scan. "
+                "On satellites there are typically many incomplete "
+                "channels, such as feeds and offline channels, "
+                "that are not useful in a typical MythTV system. "
+                "These are filtered out by this option."));
+    };
+};
+
 class AddFullTS : public TransMythUICheckBoxSetting
 {
   public:
@@ -191,6 +224,7 @@ class ScanSymbolRateDVBS: public TransMythUIComboBoxSetting
         addSelection("28000000");
         addSelection("28500000");
         addSelection("29500000");
+        addSelection("29700000");
         addSelection("29900000");
     }
 };

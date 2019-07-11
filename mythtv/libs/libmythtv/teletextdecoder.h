@@ -1,7 +1,7 @@
 #ifndef VBIDECODER_H_
 #define VBIDECODER_H_
 
-#include <stdint.h>
+#include <cstdint>
 
 class TeletextReader;
 
@@ -9,15 +9,15 @@ class TeletextDecoder
 {
   public:
     explicit TeletextDecoder(TeletextReader *reader)
-      : m_teletext_reader(reader), m_decodertype(-1) {}
+      : m_teletext_reader(reader) {}
     virtual ~TeletextDecoder() = default;
 
     int  GetDecoderType(void) const { return m_decodertype; }
     void Decode(const unsigned char *buf, int vbimode);
 
   private:
-    TeletextReader *m_teletext_reader;
-    int             m_decodertype;
+    TeletextReader *m_teletext_reader {nullptr};
+    int             m_decodertype     {-1};
 };
 
 #endif

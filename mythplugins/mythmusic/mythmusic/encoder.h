@@ -1,8 +1,8 @@
 #ifndef ENCODER_H_
 #define ENCODER_H_
 
+#include <cstdio>
 #include <sys/types.h>
-#include <stdio.h>
 
 #define EENCODEERROR -1
 #define EPARTIALSAMPLE -2
@@ -20,10 +20,10 @@ class Encoder
     virtual bool isValid() { return (m_out != nullptr); }
 
   protected:
-    const QString m_outfile;
-    FILE *m_out;
-    int m_quality;
-    MusicMetadata *m_metadata;
+    const QString  m_outfile;
+    FILE          *m_out      {nullptr};
+    int            m_quality;
+    MusicMetadata *m_metadata {nullptr};
 };
 
 #endif

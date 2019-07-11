@@ -27,10 +27,10 @@ ChannelWizard::ChannelWizard(int id, int default_sourceid)
     setLabel(tr("Channel Options"));
 
     // Must be first.
-    addChild(cid = new ChannelID());
-    cid->setValue(id);
+    addChild(m_cid = new ChannelID());
+    m_cid->setValue(id);
 
-    QStringList cardtypes = ChannelUtil::GetInputTypes(cid->getValue().toUInt());
+    QStringList cardtypes = ChannelUtil::GetInputTypes(m_cid->getValue().toUInt());
 
     // For a new channel the list will be empty so get it this way.
     if (cardtypes.empty())
@@ -45,29 +45,24 @@ ChannelWizard::ChannelWizard(int id, int default_sourceid)
     }
 
     ChannelOptionsCommon *common =
-        new ChannelOptionsCommon(*cid, default_sourceid,!all_v4l);
+        new ChannelOptionsCommon(*m_cid, default_sourceid,!all_v4l);
     addChild(common);
 
     ChannelOptionsFilters *filters =
-        new ChannelOptionsFilters(*cid);
+        new ChannelOptionsFilters(*m_cid);
     addChild(filters);
 
     if (all_v4l)
-        addChild(new ChannelOptionsV4L(*cid));
+        addChild(new ChannelOptionsV4L(*m_cid));
     else if (all_asi)
-        addChild(new ChannelOptionsRawTS(*cid));
+        addChild(new ChannelOptionsRawTS(*m_cid));
 }
 
 /////////////////////////////////////////////////////////
 
 ChannelEditor::ChannelEditor(MythScreenStack *parent)
               : MythScreenType(parent, "channeleditor"),
-    m_sourceFilter(FILTER_ALL),
-    m_currentSortMode(QCoreApplication::translate("(Common)", "Channel Name")),
-    m_currentHideMode(false),
-    m_channelList(nullptr), m_sourceList(nullptr), m_preview(nullptr),
-    m_channame(nullptr), m_channum(nullptr), m_callsign(nullptr),
-    m_chanid(nullptr), m_sourcename(nullptr), m_compoundname(nullptr)
+    m_currentSortMode(QCoreApplication::translate("(Common)", "Channel Name"))
 {
 }
 
@@ -110,6 +105,7 @@ bool ChannelEditor::Create()
     // Sort List
     new MythUIButtonListItem(sortList, tr("Channel Name"));
     new MythUIButtonListItem(sortList, tr("Channel Number"));
+    new MythUIButtonListItem(sortList, tr("Multiplex Frequency"));
     connect(m_sourceList, SIGNAL(itemSelected(MythUIButtonListItem *)),
             SLOT(setSourceID(MythUIButtonListItem *)));
     sortList->SetValue(m_currentSortMode);
@@ -250,9 +246,12 @@ void ChannelEditor::fillList(void)
     bool fAllSources = true;
 
     QString querystr = "SELECT channel.name,channum,chanid,callsign,icon,"
-                       "visible ,videosource.name FROM channel "
+                       "channel.visible ,videosource.name, serviceid, "
+                       "dtv_multiplex.frequency FROM channel "
                        "LEFT JOIN videosource ON "
-                       "(channel.sourceid = videosource.sourceid) ";
+                       "(channel.sourceid = videosource.sourceid) "
+                       "LEFT JOIN dtv_multiplex ON "
+                       "(channel.mplexid = dtv_multiplex.mplexid)";
 
     if (m_sourceFilter == FILTER_ALL)
     {
@@ -272,6 +271,10 @@ void ChannelEditor::fillList(void)
     else if (m_currentSortMode == tr("Channel Number"))
     {
         querystr += " ORDER BY channum + 0";
+    }
+    else if (m_currentSortMode == tr("Multiplex Frequency"))
+    {
+        querystr += " ORDER BY dtv_multiplex.frequency, serviceid";
     }
 
     MSqlQuery query(MSqlQuery::InitCon());

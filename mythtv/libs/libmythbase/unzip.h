@@ -33,6 +33,8 @@
 #include <QDateTime>
 
 #include <zlib.h>
+#undef Z_NULL
+#define Z_NULL nullptr
 
 #include "mythbaseexp.h"
 
@@ -138,6 +140,9 @@ public:
 	void setPassword(const QString& pwd);
 
 private:
+        UnZip(const UnZip &) = delete;            // not copyable
+        UnZip &operator=(const UnZip &) = delete; // not copyable
+
 	UnzipPrivate* d;
 };
 

@@ -38,7 +38,7 @@
 #ifdef __FreeBSD__
 #include <sys/time.h>
 #else
-#include <time.h>
+#include <ctime>
 #endif
 
 #include "config.h"
@@ -50,12 +50,6 @@
  * As with many of the more abstruse aspects of MHEG they are not all used in any
  * applications I've seen so I haven't implemented them.
  */
-
-
-MHProgram::MHProgram()
-{
-    m_fInitiallyAvailable = true; // Default true
-}
 
 void MHProgram::Initialise(MHParseNode *p, MHEngine *engine)
 {
@@ -1042,16 +1036,6 @@ void MHResidentProgram::CallProgram(bool fIsFork, const MHObjectRef &success, co
     }
 }
 
-MHRemoteProgram::MHRemoteProgram()
-{
-
-}
-
-MHRemoteProgram::~MHRemoteProgram()
-{
-
-}
-
 void MHRemoteProgram::Initialise(MHParseNode *p, MHEngine *engine)
 {
     MHProgram::Initialise(p, engine);
@@ -1066,16 +1050,6 @@ void MHRemoteProgram::PrintMe(FILE *fd, int nTabs) const
     fprintf(fd, "****TODO\n");
     PrintTabs(fd, nTabs);
     fprintf(fd, "}\n");
-}
-
-MHInterChgProgram::MHInterChgProgram()
-{
-
-}
-
-MHInterChgProgram::~MHInterChgProgram()
-{
-
 }
 
 void MHInterChgProgram::Initialise(MHParseNode *p, MHEngine *engine)

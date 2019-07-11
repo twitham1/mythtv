@@ -19,7 +19,6 @@
 #include <cmath>
 
 // POSIX headers
-#include <compat.h>
 #ifndef _WIN32
 #include <sys/utsname.h> 
 #endif
@@ -115,7 +114,7 @@ QString  HttpServer::s_platform;
 /////////////////////////////////////////////////////////////////////////////
 
 HttpServer::HttpServer() :
-    ServerPool(), m_sSharePath(GetShareDir()),
+    m_sSharePath(GetShareDir()),
     m_threadPool("HttpServerPool"), m_running(true),
     m_privateToken(QUuid::createUuid().toString()) // Cryptographically random and sufficiently long enough to act as a secure token
 {
@@ -453,7 +452,7 @@ uint HttpServer::GetSocketTimeout(HTTPRequest* pRequest) const
 HttpWorker::HttpWorker(HttpServer &httpServer, qt_socket_fd_t sock,
                        PoolServerType type
 #ifndef QT_NO_OPENSSL
-                       , QSslConfiguration sslConfig
+                       , const QSslConfiguration& sslConfig
 #endif
 )
            : m_httpServer(httpServer), m_socket(sock),

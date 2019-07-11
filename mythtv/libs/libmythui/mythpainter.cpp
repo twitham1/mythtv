@@ -1,6 +1,6 @@
-#include <stdint.h>
 #include <algorithm>
 #include <complex>
+#include <cstdint>
 
 // QT headers
 #include <QRect>
@@ -14,14 +14,12 @@
 // libmythui headers
 #include "mythfontproperties.h"
 #include "mythimage.h"
-#include "mythuianimation.h"	// UIEffects
+#include "mythuianimation.h"    // UIEffects
 
 // Own header
 #include "mythpainter.h"
 
 MythPainter::MythPainter()
-  : m_Parent(nullptr), m_HardwareCacheSize(0), m_SoftwareCacheSize(0),
-    m_showBorders(false), m_showNames(false)
 {
     SetMaximumCacheSizes(
         gCoreContext->GetNumSetting("UIPainterMaxCacheHW",64),
@@ -47,11 +45,11 @@ void MythPainter::Teardown(void)
     m_allocatedImages.clear();
 }
 
-void MythPainter::SetClipRect(const QRect &)
+void MythPainter::SetClipRect(const QRect & /*clipRect*/)
 {
 }
 
-void MythPainter::SetClipRegion(const QRegion &)
+void MythPainter::SetClipRegion(const QRegion & /*clipRegion*/)
 {
 }
 
@@ -453,8 +451,14 @@ MythImage *MythPainter::GetImageFromTextLayout(const LayoutVector &layouts,
 
         painter.setPen(QPen(font.GetBrush(), 0));
         for (Ipara = layouts.begin(); Ipara != layouts.end(); ++Ipara)
+        {
+#if QT_VERSION >= QT_VERSION_CHECK(5,6,0)
+            (*Ipara)->draw(&painter, canvas.topLeft(),
+                           (*Ipara)->formats(), clip);
+#else
             (*Ipara)->draw(&painter, canvas.topLeft(), formats, clip);
-
+#endif
+        }
         painter.end();
 
         pm.setOffset(canvas.topLeft());

@@ -1,7 +1,7 @@
 #ifndef MYTHTIMER_H_
 #define MYTHTIMER_H_
 
-#include <inttypes.h>
+#include <cinttypes>
 #include <QElapsedTimer>
 #include "mythbaseexp.h"
 
@@ -32,7 +32,7 @@ class MBASE_PUBLIC MythTimer
 
   private:
     QElapsedTimer m_timer;
-    int m_offset;
+    int           m_offset {0};
 };
 
 #endif

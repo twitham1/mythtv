@@ -2,6 +2,7 @@
 #include <QApplication>
 #include <QFileInfo>
 #include <QRunnable>
+#include <utility>
 
 #include "mythcorecontext.h"
 #include "mthreadpool.h"
@@ -34,20 +35,16 @@ class SystemEventThread : public QRunnable
      *  \param eventName Optional System Event name for this command
      */
     SystemEventThread(const QString &cmd, QString eventName = "")
-      : m_command(cmd), m_event(eventName) {};
+      : m_command(cmd), m_event(std::move(eventName)) {};
 
     /** \fn SystemEventThread::run()
      *  \brief Runs the System Event handler command
      *
      *  Overrides QRunnable::run()
      */
-    void run(void)
+    void run(void) override // QRunnable
     {
         uint flags = kMSDontBlockInputDevs;
-
-        m_event.detach();
-        m_command.detach();
-
         uint result = myth_system(m_command, flags);
 
         LOG(VB_GENERAL,
@@ -213,6 +210,7 @@ void MythSystemEventHandler::SubstituteMatches(const QStringList &tokens,
     }
 
     command.replace(QString("%VERBOSELEVEL%"), QString("%1").arg(verboseMask));
+    command.replace("%VERBOSEMODE%", QString("%1").arg(logPropagateArgs));
 
     LOG(VB_FILE, LOG_DEBUG, LOC + QString("SubstituteMatches: AFTER : %1")
                                             .arg(command));
@@ -261,7 +259,7 @@ QString MythSystemEventHandler::EventNameToSetting(const QString &name)
  */
 void MythSystemEventHandler::customEvent(QEvent *e)
 {
-    if ((MythEvent::Type)(e->type()) == MythEvent::MythEventMessage)
+    if (e->type() == MythEvent::MythEventMessage)
     {
         MythEvent *me = static_cast<MythEvent *>(e);
         QString msg = me->Message().simplified();

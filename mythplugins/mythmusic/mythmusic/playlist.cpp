@@ -1,9 +1,8 @@
-#include <unistd.h>
-#include <inttypes.h>
-#include <cstdlib>
-
-#include <map>
 #include <algorithm>
+#include <cinttypes>
+#include <cstdlib>
+#include <map>
+#include <unistd.h>
 using namespace std;
 
 // qt
@@ -38,10 +37,7 @@ const char *kID0err = "Song with ID of 0 in playlist, this shouldn't happen.";
 
 bool Playlist::checkTrack(MusicMetadata::IdType trackID) const
 {
-    if (m_songs.contains(trackID))
-        return true;
-
-    return false;
+    return m_songs.contains(trackID);
 }
 
 void Playlist::copyTracks(Playlist *to_ptr, bool update_display)
@@ -70,9 +66,9 @@ void Playlist::addTrack(MusicMetadata::IdType trackID, bool update_display)
     MusicMetadata *mdata = nullptr;
 
     if (repo == RT_Radio)
-        mdata = gMusicData->all_streams->getMetadata(trackID);
+        mdata = gMusicData->m_all_streams->getMetadata(trackID);
     else
-        mdata = gMusicData->all_music->getMetadata(trackID);
+        mdata = gMusicData->m_all_music->getMetadata(trackID);
 
     if (mdata)
     {
@@ -146,16 +142,7 @@ void Playlist::moveTrackUpDown(bool flag, int where_its_at)
 }
 
 Playlist::Playlist(void) :
-    m_playlistid(0),
-    m_name(tr("oops")),
-    m_parent(nullptr),
-    m_changed(false),
-    m_doSave(true)
-#ifdef CD_WRTITING_FIXED
-    m_progress(nullptr),
-    m_proc(nullptr),
-    m_procExitVal(0)
-#endif
+    m_name(tr("oops"))
 {
 }
 
@@ -542,7 +529,7 @@ void Playlist::getStats(uint *trackCount, uint *totalLength, uint currenttrack, 
     *totalLength = total / 1000;
 }
 
-void Playlist::loadPlaylist(QString a_name, QString a_host)
+void Playlist::loadPlaylist(const QString& a_name, const QString& a_host)
 {
     QString thequery;
     QString rawSonglist;
@@ -599,7 +586,7 @@ void Playlist::loadPlaylist(QString a_name, QString a_host)
     shuffleTracks(MusicPlayer::SHUFFLE_OFF);
 }
 
-void Playlist::loadPlaylistByID(int id, QString a_host)
+void Playlist::loadPlaylistByID(int id, const QString& a_host)
 {
     QString rawSonglist;
     MSqlQuery query(MSqlQuery::InitCon());
@@ -655,7 +642,7 @@ void Playlist::resync(void)
     }
 }
 
-void Playlist::fillSongsFromSonglist(QString songList)
+void Playlist::fillSongsFromSonglist(const QString& songList)
 {
     MusicMetadata::IdType id;
     bool badTrack = false;
@@ -669,7 +656,7 @@ void Playlist::fillSongsFromSonglist(QString songList)
         if (repo == RT_Radio)
         {
             // check this is a valid stream ID
-            if (gMusicData->all_streams->isValidID(id))
+            if (gMusicData->m_all_streams->isValidID(id))
                 m_songs.push_back(id);
             else
             {
@@ -680,7 +667,7 @@ void Playlist::fillSongsFromSonglist(QString songList)
         else
         {
             // check this is a valid track ID
-            if (gMusicData->all_music->isValidID(id))
+            if (gMusicData->m_all_music->isValidID(id))
                 m_songs.push_back(id);
             else
             {
@@ -702,7 +689,7 @@ void Playlist::fillSongsFromSonglist(QString songList)
         gPlayer->activePlaylistChanged(-1, false);
 }
 
-void Playlist::fillSonglistFromQuery(QString whereClause,
+void Playlist::fillSonglistFromQuery(const QString& whereClause,
                                      bool removeDuplicates,
                                      InsertPLOption insertOption,
                                      int currentTrackID)
@@ -772,7 +759,7 @@ void Playlist::fillSonglistFromQuery(QString whereClause,
             for (; it != list.end(); ++it)
             {
                 int an_int = (*it).toInt();
-                tempList += "," + QString(*it);
+                tempList += "," + *it;
                 if (!bFound && an_int == currentTrackID)
                 {
                     bFound = true;
@@ -841,8 +828,8 @@ void Playlist::fillSonglistFromList(const QList<int> &songList,
             QString tempList;
             for (; it != list.end(); ++it)
             {
-                int an_int = QString(*it).toInt();
-                tempList += "," + QString(*it);
+                int an_int = (*it).toInt();
+                tempList += "," + *it;
                 if (!bFound && an_int == currentTrackID)
                 {
                     bFound = true;
@@ -908,7 +895,7 @@ QString Playlist::toRawSonglist(bool shuffled, bool tracksOnly)
     return rawList;
 }
 
-void Playlist::fillSonglistFromSmartPlaylist(QString category, QString name,
+void Playlist::fillSonglistFromSmartPlaylist(const QString& category, const QString& name,
                                              bool removeDuplicates,
                                              InsertPLOption insertOption,
                                              int currentTrackID)
@@ -1006,7 +993,7 @@ void Playlist::changed(void)
         savePlaylist(m_name, gCoreContext->GetHostName());
 }
 
-void Playlist::savePlaylist(QString a_name, QString a_host)
+void Playlist::savePlaylist(const QString& a_name, const QString& a_host)
 {
     LOG(VB_GENERAL, LOG_DEBUG, LOC + "Saving playlist: " + a_name);
 
@@ -1105,9 +1092,9 @@ MusicMetadata* Playlist::getSongAt(int pos) const
         int repo = ID_TO_REPO(id);
 
         if (repo == RT_Radio)
-            mdata = gMusicData->all_streams->getMetadata(id);
+            mdata = gMusicData->m_all_streams->getMetadata(id);
         else
-            mdata = gMusicData->all_music->getMetadata(id);
+            mdata = gMusicData->m_all_music->getMetadata(id);
     }
 
     return mdata;
@@ -1123,9 +1110,9 @@ MusicMetadata* Playlist::getRawSongAt(int pos) const
         int repo = ID_TO_REPO(id);
 
         if (repo == RT_Radio)
-            mdata = gMusicData->all_streams->getMetadata(id);
+            mdata = gMusicData->m_all_streams->getMetadata(id);
         else
-            mdata = gMusicData->all_music->getMetadata(id);
+            mdata = gMusicData->m_all_music->getMetadata(id);
     }
 
     return mdata;

@@ -1,4 +1,4 @@
-#include <math.h>
+#include <cmath>
 
 #include <apetag.h>
 #include <apeitem.h>
@@ -9,11 +9,6 @@
 #include "metaiowavpack.h"
 #include "musicmetadata.h"
 #include "musicutils.h"
-
-MetaIOWavPack::MetaIOWavPack(void)
-    : MetaIOTagLib()
-{
-}
 
 /*!
 * \brief Open the file to read the tag
@@ -79,8 +74,7 @@ bool MetaIOWavPack::write(const QString &filename, MusicMetadata* mdata)
     bool result = wpfile->save();
     restoreTimeStamps();
 
-    if (wpfile)
-        delete wpfile;
+    delete wpfile;
 
     return (result);
 }

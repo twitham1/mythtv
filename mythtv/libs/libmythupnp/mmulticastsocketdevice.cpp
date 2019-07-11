@@ -10,7 +10,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include <errno.h>
+#include <cerrno>
 #include "mythconfig.h"
 
 #ifdef _WIN32
@@ -38,7 +38,7 @@
                      .arg(m_address.toString()).arg(socket())
 
 MMulticastSocketDevice::MMulticastSocketDevice(
-    QString sAddress, quint16 nPort, u_char ttl) :
+    const QString& sAddress, quint16 nPort, u_char ttl) :
     MSocketDevice(MSocketDevice::Datagram),
     m_address(sAddress), m_port(nPort)
 {
