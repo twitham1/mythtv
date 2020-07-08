@@ -109,8 +109,8 @@ PreviewGeneratorQueue::~PreviewGeneratorQueue()
 {
     // disconnect preview generators
     QMutexLocker locker(&m_lock);
-    PreviewMap::iterator it = m_previewMap.begin();
-    for (;it != m_previewMap.end(); ++it)
+    // NOLINTNEXTLINE(modernize-loop-convert)
+    for (auto it = m_previewMap.begin(); it != m_previewMap.end(); ++it)
     {
         if ((*it).m_gen)
             (*it).m_gen->deleteLater();
@@ -168,7 +168,7 @@ void PreviewGeneratorQueue::GetPreviewImage(
     extra += outputfile;
     extra += QString::number(time);
     extra += (in_seconds ? "1" : "0");
-    MythEvent *e = new MythEvent("GET_PREVIEW", extra);
+    auto *e = new MythEvent("GET_PREVIEW", extra);
     QCoreApplication::postEvent(s_pgq, e);
 }
 
@@ -225,7 +225,9 @@ bool PreviewGeneratorQueue::event(QEvent *e)
     if (e->type() != MythEvent::MythEventMessage)
         return QObject::event(e);
 
-    MythEvent *me = static_cast<MythEvent*>(e);
+    auto *me = dynamic_cast<MythEvent*>(e);
+    if (me == nullptr)
+        return false;
     if (me->Message() == "GET_PREVIEW")
     {
         const QStringList &list = me->ExtraDataList();
@@ -302,22 +304,20 @@ bool PreviewGeneratorQueue::event(QEvent *e)
             list.push_back(filename);
             list.push_back(msg);
             list.push_back(datetime);
-            QSet<QString>::const_iterator tit = (*it).m_tokens.begin();
-            for (; tit != (*it).m_tokens.end(); ++tit)
+            for (const auto & tok : qAsConst((*it).m_tokens))
             {
-                kit = m_tokenToKeyMap.find(*tit);
+                kit = m_tokenToKeyMap.find(tok);
                 if (kit != m_tokenToKeyMap.end())
                     m_tokenToKeyMap.erase(kit);
-                list.push_back(*tit);
+                list.push_back(tok);
             }
 
             if (list.size() > 4)
             {
-                QSet<QObject*>::iterator sit = m_listeners.begin();
-                for (; sit != m_listeners.end(); ++sit)
+                for (auto *listener : qAsConst(m_listeners))
                 {
-                    MythEvent *le = new MythEvent(me->Message(), list);
-                    QCoreApplication::postEvent(*sit, le);
+                    auto *le = new MythEvent(me->Message(), list);
+                    QCoreApplication::postEvent(listener, le);
                 }
                 (*it).m_tokens.clear();
             }
@@ -367,11 +367,10 @@ void PreviewGeneratorQueue::SendEvent(
     list.push_back(token);
 
     QMutexLocker locker(&m_lock);
-    QSet<QObject*>::iterator it = m_listeners.begin();
-    for (; it != m_listeners.end(); ++it)
+    for (auto *listener : qAsConst(m_listeners))
     {
-        MythEvent *e = new MythEvent(eventname, list);
-        QCoreApplication::postEvent(*it, e);
+        auto *e = new MythEvent(eventname, list);
+        QCoreApplication::postEvent(listener, e);
     }
 }
 
@@ -435,7 +434,7 @@ QString PreviewGeneratorQueue::GeneratePreviewImage(
     QString ret;
 
     bool is_special = !outputfile.isEmpty() || time >= 0 ||
-        size.width() || size.height();
+        (size.width() != 0) || (size.height() != 0);
 
     bool needs_gen = true;
     if (!is_special)
@@ -533,7 +532,7 @@ QString PreviewGeneratorQueue::GeneratePreviewImage(
         {
             LOG(VB_PLAYBACK, LOG_INFO, LOC +
                 QString("Requesting preview for '%1'") .arg(key));
-            PreviewGenerator *pg = new PreviewGenerator(&pginfo, token, m_mode);
+            auto *pg = new PreviewGenerator(&pginfo, token, m_mode);
             if (!outputfile.isEmpty() || time >= 0 ||
                 size.width() || size.height())
             {
@@ -574,7 +573,8 @@ QString PreviewGeneratorQueue::GeneratePreviewImage(
     }
     else
     {
-        uint queue_depth, token_cnt;
+        uint queue_depth = 0;
+        uint token_cnt = 0;
         GetInfo(key, queue_depth, token_cnt);
         QString msg = QString("Queue depth %1, our tokens %2")
             .arg(queue_depth).arg(token_cnt);

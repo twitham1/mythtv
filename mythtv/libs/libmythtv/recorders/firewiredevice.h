@@ -4,8 +4,8 @@
  *  Distributed as part of MythTV under GPL v2 and later.
  */
 
-#ifndef _FIREWIRE_DEVICE_H_
-#define _FIREWIRE_DEVICE_H_
+#ifndef FIREWIRE_DEVICE_H
+#define FIREWIRE_DEVICE_H
 
 // C++ headers
 #include <vector>
@@ -26,16 +26,16 @@ class FirewireDevice
   public:
 
     // Public enums
-    typedef enum
+    enum PowerState
     {
         kAVCPowerOn,
         kAVCPowerOff,
         kAVCPowerUnknown,
         kAVCPowerQueryFailed,
-    } PowerState;
+    };
 
     // AVC commands
-    typedef enum
+    enum IEEE1394Command
     {
         kAVCControlCommand         = 0x00,
         kAVCStatusInquiryCommand   = 0x01,
@@ -52,10 +52,10 @@ class FirewireDevice
 
         kAVCInterimStatus          = 0x0f,
         kAVCResponseImplemented    = 0x0c,
-    } IEEE1394Command;
+    };
 
     // AVC unit addresses
-    typedef enum
+    enum IEEE1394UnitAddress
     {
         kAVCSubunitId0                = 0x00,
         kAVCSubunitId1                = 0x01,
@@ -80,10 +80,10 @@ class FirewireDevice
         kAVCSubunitTypeVendorUnique   = (0x1c << 3),
         kAVCSubunitTypeExtended       = (0x1e << 3),
         kAVCSubunitTypeUnit           = (0x1f << 3),
-    } IEEE1394UnitAddress;
+    };
 
     // AVC opcode
-    typedef enum
+    enum IEEE1394Opcode
     {
         // Unit
         kAVCUnitPlugInfoOpcode               = 0x02,
@@ -115,17 +115,17 @@ class FirewireDevice
 
         // Panel
         kAVCPanelPassThrough                 = 0x7c,
-    } IEEE1394Opcode;
+    };
 
     // AVC param 0
-    typedef enum
+    enum IEEE1394UnitPowerParam0
     {
         kAVCPowerStateOn           = 0x70,
         kAVCPowerStateOff          = 0x60,
         kAVCPowerStateQuery        = 0x7f,
-    } IEEE1394UnitPowerParam0;
+    };
 
-    typedef enum
+    enum IEEE1394PanelPassThroughParam0
     {
         kAVCPanelKeySelect          = 0x00,
         kAVCPanelKeyUp              = 0x01,
@@ -188,7 +188,7 @@ class FirewireDevice
         kAVCPanelKeyPress           = 0x00,
         kAVCPanelKeyRelease         = 0x80,
 
-    } IEEE1394PanelPassThroughParam0;
+    };
 
     virtual ~FirewireDevice() = default;
 
@@ -197,8 +197,8 @@ class FirewireDevice
     virtual bool ClosePort(void) = 0;
     virtual bool ResetBus(void) { return false; }
 
-    virtual void AddListener(TSDataListener*);
-    virtual void RemoveListener(TSDataListener*);
+    virtual void AddListener(TSDataListener *listener);
+    virtual void RemoveListener(TSDataListener *listener);
 
     // Sets
     virtual bool SetPowerState(bool on);
@@ -226,7 +226,7 @@ class FirewireDevice
     bool GetSubunitInfo(uint8_t table[32]);
 
     void SetLastChannel(uint channel);
-    void ProcessPATPacket(const TSPacket&);
+    void ProcessPATPacket(const TSPacket &tspacket);
     virtual void BroadcastToListeners(
         const unsigned char *data, uint dataSize);
 
@@ -246,4 +246,4 @@ class FirewireDevice
     static QMutex                 s_static_lock;
 };
 
-#endif // _FIREWIRE_DEVICE_H_
+#endif // FIREWIRE_DEVICE_H

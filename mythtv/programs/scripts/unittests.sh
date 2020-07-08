@@ -9,6 +9,17 @@ GCOV=`which gcov`
 GREP=`which grep`
 TEST_FAILED=0
 
+if test "x$(uname -s)" = "xFreeBSD"; then
+    # Find all shared libraries (".so" on linux/freebsd, ".dylib" on OSX).
+    # Eliminate multiples on OSX because of where the suffix is added.
+    DIRS=""
+    LIBS=$(find $(dirname $(pwd)) -name "*.so" -o -name "*.dylib")
+    for lib in $LIBS ; do
+        DIR=$(dirname $lib)
+        DIRS="$DIRS $DIR"
+    done
+    export LD_LIBRARY_PATH=$(echo ${DIRS} | tr ' ' ':')
+fi
 
 TESTS=`find . -name "test_*.pro"`
 

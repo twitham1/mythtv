@@ -139,7 +139,7 @@ QString GenerateNonce(void)
     int nonceParts[4];
     QString nonce;
 #if QT_VERSION >= QT_VERSION_CHECK(5,10,0)
-    auto randgen = QRandomGenerator::global();
+    auto *randgen = QRandomGenerator::global();
     nonceParts[0] = randgen->generate();
     nonceParts[1] = randgen->generate();
     nonceParts[2] = randgen->generate();
@@ -232,9 +232,9 @@ class APHTTPRequest
 
     QByteArray GetQueryValue(const QByteArray& key)
     {
-        for (int i = 0; i < m_queries.size(); i++)
-            if (m_queries[i].first == key)
-                return m_queries[i].second;
+        for (const auto& query : qAsConst(m_queries))
+            if (query.first == key)
+                return query.second;
         return "";
     }
 
@@ -242,7 +242,7 @@ class APHTTPRequest
     {
         QMap<QByteArray,QByteArray> result;
         QList<QByteArray> lines = m_body.split('\n');;
-        foreach (QByteArray line, lines)
+        for (const QByteArray& line : qAsConst(lines))
         {
             int index = line.indexOf(":");
             if (index > 0)
@@ -254,7 +254,7 @@ class APHTTPRequest
         return result;
     }
 
-    bool IsComplete(void)
+    bool IsComplete(void) const
     {
         return !m_incomingPartial;
     }
@@ -432,7 +432,7 @@ void MythAirplayServer::Teardown(void)
     m_bonjour = nullptr;
 
     // disconnect connections
-    foreach (QTcpSocket* connection, m_sockets)
+    for (QTcpSocket* connection : qAsConst(m_sockets))
     {
         disconnect(connection, nullptr, nullptr, nullptr);
         delete connection;
@@ -440,7 +440,7 @@ void MythAirplayServer::Teardown(void)
     m_sockets.clear();
 
     // remove all incoming buffers
-    foreach (APHTTPRequest* request, m_incoming)
+    for (APHTTPRequest* request : qAsConst(m_incoming))
     {
         delete request;
     }
@@ -537,7 +537,7 @@ void MythAirplayServer::newConnection(QTcpSocket *client)
 void MythAirplayServer::deleteConnection(void)
 {
     QMutexLocker locker(m_lock);
-    QTcpSocket *socket = (QTcpSocket *)sender();
+    auto *socket = dynamic_cast<QTcpSocket *>(sender());
     if (!socket)
         return;
 
@@ -601,7 +601,7 @@ void MythAirplayServer::deleteConnection(QTcpSocket *socket)
 void MythAirplayServer::read(void)
 {
     QMutexLocker locker(m_lock);
-    QTcpSocket *socket = (QTcpSocket *)sender();
+    auto *socket = dynamic_cast<QTcpSocket *>(sender());
     if (!socket)
         return;
 
@@ -612,7 +612,7 @@ void MythAirplayServer::read(void)
 
     if (!m_incoming.contains(socket))
     {
-        APHTTPRequest *request = new APHTTPRequest(buf);
+        auto *request = new APHTTPRequest(buf);
         m_incoming.insert(socket, request);
     }
     else
@@ -807,7 +807,7 @@ void MythAirplayServer::HandleResponse(APHTTPRequest *req,
         if (req->GetMethod() == "POST")
         {
             // this may be received before playback starts...
-            uint64_t intpos = (uint64_t)pos;
+            auto intpos = (uint64_t)pos;
             m_connections[session].m_position = pos;
             LOG(VB_GENERAL, LOG_INFO, LOC +
                 QString("Scrub: (post) seek to %1").arg(intpos));
@@ -877,11 +877,8 @@ void MythAirplayServer::HandleResponse(APHTTPRequest *req,
     {
         LOG(VB_GENERAL, LOG_INFO, LOC + "Ignoring authorize request.");
     }
-    else if (req->GetURI() == "/setProperty")
-    {
-        status = HTTP_STATUS_NOT_FOUND;
-    }
-    else if (req->GetURI() == "/getProperty")
+    else if ((req->GetURI() == "/setProperty") ||
+             (req->GetURI() == "/getProperty"))
     {
         status = HTTP_STATUS_NOT_FOUND;
     }
@@ -1156,7 +1153,6 @@ void MythAirplayServer::DisconnectAllClients(const QByteArray &session)
 
     while (it != m_connections.end())
     {
-        QTcpSocket *socket;
         AirplayConnection& cnx = it.value();
 
         if (it.key() == session ||
@@ -1174,7 +1170,7 @@ void MythAirplayServer::DisconnectAllClients(const QByteArray &session)
         {
             StopSession(it.key());
         }
-        socket = cnx.m_reverseSocket;
+        QTcpSocket *socket = cnx.m_reverseSocket;
         if (socket)
         {
             socket->disconnect();
@@ -1213,8 +1209,7 @@ void MythAirplayServer::StartPlayback(const QString &pathname)
     LOG(VB_PLAYBACK, LOG_DEBUG, LOC +
         QString("Sending ACTION_HANDLEMEDIA for %1")
         .arg(pathname));
-    MythEvent* me = new MythEvent(ACTION_HANDLEMEDIA,
-                                  QStringList(pathname));
+    auto* me = new MythEvent(ACTION_HANDLEMEDIA, QStringList(pathname));
     qApp->postEvent(GetMythMainWindow(), me);
     // Wait until we receive that the play has started
     gCoreContext->WaitUntilSignals(SIGNAL(TVPlaybackStarted()),
@@ -1232,8 +1227,8 @@ void MythAirplayServer::StopPlayback(void)
             QString("Sending ACTION_STOP for %1")
             .arg(m_pathname));
 
-        QKeyEvent* ke = new QKeyEvent(QEvent::KeyPress, 0,
-                                      Qt::NoModifier, ACTION_STOP);
+        auto* ke = new QKeyEvent(QEvent::KeyPress, 0,
+                                 Qt::NoModifier, ACTION_STOP);
         qApp->postEvent(GetMythMainWindow(), (QEvent*)ke);
         // Wait until we receive that playback has stopped
         gCoreContext->WaitUntilSignals(SIGNAL(TVPlaybackStopped()),
@@ -1258,8 +1253,8 @@ void MythAirplayServer::SeekPosition(uint64_t position)
             .arg(position)
             .arg(m_pathname));
 
-        MythEvent* me = new MythEvent(ACTION_SEEKABSOLUTE,
-                                      QStringList(QString::number(position)));
+        auto* me = new MythEvent(ACTION_SEEKABSOLUTE,
+                                 QStringList(QString::number(position)));
         qApp->postEvent(GetMythMainWindow(), me);
         // Wait until we receive that the seek has completed
         gCoreContext->WaitUntilSignals(SIGNAL(TVPlaybackSought(qint64)),
@@ -1284,8 +1279,8 @@ void MythAirplayServer::PausePlayback(void)
             QString("Sending ACTION_PAUSE for %1")
             .arg(m_pathname));
 
-        QKeyEvent* ke = new QKeyEvent(QEvent::KeyPress, 0,
-                                      Qt::NoModifier, ACTION_PAUSE);
+        auto* ke = new QKeyEvent(QEvent::KeyPress, 0,
+                                 Qt::NoModifier, ACTION_PAUSE);
         qApp->postEvent(GetMythMainWindow(), (QEvent*)ke);
         // Wait until we receive that playback has stopped
         gCoreContext->WaitUntilSignals(SIGNAL(TVPlaybackPaused()),
@@ -1310,8 +1305,8 @@ void MythAirplayServer::UnpausePlayback(void)
             QString("Sending ACTION_PLAY for %1")
             .arg(m_pathname));
 
-        QKeyEvent* ke = new QKeyEvent(QEvent::KeyPress, 0,
-                                      Qt::NoModifier, ACTION_PLAY);
+        auto* ke = new QKeyEvent(QEvent::KeyPress, 0,
+                                 Qt::NoModifier, ACTION_PLAY);
         qApp->postEvent(GetMythMainWindow(), (QEvent*)ke);
         // Wait until we receive that playback has stopped
         gCoreContext->WaitUntilSignals(SIGNAL(TVPlaybackPlaying()),

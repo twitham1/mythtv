@@ -76,7 +76,7 @@ DTC::ImageMetadataInfoList* Image::GetImageInfoList(int id)
 {
     // This holds the xml data structure from
     // the returned stringlist with the exif data
-    DTC::ImageMetadataInfoList *imInfoList = new DTC::ImageMetadataInfoList();
+    auto *imInfoList = new DTC::ImageMetadataInfoList();
 
     // Read all metadata tags
 //    ImageManagerBe *mgr = ImageManagerBe::getInstance();
@@ -100,7 +100,7 @@ DTC::ImageMetadataInfoList* Image::GetImageInfoList(int id)
     // Each string contains a Name<seperator>Label<seperator>Value.
     QString seperator = tags.takeFirst();
     int index = 0;
-    foreach (const QString &token, tags)
+    for (const QString & token : qAsConst(tags))
     {
         QStringList parts = token.split(seperator);
         if (parts.size() != 3)
@@ -203,7 +203,7 @@ DTC::ImageSyncInfo* Image::GetSyncStatus( void )
         QString("Image: Sync status is running: %1, current: %2, total: %3")
         .arg(running).arg(current).arg(total));
 
-    DTC::ImageSyncInfo *syncInfo = new DTC::ImageSyncInfo();
+    auto *syncInfo = new DTC::ImageSyncInfo();
     syncInfo->setRunning(running);
     syncInfo->setCurrent(current);
     syncInfo->setTotal(total);

@@ -1,6 +1,9 @@
 #ifndef PLAYLISTEDITORVIEW_H_
 #define PLAYLISTEDITORVIEW_H_
 
+// c++
+#include <utility>
+
 // qt
 #include <QEvent>
 #include <QVector>
@@ -28,7 +31,7 @@ class MPUBLIC MusicButtonItem : public MythUIButtonListItem, public QObject
         MythUIButtonListItem(lbtype, text, image, checkable, state, showArrow, listPosition) {}
 
     MusicButtonItem(MythUIButtonList *lbtype, const QString& text, QVariant data, int listPosition = -1) :
-        MythUIButtonListItem(lbtype, text, data, listPosition) {}
+        MythUIButtonListItem(lbtype, text, std::move(data), listPosition) {}
 };
 
 class MPUBLIC MusicGenericTree : public MythGenericTree
@@ -38,7 +41,7 @@ class MPUBLIC MusicGenericTree : public MythGenericTree
                      const QString &action = "",
                      MythUIButtonListItem::CheckState check = MythUIButtonListItem::CantCheck,
                      bool showArrow = true);
-    virtual ~MusicGenericTree() = default;
+    ~MusicGenericTree() override = default;
 
     QString getAction(void) const { return m_action; }
 
@@ -64,10 +67,10 @@ class PlaylistEditorView : public MusicCommon
   public:
     PlaylistEditorView(MythScreenStack *parent, MythScreenType *parentScreen,
                        const QString &layout, bool restorePosition = false);
-    ~PlaylistEditorView(void);
+    ~PlaylistEditorView(void) override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MusicCommon
+    bool keyPressEvent(QKeyEvent *event) override; // MusicCommon
 
     void saveTreePosition(void);
 
@@ -78,7 +81,7 @@ class PlaylistEditorView : public MusicCommon
 
   private slots:
     void treeItemClicked(MythUIButtonListItem *item);
-    void treeItemVisible(MythUIButtonListItem *item);
+    static void treeItemVisible(MythUIButtonListItem *item);
     void treeNodeChanged(MythGenericTree *node);
     void smartPLChanged(const QString &category, const QString &name);
     void deleteSmartPlaylist(bool ok);
@@ -87,14 +90,14 @@ class PlaylistEditorView : public MusicCommon
   private:
     void filterTracks(MusicGenericTree *node);
 
-    void getPlaylists(MusicGenericTree *node);
-    void getPlaylistTracks(MusicGenericTree *node, int playlistID);
+    static void getPlaylists(MusicGenericTree *node);
+    static void getPlaylistTracks(MusicGenericTree *node, int playlistID);
 
-    void getSmartPlaylistCategories(MusicGenericTree *node);
-    void getSmartPlaylists(MusicGenericTree *node);
-    void getSmartPlaylistTracks(MusicGenericTree *node, int playlistID);
+    static void getSmartPlaylistCategories(MusicGenericTree *node);
+    static void getSmartPlaylists(MusicGenericTree *node);
+    static void getSmartPlaylistTracks(MusicGenericTree *node, int playlistID);
 
-    void getCDTracks(MusicGenericTree *node);
+    static void getCDTracks(MusicGenericTree *node);
 
     void updateSelectedTracks(void);
     void updateSelectedTracks(MusicGenericTree *node);

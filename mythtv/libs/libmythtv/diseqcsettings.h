@@ -4,13 +4,13 @@
  * \author Copyright (C) 2006, Yeasah Pell
  */
 
-#ifndef _DISEQCSETTINGS_H_
-#define _DISEQCSETTINGS_H_
+#ifndef DISEQCSETTINGS_H
+#define DISEQCSETTINGS_H
 
 #include "diseqc.h"
 #include "standardsettings.h"
 
-typedef QMap<uint, StandardSetting*> devid_to_setting_t;
+using devid_to_setting_t = QMap<uint, StandardSetting*>;
 
 class SwitchTypeSetting;
 class SwitchPortsSetting;
@@ -22,7 +22,7 @@ class DiseqcConfigBase : public GroupSetting
     Q_OBJECT
 
   public:
-    bool keyPressEvent(QKeyEvent *) override; // StandardSetting
+    bool keyPressEvent(QKeyEvent *event) override; // StandardSetting
     static DiseqcConfigBase* CreateByType(DiSEqCDevDevice *dev,
                                           StandardSetting *parent);
 
@@ -60,7 +60,7 @@ class RotorPosMap : public GroupSetting
     void Save(void) override; // StandardSetting
 
   private slots:
-    void valueChanged(StandardSetting*);
+    void valueChanged(StandardSetting *setting);
 
   protected:
     void PopulateList(void);
@@ -119,10 +119,10 @@ class LNBConfig : public DiseqcConfigBase
   private:
     LNBPresetSetting           *m_preset     {nullptr};
     LNBTypeSetting             *m_type       {nullptr};
-    LNBLOFSwitchSetting        *m_lof_switch {nullptr};
-    LNBLOFLowSetting           *m_lof_lo     {nullptr};
-    LNBLOFHighSetting          *m_lof_hi     {nullptr};
-    LNBPolarityInvertedSetting *m_pol_inv    {nullptr};
+    LNBLOFSwitchSetting        *m_lofSwitch  {nullptr};
+    LNBLOFLowSetting           *m_lofLo      {nullptr};
+    LNBLOFHighSetting          *m_lofHi      {nullptr};
+    LNBPolarityInvertedSetting *m_polInv     {nullptr};
 };
 
 class DeviceTypeSetting;
@@ -166,21 +166,20 @@ class DTVDeviceConfigGroup : public GroupSetting
   public:
     DTVDeviceConfigGroup(DiSEqCDevSettings &settings, uint cardid,
                          bool switches_enabled);
-    ~DTVDeviceConfigGroup(void) = default;
+    ~DTVDeviceConfigGroup(void) override = default;
 
   protected:
     void AddNodes(StandardSetting *group, const QString &trigger,
                   DiSEqCDevDevice *node);
 
-    void AddChild(StandardSetting *group, const QString &trigger,
-                  StandardSetting *setting);
+    static void AddChild(StandardSetting *group, const QString &trigger,
+                         StandardSetting *setting);
 
   private:
     DiSEqCDevTree       m_tree;
     DiSEqCDevSettings  &m_settings;
     devid_to_setting_t  m_devs;
-    bool                m_switches_enabled;
+    bool                m_switchesEnabled;
 };
 
-#endif // _DISEQCSETTINGS_H_
-
+#endif // DISEQCSETTINGS_H

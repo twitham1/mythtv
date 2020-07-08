@@ -20,8 +20,7 @@
 #include "ExternalRecorder.h"
 #include "ExternalStreamHandler.h"
 
-#define LOC QString("ExternSigMon[%1](%2): ") \
-    .arg(m_inputid).arg(static_cast<ExternalChannel *>(m_channel)->GetDescription())
+#define LOC QString("ExternSigMon[%1](%2): ").arg(m_inputid).arg(m_loc)
 
 /**
  *  \brief Initializes signal lock and signal values.
@@ -41,7 +40,7 @@ ExternalSignalMonitor::ExternalSignalMonitor(int db_cardnum,
                                              ExternalChannel *_channel,
                                              bool _release_stream,
                                              uint64_t _flags)
-    : DTVSignalMonitor(db_cardnum, _channel, _flags, _release_stream)
+    : DTVSignalMonitor(db_cardnum, _channel, _release_stream, _flags)
 {
     QString result;
 
@@ -53,6 +52,9 @@ ExternalSignalMonitor::ExternalSignalMonitor(int db_cardnum,
         LOG(VB_GENERAL, LOG_ERR, LOC + "Open failed");
     else
         m_lock_timeout = GetLockTimeout() * 1000;
+
+    if (GetExternalChannel()->IsBackgroundTuning())
+        m_scriptStatus.SetValue(1);
 }
 
 /** \fn ExternalSignalMonitor::~ExternalSignalMonitor()
@@ -105,6 +107,16 @@ void ExternalSignalMonitor::UpdateValues(void)
             return;
     }
 
+    if (GetExternalChannel()->IsBackgroundTuning())
+    {
+        QMutexLocker locker(&m_statusLock);
+        if (m_scriptStatus.GetValue() < 2)
+            m_scriptStatus.SetValue(GetExternalChannel()->GetTuneStatus());
+
+        if (!m_scriptStatus.IsGood())
+            return;
+    }
+
     if (m_stream_handler_started)
     {
         if (!m_stream_handler->IsRunning())
@@ -132,7 +144,7 @@ void ExternalSignalMonitor::UpdateValues(void)
     {
         QMutexLocker locker(&m_statusLock);
         m_signalStrength.SetValue(strength);
-        m_signalLock.SetValue(is_locked);
+        m_signalLock.SetValue(static_cast<int>(is_locked));
     }
 
     EmitStatus();
@@ -180,7 +192,7 @@ int ExternalSignalMonitor::GetSignalStrengthPercent(void)
     m_stream_handler->ProcessCommand("SignalStrengthPercent?", result);
     if (result.startsWith("OK:"))
     {
-        bool ok;
+        bool ok = false;
         int percent = result.mid(3).toInt(&ok);
         if (!ok)
         {
@@ -206,7 +218,7 @@ int ExternalSignalMonitor::GetLockTimeout(void)
     m_stream_handler->ProcessCommand("LockTimeout?", result, 10000);
     if (result.startsWith("OK:"))
     {
-        bool ok;
+        bool ok = false;
         int timeout = result.mid(3).toInt(&ok);
         if (!ok)
         {

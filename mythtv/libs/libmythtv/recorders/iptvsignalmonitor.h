@@ -1,7 +1,7 @@
 // -*- Mode: c++ -*-
 
-#ifndef _IPTVSIGNALMONITOR_H_
-#define _IPTVSIGNALMONITOR_H_
+#ifndef IPTVSIGNALMONITOR_H
+#define IPTVSIGNALMONITOR_H
 
 #include "dtvsignalmonitor.h"
 
@@ -14,7 +14,7 @@ class IPTVSignalMonitor : public DTVSignalMonitor
   public:
     IPTVSignalMonitor(int db_cardnum, IPTVChannel *_channel,
                       bool _release_stream, uint64_t _flags = 0);
-    virtual ~IPTVSignalMonitor();
+    ~IPTVSignalMonitor() override;
 
     void Stop(void) override; // SignalMonitor
 
@@ -22,7 +22,7 @@ class IPTVSignalMonitor : public DTVSignalMonitor
     void SetStreamData(MPEGStreamData *data) override; // DTVSignalMonitor
 
     // MPEG
-    void HandlePAT(const ProgramAssociationTable*) override; // DTVSignalMonitor
+    void HandlePAT(const ProgramAssociationTable *pat) override; // DTVSignalMonitor
 
   protected:
     IPTVSignalMonitor(void);
@@ -36,4 +36,4 @@ class IPTVSignalMonitor : public DTVSignalMonitor
     bool m_locked               {false};
 };
 
-#endif // _IPTVSIGNALMONITOR_H_
+#endif // IPTVSIGNALMONITOR_H

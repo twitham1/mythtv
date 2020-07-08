@@ -4,11 +4,12 @@
 
 #include <QDomDocument>
 
-QRect UIEffects::GetExtent(const QSize &size)
+QRect UIEffects::GetExtent(const QSize &size) const
 {
-    int x = 0, y = 0;
-    int zoomedWidth = size.width() * m_hzoom;
-    int zoomedHeight = size.height() * m_vzoom;
+    int x = 0;
+    int y = 0;
+    int zoomedWidth = static_cast<int>(static_cast<float>(size.width()) * m_hzoom);
+    int zoomedHeight = static_cast<int>(static_cast<float>(size.height()) * m_vzoom);
 
     switch (m_centre)
     {
@@ -268,7 +269,7 @@ void MythUIAnimation::ParseSection(const QDomElement &element,
         else
             continue;
 
-        MythUIAnimation* a = new MythUIAnimation(parent, trigger, type);
+        auto* a = new MythUIAnimation(parent, trigger, type);
         a->setStartValue(start);
         a->setEndValue(end);
         a->setDuration(effectduration);

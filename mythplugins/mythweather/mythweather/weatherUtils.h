@@ -1,13 +1,15 @@
-#ifndef _WEATHERUTILS_H_
-#define _WEATHERUTILS_H_
+#ifndef WEATHERUTILS_H
+#define WEATHERUTILS_H
+
+#include <utility>
 
 // QT headers
-#include <QMap>
-#include <QMultiHash>
-#include <QString>
 #include <QDomElement>
 #include <QFile>
+#include <QMap>
 #include <QMetaType>
+#include <QMultiHash>
+#include <QString>
 
 // MythTV headers
 #include <mythcontext.h>
@@ -19,45 +21,34 @@
 
 class ScriptInfo;
 
-typedef unsigned char units_t;
-typedef QMap<QString, QString> DataMap;
+using units_t = unsigned char;
+using DataMap = QMap<QString, QString>;
 
 class TypeListInfo
 {
   public:
 
-    TypeListInfo(const TypeListInfo& info)
-        : m_name(info.m_name), m_location(info.m_location), m_src(info.m_src) {}
-    explicit TypeListInfo(const QString &_name)
-        : m_name(_name) {}
-    TypeListInfo(const QString &_name, const QString &_location)
-        : m_name(_name), m_location(_location) {}
-    TypeListInfo(const QString &_name, const QString &_location,
+    TypeListInfo(const TypeListInfo& info) = default;
+    explicit TypeListInfo(QString _name)
+        : m_name(std::move(_name)) {}
+    TypeListInfo(QString _name, QString _location)
+        : m_name(std::move(_name)), m_location(std::move(_location)) {}
+    TypeListInfo(QString _name, QString _location,
                  ScriptInfo *_src)
-        : m_name(_name), m_location(_location), m_src(_src) {}
+        : m_name(std::move(_name)), m_location(std::move(_location)), m_src(_src) {}
 
   public:
     QString     m_name;
     QString     m_location;
     ScriptInfo *m_src      {nullptr};
 };
-typedef QMultiHash<QString, TypeListInfo> TypeListMap;
+using TypeListMap = QMultiHash<QString, TypeListInfo>;
 
 class ScreenListInfo
 {
   public:
     ScreenListInfo() = default;
-    ScreenListInfo(const ScreenListInfo& info) :
-        m_name(info.m_name),
-        m_title(info.m_title),
-        m_types(info.m_types),
-        m_dataTypes(info.m_dataTypes),
-        m_helptxt(info.m_helptxt),
-        m_sources(info.m_sources),
-        m_units(info.m_units),
-        m_hasUnits(info.m_hasUnits),
-        m_multiLoc(info.m_multiLoc),
-        m_updating(info.m_updating) {}
+    ScreenListInfo(const ScreenListInfo& info) = default;
 
     TypeListInfo GetCurrentTypeList(void) const;
 
@@ -76,10 +67,10 @@ class ScreenListInfo
 
 Q_DECLARE_METATYPE(ScreenListInfo *);
 
-typedef QMap<QString, ScreenListInfo> ScreenListMap;
+using ScreenListMap = QMap<QString, ScreenListInfo>;
 
 ScreenListMap loadScreens();
 QStringList loadScreen(const QDomElement& ScreenListInfo);
 bool doLoadScreens(const QString &filename, ScreenListMap &screens);
 
-#endif
+#endif /* WEATHERUTILS_H */

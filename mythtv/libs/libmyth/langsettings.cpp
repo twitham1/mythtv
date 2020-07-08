@@ -80,7 +80,7 @@ bool LanguageSelection::Create(void)
 
 void LanguageSelection::Load(void)
 {
-    MythLocale *locale = new MythLocale();
+    auto *locale = new MythLocale();
 
     QString langCode;
 
@@ -116,14 +116,12 @@ void LanguageSelection::Load(void)
     QMap<QString,QString> langMap = MythTranslation::getLanguages();
     QStringList langs = langMap.values();
     langs.sort();
-    MythUIButtonListItem *item;
     bool foundLanguage = false;
-    for (QStringList::Iterator it = langs.begin(); it != langs.end(); ++it)
+    for (const auto& nativeLang : qAsConst(langs))
     {
-        QString nativeLang = *it;
         QString code = langMap.key(nativeLang); // Slow, but map is small
         QString language = GetISO639EnglishLanguageName(code);
-        item = new MythUIButtonListItem(m_languageList, nativeLang);
+        auto *item = new MythUIButtonListItem(m_languageList, nativeLang);
         item->SetText(language, "language");
         item->SetText(nativeLang, "nativelanguage");
         item->SetData(code);
@@ -142,8 +140,8 @@ void LanguageSelection::Load(void)
         LOG(VB_GUI, LOG_ERR, "ERROR - Failed to load translations, at least "
                              "one translation file MUST be installed.");
 
-        item = new MythUIButtonListItem(m_languageList,
-                                        "English (United States)");
+        auto *item = new MythUIButtonListItem(m_languageList,
+                                              "English (United States)");
         item->SetText("English (United States)", "language");
         item->SetText("English (United States)", "nativelanguage");
         item->SetData("en_US");
@@ -155,13 +153,11 @@ void LanguageSelection::Load(void)
     ISO3166ToNameMap localesMap = GetISO3166EnglishCountryMap();
     QStringList locales = localesMap.values();
     locales.sort();
-    for (QStringList::Iterator it = locales.begin(); it != locales.end();
-         ++it)
+    for (const auto& country : qAsConst(locales))
     {
-        QString country = *it;
         QString code = localesMap.key(country); // Slow, but map is small
         QString nativeCountry = GetISO3166CountryName(code);
-        item = new MythUIButtonListItem(m_countryList, country);
+        auto *item = new MythUIButtonListItem(m_countryList, country);
         item->SetData(code);
         item->SetText(country, "country");
         item->SetText(nativeCountry, "nativecountry");
@@ -188,8 +184,7 @@ bool LanguageSelection::prompt(bool force)
         if (!mainStack)
             return false;
 
-        LanguageSelection *langSettings = new LanguageSelection(mainStack,
-                                                                true);
+        auto *langSettings = new LanguageSelection(mainStack, true);
 
         if (langSettings->Create())
         {

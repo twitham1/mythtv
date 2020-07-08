@@ -671,17 +671,15 @@ static int shutdown()
             {
                 QString time_ts;
                 nvramCommand.replace(
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-                    "$time", time_ts.setNum(dtWakeupTime.toTime_t())
-#else
                     "$time", time_ts.setNum(dtWakeupTime.toSecsSinceEpoch())
-#endif
                     );
             }
             else
+            {
                 nvramCommand.replace(
                     "$time", dtWakeupTime.toLocalTime()
                     .toString(wakeup_timeformat));
+            }
 
             LOG(VB_STDIO|VB_FLUSH, LOG_ERR,
                 QObject::tr("Sending command to set time in BIOS %1",
@@ -834,7 +832,7 @@ int main(int argc, char **argv)
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythShutdownCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
 

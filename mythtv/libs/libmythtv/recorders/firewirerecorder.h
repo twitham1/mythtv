@@ -4,8 +4,8 @@
  *  Distributed as part of MythTV under GPL v2 and later.
  */
 
-#ifndef _FIREWIRERECORDER_H_
-#define _FIREWIRERECORDER_H_
+#ifndef FIREWIRERECORDER_H
+#define FIREWIRERECORDER_H
 
 // MythTV headers
 #include "dtvrecorder.h"
@@ -30,7 +30,7 @@ class FirewireRecorder :
 
   public:
     FirewireRecorder(TVRec *rec, FirewireChannel *chan);
-    virtual ~FirewireRecorder();
+    ~FirewireRecorder() override;
 
     // Commands
     bool Open(void);
@@ -63,4 +63,4 @@ class FirewireRecorder :
     vector<unsigned char>  m_buffer;
 };
 
-#endif //  _FIREWIRERECORDER_H_
+#endif // FIREWIRERECORDER_H

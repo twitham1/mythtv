@@ -14,11 +14,11 @@
 void PlaylistLoadingThread::run()
 {
     RunProlog();
-    while (!all_music->doneLoading())
+    while (!m_allMusic->doneLoading())
     {
         msleep(250);
     }
-    parent->load();
+    m_parent->load();
     RunEpilog();
 }
 
@@ -58,7 +58,7 @@ PlaylistContainer::~PlaylistContainer()
 }
 
 void PlaylistContainer::FillIntelliWeights(int &rating, int &playcount,
-                                            int &lastplay, int &random)
+                                            int &lastplay, int &random) const
 {
     rating = m_randomWeight;
     playcount = m_playCountWeight;
@@ -101,7 +101,7 @@ void PlaylistContainer::load()
     {
         while (query.next())
         {
-            Playlist *temp_playlist = new Playlist();
+            auto *temp_playlist = new Playlist();
             //  No, we don't destruct this ...
             temp_playlist->setParent(this);
             temp_playlist->loadPlaylistByID(query.value(0).toInt(), m_myHost);
@@ -116,11 +116,9 @@ void PlaylistContainer::load()
 // resync all the playlists after a rescan just in case some tracks were removed
 void PlaylistContainer::resync(void)
 {
-    QList<Playlist*>::const_iterator it = m_allPlaylists->begin();
-    for (; it != m_allPlaylists->end(); ++it)
-    {
+    // NOLINTNEXTLINE(modernize-loop-convert)
+    for (auto it = m_allPlaylists->begin(); it != m_allPlaylists->end(); ++it)
         (*it)->resync();
-    }
 
     m_activePlaylist->resync();
 }
@@ -129,9 +127,8 @@ void PlaylistContainer::describeYourself(void) const
 {
     //    Debugging
     m_activePlaylist->describeYourself();
-    QList<Playlist*>::const_iterator it = m_allPlaylists->begin();
-    for (; it != m_allPlaylists->end(); ++it)
-        (*it)->describeYourself();
+    for (const auto & playlist : qAsConst(*m_allPlaylists))
+        playlist->describeYourself();
 }
 
 Playlist *PlaylistContainer::getPlaylist(int id)
@@ -144,11 +141,10 @@ Playlist *PlaylistContainer::getPlaylist(int id)
         return m_activePlaylist;
     }
 
-    QList<Playlist*>::iterator it = m_allPlaylists->begin();
-    for (; it != m_allPlaylists->end(); ++it)
+    for (const auto & playlist : qAsConst(*m_allPlaylists))
     {
-        if ((*it)->getID() == id)
-            return *it;
+        if (playlist->getID() == id)
+            return playlist;
     }
 
     LOG(VB_GENERAL, LOG_ERR,
@@ -161,11 +157,10 @@ Playlist *PlaylistContainer::getPlaylist(const QString &name)
     //  return a pointer to a playlist
     //  by name;
 
-    QList<Playlist*>::iterator it = m_allPlaylists->begin();
-    for (; it != m_allPlaylists->end(); ++it)
+    for (const auto & playlist : qAsConst(*m_allPlaylists))
     {
-        if ((*it)->getName() == name)
-            return *it;
+        if (playlist->getName() == name)
+            return playlist;
     }
 
     LOG(VB_GENERAL, LOG_ERR, QString("getPlaylistName() called with unknown name: %1").arg(name));
@@ -174,8 +169,8 @@ Playlist *PlaylistContainer::getPlaylist(const QString &name)
 
 void PlaylistContainer::save(void)
 {
-    QList<Playlist*>::const_iterator it = m_allPlaylists->begin();
-    for (; it != m_allPlaylists->end(); ++it)
+    // NOLINTNEXTLINE(modernize-loop-convert)
+    for (auto it = m_allPlaylists->begin(); it != m_allPlaylists->end(); ++it)
     {
         if ((*it)->hasChanged())
             (*it)->savePlaylist((*it)->getName(), m_myHost);
@@ -185,24 +180,24 @@ void PlaylistContainer::save(void)
     m_streamPlaylist->savePlaylist(DEFAULT_STREAMLIST_NAME, m_myHost);
 }
 
-void PlaylistContainer::createNewPlaylist(QString name)
+void PlaylistContainer::createNewPlaylist(const QString &name)
 {
-    Playlist *new_list = new Playlist();
+    auto *new_list = new Playlist();
     new_list->setParent(this);
 
     //  Need to touch the database to get persistent ID
-    new_list->savePlaylist(std::move(name), m_myHost);
+    new_list->savePlaylist(name, m_myHost);
 
     m_allPlaylists->push_back(new_list);
 }
 
-void PlaylistContainer::copyNewPlaylist(QString name)
+void PlaylistContainer::copyNewPlaylist(const QString &name)
 {
-    Playlist *new_list = new Playlist();
+    auto *new_list = new Playlist();
     new_list->setParent(this);
 
     //  Need to touch the database to get persistent ID
-    new_list->savePlaylist(std::move(name), m_myHost);
+    new_list->savePlaylist(name, m_myHost);
 
     m_allPlaylists->push_back(new_list);
     m_activePlaylist->copyTracks(new_list, false);
@@ -264,11 +259,10 @@ QString PlaylistContainer::getPlaylistName(int index, bool &reference)
             return m_activePlaylist->getName();
         }
 
-        QList<Playlist*>::iterator it = m_allPlaylists->begin();
-        for (; it != m_allPlaylists->end(); ++it)
+        for (const auto & playlist : qAsConst(*m_allPlaylists))
         {
-            if ((*it)->getID() == index)
-                return (*it)->getName();
+            if (playlist->getID() == index)
+                return playlist->getName();
         }
     }
 
@@ -284,10 +278,9 @@ bool PlaylistContainer::nameIsUnique(const QString& a_name, int which_id)
     if (a_name == DEFAULT_PLAYLIST_NAME)
         return false;
 
-    QList<Playlist*>::iterator it = m_allPlaylists->begin();
-    for (; it != m_allPlaylists->end(); ++it)
+    for (const auto & playlist : qAsConst(*m_allPlaylists))
     {
-        if ((*it)->getName() == a_name && (*it)->getID() != which_id)
+        if (playlist->getName() == a_name && playlist->getID() != which_id)
             return false;
     }
 
@@ -298,10 +291,9 @@ QStringList PlaylistContainer::getPlaylistNames(void)
 {
     QStringList res;
 
-    QList<Playlist*>::iterator it = m_allPlaylists->begin();
-    for (; it != m_allPlaylists->end(); ++it)
+    for (const auto & playlist : qAsConst(*m_allPlaylists))
     {
-        res.append((*it)->getName());
+        res.append(playlist->getName());
     }
 
     return res;

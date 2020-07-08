@@ -1,5 +1,5 @@
-#ifndef _CUSTOMEVENTRELAYER_H_
-#define _CUSTOMEVENTRELAYER_H_
+#ifndef CUSTOMEVENTRELAYER_H
+#define CUSTOMEVENTRELAYER_H
 
 #include <QObject>
 
@@ -16,7 +16,7 @@ class CustomEventRelayer : public QObject
     Q_OBJECT
 
   public:
-    explicit CustomEventRelayer(void (*fp_in)(QEvent*)) : fp(fp_in)
+    explicit CustomEventRelayer(void (*fp_in)(QEvent*)) : m_fp(fp_in)
     {
         gCoreContext->addListener(this);
     }
@@ -33,16 +33,15 @@ class CustomEventRelayer : public QObject
     }
 
     void customEvent(QEvent *e) override //QObject
-        { fp(e); }
+        { m_fp(e); }
 
   protected:
-    virtual ~CustomEventRelayer() = default;
+    ~CustomEventRelayer() override = default;
 
   private:
-    void (*fp)(QEvent*);
+    void (*m_fp)(QEvent*) {nullptr};
 };
 
-#endif
-
+#endif //  CUSTOMEVENTRELAYER_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

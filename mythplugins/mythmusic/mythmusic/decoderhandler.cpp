@@ -45,7 +45,7 @@ DecoderHandlerEvent::~DecoderHandlerEvent(void)
 
 MythEvent* DecoderHandlerEvent::clone(void) const
 {
-    DecoderHandlerEvent *result = new DecoderHandlerEvent(*this);
+    auto *result = new DecoderHandlerEvent(*this);
 
     if (m_msg)
         result->m_msg = new QString(*m_msg);
@@ -78,7 +78,7 @@ void DecoderHandler::start(MusicMetadata *mdata)
 
     m_playlist.clear();
     m_meta = *mdata;
-    m_playlist_pos = -1;
+    m_playlistPos = -1;
     m_redirects = 0;
 
     if (QFileInfo(mdata->Filename()).isAbsolute())
@@ -116,7 +116,7 @@ void DecoderHandler::doStart(bool result)
 
 void DecoderHandler::error(const QString &e)
 {
-    QString *str = new QString(e);
+    auto *str = new QString(e);
     DecoderHandlerEvent ev(DecoderHandlerEvent::Error, str);
     dispatch(ev);
 }
@@ -126,7 +126,7 @@ bool DecoderHandler::done(void)
     if (m_state == STOPPED)
         return true;
 
-    if (m_playlist_pos + 1 >= m_playlist.size())
+    if (m_playlistPos + 1 >= m_playlist.size())
     {
         m_state = STOPPED;
         return true;
@@ -142,14 +142,14 @@ bool DecoderHandler::next(void)
 
     if (m_meta.Format() == "cast")
     {
-        m_playlist_pos = random() % m_playlist.size();
+        m_playlistPos = random() % m_playlist.size();
     }
     else
     {
-        m_playlist_pos++;
+        m_playlistPos++;
     }
 
-    PlayListFileEntry *entry = m_playlist.get(m_playlist_pos);
+    PlayListFileEntry *entry = m_playlist.get(m_playlistPos);
 
     if (QFileInfo(entry->File()).isAbsolute())
         m_url = QUrl::fromLocalFile(entry->File());
@@ -205,15 +205,24 @@ void DecoderHandler::stop(void)
 
 void DecoderHandler::customEvent(QEvent *event)
 {
-    if (DecoderHandlerEvent *dhe = dynamic_cast<DecoderHandlerEvent*>(event))
+    if (event == nullptr)
+        return;
+
+    if (auto *dhe = dynamic_cast<DecoderHandlerEvent*>(event))
     {
         // Proxy all DecoderHandlerEvents
         return dispatch(*dhe);
     }
     if (event->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = static_cast<MythEvent *>(event);
+        auto *me = dynamic_cast<MythEvent *>(event);
+        if (me == nullptr)
+            return;
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList tokens = me->Message().split(" ", QString::SkipEmptyParts);
+#else
+        QStringList tokens = me->Message().split(" ", Qt::SkipEmptyParts);
+#endif
 
         if (tokens.isEmpty())
             return;
@@ -273,7 +282,7 @@ void DecoderHandler::createPlaylist(const QUrl &url)
 
 void DecoderHandler::createPlaylistForSingleFile(const QUrl &url)
 {
-    PlayListFileEntry *entry = new PlayListFileEntry;
+    auto *entry = new PlayListFileEntry;
 
     if (url.scheme() == "file" || QFileInfo(url.toString()).isAbsolute())
         entry->setFile(url.toLocalFile());
@@ -306,11 +315,11 @@ void DecoderHandler::createPlaylistFromRemoteUrl(const QUrl &url)
     GetMythDownloadManager()->queueDownload(url.toString(), saveFilename, this);
 
     //TODO should find a better way to do this
-    QTime time;
+    QElapsedTimer time;
     time.start();
     while (m_state == LOADING)
     {
-        if (time.elapsed() > 30000)
+        if (time.hasExpired(30000))
         {
             doOperationStop();
             GetMythDownloadManager()->cancelDownload(url.toString());
@@ -319,7 +328,7 @@ void DecoderHandler::createPlaylistFromRemoteUrl(const QUrl &url)
             m_state = STOPPED;
         }
 
-        qApp->processEvents();
+        QCoreApplication::processEvents();
         usleep(500);
     }
 }

@@ -35,7 +35,7 @@ using namespace std;
 #include "tvremoteutil.h"
 #include "jobqueue.h"
 #include "remoteencoder.h"
-#include "ringbuffer.h"
+#include "io/mythmediabuffer.h"
 #include "commandlineparser.h"
 #include "mythtranslation.h"
 #include "loggingserver.h"
@@ -78,12 +78,12 @@ int recorderNum = -1;
 int jobID = -1;
 int lastCmd = -1;
 
-static QMap<QString,SkipTypes> *init_skip_types();
-QMap<QString,SkipTypes> *skipTypes = init_skip_types();
+static QMap<QString,SkipType> *init_skip_types();
+QMap<QString,SkipType> *skipTypes = init_skip_types();
 
-static QMap<QString,SkipTypes> *init_skip_types(void)
+static QMap<QString,SkipType> *init_skip_types(void)
 {
-    QMap<QString,SkipTypes> *tmp = new QMap<QString,SkipTypes>;
+    auto *tmp = new QMap<QString,SkipType>;
     (*tmp)["commfree"]    = COMM_DETECT_COMMFREE;
     (*tmp)["uninit"]      = COMM_DETECT_UNINIT;
     (*tmp)["off"]         = COMM_DETECT_OFF;
@@ -102,11 +102,11 @@ static QMap<QString,SkipTypes> *init_skip_types(void)
     return tmp;
 }
 
-typedef enum
+enum OutputMethod
 {
     kOutputMethodEssentials = 1,
     kOutputMethodFull,
-} OutputMethod;
+};
 OutputMethod outputMethod = kOutputMethodEssentials;
 
 static QMap<QString,OutputMethod> *init_output_types();
@@ -114,7 +114,7 @@ QMap<QString,OutputMethod> *outputTypes = init_output_types();
 
 static QMap<QString,OutputMethod> *init_output_types(void)
 {
-    QMap<QString,OutputMethod> *tmp = new QMap<QString,OutputMethod>;
+    auto *tmp = new QMap<QString,OutputMethod>;
     (*tmp)["essentials"] = kOutputMethodEssentials;
     (*tmp)["full"]       = kOutputMethodFull;
     return tmp;
@@ -195,10 +195,12 @@ static int CopySkipListToCutList(uint chanid, const QDateTime& starttime)
 
     pginfo.QueryCommBreakList(cutlist);
     for (it = cutlist.begin(); it != cutlist.end(); ++it)
+    {
         if (*it == MARK_COMM_START)
             cutlist[it.key()] = MARK_CUT_START;
         else
             cutlist[it.key()] = MARK_CUT_END;
+    }
     pginfo.SaveCutList(cutlist);
 
     return GENERIC_EXIT_OK;
@@ -231,11 +233,19 @@ static int SetCutList(uint chanid, const QDateTime& starttime, QString newCutLis
 
     newCutList.replace(QRegExp(" "), "");
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList tokens = newCutList.split(",", QString::SkipEmptyParts);
+#else
+    QStringList tokens = newCutList.split(",", Qt::SkipEmptyParts);
+#endif
 
     for (int i = 0; i < tokens.size(); i++)
     {
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList cutpair = tokens[i].split("-", QString::SkipEmptyParts);
+#else
+        QStringList cutpair = tokens[i].split("-", Qt::SkipEmptyParts);
+#endif
         cutlist[cutpair[0].toInt()] = MARK_CUT_START;
         cutlist[cutpair[1].toInt()] = MARK_CUT_END;
     }
@@ -469,11 +479,18 @@ static void incomingCustomEvent(QEvent* e)
 {
     if (e->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = static_cast<MythEvent *>(e);
+        auto *me = dynamic_cast<MythEvent *>(e);
+        if (me == nullptr)
+            return;
+
         QString message = me->Message();
 
         message = message.simplified();
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList tokens = message.split(" ", QString::SkipEmptyParts);
+#else
+        QStringList tokens = message.split(" ", Qt::SkipEmptyParts);
+#endif
 
         LOG(VB_COMMFLAG, LOG_INFO,
             QString("mythcommflag: Received Event: '%1'") .arg(message));
@@ -521,11 +538,10 @@ static void incomingCustomEvent(QEvent* e)
 static int DoFlagCommercials(
     ProgramInfo *program_info,
     bool showPercentage, bool fullSpeed, int jobid,
-    MythCommFlagPlayer* cfp, enum SkipTypes commDetectMethod,
+    MythCommFlagPlayer* cfp, SkipType commDetectMethod,
     const QString &outputfilename, bool useDB)
 {
-    CommDetectorFactory factory;
-    commDetector = factory.makeCommDetector(
+    commDetector = CommDetectorFactory::makeCommDetector(
         commDetectMethod, showPercentage,
         fullSpeed, cfp,
         program_info->GetChanID(),
@@ -541,10 +557,10 @@ static int DoFlagCommercials(
     if (useDB)
         program_info->SaveCommFlagged(COMM_FLAG_PROCESSING);
 
-    CustomEventRelayer *cer = new CustomEventRelayer(incomingCustomEvent);
-    SlotRelayer *a = new SlotRelayer(commDetectorBreathe);
-    SlotRelayer *b = new SlotRelayer(commDetectorStatusUpdate);
-    SlotRelayer *c = new SlotRelayer(commDetectorGotNewCommercialBreakList);
+    auto *cer = new CustomEventRelayer(incomingCustomEvent);
+    auto *a = new SlotRelayer(commDetectorBreathe);
+    auto *b = new SlotRelayer(commDetectorStatusUpdate);
+    auto *c = new SlotRelayer(commDetectorGotNewCommercialBreakList);
     QObject::connect(commDetector, SIGNAL(breathe()),
                      a,            SLOT(relay()));
     QObject::connect(commDetector, SIGNAL(statusUpdate(const QString&)),
@@ -717,7 +733,7 @@ static int FlagCommercials(ProgramInfo *program_info, int jobid,
     int breaksFound = 0;
 
     // configure commercial detection method
-    SkipTypes commDetectMethod = (SkipTypes)gCoreContext->GetNumSetting(
+    SkipType commDetectMethod = (SkipType)gCoreContext->GetNumSetting(
                                     "CommercialSkipMethod", COMM_DETECT_ALL);
 
     if (cmdline.toBool("commmethod"))
@@ -727,17 +743,20 @@ static int FlagCommercials(ProgramInfo *program_info, int jobid,
 
         // assume definition as integer value
         bool ok = true;
-        commDetectMethod = (SkipTypes) commmethod.toInt(&ok);
+        commDetectMethod = (SkipType) commmethod.toInt(&ok);
         if (!ok)
         {
             // not an integer, attempt comma separated list
             commDetectMethod = COMM_DETECT_UNINIT;
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
             QStringList list = commmethod.split(",", QString::SkipEmptyParts);
-            QStringList::const_iterator it = list.begin();
-            for (; it != list.end(); ++it)
+#else
+            QStringList list = commmethod.split(",", Qt::SkipEmptyParts);
+#endif
+            for (const auto & it : qAsConst(list))
             {
-                QString val = (*it).toLower();
+                QString val = it.toLower();
                 if (val == "off")
                 {
                     commDetectMethod = COMM_DETECT_OFF;
@@ -755,7 +774,7 @@ static int FlagCommercials(ProgramInfo *program_info, int jobid,
                 if (commDetectMethod == COMM_DETECT_UNINIT) {
                     commDetectMethod = skipTypes->value(val);
                 } else {
-                    commDetectMethod = (SkipTypes) ((int)commDetectMethod
+                    commDetectMethod = (SkipType) ((int)commDetectMethod
                                                   | (int)skipTypes->value(val));
                 }
             }
@@ -781,12 +800,11 @@ static int FlagCommercials(ProgramInfo *program_info, int jobid,
         }
         else if (query.next())
         {
-            commDetectMethod = (enum SkipTypes)query.value(0).toInt();
+            commDetectMethod = (SkipType)query.value(0).toInt();
             if (commDetectMethod == COMM_DETECT_COMMFREE)
             {
                 // if the channel is commercial free, drop to the default instead
-                commDetectMethod =
-                        (enum SkipTypes)gCoreContext->GetNumSetting(
+                commDetectMethod = (SkipType)gCoreContext->GetNumSetting(
                                     "CommercialSkipMethod", COMM_DETECT_ALL);
                 LOG(VB_COMMFLAG, LOG_INFO,
                         QString("Chanid %1 is marked as being Commercial Free, "
@@ -794,10 +812,11 @@ static int FlagCommercials(ProgramInfo *program_info, int jobid,
                                 "method").arg(program_info->GetChanID()));
             }
             else if (commDetectMethod == COMM_DETECT_UNINIT)
+            {
                 // no value set, so use the database default
-                commDetectMethod =
-                        (enum SkipTypes)gCoreContext->GetNumSetting(
+                commDetectMethod = (SkipType)gCoreContext->GetNumSetting(
                                      "CommercialSkipMethod", COMM_DETECT_ALL);
+            }
             LOG(VB_COMMFLAG, LOG_INFO,
                 QString("Using method: %1 from channel %2")
                     .arg(commDetectMethod).arg(program_info->GetChanID()));
@@ -843,7 +862,7 @@ static int FlagCommercials(ProgramInfo *program_info, int jobid,
 
     QString filename = get_filename(program_info);
 
-    RingBuffer *tmprbuf = RingBuffer::Create(filename, false);
+    MythMediaBuffer *tmprbuf = MythMediaBuffer::Create(filename, false);
     if (!tmprbuf)
     {
         LOG(VB_GENERAL, LOG_ERR,
@@ -863,21 +882,28 @@ static int FlagCommercials(ProgramInfo *program_info, int jobid,
         }
     }
 
-    PlayerFlags flags = (PlayerFlags)(kAudioMuted   |
-                                      kVideoIsNull  |
-                                      kDecodeLowRes |
-                                      kDecodeSingleThreaded |
-                                      kDecodeNoLoopFilter |
-                                      kNoITV);
-    /* blank detector needs to be only sample center for this optimization. */
-    if ((COMM_DETECT_BLANKS  == commDetectMethod) ||
-        (COMM_DETECT_2_BLANK == commDetectMethod))
+    auto flags = static_cast<PlayerFlags>(kAudioMuted | kVideoIsNull | kNoITV);
+
+    int flagfast = gCoreContext->GetNumSetting("CommFlagFast", 0);
+    if (flagfast)
     {
-        flags = (PlayerFlags) (flags | kDecodeFewBlocks);
+        // Note: These additional flags replicate the intent of the original
+        // commit that enabled lowres support - but I'm not sure why it requires
+        // single threaded decoding - which surely slows everything down? Though
+        // there is probably no profile to enable multi-threaded decoding anyway.
+        LOG(VB_GENERAL, LOG_INFO, "Enabling experimental flagging speedup (low resolution)");
+        flags = static_cast<PlayerFlags>(flags | kDecodeLowRes | kDecodeSingleThreaded | kDecodeNoLoopFilter);
     }
 
-    MythCommFlagPlayer *cfp = new MythCommFlagPlayer(flags);
-    PlayerContext *ctx = new PlayerContext(kFlaggerInUseID);
+    // blank detector needs to be only sample center for this optimization.
+    if (flagfast && ((COMM_DETECT_BLANKS  == commDetectMethod) ||
+                     (COMM_DETECT_2_BLANK == commDetectMethod)))
+    {
+        flags = static_cast<PlayerFlags>(flags | kDecodeFewBlocks);
+    }
+
+    auto *cfp = new MythCommFlagPlayer(flags);
+    auto *ctx = new PlayerContext(kFlaggerInUseID);
     ctx->SetPlayingInfo(program_info);
     ctx->SetRingBuffer(tmprbuf);
     ctx->SetPlayer(cfp);
@@ -1014,7 +1040,7 @@ static int RebuildSeekTable(ProgramInfo *pginfo, int jobid, bool writefile = fal
     // scripts after transcoding or other size-changing operations
     UpdateFileSize(pginfo);
 
-    RingBuffer *tmprbuf = RingBuffer::Create(filename, false);
+    MythMediaBuffer *tmprbuf = MythMediaBuffer::Create(filename, false);
     if (!tmprbuf)
     {
         LOG(VB_GENERAL, LOG_ERR,
@@ -1022,10 +1048,9 @@ static int RebuildSeekTable(ProgramInfo *pginfo, int jobid, bool writefile = fal
         return GENERIC_EXIT_PERMISSIONS_ERROR;
     }
 
-    MythCommFlagPlayer *cfp = new MythCommFlagPlayer(
-                                    (PlayerFlags)(kAudioMuted | kVideoIsNull |
-                                                  kDecodeNoDecode | kNoITV));
-    PlayerContext *ctx = new PlayerContext(kFlaggerInUseID);
+    auto *cfp = new MythCommFlagPlayer((PlayerFlags)(kAudioMuted | kVideoIsNull |
+                                                     kDecodeNoDecode | kNoITV));
+    auto *ctx = new PlayerContext(kFlaggerInUseID);
     ctx->SetPlayingInfo(pginfo);
     ctx->SetRingBuffer(tmprbuf);
     ctx->SetPlayer(cfp);
@@ -1102,7 +1127,7 @@ int main(int argc, char *argv[])
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythCommFlagCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
 
@@ -1179,7 +1204,7 @@ int main(int argc, char *argv[])
     else if (cmdline.toBool("jobid"))
     {
         jobID = cmdline.toInt("jobid");
-        uint chanid;
+        uint chanid = 0;
         QDateTime starttime;
 
         if (!JobQueue::GetJobInfoFromID(jobID, jobType, chanid, starttime))
@@ -1207,16 +1232,20 @@ int main(int argc, char *argv[])
             ret = FlagCommercials(chanid, starttime, jobID, "", jobQueueCPU != 0);
 
         if (ret > GENERIC_EXIT_NOT_OK)
+        {
             JobQueue::ChangeJobStatus(jobID, JOB_ERRORED,
                 QCoreApplication::translate("(mythcommflag)",
                                             "Failed with exit status %1",
                                             "Job status").arg(ret));
+        }
         else
+        {
             JobQueue::ChangeJobStatus(jobID, JOB_FINISHED,
                 QCoreApplication::translate("(mythcommflag)",
                                             "%n commercial break(s)",
                                             "Job status",
                                             ret));
+        }
     }
     else if (cmdline.toBool("video"))
     {
@@ -1251,14 +1280,18 @@ int main(int argc, char *argv[])
             // inefficient, but it lets the other function
             // handle sanity checking
             if (cmdline.toBool("rebuild"))
+            {
                 result = RebuildSeekTable(pginfo.GetChanID(),
                                           pginfo.GetRecordingStartTime(),
                                           -1, cmdline.toBool("writefile"));
+            }
             else
+            {
                 result = FlagCommercials(pginfo.GetChanID(),
                                          pginfo.GetRecordingStartTime(),
                                          -1, cmdline.toString("outputfile"),
                                          true);
+            }
         }
     }
     else if (cmdline.toBool("queue"))

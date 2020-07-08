@@ -23,11 +23,12 @@ class SelectDestination : public MythScreenType
   Q_OBJECT
 
   public:
-    SelectDestination(MythScreenStack *parent, bool nativeMode, const QString& name);
-    ~SelectDestination(void);
+    SelectDestination(MythScreenStack *parent, bool nativeMode, const QString& name)
+        : MythScreenType(parent, name), m_nativeMode(nativeMode) {};
+    ~SelectDestination(void) override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
   public slots:
 
@@ -46,7 +47,7 @@ class SelectDestination : public MythScreenType
 
     bool               m_nativeMode;
 
-    ArchiveDestination m_archiveDestination;
+    ArchiveDestination m_archiveDestination  {AD_FILE, nullptr, nullptr, 0LL};
     int                m_freeSpace           {0};
 
     MythUIButton      *m_nextButton          {nullptr};

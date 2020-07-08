@@ -13,8 +13,6 @@ class SERVICE_PUBLIC RecStatus : public QObject
   Q_OBJECT
 
   public:
-    Q_ENUMS(Type)
-
     enum Type {
         Pending = -15,
         Failing = -14,
@@ -46,12 +44,13 @@ class SERVICE_PUBLIC RecStatus : public QObject
         Offline = 12
         //OtherShowing = 13 (obsolete)
     }; // note stored in int8_t in ProgramInfo
+    Q_ENUM(Type)
 
-    static QString toUIState(Type);
-    static QString toString(Type, uint id);
-    static QString toString(Type, const QString &name);
-    static QString toString(Type, RecordingType type = kNotRecording);
-    static QString toDescription(Type, RecordingType,
+    static QString toUIState(Type recstatus);
+    static QString toString(Type recstatus, uint id);
+    static QString toString(Type recstatus, const QString &name);
+    static QString toString(Type recstatus, RecordingType type = kNotRecording);
+    static QString toDescription(Type recstatus, RecordingType rectype,
                                  const QDateTime &recstartts);
     public:
 

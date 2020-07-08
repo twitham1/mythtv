@@ -27,7 +27,7 @@ class GameUI : public MythScreenType
 
   public:
     explicit GameUI(MythScreenStack *parentStack);
-    ~GameUI() = default;
+    ~GameUI() override = default;
 
     bool Create() override; // MythScreenType
     void BuildTree();
@@ -37,7 +37,7 @@ class GameUI : public MythScreenType
     void nodeChanged(MythGenericTree* node);
     void itemClicked(MythUIButtonListItem* item);
     void showImages(void);
-    void searchComplete(const QString&);
+    void searchComplete(const QString& string);
     void gameSearch(MythGenericTree *node = nullptr,
                      bool automode = false);
     void OnGameSearchListSelection(RefCountHandler<MetadataLookup> lookup);
@@ -59,10 +59,10 @@ class GameUI : public MythScreenType
     void createBusyDialog(const QString& title);
 
     QString getFillSql(MythGenericTree* node) const;
-    QString getChildLevelString(MythGenericTree *node) const;
-    QString getFilter(MythGenericTree *node) const;
-    int     getLevelsOnThisBranch(MythGenericTree *node) const;
-    bool    isLeaf(MythGenericTree *node) const;
+    static QString getChildLevelString(MythGenericTree *node);
+    static QString getFilter(MythGenericTree *node) ;
+    static int     getLevelsOnThisBranch(MythGenericTree *node);
+    static bool    isLeaf(MythGenericTree *node);
     void    fillNode(MythGenericTree *node);
     void    resetOtherTrees(MythGenericTree *node);
     void    updateChangedNode(MythGenericTree *node, RomInfo *romInfo);

@@ -24,7 +24,7 @@
 #define MythXCode_hlsbuffer_h
 
 #include "mythcorecontext.h"
-#include "ringbuffer.h"
+#include "io/mythmediabuffer.h"
 
 extern "C" {
 #include "libavformat/avformat.h"
@@ -38,9 +38,9 @@ class StreamWorker;
 class PlaylistWorker;
 class HLSPlayback;
 
-typedef QList<HLSStream*> StreamsList;
+using StreamsList = QList<HLSStream*>;
 
-class HLSRingBuffer : public RingBuffer
+class HLSRingBuffer : public MythMediaBuffer
 {
 public:
     explicit HLSRingBuffer(const QString &lfilename);
@@ -58,13 +58,12 @@ public:
     static bool TestForHTTPLiveStreaming(const QString &filename);
     bool SaveToDisk(const QString &filename, int segstart = 0, int segend = -1);
     int NumStreams(void) const;
-    int Read(void *data, uint i_read) { return safe_read(data, i_read); }
     void Interrupt(void);
     void Continue(void);
     int DurationForBytes(uint size);
 
 protected:
-    int safe_read(void *data, uint sz) override; // RingBuffer
+    int SafeRead(void *data, uint sz) override; // RingBuffer
     long long GetRealFileSizeInternal(void) const override; // RingBuffer
     long long SeekInternal(long long pos, int whence) override; // RingBuffer
 
@@ -76,19 +75,19 @@ private:
     HLSStream *GetLastStream(const StreamsList *streams = nullptr) const;
     HLSStream *FindStream(const HLSStream *hls_new, const StreamsList *streams = nullptr) const;
     HLSStream *GetCurrentStream(void) const;
-    QString ParseAttributes(const QString &line, const char *attr) const;
-    int ParseDecimalValue(const QString &line, int &target) const;
-    int ParseSegmentInformation(const HLSStream *hls, const QString &line,
-                                int &duration, QString &title) const;
-    int ParseTargetDuration(HLSStream *hls, const QString &line) const;
+    static QString ParseAttributes(const QString &line, const char *attr);
+    static int ParseDecimalValue(const QString &line, int &target);
+    static int ParseSegmentInformation(const HLSStream *hls, const QString &line,
+                                       int &duration, QString &title);
+    static int ParseTargetDuration(HLSStream *hls, const QString &line);
     HLSStream *ParseStreamInformation(const QString &line, const QString &uri) const;
-    int ParseMediaSequence(HLSStream *hls, const QString &line) const;
+    static int ParseMediaSequence(HLSStream *hls, const QString &line);
     int ParseKey(HLSStream *hls, const QString &line);
-    int ParseProgramDateTime(HLSStream *hls, const QString &line) const;
-    int ParseAllowCache(HLSStream *hls, const QString &line) const;
-    int ParseVersion(const QString &line, int &version) const;
-    int ParseEndList(HLSStream *hls) const;
-    int ParseDiscontinuity(HLSStream *hls, const QString &line) const;
+    static int ParseProgramDateTime(HLSStream *hls, const QString &line);
+    static int ParseAllowCache(HLSStream *hls, const QString &line);
+    static int ParseVersion(const QString &line, int &version);
+    static int ParseEndList(HLSStream *hls);
+    static int ParseDiscontinuity(HLSStream *hls, const QString &line);
     int ParseM3U8(const QByteArray *buffer, StreamsList *streams = nullptr);
     int Prefetch(int count);
     void SanityCheck(const HLSStream *hls) const;
@@ -110,7 +109,9 @@ private:
     mutable QMutex      m_lock;     // protect general class members
     bool                m_meta    {false}; // meta playlist
     bool                m_error   {false}; // parsing error
+#ifdef USING_LIBCRYPTO
     bool                m_aesmsg  {false}; // only print one time that the media is encrypted
+#endif
     int                 m_startup {0};  // starting segment (where seek start)
     /**
      * assumed bitrate of playback

@@ -191,10 +191,14 @@ bool GallerySlideView::keyPressEvent(QKeyEvent *event)
         else if (action == "RECENTER")
             Pan();
         else if (action == "ESCAPE" && !GetMythMainWindow()->IsExitingToMain())
+        {
             // Exit info details, if shown
             handled = m_infoList.Hide();
+        }
         else
+        {
             handled = false;
+        }
     }
 
     if (!handled)
@@ -212,8 +216,11 @@ void GallerySlideView::customEvent(QEvent *event)
 {
     if (event->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me      = static_cast<MythEvent *>(event);
-        const QString&    message = me->Message();
+        auto *me = dynamic_cast<MythEvent *>(event);
+        if (me == nullptr)
+            return;
+
+        const QString& message = me->Message();
 
         QStringList extra = me->ExtraDataList();
 
@@ -233,7 +240,7 @@ void GallerySlideView::customEvent(QEvent *event)
     }
     else if (event->type() == DialogCompletionEvent::kEventType)
     {
-        DialogCompletionEvent *dce = (DialogCompletionEvent *)(event);
+        auto *dce = (DialogCompletionEvent *)(event);
 
         QString resultid  = dce->GetId();
         int     buttonnum = dce->GetResult();
@@ -261,7 +268,7 @@ void GallerySlideView::customEvent(QEvent *event)
 void GallerySlideView::MenuMain()
 {
     // Create the main menu that will contain the submenus above
-    MythMenu *menu = new MythMenu(tr("Slideshow Options"), this, "mainmenu");
+    auto *menu = new MythMenu(tr("Slideshow Options"), this, "mainmenu");
 
     ImagePtrK im = m_slides.GetCurrent().GetImageData();
     if (im && im->m_type == kVideoFile)
@@ -301,7 +308,7 @@ void GallerySlideView::MenuMain()
         menu->AddItem(tr("Hide Details"), SLOT(HideInfo()));
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
-    MythDialogBox *menuPopup = new MythDialogBox(menu, popupStack, "menuPopup");
+    auto *menuPopup = new MythDialogBox(menu, popupStack, "menuPopup");
     if (menuPopup->Create())
         popupStack->AddScreen(menuPopup);
     else
@@ -318,7 +325,7 @@ void GallerySlideView::MenuTransforms(MythMenu &mainMenu)
     ImagePtrK im = m_slides.GetCurrent().GetImageData();
     if (im && !m_playing)
     {
-        MythMenu *menu = new MythMenu(tr("Transform Options"),
+        auto *menu = new MythMenu(tr("Transform Options"),
                                       this, "metadatamenu");
         if (m_editsAllowed)
         {
@@ -636,7 +643,7 @@ void GallerySlideView::TransitionComplete()
     {
         // show the date & comment
         QStringList text;
-        text << m_mgr.LongDateOf(im);
+        text << ImageManagerFe::LongDateOf(im);
 
         if (!im->m_comment.isEmpty())
             text << im->m_comment;
@@ -664,12 +671,15 @@ void GallerySlideView::TransitionComplete()
 void GallerySlideView::ShowPrevSlide(int inc)
 {
     if (m_playing && m_view->HasPrev(inc) == nullptr)
+    {
         // Prohibit back-wrapping during slideshow: it will cause premature end
         //: Cannot go back beyond first slide of slideshow
         SetStatus(tr("Start"));
-
+    }
     else if (m_view->Prev(inc))
+    {
         ShowSlide(-1);
+    }
 }
 
 

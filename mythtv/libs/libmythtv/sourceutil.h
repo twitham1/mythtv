@@ -1,6 +1,6 @@
 // -*- Mode: c++ -*-
-#ifndef _SOURCEUTIL_H_
-#define _SOURCEUTIL_H_
+#ifndef SOURCEUTIL_H
+#define SOURCEUTIL_H
 
 // C++ headers
 #include <vector>
@@ -17,6 +17,7 @@ class MTV_PUBLIC SourceUtil
   public:
     static bool    HasDigitalChannel(uint sourceid);
     static QString GetSourceName(uint sourceid);
+    static uint    GetSourceID(const QString &name);
     static QString GetChannelSeparator(uint sourceid);
     static QString GetChannelFormat(uint sourceid);
     static uint    GetChannelCount(uint sourceid);
@@ -30,6 +31,7 @@ class MTV_PUBLIC SourceUtil
     static bool    IsUnscanable(uint sourceid);
     static bool    IsCableCardPresent(uint sourceid);
     static bool    IsAnySourceScanable(void);
+    static bool    IsSourceIDValid(uint sourceid);
     static bool    UpdateChannelsFromListings(
         uint sourceid, const QString& inputtype = QString(), bool wait = false);
 
@@ -37,14 +39,16 @@ class MTV_PUBLIC SourceUtil
                                  const QString& grabber, const QString& userid,
                                  const QString& freqtable, const QString& lineupid,
                                  const QString& password, bool useeit,
-                                 const QString& configpath, int nitid);
+                                 const QString& configpath, int nitid,
+                                 uint bouquetid, uint regionid, uint scanfrequency);
     static int     CreateSource( const QString& sourcename,
                                  const QString& grabber, const QString& userid,
                                  const QString& freqtable, const QString& lineupid,
                                  const QString& password, bool useeit,
-                                 const QString& configpath, int nitid);
+                                 const QString& configpath, int nitid,
+                                 uint bouquetid, uint regionid, uint scanfrequency);
     static bool    DeleteSource(uint sourceid);
     static bool    DeleteAllSources(void);
 };
 
-#endif //_SOURCEUTIL_H_
+#endif //SOURCEUTIL_H

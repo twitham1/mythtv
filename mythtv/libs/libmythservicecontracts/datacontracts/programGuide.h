@@ -54,7 +54,7 @@ class SERVICE_PUBLIC ProgramGuide : public QObject
     Q_PROPERTY( QString       Version        READ Version        WRITE setVersion        )
     Q_PROPERTY( QString       ProtoVer       READ ProtoVer       WRITE setProtoVer       )
 
-    Q_PROPERTY( QVariantList Channels READ Channels DESIGNABLE true )
+    Q_PROPERTY( QVariantList Channels READ Channels )
 
     PROPERTYIMP       ( QDateTime   , StartTime     )
     PROPERTYIMP       ( QDateTime   , EndTime       )
@@ -102,7 +102,7 @@ class SERVICE_PUBLIC ProgramGuide : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            ChannelInfo *pObject = new ChannelInfo( this );
+            auto *pObject = new ChannelInfo( this );
             Channels().append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

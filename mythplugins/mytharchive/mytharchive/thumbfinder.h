@@ -19,11 +19,11 @@ extern "C" {
 #include "remoteavformatcontext.h"
 #include "mythavutil.h"
 
-typedef struct SeekAmount
+struct SeekAmount
 {
     QString name;
     int amount;
-} SeekAmount;
+};
 
 extern struct SeekAmount SeekAmounts[];
 extern int SeekAmountsCount;
@@ -44,10 +44,10 @@ class ThumbFinder : public MythScreenType
 
       ThumbFinder(MythScreenStack *parent, ArchiveItem *archiveItem,
                   const QString &menuTheme);
-    ~ThumbFinder();
+    ~ThumbFinder() override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
 
   private slots:
@@ -60,12 +60,12 @@ class ThumbFinder : public MythScreenType
   private:
     void Init(void) override; // MythScreenType
     bool getThumbImages(void);
-    int  getChapterCount(const QString &menuTheme);
+    static int getChapterCount(const QString &menuTheme);
     void changeSeekAmount(bool up);
     void updateCurrentPos(void);
     bool seekToFrame(int frame, bool checkPos = true);
-    QString createThumbDir(void);
-    QString frameToTime(int64_t frame, bool addFrame = false);
+    static QString createThumbDir(void);
+    QString frameToTime(int64_t frame, bool addFrame = false) const;
 
     // avcodec stuff
     bool initAVCodec(const QString &inFile);
@@ -80,6 +80,7 @@ class ThumbFinder : public MythScreenType
 
     RemoteAVFormatContext m_inputFC      {nullptr};
     AVCodecContext  *m_codecCtx          {nullptr};
+    MythCodecMap     m_codecMap          {};
     AVCodec         *m_codec             {nullptr};
     MythAVFrame      m_frame;
     MythAVCopy       m_copy;

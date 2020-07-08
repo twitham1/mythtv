@@ -31,7 +31,7 @@ class SERVICE_PUBLIC EncoderList : public QObject
 
     Q_CLASSINFO( "Encoders", "type=DTC::Encoder");
 
-    Q_PROPERTY( QVariantList Encoders READ Encoders DESIGNABLE true )
+    Q_PROPERTY( QVariantList Encoders READ Encoders )
 
     PROPERTYIMP_RO_REF( QVariantList, Encoders );
 
@@ -54,7 +54,7 @@ class SERVICE_PUBLIC EncoderList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            Encoder *pObject = new Encoder( this );
+            auto *pObject = new Encoder( this );
             m_Encoders.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

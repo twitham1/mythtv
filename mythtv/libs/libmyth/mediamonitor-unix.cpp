@@ -217,7 +217,7 @@ bool MediaMonitorUnix::CheckMountable(void)
         }
 
         // Enumerate devices
-        typedef QList<QDBusObjectPath> QDBusObjectPathList;
+        using QDBusObjectPathList = QList<QDBusObjectPath>;
         QDBusReply<QDBusObjectPathList> reply = iface.call("EnumerateDevices");
         if (!reply.isValid())
         {
@@ -237,20 +237,19 @@ bool MediaMonitorUnix::CheckMountable(void)
 
         // Parse the returned device array
         const QDBusObjectPathList& list(reply.value());
-        for (QDBusObjectPathList::const_iterator it = list.begin();
-            it != list.end(); ++it)
+        for (const auto& entry : qAsConst(list))
         {
-            if (!DeviceProperty(*it, "DeviceIsSystemInternal").toBool() &&
-                !DeviceProperty(*it, "DeviceIsPartitionTable").toBool() )
+            if (!DeviceProperty(entry, "DeviceIsSystemInternal").toBool() &&
+                !DeviceProperty(entry, "DeviceIsPartitionTable").toBool() )
             {
-                QString dev = DeviceProperty(*it, "DeviceFile").toString();
+                QString dev = DeviceProperty(entry, "DeviceFile").toString();
 
                 // ignore floppies, too slow
                 if (dev.startsWith("/dev/fd"))
                     continue;
 
-                MythMediaDevice* pDevice;
-                if (DeviceProperty(*it, "DeviceIsRemovable").toBool())
+                MythMediaDevice* pDevice = nullptr;
+                if (DeviceProperty(entry, "DeviceIsRemovable").toBool())
                     pDevice = MythCDROM::get(this, dev.toLatin1(), false, m_AllowEject);
                 else
                     pDevice = MythHDD::Get(this, dev.toLatin1(), false, false);
@@ -275,15 +274,13 @@ bool MediaMonitorUnix::CheckMountable(void)
     QDir sysfs("/sys/block");
     sysfs.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
 
-    QStringList devices = sysfs.entryList();
-
-    for (QStringList::iterator it = devices.begin(); it != devices.end(); ++it)
+    for (const auto& device : sysfs.entryList())
     {
         // ignore floppies, too slow
-        if ((*it).startsWith("fd"))
+        if (device.startsWith("fd"))
             continue;
 
-        sysfs.cd(*it);
+        sysfs.cd(device);
         QString path = sysfs.absolutePath();
         if (CheckRemovable(path))
             FindPartitions(path, true);
@@ -435,17 +432,16 @@ QStringList MediaMonitorUnix::GetCDROMBlockDevices(void)
     if (iface.isValid())
     {
         // Enumerate devices
-        typedef QList<QDBusObjectPath> QDBusObjectPathList;
+        using QDBusObjectPathList = QList<QDBusObjectPath>;
         QDBusReply<QDBusObjectPathList> reply = iface.call("EnumerateDevices");
         if (reply.isValid())
         {
             const QDBusObjectPathList& list(reply.value());
-            for (QDBusObjectPathList::const_iterator it = list.begin();
-                it != list.end(); ++it)
+            for (const auto& entry : qAsConst(list))
             {
-                if (DeviceProperty(*it, "DeviceIsRemovable").toBool())
+                if (DeviceProperty(entry, "DeviceIsRemovable").toBool())
                 {
-                    QString dev = DeviceProperty(*it, "DeviceFile").toString();
+                    QString dev = DeviceProperty(entry, "DeviceFile").toString();
                     if (dev.startsWith("/dev/"))
                         dev.remove(0,5);
                     l.push_back(dev);
@@ -465,7 +461,11 @@ QStringList MediaMonitorUnix::GetCDROMBlockDevices(void)
             line = stream.readLine();
             if (line.startsWith("drive name:"))
             {
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
                 l = line.split('\t', QString::SkipEmptyParts);
+#else
+                l = line.split('\t', Qt::SkipEmptyParts);
+#endif
                 l.pop_front();   // Remove 'drive name:' field
                 break;           // file should only contain one drive table?
             }
@@ -576,25 +576,22 @@ bool MediaMonitorUnix::AddDevice(MythMediaDevice* pDevice)
         return false;
     }
 
-    dev_t new_rdev;
-    struct stat sb;
-
+    struct stat sb {};
     if (stat(path.toLocal8Bit().constData(), &sb) < 0)
     {
         statError(":AddDevice()", path);
         return false;
     }
-    new_rdev = sb.st_rdev;
+    dev_t new_rdev = sb.st_rdev;
 
     //
     // Check if this is a duplicate of a device we have already added
     //
-    QList<MythMediaDevice*>::const_iterator itr = m_Devices.begin();
-    for (; itr != m_Devices.end(); ++itr)
+    for (const auto *device : qAsConst(m_Devices))
     {
-        if (stat((*itr)->getDevicePath().toLocal8Bit().constData(), &sb) < 0)
+        if (stat(device->getDevicePath().toLocal8Bit().constData(), &sb) < 0)
         {
-            statError(":AddDevice()", (*itr)->getDevicePath());
+            statError(":AddDevice()", device->getDevicePath());
             return false;
         }
 
@@ -604,7 +601,7 @@ bool MediaMonitorUnix::AddDevice(MythMediaDevice* pDevice)
                      LOC + ":AddDevice() - not adding " + path +
                      "\n                        "
                      "because it appears to be a duplicate of " +
-                     (*itr)->getDevicePath());
+                     device->getDevicePath());
             return false;
         }
     }
@@ -635,7 +632,7 @@ bool MediaMonitorUnix::AddDevice(struct fstab * mep)
 #endif
 
     MythMediaDevice* pDevice = nullptr;
-    struct stat sbuf;
+    struct stat sbuf {};
 
     bool is_supermount = false;
     bool is_cdrom = false;
@@ -731,7 +728,7 @@ void MediaMonitorUnix::deviceAdded( const QDBusObjectPath& o)
     {
         QString dev = DeviceProperty(o, "DeviceFile").toString();
 
-        MythMediaDevice* pDevice;
+        MythMediaDevice* pDevice = nullptr;
         if (DeviceProperty(o, "DeviceIsRemovable").toBool())
             pDevice = MythCDROM::get(this, dev.toLatin1(), false, m_AllowEject);
         else
@@ -792,17 +789,16 @@ bool MediaMonitorUnix::FindPartitions(const QString &dev, bool checkPartitions)
 
         bool found_partitions = false;
         QStringList parts = sysfs.entryList();
-        for (QStringList::iterator pit = parts.begin();
-             pit != parts.end(); ++pit)
+        for (const auto& part : qAsConst(parts))
         {
             // skip some sysfs dirs that are _not_ sub-partitions
-            if (*pit == "device" || *pit == "holders" || *pit == "queue"
-                                 || *pit == "slaves"  || *pit == "subsystem"
-                                 || *pit == "bdi"     || *pit == "power")
+            if (part == "device" || part == "holders" || part == "queue"
+                                 || part == "slaves"  || part == "subsystem"
+                                 || part == "bdi"     || part == "power")
                 continue;
 
             found_partitions |= FindPartitions(
-                sysfs.absoluteFilePath(*pit), false);
+                sysfs.absoluteFilePath(part), false);
         }
 
         // no partitions on block device, use main device
@@ -862,22 +858,24 @@ void MediaMonitorUnix::CheckDeviceNotifications(void)
         qBuffer.append(buffer);
         size = read(m_fifo, buffer, 255);
     }
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     const QStringList list = qBuffer.split('\n', QString::SkipEmptyParts);
-
-    QStringList::const_iterator it = list.begin();
-    for (; it != list.end(); ++it)
+#else
+    const QStringList list = qBuffer.split('\n', Qt::SkipEmptyParts);
+#endif
+    for (const auto& notif : qAsConst(list))
     {
-        if ((*it).startsWith("add"))
+        if (notif.startsWith("add"))
         {
-            QString dev = (*it).section(' ', 1, 1);
+            QString dev = notif.section(' ', 1, 1);
             LOG(VB_MEDIA, LOG_INFO, "Udev add " + dev);
 
             if (CheckRemovable(dev))
                 FindPartitions(dev, true);
         }
-        else if ((*it).startsWith("remove"))
+        else if (notif.startsWith("remove"))
         {
-            QString dev = (*it).section(' ', 2, 2);
+            QString dev = notif.section(' ', 2, 2);
             LOG(VB_MEDIA, LOG_INFO, "Udev remove " + dev);
             RemoveDevice(dev);
         }

@@ -80,7 +80,7 @@ class VisualBase
 
     // this is called on nodes that will not be displayed :: Not needed for most visualizations
     // (i.e. between the displayed frames, if you need the whole audio stream)
-    virtual bool processUndisplayed( VisualNode * )
+    virtual bool processUndisplayed( VisualNode */*node*/ )
     {
         return true; // By default this does nothing : Ignore the in-between chunks of audio data
     };
@@ -91,7 +91,7 @@ class VisualBase
     virtual int getDesiredFPS(void) { return m_fps; }
     // Override this if you need the potential of capturing more data than the default
     virtual unsigned long getDesiredSamples(void) { return SAMPLES_DEFAULT_SIZE; }
-    void drawWarning(QPainter *p, const QColor &back, const QSize &size, const QString& warning, int fontsize = 28);
+    static void drawWarning(QPainter *p, const QColor &back, const QSize &size, const QString& warning, int fontsize = 28);
 
   protected:
     int  m_fps                {20};
@@ -113,14 +113,14 @@ class VisFactory
     VisFactory*        m_pNextVisFactory {nullptr};
 };
 
-#define RUBBERBAND 0
+#define RUBBERBAND false
 #define TWOCOLOUR 0
 
 class StereoScope : public VisualBase
 {
   public:
     StereoScope();
-    virtual ~StereoScope() = default;
+    ~StereoScope() override = default;
 
     void resize( const QSize &size ) override; // VisualBase
     bool process( VisualNode *node ) override; // VisualBase
@@ -131,7 +131,7 @@ class StereoScope : public VisualBase
   protected:
     QColor         m_startColor  {Qt::green};
     QColor         m_targetColor {Qt::red};
-    vector<double> m_magnitudes;
+    vector<double> m_magnitudes  {};
     QSize          m_size;
     bool const     m_rubberband  {RUBBERBAND};
     double const   m_falloff     {1.0};
@@ -141,7 +141,7 @@ class MonoScope : public StereoScope
 {
   public:
     MonoScope() = default;
-    virtual ~MonoScope() = default;
+    ~MonoScope() override = default;
 
     bool process( VisualNode *node ) override; // StereoScope
     bool draw( QPainter *p, const QColor &back ) override; // StereoScope
@@ -150,15 +150,15 @@ class MonoScope : public StereoScope
 class LogScale
 {
   public:
-    LogScale(int = 0, int = 0);
+    explicit LogScale(int maxscale = 0, int maxrange = 0);
     ~LogScale();
 
     int scale() const { return m_s; }
     int range() const { return m_r; }
 
-    void setMax(int, int);
+    void setMax(int maxscale, int maxrange);
 
-    int operator[](int);
+    int operator[](int index);
 
 
   private:
@@ -176,7 +176,7 @@ class Spectrum : public VisualBase
     
   public:
     Spectrum();
-    virtual ~Spectrum();
+    ~Spectrum() override;
 
     void resize(const QSize &size) override; // VisualBase
     bool process(VisualNode *node) override; // VisualBase
@@ -185,7 +185,7 @@ class Spectrum : public VisualBase
         {(void) action;}
 
   protected:
-    inline double clamp(double cur, double max, double min);
+    static inline double clamp(double cur, double max, double min);
 
     QColor             m_startColor       {Qt::blue};
     QColor             m_targetColor      {Qt::red};
@@ -212,7 +212,7 @@ class Squares : public Spectrum
 {
   public:
     Squares();
-    virtual ~Squares() = default;
+    ~Squares() override = default;
 
     void resize (const QSize &newsize) override; // Spectrum
     bool draw(QPainter *p, const QColor &back = Qt::black) override; // Spectrum
@@ -222,8 +222,8 @@ class Squares : public Spectrum
   private:
     void drawRect(QPainter *p, QRect *rect, int i, int c, int w, int h);
     QSize m_actualSize        {0,0};
-    int   m_fake_height       {0};
-    int   m_number_of_squares {16};
+    int   m_fakeHeight        {0};
+    int   m_numberOfSquares   {16};
 };
 
 #endif // FFTW3_SUPPORT
@@ -242,10 +242,10 @@ class Piano : public VisualBase
 
 #define PIANO_RMS_NEGLIGIBLE .001
 #define PIANO_SPECTRUM_SMOOTHING 0.95
-#define PIANO_MIN_VOL -10
+#define PIANO_MIN_VOL (-10)
 #define PIANO_KEYPRESS_TOO_LIGHT .2
 
-typedef struct piano_key_data {
+struct piano_key_data {
     goertzel_data q1, q2, coeff, magnitude;
     goertzel_data max_magnitude_seen;
 
@@ -256,11 +256,11 @@ typedef struct piano_key_data {
     int samples_process_before_display_update;
 
     bool is_black_note; // These are painted on top of white notes, and have different colouring
-} piano_key_data;
+};
 
   public:
     Piano();
-    virtual ~Piano();
+    ~Piano() override;
 
     void resize(const QSize &size) override; // VisualBase
 
@@ -275,7 +275,7 @@ typedef struct piano_key_data {
         {(void) action;}
 
   protected:
-    inline double clamp(double cur, double max, double min);
+    static inline double clamp(double cur, double max, double min);
     bool process_all_types(VisualNode *node, bool this_will_be_displayed);
     void zero_analysis(void);
 
@@ -284,15 +284,15 @@ typedef struct piano_key_data {
     QColor          m_blackStartColor  {10,10,10};
     QColor          m_blackTargetColor {Qt::red};
 
-    vector<QRect>   m_rects;
+    vector<QRect>   m_rects            {};
     QSize           m_size;
 
-    unsigned long   m_offset_processed;
+    unsigned long   m_offset_processed {0};
 
     piano_key_data *m_piano_data       {nullptr};
     piano_audio    *m_audio_data       {nullptr};
 
-    vector<double>  m_magnitude;
+    vector<double>  m_magnitude        {};
 };
 
 class AlbumArt : public VisualBase
@@ -301,7 +301,7 @@ class AlbumArt : public VisualBase
 
   public:
     AlbumArt(void);
-    virtual ~AlbumArt() = default;
+    ~AlbumArt() override = default;
 
     void resize(const QSize &size) override; // VisualBase
     bool process(VisualNode *node = nullptr) override; // VisualBase
@@ -315,7 +315,7 @@ class AlbumArt : public VisualBase
 
     QSize m_size;
     QSize m_cursize;
-    ImageType m_currImageType;
+    ImageType m_currImageType {IT_UNKNOWN};
     QImage m_image;
 
     MusicMetadata *m_currentMetadata {nullptr};
@@ -327,7 +327,7 @@ class Blank : public VisualBase
     // This draws ... well ... nothing    
   public:
     Blank();
-    virtual ~Blank() = default;
+    ~Blank() override = default;
 
     void resize(const QSize &size) override; // VisualBase
     bool process(VisualNode *node = nullptr) override; // VisualBase

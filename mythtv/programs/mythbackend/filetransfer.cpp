@@ -4,7 +4,7 @@
 #include <utility>
 
 #include "filetransfer.h"
-#include "ringbuffer.h"
+#include "io/mythmediabuffer.h"
 #include "mythdate.h"
 #include "mythsocket.h"
 #include "programinfo.h"
@@ -13,7 +13,7 @@
 FileTransfer::FileTransfer(QString &filename, MythSocket *remote,
                            bool usereadahead, int timeout_ms) :
     ReferenceCounter(QString("FileTransfer:%1").arg(filename)),
-    m_rbuffer(RingBuffer::Create(filename, false, usereadahead, timeout_ms, true)),
+    m_rbuffer(MythMediaBuffer::Create(filename, false, usereadahead, timeout_ms, true)),
     m_sock(remote)
 {
     m_pginfo = new ProgramInfo(filename);
@@ -24,7 +24,7 @@ FileTransfer::FileTransfer(QString &filename, MythSocket *remote,
 
 FileTransfer::FileTransfer(QString &filename, MythSocket *remote, bool write) :
     ReferenceCounter(QString("FileTransfer:%1").arg(filename)),
-    m_rbuffer(RingBuffer::Create(filename, write)),
+    m_rbuffer(MythMediaBuffer::Create(filename, write)),
     m_sock(remote), m_writemode(write)
 {
     m_pginfo = new ProgramInfo(filename);
@@ -61,13 +61,13 @@ bool FileTransfer::isOpen(void)
     return m_rbuffer && m_rbuffer->IsOpen();
 }
 
-bool FileTransfer::ReOpen(QString newFilename)
+bool FileTransfer::ReOpen(const QString& newFilename)
 {
     if (!m_writemode)
         return false;
 
     if (m_rbuffer)
-        return m_rbuffer->ReOpen(std::move(newFilename));
+        return m_rbuffer->ReOpen(newFilename);
 
     return false;
 }
@@ -176,9 +176,7 @@ int FileTransfer::WriteBlock(int size)
     while (tot < size)
     {
         int request = size - tot;
-        int received;
-
-        received = m_sock->Read(buf, (uint)request, 200 /*ms */);
+        int received = m_sock->Read(buf, (uint)request, 200 /*ms */);
 
         if (received != request)
         {

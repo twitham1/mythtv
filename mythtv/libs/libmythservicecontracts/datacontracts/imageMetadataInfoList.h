@@ -27,7 +27,7 @@ class SERVICE_PUBLIC ImageMetadataInfoList : public QObject
     Q_PROPERTY( QString      Path               READ Path               WRITE setPath           )
     Q_PROPERTY( int          Size               READ Size               WRITE setSize           )
     Q_PROPERTY( QString      Extension          READ Extension          WRITE setExtension      )
-    Q_PROPERTY( QVariantList ImageMetadataInfos READ ImageMetadataInfos DESIGNABLE true )
+    Q_PROPERTY( QVariantList ImageMetadataInfos READ ImageMetadataInfos )
 
     PROPERTYIMP       ( int         , Count           )
     PROPERTYIMP       ( QString     , File            )
@@ -62,7 +62,7 @@ class SERVICE_PUBLIC ImageMetadataInfoList : public QObject
         {
             // We must make sure the object added to the
             // QVariantList has a parent of 'this'
-            ImageMetadataInfo *pObject = new ImageMetadataInfo( this );
+            auto *pObject = new ImageMetadataInfo( this );
             m_ImageMetadataInfos.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

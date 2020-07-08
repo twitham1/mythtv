@@ -138,7 +138,7 @@ void VideoSelector::ShowMenu()
 {
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    MythDialogBox *menuPopup = new MythDialogBox(tr("Menu"), popupStack, "actionmenu");
+    auto *menuPopup = new MythDialogBox(tr("Menu"), popupStack, "actionmenu");
 
     if (menuPopup->Create())
         popupStack->AddScreen(menuPopup);
@@ -155,12 +155,8 @@ void VideoSelector::selectAll()
          m_selectedList.takeFirst();
     m_selectedList.clear();
 
-    vector<VideoInfo *>::iterator i = m_videoList->begin();
-    for ( ; i != m_videoList->end(); ++i)
-    {
-        VideoInfo *v = *i;
+    for (auto *v : *m_videoList)
         m_selectedList.append(v);
-    }
 
     updateVideoList();
 }
@@ -195,7 +191,7 @@ void VideoSelector::toggleSelected(MythUIButtonListItem *item)
 
 void VideoSelector::titleChanged(MythUIButtonListItem *item)
 {
-    VideoInfo *v = item->GetData().value<VideoInfo *>();
+    auto *v = item->GetData().value<VideoInfo *>();
 
     if (!v)
         return;
@@ -224,19 +220,18 @@ void VideoSelector::titleChanged(MythUIButtonListItem *item)
     {
         if (v->size == 0)
         {
-            bool bExists;
+            struct stat fileinfo {};
 
-            struct stat fileinfo;
-            memset(&fileinfo, 0, sizeof(fileinfo ));
-
-            bExists = RemoteFile::Exists(v->filename, &fileinfo);
+            bool bExists = RemoteFile::Exists(v->filename, &fileinfo);
             if (bExists)
                 v->size = (uint64_t)fileinfo.st_size;
 
             if (!bExists)
+            {
                 LOG(VB_GENERAL, LOG_ERR,
                     QString("VideoSelector: Cannot find file: %1")
                         .arg(v->filename));
+            }
         }
 
         m_filesizeText->SetText(formatSize(v->size / 1024));
@@ -246,19 +241,14 @@ void VideoSelector::titleChanged(MythUIButtonListItem *item)
 void VideoSelector::OKPressed()
 {
     // loop though selected videos and add them to the list
-    VideoInfo *v;
-    ArchiveItem *a;
-
     // remove any items that have been removed from the list
     QList<ArchiveItem *> tempAList;
-    for (int x = 0; x < m_archiveList->size(); x++)
+    for (auto *a : qAsConst(*m_archiveList))
     {
-        a = m_archiveList->at(x);
         bool found = false;
 
-        for (int y = 0; y < m_selectedList.size(); y++)
+        for (const auto *v : qAsConst(m_selectedList))
         {
-            v = m_selectedList.at(y);
             if (a->type != "Video" || a->filename == v->filename)
             {
                 found = true;
@@ -270,18 +260,15 @@ void VideoSelector::OKPressed()
             tempAList.append(a);
     }
 
-    for (int x = 0; x < tempAList.size(); x++)
-        m_archiveList->removeAll(tempAList.at(x));
+    for (auto *x : qAsConst(tempAList))
+        m_archiveList->removeAll(x);
 
     // remove any items that are already in the list
     QList<VideoInfo *> tempSList;
-    for (int x = 0; x < m_selectedList.size(); x++)
+    for (auto *v : qAsConst(m_selectedList))
     {
-        v = m_selectedList.at(x);
-
-        for (int y = 0; y < m_archiveList->size(); y++)
+        for (const auto *a : qAsConst(*m_archiveList))
         {
-            a = m_archiveList->at(y);
             if (a->filename == v->filename)
             {
                 tempSList.append(v);
@@ -290,14 +277,13 @@ void VideoSelector::OKPressed()
         }
     }
 
-    for (int x = 0; x < tempSList.size(); x++)
-        m_selectedList.removeAll(tempSList.at(x));
+    for (auto *x : qAsConst(tempSList))
+        m_selectedList.removeAll(x);
 
     // add all that are left
-    for (int x = 0; x < m_selectedList.size(); x++)
+    for (const auto *v : qAsConst(m_selectedList))
     {
-        v = m_selectedList.at(x);
-        a = new ArchiveItem;
+        auto *a = new ArchiveItem;
         a->type = "Video";
         a->title = v->title;
         a->subtitle = "";
@@ -339,18 +325,15 @@ void VideoSelector::updateVideoList(void)
 
     if (m_categorySelector)
     {
-        vector<VideoInfo *>::iterator i = m_videoList->begin();
-        for ( ; i != m_videoList->end(); ++i)
+        for (auto *v : *m_videoList)
         {
-            VideoInfo *v = *i;
-
             if (v->category == m_categorySelector->GetValue() ||
                 m_categorySelector->GetValue() == tr("All Videos"))
             {
                 if (v->parentalLevel <= m_currentParentalLevel)
                 {
-                    MythUIButtonListItem* item = new MythUIButtonListItem(
-                            m_videoButtonList, v->title);
+                    auto* item = new MythUIButtonListItem(m_videoButtonList,
+                                                          v->title);
                     item->setCheckable(true);
                     if (m_selectedList.indexOf(v) != -1)
                     {
@@ -361,7 +344,7 @@ void VideoSelector::updateVideoList(void)
                         item->setChecked(MythUIButtonListItem::NotChecked);
                     }
 
-                    item->SetData(qVariantFromValue(v));
+                    item->SetData(QVariant::fromValue(v));
                 }
             }
         }
@@ -387,7 +370,7 @@ void VideoSelector::updateVideoList(void)
 vector<VideoInfo *> *VideoSelector::getVideoListFromDB(void)
 {
     // get a list of category's
-    typedef QMap<int, QString> CategoryMap;
+    using CategoryMap = QMap<int, QString>;
     CategoryMap categoryMap;
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare("SELECT intid, category FROM videocategory");
@@ -408,8 +391,10 @@ vector<VideoInfo *> *VideoSelector::getVideoListFromDB(void)
 
     if (query.exec() && query.size())
     {
-        vector<VideoInfo*> *videoList = new vector<VideoInfo*>;
-        QString artist, genre, episode;
+        auto *videoList = new vector<VideoInfo*>;
+        QString artist;
+        QString genre;
+        QString episode;
         while (query.next())
         {
             // Exclude iso images as they aren't supported
@@ -417,7 +402,7 @@ vector<VideoInfo *> *VideoSelector::getVideoListFromDB(void)
             if (filename.endsWith(".iso") || filename.endsWith(".ISO"))
                 continue;
 
-            VideoInfo *info = new VideoInfo;
+            auto *info = new VideoInfo;
 
             info->id = query.value(0).toInt();
             if (query.value(9).toInt() > 0)
@@ -494,11 +479,8 @@ void VideoSelector::getVideoList(void)
 
     if (m_videoList && !m_videoList->empty())
     {
-        vector<VideoInfo *>::iterator i = m_videoList->begin();
-        for ( ; i != m_videoList->end(); ++i)
+        for (auto *v : *m_videoList)
         {
-            VideoInfo *v = *i;
-
             if (categories.indexOf(v->category) == -1)
                 categories.append(v->category);
         }
@@ -539,12 +521,10 @@ void VideoSelector::updateSelectedList()
 
     m_selectedList.clear();
 
-    for (int x = 0; x < m_archiveList->size(); x++)
+    for (const auto *a : qAsConst(*m_archiveList))
     {
-        ArchiveItem *a = m_archiveList->at(x);
-        for (size_t y = 0; y < m_videoList->size(); y++)
+        for (auto *v : qAsConst(*m_videoList))
         {
-            VideoInfo *v = m_videoList->at(y);
             if (v->filename == a->filename)
             {
                 if (m_selectedList.indexOf(v) == -1)

@@ -32,7 +32,7 @@ class SERVICE_PUBLIC CutList : public QObject
 
     Q_CLASSINFO( "Cuttings", "type=DTC::Cutting");
 
-    Q_PROPERTY( QVariantList Cuttings READ Cuttings DESIGNABLE true )
+    Q_PROPERTY( QVariantList Cuttings READ Cuttings )
 
     PROPERTYIMP_RO_REF( QVariantList, Cuttings );
 
@@ -55,7 +55,7 @@ class SERVICE_PUBLIC CutList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            Cutting *pObject = new Cutting( this );
+            auto *pObject = new Cutting( this );
             m_Cuttings.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

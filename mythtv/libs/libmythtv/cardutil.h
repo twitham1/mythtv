@@ -1,6 +1,6 @@
 // -*- Mode: c++ -*-
-#ifndef _CARDUTIL_H_
-#define _CARDUTIL_H_
+#ifndef CARDUTIL_H
+#define CARDUTIL_H
 
 // C++ headers
 #include <cstdint>
@@ -18,13 +18,13 @@ using namespace std;
 
 class InputInfo;
 class CardInput;
-typedef QMap<int,QString> InputNames;
+using InputNames = QMap<int,QString>;
 
-MTV_PUBLIC QString get_on_input(const QString&, uint);
+MTV_PUBLIC QString get_on_input(const QString &to_get, uint inputid);
 
-MTV_PUBLIC bool set_on_input(const QString&, uint, const QString&);
+MTV_PUBLIC bool set_on_input(const QString &to_set, uint inputid, const QString &value);
 
-typedef enum
+enum dvb_dev_type_t
 {
     DVB_DEV_FRONTEND = 1,
     DVB_DEV_DVR,
@@ -32,7 +32,7 @@ typedef enum
     DVB_DEV_CA,
     DVB_DEV_AUDIO,
     DVB_DEV_VIDEO,
-} dvb_dev_type_t;
+};
 
 /** \class CardUtil
  *  \brief Collection of helper utilities for input DB use
@@ -40,7 +40,7 @@ typedef enum
 class MTV_PUBLIC CardUtil
 {
   public:
-    typedef QMap<QString, QString> InputTypes;
+    using InputTypes = QMap<QString, QString>;
 
     /// \brief all the different inputs
     enum INPUT_TYPES
@@ -79,10 +79,16 @@ class MTV_PUBLIC CardUtil
             return ERROR_PROBE;
         if ("QPSK" == name)
             return QPSK;
+        if ("DVBS" == name)
+            return DVBS;
         if ("QAM" == name)
             return QAM;
+        if ("DVBC" == name)
+            return DVBC;
         if ("OFDM" == name)
             return OFDM;
+        if ("DVBT" == name)
+            return DVBT;
         if ("ATSC" == name)
             return ATSC;
         if ("V4L" == name)
@@ -216,25 +222,25 @@ class MTV_PUBLIC CardUtil
                                           const QString &audiodevice,
                                           const QString &vbidevice,
                                           const QString &inputtype,
-                                          const uint audioratelimit,
+                                          uint audioratelimit,
                                           const QString &hostname,
-                                          const uint dvb_swfilter,
-                                          const uint dvb_sat_type,
+                                          uint dvb_swfilter,
+                                          uint dvb_sat_type,
                                           bool       dvb_wait_for_seqstart,
                                           bool       skipbtaudio,
                                           bool       dvb_on_demand,
-                                          const uint dvb_diseqc_type,
-                                          const uint firewire_speed,
+                                          uint dvb_diseqc_type,
+                                          uint firewire_speed,
                                           const QString &firewire_model,
-                                          const uint firewire_connection,
-                                          const uint signal_timeout,
-                                          const uint channel_timeout,
-                                          const uint dvb_tuning_delay,
-                                          const uint contrast,
-                                          const uint brightness,
-                                          const uint colour,
-                                          const uint hue,
-                                          const uint diseqcid,
+                                          uint firewire_connection,
+                                          uint signal_timeout,
+                                          uint channel_timeout,
+                                          uint dvb_tuning_delay,
+                                          uint contrast,
+                                          uint brightness,
+                                          uint colour,
+                                          uint hue,
+                                          uint diseqcid,
                                           bool       dvb_eitscan);
 
     static bool         DeleteInput(uint inputid);
@@ -295,8 +301,8 @@ class MTV_PUBLIC CardUtil
                                         const QString &channum);
 
     // Input creation and deletion
-    static int           CreateCardInput(const uint inputid,
-                                         const uint sourceid,
+    static int           CreateCardInput(uint inputid,
+                                         uint sourceid,
                                          const QString &inputname,
                                          const QString &externalcommand,
                                          const QString &changer_device,
@@ -306,10 +312,10 @@ class MTV_PUBLIC CardUtil
                                          const QString &startchan,
                                          const QString &displayname,
                                          bool  dishnet_eit,
-                                         const uint recpriority,
-                                         const uint quicktune,
-                                         const uint schedorder,
-                                         const uint livetvorder);
+                                         uint recpriority,
+                                         uint quicktune,
+                                         uint schedorder,
+                                         uint livetvorder);
 
     // Other input functions
 
@@ -320,6 +326,8 @@ class MTV_PUBLIC CardUtil
     static QString      GetInputName(uint inputid);
     static QString      GetStartingChannel(uint inputid);
     static QString      GetDisplayName(uint inputid);
+    static bool         IsUniqueDisplayName(const QString &name,
+                                            uint exclude_inputid);
     static uint         GetSourceID(uint inputid);
 
     // Input Groups
@@ -385,6 +393,7 @@ class MTV_PUBLIC CardUtil
     static DTVTunerType GetTunerType(uint inputid);
     static DTVTunerType ProbeTunerType(int fd_frontend);
     static DTVTunerType ProbeTunerType(const QString &device);
+    static DTVTunerType GetTunerTypeFromMultiplex(uint mplexid);
     static DTVModulationSystem GetDeliverySystem(uint inputid);
     static DTVModulationSystem ProbeCurrentDeliverySystem(const QString &device);
     static DTVModulationSystem ProbeCurrentDeliverySystem(int fd_frontend);
@@ -397,7 +406,7 @@ class MTV_PUBLIC CardUtil
     static int          SetDeliverySystem(uint inputid, DTVModulationSystem delsys, int fd);
     static int          OpenVideoDevice(int inputid);
     static int          OpenVideoDevice(const QString &device);
-    static QString      GetDeviceName(dvb_dev_type_t, const QString &device);
+    static QString      GetDeviceName(dvb_dev_type_t type, const QString &device);
     static InputNames   GetConfiguredDVBInputs(const QString &device);
 
     // V4L info
@@ -405,12 +414,17 @@ class MTV_PUBLIC CardUtil
     static bool         GetV4LInfo(int videofd, QString &input, QString &driver,
                                    uint32_t &version, uint32_t &capabilities);
     static bool         GetV4LInfo(int videofd, QString &input, QString &driver)
-        { uint32_t d1,d2; return GetV4LInfo(videofd, input, driver, d1, d2); }
+        {
+            uint32_t d1 = 0;
+            uint32_t d2 = 0;
+            return GetV4LInfo(videofd, input, driver, d1, d2);
+        }
     static InputNames   ProbeV4LVideoInputs(int videofd, bool &ok);
     static InputNames   ProbeV4LAudioInputs(int videofd, bool &ok);
 
     // HDHomeRun info
     static bool         HDHRdoesDVB(const QString &device);
+    static bool         HDHRdoesDVBC(const QString &device);
     static QString      GetHDHRdesc(const QString &device);
 
     // VBox info
@@ -437,4 +451,4 @@ class MTV_PUBLIC CardUtil
     static QMap <QString,QStringList> s_videoDeviceCache;
 };
 
-#endif //_CARDUTIL_H_
+#endif //CARDUTIL_H

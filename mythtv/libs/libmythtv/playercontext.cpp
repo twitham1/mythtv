@@ -1,4 +1,5 @@
 #include <cmath>
+#include <utility>
 
 #include <QPainter>
 
@@ -8,7 +9,7 @@
 #include "mythplayer.h"
 #include "remoteencoder.h"
 #include "livetvchain.h"
-#include "ringbuffer.h"
+#include "io/mythmediabuffer.h"
 #include "playgroup.h"
 #include "videoouttypes.h"
 #include "storagegroup.h"
@@ -26,8 +27,8 @@
 const uint PlayerContext::kSMExitTimeout     = 2000;
 const uint PlayerContext::kMaxChannelHistory = 30;
 
-PlayerContext::PlayerContext(const QString &inUseID) :
-    m_recUsage(inUseID)
+PlayerContext::PlayerContext(QString inUseID) :
+    m_recUsage(std::move(inUseID))
 {
     m_lastSignalMsgTime.start();
     m_lastSignalMsgTime.addMSecs(-2 * (int)kSMExitTimeout);
@@ -106,7 +107,7 @@ bool PlayerContext::IsPIPSupported(void) const
     QMutexLocker locker(&m_deletePlayerLock);
     if (m_player)
     {
-        const VideoOutput *vid = m_player->GetVideoOutput();
+        const MythVideoOutput *vid = m_player->GetVideoOutput();
         if (vid)
             supported = vid->IsPIPSupported();
     }
@@ -124,7 +125,7 @@ bool PlayerContext::IsPBPSupported(void) const
     QMutexLocker locker(&m_deletePlayerLock);
     if (m_player)
     {
-        const VideoOutput *vid = m_player->GetVideoOutput();
+        const MythVideoOutput *vid = m_player->GetVideoOutput();
         if (vid)
             supported = vid->IsPBPSupported();
     }
@@ -249,7 +250,7 @@ void PlayerContext::ResizePIPWindow(const QRect &rect)
     m_pipRect = QRect(rect);
 }
 
-bool PlayerContext::StartEmbedding(const QRect &embedRect)
+bool PlayerContext::StartEmbedding(const QRect &embedRect) const
 {
     bool ret = false;
     LockDeletePlayer(__FILE__, __LINE__);
@@ -272,7 +273,7 @@ bool PlayerContext::IsEmbedding(void) const
     return ret;
 }
 
-void PlayerContext::StopEmbedding(void)
+void PlayerContext::StopEmbedding(void) const
 {
     LockDeletePlayer(__FILE__, __LINE__);
     if (m_player)
@@ -290,18 +291,6 @@ bool PlayerContext::IsPlayerErrored(void) const
 {
     QMutexLocker locker(&m_deletePlayerLock);
     return m_player && m_player->IsErrored();
-}
-
-bool PlayerContext::IsPlayerRecoverable(void) const
-{
-    QMutexLocker locker(&m_deletePlayerLock);
-    return m_player && m_player->IsErrorRecoverable();
-}
-
-bool PlayerContext::IsPlayerDecoderErrored(void) const
-{
-    QMutexLocker locker(&m_deletePlayerLock);
-    return m_player && m_player->IsDecoderErrored();
 }
 
 bool PlayerContext::IsPlayerPlaying(void) const
@@ -393,8 +382,6 @@ bool PlayerContext::CreatePlayer(TV *tv, QWidget *widget,
     player->AdjustAudioTimecodeOffset(
                 0, gCoreContext->GetNumSetting("AudioSyncOffset", 0));
 
-    player->SetVideoFilters((m_useNullVideo) ? "onefield" : "");
-
     bool isWatchingRecording = (desiredState == kState_WatchingRecording);
     player->SetWatchingRecording(isWatchingRecording);
 
@@ -467,7 +454,7 @@ bool PlayerContext::StartPlaying(int maxWait)
     return false;
 }
 
-void PlayerContext::StopPlaying(void)
+void PlayerContext::StopPlaying(void) const
 {
     if (m_player)
         m_player->StopPlaying();
@@ -833,7 +820,7 @@ void PlayerContext::SetTVChain(LiveTVChain *chain)
     }
 }
 
-void PlayerContext::SetRingBuffer(RingBuffer *buf)
+void PlayerContext::SetRingBuffer(MythMediaBuffer *Buffer)
 {
     if (m_buffer)
     {
@@ -841,7 +828,7 @@ void PlayerContext::SetRingBuffer(RingBuffer *buf)
         m_buffer = nullptr;
     }
 
-    m_buffer = buf;
+    m_buffer = Buffer;
 }
 
 /**

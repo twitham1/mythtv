@@ -6,42 +6,38 @@
 class LogScale
 {
   public:
-    LogScale(int maxscale = 0, int maxrange = 0)
-    : indices(nullptr), s(0), r(0)
+    explicit LogScale(int maxscale = 0, int maxrange = 0)
     {
         setMax(maxscale, maxrange);
     }
 
    ~LogScale()
     {
-        if (indices)
-            delete [] indices;
+        delete [] m_indices;
     }
 
-    int scale() const { return s; }
-    int range() const { return r; }
+    int scale() const { return m_s; }
+    int range() const { return m_r; }
 
     void setMax(int maxscale, int maxrange)
     {
         if (maxscale == 0 || maxrange == 0)
             return;
 
-        s = maxscale;
-        r = maxrange;
+        m_s = maxscale;
+        m_r = maxrange;
 
-        if (indices)
-            delete [] indices;
+        delete [] m_indices;
 
-        double alpha;
-        long double domain = (long double) maxscale;
-        long double range  = (long double) maxrange;
+        auto domain = (long double) maxscale;
+        auto range  = (long double) maxrange;
         long double x  = 1.0;
         long double dx = 1.0;
         long double e4 = 1.0E-8;
 
-        indices = new int[maxrange];
+        m_indices = new int[maxrange];
         for (int i = 0; i < maxrange; i++)
-            indices[i] = 0;
+            m_indices[i] = 0;
 
         // initialize log scale
         for (uint i = 0; i < 10000 && (std::abs(dx) > e4); i++)
@@ -53,31 +49,32 @@ class LogScale
             x -= dx;
         }
 
-        alpha = x;
+        double alpha = x;
         for (int i = 1; i < (int) domain; i++)
         {
             int scaled = (int) floor(0.5 + (alpha * log((double(i) + alpha) / alpha)));
             if (scaled < 1)
                 scaled = 1;
-            if (indices[scaled - 1] < i)
-                indices[scaled - 1] = i;
+            if (m_indices[scaled - 1] < i)
+                m_indices[scaled - 1] = i;
         }
     }
 
     int operator[](int index) const
     {
-        return indices[index];
+        return m_indices[index];
     }
 
 
   private:
-    int *indices;
-    int s, r;
+    int *m_indices {nullptr};
+    int  m_s       {0};
+    int  m_r       {0};
 };
 
 static inline void stereo16_from_stereopcm8(short *l,
                         short *r,
-                        uchar *c,
+                        const uchar *c,
                         long cnt)
 {
     while (cnt >= 4L)
@@ -115,7 +112,7 @@ static inline void stereo16_from_stereopcm8(short *l,
 
 static inline void stereo16_from_stereopcm16(short *l,
                          short *r,
-                         short *s,
+                         const short *s,
                          long cnt)
 {
     while (cnt >= 4L)
@@ -152,7 +149,7 @@ static inline void stereo16_from_stereopcm16(short *l,
 }
 
 static inline void mono16_from_monopcm8(short *l,
-                    uchar *c,
+                    const uchar *c,
                     long cnt)
 {
     while (cnt >= 4L)
@@ -181,7 +178,7 @@ static inline void mono16_from_monopcm8(short *l,
 }
 
 static inline void mono16_from_monopcm16(short *l,
-                     short *s,
+                     const short *s,
                      long cnt)
 {
     while (cnt >= 4L)
@@ -249,7 +246,7 @@ static inline void fast_short_set(short *p,
 }
 
 static inline void fast_real_set_from_short(fftw_real *d,
-                        short *s,
+                        const short *s,
                         long c)
 {
     while (c >= 4L) {

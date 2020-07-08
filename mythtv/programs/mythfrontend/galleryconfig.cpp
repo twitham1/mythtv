@@ -8,9 +8,9 @@
 
 #define TR GallerySettings::tr
 
-StandardSetting *GallerySettings::ImageOrder()
+StandardSetting *GallerySettings::ImageOrder() const
 {
-    HostComboBoxSetting *gc = new HostComboBoxSetting("GalleryImageOrder");
+    auto *gc = new HostComboBoxSetting("GalleryImageOrder");
 
     gc->setLabel(TR("Image Order"));
     gc->setHelpText(TR("The order that pictures/videos are shown in thumbnail "
@@ -43,9 +43,9 @@ StandardSetting *GallerySettings::ImageOrder()
     return gc;
 }
 
-StandardSetting *GallerySettings::DirOrder()
+StandardSetting *GallerySettings::DirOrder() const
 {
-    HostComboBoxSetting *gc = new HostComboBoxSetting("GalleryDirOrder");
+    auto *gc = new HostComboBoxSetting("GalleryDirOrder");
 
     gc->setLabel(TR("Directory Order"));
     gc->setHelpText(TR("The order that dirctories are shown and traversed "
@@ -65,9 +65,9 @@ StandardSetting *GallerySettings::DirOrder()
 static void AddFormat(HostComboBoxSetting* gc, const QDateTime& date, const QString& format)
 { gc->addSelection(gCoreContext->GetQLocale().toString(date, format), format); }
 
-StandardSetting *GallerySettings::DateFormat()
+StandardSetting *GallerySettings::DateFormat() const
 {
-    HostComboBoxSetting *gc = new HostComboBoxSetting("GalleryDateFormat");
+    auto *gc = new HostComboBoxSetting("GalleryDateFormat");
 
     gc->setLabel(TR("Date Format"));
     gc->setHelpText(TR("Date format of thumbnail captions. Other places use the system date format. "
@@ -101,7 +101,7 @@ StandardSetting *GallerySettings::DateFormat()
 
 static StandardSetting *TransitionType()
 {
-    HostComboBoxSetting *gc = new HostComboBoxSetting("GalleryTransitionType");
+    auto *gc = new HostComboBoxSetting("GalleryTransitionType");
 
     gc->setLabel(TR("Transition"));
     gc->setHelpText(TR("Effect to use between slides"));
@@ -121,7 +121,7 @@ static StandardSetting *TransitionType()
 
 static StandardSetting *SlideDuration()
 {
-    HostSpinBoxSetting *gc = new HostSpinBoxSetting("GallerySlideShowTime", 100, 60000, 100, 5);
+    auto *gc = new HostSpinBoxSetting("GallerySlideShowTime", 100, 60000, 100, 5);
 
     gc->setLabel(TR("Slide Duration (ms)"));
     gc->setHelpText(TR("The time that a slide is displayed (between transitions), "
@@ -131,7 +131,7 @@ static StandardSetting *SlideDuration()
 
 static StandardSetting *TransitionDuration()
 {
-    HostSpinBoxSetting *gc = new HostSpinBoxSetting("GalleryTransitionTime", 100, 60000, 100, 5);
+    auto *gc = new HostSpinBoxSetting("GalleryTransitionTime", 100, 60000, 100, 5);
 
     gc->setLabel(TR("Transition Duration (ms)"));
     gc->setHelpText(TR("The time that each transition lasts, in milliseconds."));
@@ -140,7 +140,7 @@ static StandardSetting *TransitionDuration()
 
 static StandardSetting *StatusDelay()
 {
-    HostSpinBoxSetting *gc = new HostSpinBoxSetting("GalleryStatusDelay", 0, 10000, 50, 10);
+    auto *gc = new HostSpinBoxSetting("GalleryStatusDelay", 0, 10000, 50, 10);
 
     gc->setLabel(TR("Status Delay (ms)"));
     gc->setHelpText(TR("The delay before showing the Loading/Playing status, "
@@ -150,7 +150,7 @@ static StandardSetting *StatusDelay()
 
 static StandardSetting *UseTransitions()
 {
-    HostCheckBoxSetting *gc = new HostCheckBoxSetting("GalleryBrowseTransition");
+    auto *gc = new HostCheckBoxSetting("GalleryBrowseTransition");
 
     gc->setLabel(TR("Use transitions when browsing"));
     gc->setHelpText(TR("When cleared, transitions will only be used "
@@ -164,7 +164,7 @@ static StandardSetting *UseTransitions()
 */
 static StandardSetting *Import(bool enabled)
 {
-    HostTextEditSetting *gc = new HostTextEditSetting("GalleryImportCmd");
+    auto *gc = new HostTextEditSetting("GalleryImportCmd");
 
     gc->setVisible(enabled);
     gc->setLabel(TR("Import Command"));
@@ -179,9 +179,9 @@ static StandardSetting *Import(bool enabled)
  \brief Setting for excluding image files by pattern
  \param enabled True if password has been entered
 */
-StandardSetting *GallerySettings::Exclusions(bool enabled)
+StandardSetting *GallerySettings::Exclusions(bool enabled) const
 {
-    GlobalTextEditSetting *gc = new GlobalTextEditSetting("GalleryIgnoreFilter");
+    auto *gc = new GlobalTextEditSetting("GalleryIgnoreFilter");
 
     gc->setVisible(enabled);
     gc->setLabel(TR("Scanner Exclusions"));
@@ -201,7 +201,7 @@ StandardSetting *GallerySettings::Exclusions(bool enabled)
 */
 static StandardSetting *Autorun(bool enabled)
 {
-    HostCheckBoxSetting *gc = new HostCheckBoxSetting("GalleryAutoStart");
+    auto *gc = new HostCheckBoxSetting("GalleryAutoStart");
 
     gc->setVisible(enabled);
     gc->setLabel(TR("Start Gallery when media inserted"));
@@ -216,7 +216,7 @@ static StandardSetting *Autorun(bool enabled)
 */
 static StandardSetting *Password(bool enabled)
 {
-    GlobalTextEditSetting *gc = new GlobalTextEditSetting("GalleryPassword");
+    auto *gc = new GlobalTextEditSetting("GalleryPassword");
 
     gc->setVisible(enabled);
     gc->setLabel(TR("Password"));
@@ -233,9 +233,9 @@ static StandardSetting *Password(bool enabled)
  \brief Setting for clearing image database
  \param enabled True if password has been entered
 */
-StandardSetting *GallerySettings::ClearDb(bool enabled)
+StandardSetting *GallerySettings::ClearDb(bool enabled) const
 {
-    ButtonStandardSetting *gc = new ButtonStandardSetting(TR("Reset Image Database"));
+    auto *gc = new ButtonStandardSetting(TR("Reset Image Database"));
 
     gc->setVisible(enabled);
     gc->setLabel(TR("Reset Image Database"));
@@ -253,8 +253,8 @@ void GallerySettings::ShowConfirmDialog()
     QString msg(TR("Warning! This will erase settings for: hidden images, "
                    "directory covers and re-orientations. "
                    "You will have to set them again after re-scanning."));
-    auto stack = GetMythMainWindow()->GetStack("popup stack");
-    auto dialog = new MythConfirmationDialog(stack, msg);
+    auto *stack = GetMythMainWindow()->GetStack("popup stack");
+    auto *dialog = new MythConfirmationDialog(stack, msg);
     if (dialog->Create())
     {
         stack->AddScreen(dialog);

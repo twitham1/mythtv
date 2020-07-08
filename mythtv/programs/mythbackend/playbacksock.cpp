@@ -29,10 +29,7 @@ PlaybackSock::PlaybackSock(
     m_eventsMode = eventsMode;
     m_ip = "";
 
-    if (m_hostname == localhostname)
-        m_local = true;
-    else
-        m_local = false;
+    m_local = (m_hostname == localhostname);
 }
 
 PlaybackSock::~PlaybackSock()
@@ -231,7 +228,7 @@ QStringList PlaybackSock::GetSGFileList(QString &host, QString &groupname,
     strlist << host;
     strlist << groupname;
     strlist << directory;
-    strlist << QString::number(fileNamesOnly);
+    strlist << QString::number(static_cast<int>(fileNamesOnly));
 
     SendReceiveStringList(strlist);
 
@@ -316,11 +313,9 @@ QDateTime PlaybackSock::PixmapLastModified(const ProgramInfo *pginfo)
     SendReceiveStringList(strlist);
 
     if (!strlist.empty() && !strlist[0].isEmpty() && (strlist[0] != "BAD"))
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-        return MythDate::fromTime_t(strlist[0].toUInt());
-#else
+    {
         return MythDate::fromSecsSinceEpoch(strlist[0].toLongLong());
-#endif
+    }
 
     return QDateTime();
 }
@@ -423,7 +418,7 @@ ProgramInfo *PlaybackSock::GetRecording(uint cardid)
     if (!SendReceiveStringList(strlist))
         return nullptr;
 
-    ProgramInfo *pginfo = new ProgramInfo(strlist);
+    auto *pginfo = new ProgramInfo(strlist);
     if (!pginfo->HasPathname() && !pginfo->GetChanID())
     {
         delete pginfo;
@@ -456,13 +451,8 @@ RecStatus::Type PlaybackSock::StartRecording(int capturecardnum,
     if (SendReceiveStringList(strlist, 3))
     {
         pginfo->SetRecordingID(strlist[1].toUInt());
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-        pginfo->SetRecordingStartTime(
-            MythDate::fromTime_t(strlist[2].toUInt()));
-#else
         pginfo->SetRecordingStartTime(
             MythDate::fromSecsSinceEpoch(strlist[2].toLongLong()));
-#endif
         return RecStatus::Type(strlist[0].toInt());
     }
 
@@ -492,7 +482,7 @@ void PlaybackSock::RecordPending(int capturecardnum, const ProgramInfo *pginfo,
     QStringList strlist(QString("QUERY_REMOTEENCODER %1").arg(capturecardnum));
     strlist << "RECORD_PENDING";
     strlist << QString::number(secsleft);
-    strlist << QString::number(hasLater);
+    strlist << QString::number(static_cast<int>(hasLater));
     pginfo->ToStringList(strlist);
 
     SendReceiveStringList(strlist);
@@ -527,7 +517,7 @@ void PlaybackSock::CancelNextRecording(int capturecardnum, bool cancel)
                         .arg(capturecardnum));
 
     strlist << "CANCEL_NEXT_RECORDING";
-    strlist << QString::number(cancel);
+    strlist << QString::number(static_cast<int>(cancel));
 
     SendReceiveStringList(strlist);
 }

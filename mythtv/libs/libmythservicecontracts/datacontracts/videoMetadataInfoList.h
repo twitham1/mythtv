@@ -41,7 +41,7 @@ class SERVICE_PUBLIC VideoMetadataInfoList : public QObject
     Q_PROPERTY( QString      Version        READ Version         WRITE setVersion        )
     Q_PROPERTY( QString      ProtoVer       READ ProtoVer        WRITE setProtoVer       )
 
-    Q_PROPERTY( QVariantList VideoMetadataInfos READ VideoMetadataInfos DESIGNABLE true )
+    Q_PROPERTY( QVariantList VideoMetadataInfos READ VideoMetadataInfos )
 
     PROPERTYIMP       ( int         , StartIndex      )
     PROPERTYIMP       ( int         , Count           )
@@ -85,7 +85,7 @@ class SERVICE_PUBLIC VideoMetadataInfoList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            VideoMetadataInfo *pObject = new VideoMetadataInfo( this );
+            auto *pObject = new VideoMetadataInfo( this );
             m_VideoMetadataInfos.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

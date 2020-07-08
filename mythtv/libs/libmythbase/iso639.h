@@ -1,6 +1,6 @@
 // -*- Mode: c++ -*-
-#ifndef _ISO_639_2_H_
-#define _ISO_639_2_H_
+#ifndef ISO_639_2_H
+#define ISO_639_2_H
 
 #include <vector>
 
@@ -11,7 +11,7 @@ class QStringList;
 
 #include "mythbaseexp.h"
 
-extern MBASE_PUBLIC QMap<int, QString> _iso639_key_to_english_name;
+extern MBASE_PUBLIC QMap<int, QString> iso639_key_to_english_name;
 
 /** \file iso639.h
  *  \brief ISO 639-1 and ISO 639-2 support functions
@@ -46,9 +46,9 @@ MBASE_PUBLIC  QString     iso639_str2_to_str3(const QString &str2);
 static inline QString iso639_key_to_str3(int code)
 {
     char str[4];
-    str[0] = (code>>16) & 0xFF;
-    str[1] = (code>>8)  & 0xFF;
-    str[2] = code & 0xFF;
+    str[0] = static_cast<char>((code>>16) & 0xFF);
+    str[1] = static_cast<char>((code>>8)  & 0xFF);
+    str[2] = static_cast<char>(code & 0xFF);
     str[3] = 0;
     return QString(str);
 }
@@ -73,15 +73,10 @@ static inline int iso639_str3_to_key(const char *iso639_2)
 static inline int iso639_str3_to_key(const QString &iso639_2)
 {
     if (iso639_2.length() < 3)
-    {
         return iso639_str3_to_key("und");
-    }
-    else
-    {
-        return ((iso639_2.at(0).toLatin1()<<16) |
-                (iso639_2.at(1).toLatin1()<<8) |
-                (iso639_2.at(2).toLatin1()));
-    }
+    return ((iso639_2.at(0).toLatin1()<<16) |
+            (iso639_2.at(1).toLatin1()<<8) |
+            (iso639_2.at(2).toLatin1()));
 }
 
 
@@ -105,4 +100,4 @@ static inline QString iso639_str_to_canonoical_str(const QString &str3)
 MBASE_PUBLIC  QString GetISO639LanguageName(const QString &iso639Code);
 MBASE_PUBLIC  QString GetISO639EnglishLanguageName(const QString &iso639Code);
 
-#endif // _ISO_639_2_H_
+#endif // ISO_639_2_H

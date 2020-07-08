@@ -124,7 +124,7 @@ bool CetonRTSP::ProcessRequest(
     QRegExp firstLineRegex(
         "^RTSP/1.0 (\\d+) ([^\r\n]+)", Qt::CaseSensitive, QRegExp::RegExp2);
     QRegExp headerRegex(
-        "^([^:]+):\\s*([^\\r\\n]+)", Qt::CaseSensitive, QRegExp::RegExp2);
+        R"(^([^:]+):\s*([^\r\n]+))", Qt::CaseSensitive, QRegExp::RegExp2);
     QRegExp blankLineRegex(
         "^[\\r\\n]*$", Qt::CaseSensitive, QRegExp::RegExp2);
 
@@ -194,7 +194,7 @@ bool CetonRTSP::ProcessRequest(
     {
         // Handle broken implementation, such as VLC
         // doesn't respect the case of "CSeq", so find it regardless of the spelling
-        foreach (QString key, m_responseHeaders.keys())
+        for (const QString& key : m_responseHeaders.keys())
         {
             if (key.compare("CSeq", Qt::CaseInsensitive) == 0)
             {
@@ -333,7 +333,7 @@ bool CetonRTSP::Describe(void)
     bool found = false;
     QUrl base = m_controlUrl = GetBaseUrl();
 
-    foreach (QString line, lines)
+    for (const QString& line : qAsConst(lines))
     {
         if (line.startsWith("m="))
         {
@@ -431,7 +431,7 @@ bool CetonRTSP::Setup(ushort clientPort1, ushort clientPort2,
     Q_UNUSED(transport);
     if (params.contains("ssrc"))
     {
-        bool ok;
+        bool ok = false;
         ssrc = params["ssrc"].toUInt(&ok, 16);
     }
     if (params.contains("server_port"))

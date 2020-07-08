@@ -69,11 +69,11 @@ class StoreOptMixin
     void Load(void);
     void Save(void);
     void RuleChanged(void);
-    void MaxEpisodesChanged(MythUIButtonListItem *);
+    void MaxEpisodesChanged(MythUIButtonListItem *item);
     void PromptForRecGroup(void);
     void SetRecGroup(int recgroupID, QString recgroup);
 
-    int CreateRecordingGroup(const QString &groupName);
+    static int CreateRecordingGroup(const QString &groupName);
 
     MythUIButtonList *m_recprofileList   {nullptr};
     MythUIButtonList *m_recgroupList     {nullptr};
@@ -130,7 +130,7 @@ class FilterOptMixin
     void Load(void);
     void Save(void);
     void RuleChanged(void);
-    void ToggleSelected(MythUIButtonListItem *item);
+    static void ToggleSelected(MythUIButtonListItem *item);
 
     MythUIButtonList *m_filtersList       {nullptr};
     MythUIButtonList *m_activeFiltersList {nullptr};
@@ -154,7 +154,7 @@ class ScheduleEditor : public ScheduleCommon,
                    TV *player = nullptr);
     ScheduleEditor(MythScreenStack *parent, RecordingRule* recrule,
                    TV *player = nullptr);
-   ~ScheduleEditor();
+   ~ScheduleEditor() override;
 
     bool Create(void) override; // MythScreenType
     bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
@@ -185,9 +185,9 @@ class ScheduleEditor : public ScheduleCommon,
 
   protected slots:
     void RuleChanged(MythUIButtonListItem *item);
-    void DupMethodChanged(MythUIButtonListItem *);
-    void FilterChanged(MythUIButtonListItem *);
-    void MaxEpisodesChanged(MythUIButtonListItem *);
+    void DupMethodChanged(MythUIButtonListItem *item);
+    static void FilterChanged(MythUIButtonListItem *item);
+    void MaxEpisodesChanged(MythUIButtonListItem *item);
     void PromptForRecGroup(void);
     void TranscodeChanged(bool enable);
     void ShowSchedInfo(void);
@@ -197,7 +197,7 @@ class ScheduleEditor : public ScheduleCommon,
   private:
     Q_DISABLE_COPY(ScheduleEditor);
     void Load(void) override; // MythScreenType
-    void LoadTemplate(QString name);
+    void LoadTemplate(const QString& name);
     void DeleteRule(void);
 
     void showTemplateMenu(void);
@@ -248,7 +248,7 @@ class SchedEditChild : public MythScreenType
     SchedEditChild(MythScreenStack *parent, const QString &name,
                    ScheduleEditor &editor, RecordingRule &rule,
                    RecordingInfo *recinfo);
-   ~SchedEditChild() = default;
+   ~SchedEditChild() override = default;
 
     bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
     virtual bool CreateEditChild(
@@ -280,12 +280,12 @@ class SchedOptEditor : public SchedEditChild, public SchedOptMixin
   public:
     SchedOptEditor(MythScreenStack *parent, ScheduleEditor &editor,
                    RecordingRule &rule, RecordingInfo *recinfo);
-   ~SchedOptEditor() = default;
+   ~SchedOptEditor() override = default;
 
     bool Create(void) override; // MythScreenType
 
   protected slots:
-    void DupMethodChanged(MythUIButtonListItem *);
+    void DupMethodChanged(MythUIButtonListItem *item);
 
   private:
     void Load(void) override; // SchedEditChild
@@ -300,12 +300,12 @@ class SchedFilterEditor : public SchedEditChild, public FilterOptMixin
   public:
     SchedFilterEditor(MythScreenStack *parent, ScheduleEditor &editor,
                       RecordingRule &rule, RecordingInfo *recinfo);
-   ~SchedFilterEditor() = default;
+   ~SchedFilterEditor() override = default;
 
     bool Create(void) override; // MythScreenType
 
   protected slots:
-    void ToggleSelected(MythUIButtonListItem *item);
+    static void ToggleSelected(MythUIButtonListItem *item);
 
   private:
     void Load(void) override; // SchedEditChild
@@ -318,13 +318,13 @@ class StoreOptEditor : public SchedEditChild, public StoreOptMixin
   public:
     StoreOptEditor(MythScreenStack *parent, ScheduleEditor &editor,
                    RecordingRule &rule, RecordingInfo *recinfo);
-   ~StoreOptEditor() = default;
+   ~StoreOptEditor() override = default;
 
     bool Create(void) override; // MythScreenType
     void customEvent(QEvent *event) override; // MythUIType
 
   protected slots:
-    void MaxEpisodesChanged(MythUIButtonListItem *);
+    void MaxEpisodesChanged(MythUIButtonListItem *item);
     void PromptForRecGroup(void);
 
   private:
@@ -338,7 +338,7 @@ class PostProcEditor : public SchedEditChild, public PostProcMixin
   public:
     PostProcEditor(MythScreenStack *parent, ScheduleEditor &editor,
                    RecordingRule &rule, RecordingInfo *recinfo);
-   ~PostProcEditor() = default;
+   ~PostProcEditor() override = default;
 
     bool Create(void) override; // MythScreenType
 
@@ -356,11 +356,12 @@ class MetadataOptions : public SchedEditChild
   public:
     MetadataOptions(MythScreenStack *parent, ScheduleEditor &editor,
                     RecordingRule &rule, RecordingInfo *recinfo);
-   ~MetadataOptions();
+   ~MetadataOptions() override;
 
     bool Create(void) override; // MythScreenType
 
   protected slots:
+    void ClearInetref();
     void PerformQuery();
     void SelectLocalFanart();
     void SelectLocalCoverart();
@@ -382,11 +383,11 @@ class MetadataOptions : public SchedEditChild
     void Save(void) override; // SchedEditChild
 
     void CreateBusyDialog(const QString& title);
-    void FindImagePopup(const QString &prefix,
-                        const QString &prefixAlt,
-                        QObject &inst,
-                        const QString &returnEvent);
-    QStringList GetSupportedImageExtensionFilter();
+    static void FindImagePopup(const QString &prefix,
+                               const QString &prefixAlt,
+                               QObject &inst,
+                               const QString &returnEvent);
+    static QStringList GetSupportedImageExtensionFilter();
 
     void HandleDownloadedImages(MetadataLookup *lookup);
     MetadataLookup *CreateLookup(MetadataType mtype);
@@ -414,6 +415,7 @@ class MetadataOptions : public SchedEditChild
     MythUISpinBox   *m_seasonSpin {nullptr};
     MythUISpinBox   *m_episodeSpin {nullptr};
 
+    MythUIButton    *m_inetrefClear {nullptr};
     MythUIButton    *m_queryButton {nullptr};
     MythUIButton    *m_localFanartButton {nullptr};
     MythUIButton    *m_localCoverartButton {nullptr};

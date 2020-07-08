@@ -1,8 +1,8 @@
 
 #include "mythuiimageresults.h"
 
-#include <QFile>
 #include <QDir>
+#include <QFile>
 
 #include "mythdirs.h"
 #include "mythdate.h"
@@ -13,11 +13,11 @@
 
 ImageSearchResultsDialog::ImageSearchResultsDialog(
     MythScreenStack *lparent,
-    const ArtworkList& list,
+    ArtworkList list,
     const VideoArtworkType type) :
 
     MythScreenType(lparent, "videosearchresultspopup"),
-    m_list(list),
+    m_list(std::move(list)),
     m_type(type)
 {
     m_imageDownload = new MetadataImageDownload(this);
@@ -51,9 +51,7 @@ bool ImageSearchResultsDialog::Create()
             i != m_list.end(); ++i)
     {
             ArtworkInfo info = (*i);
-            MythUIButtonListItem *button =
-                new MythUIButtonListItem(m_resultsList,
-                QString());
+            auto *button = new MythUIButtonListItem(m_resultsList, QString());
             button->SetText(info.label, "label");
             button->SetText(info.thumbnail, "thumbnail");
             button->SetText(info.url, "url");
@@ -80,12 +78,14 @@ bool ImageSearchResultsDialog::Create()
                 if (QFile::exists(dlfile))
                     button->SetImage(dlfile);
                 else
+                {
                     m_imageDownload->addThumb(info.label,
                                      artfile,
-                                     qVariantFromValue<uint>(pos));
+                                     QVariant::fromValue<uint>(pos));
+                }
             }
 
-            button->SetData(qVariantFromValue<ArtworkInfo>(*i));
+            button->SetData(QVariant::fromValue<ArtworkInfo>(*i));
         }
 
     connect(m_resultsList, SIGNAL(itemClicked(MythUIButtonListItem *)),
@@ -122,7 +122,9 @@ void ImageSearchResultsDialog::customEvent(QEvent *event)
 {
     if (event->type() == ThumbnailDLEvent::kEventType)
     {
-        ThumbnailDLEvent *tde = (ThumbnailDLEvent *)event;
+        auto *tde = dynamic_cast<ThumbnailDLEvent *>(event);
+        if (tde == nullptr)
+            return;
 
         ThumbnailData *data = tde->m_thumb;
 

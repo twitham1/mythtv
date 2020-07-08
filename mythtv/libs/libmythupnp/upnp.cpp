@@ -42,6 +42,17 @@ Configuration   *UPnp::g_pConfig        = nullptr;
 UPnp::UPnp()
 {
     LOG(VB_UPNP, LOG_DEBUG, "UPnp - Constructor");
+    // N.B. Ask for 5 second delay to send Bye Bye twice
+    // TODO Check whether we actually send Bye Bye twice:)
+    m_power = MythPower::AcquireRelease(this, true, 5);
+    if (m_power)
+    {
+        // NB We only listen for WillXXX signals which should give us time to send notifications
+        connect(m_power, &MythPower::WillRestart,  this, &UPnp::DisableNotifications);
+        connect(m_power, &MythPower::WillSuspend,  this, &UPnp::DisableNotifications);
+        connect(m_power, &MythPower::WillShutDown, this, &UPnp::DisableNotifications);
+        connect(m_power, &MythPower::WokeUp,       this, &UPnp::EnableNotificatins);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -52,6 +63,8 @@ UPnp::~UPnp()
 {
     LOG(VB_UPNP, LOG_DEBUG, "UPnp - Destructor");
     CleanUp();
+    if (m_power)
+        MythPower::AcquireRelease(this, false);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -125,11 +138,10 @@ bool UPnp::Initialize( QList<QHostAddress> &sIPAddrList, int nServicePort, HttpS
     }
 
     g_IPAddrList   = sIPAddrList;
-    int it;
     bool ipv4 = gCoreContext->GetBoolSetting("IPv4Support",true);
     bool ipv6 = gCoreContext->GetBoolSetting("IPv6Support",true);
 
-    for (it = 0; it < g_IPAddrList.size(); ++it)
+    for (int it = 0; it < g_IPAddrList.size(); ++it)
     {
         // If IPV4 support is disabled and this is an IPV4 address,
         // remove this address
@@ -319,4 +331,14 @@ void UPnp::FormatRedirectResponse( HTTPRequest   *pRequest,
                                .arg(url.toString()));
 
     pRequest->SendResponse();
+}
+
+void UPnp::DisableNotifications(uint /*unused*/)
+{
+    SSDP::Instance()->DisableNotifications();
+}
+
+void UPnp::EnableNotificatins(qint64 /*unused*/) const
+{
+    SSDP::Instance()->EnableNotifications(m_nServicePort);
 }

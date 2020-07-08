@@ -4,8 +4,8 @@
 // warranty, or liability of any kind.
 //
 
-#ifndef __visual_h
-#define __visual_h
+#ifndef VISUAL_H
+#define VISUAL_H
 
 #include <QMutex>
 
@@ -22,12 +22,12 @@ public:
     virtual void add(const void *b, unsigned long b_len, unsigned long w, int c, int p) = 0;
     virtual void prepare() = 0;
 
-    QMutex *mutex() { return &mtx; }
+    QMutex *mutex() { return &m_mtx; }
 
 
 private:
-    QMutex mtx;
+    QMutex m_mtx;
 };
 };
 
-#endif // __visual_h
+#endif // VISUAL_H

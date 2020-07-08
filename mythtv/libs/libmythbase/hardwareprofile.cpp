@@ -96,7 +96,7 @@ void HardwareProfile::GenerateUUIDs(void)
     m_publicuuid = GetPublicUUIDFromFile();
 }
 
-QString HardwareProfile::GetPrivateUUIDFromFile() const
+QString HardwareProfile::GetPrivateUUIDFromFile()
 {
     QString ret;
 
@@ -138,7 +138,7 @@ QString HardwareProfile::GetPublicUUIDFromFile() const
     return ret;
 }
 
-QString HardwareProfile::GetAdminPasswordFromFile() const
+QString HardwareProfile::GetAdminPasswordFromFile()
 {
     QString ret;
 
@@ -195,9 +195,11 @@ bool HardwareProfile::SubmitProfile(bool updateTime)
         Enable();
 
     if (!m_hardwareProfile.isEmpty())
+    {
         LOG(VB_GENERAL, LOG_INFO,
                  QString("Submitting the following hardware profile:  %1")
                          .arg(m_hardwareProfile));
+    }
 
     QString cmd = GetShareDir() + "hardwareprofile/sendProfile.py";
     QStringList args;
@@ -259,7 +261,7 @@ QString HardwareProfile::GetProfileURL() const
     return ret;
 }
 
-QString HardwareProfile::GetHardwareProfile() const
+QString HardwareProfile::GetHardwareProfile()
 {
     QString cmd = GetShareDir() + "hardwareprofile/sendProfile.py";
     QStringList args;
@@ -271,7 +273,7 @@ QString HardwareProfile::GetHardwareProfile() const
     return system.ReadAll();
 }
 
-bool HardwareProfileTask::DoCheckRun(QDateTime now)
+bool HardwareProfileTask::DoCheckRun(const QDateTime& now)
 {
     if (gCoreContext->GetNumSetting("HardwareProfileEnabled", 0) == 0)
         // global disable, we don't want to run

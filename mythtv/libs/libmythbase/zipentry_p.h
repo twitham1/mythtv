@@ -36,8 +36,8 @@
 // We mean it.
 //
 
-#ifndef OSDAB_ZIPENTRY_P__H
-#define OSDAB_ZIPENTRY_P__H
+#ifndef OSDAB_ZIPENTRY_P_H
+#define OSDAB_ZIPENTRY_P_H
 
 #include <QtGlobal>
 #include <QString>
@@ -60,10 +60,10 @@ public:
 
 	quint32 lhOffset;			// Offset of the local header record for this entry
 	quint32 dataOffset;			// Offset of the file data for this entry
-	unsigned char gpFlag[2];	// General purpose flag
+	unsigned char gpFlag[2]  {};		// General purpose flag
 	quint16 compMethod;			// Compression method
-	unsigned char modTime[2];	// Last modified time
-	unsigned char modDate[2];	// Last modified date
+	unsigned char modTime[2] {};		// Last modified time
+	unsigned char modDate[2] {};		// Last modified date
 	quint32 crc;				// CRC32
 	quint32 szComp;				// Compressed file size
 	quint32 szUncomp;			// Uncompressed file size
@@ -75,4 +75,4 @@ public:
 	inline bool hasDataDescriptor() const { return ( gpFlag[0] & 0x08 ) != 0; }
 };
 
-#endif // OSDAB_ZIPENTRY_P__H
+#endif // OSDAB_ZIPENTRY_P_H

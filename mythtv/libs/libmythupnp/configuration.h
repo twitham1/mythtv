@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __CONFIGURATION_H__
-#define __CONFIGURATION_H__
+#ifndef CONFIGURATION_H
+#define CONFIGURATION_H
 
 #include <QDomDocument>
 #include <QStringList>
@@ -65,7 +65,7 @@ class UPNP_PUBLIC XmlConfiguration : public Configuration
 
         explicit XmlConfiguration( const QString &sFileName );
 
-        virtual ~XmlConfiguration() = default;
+        ~XmlConfiguration() override = default;
 
         bool    Load    ( void ) override; // Configuration
         bool    Save    ( void ) override; // Configuration
@@ -92,7 +92,7 @@ class UPNP_PUBLIC DBConfiguration : public Configuration
 
         DBConfiguration() = default;
 
-        virtual ~DBConfiguration() = default;
+        ~DBConfiguration() override = default;
 
         bool    Load    ( void ) override; // Configuration
         bool    Save    ( void ) override; // Configuration
@@ -109,5 +109,4 @@ class UPNP_PUBLIC DBConfiguration : public Configuration
             {SetValue(sSetting, static_cast<int>(value)); }
 };
 
-#endif
-
+#endif // CONFIGURATION_H

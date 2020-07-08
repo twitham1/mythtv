@@ -23,9 +23,11 @@
 #ifndef ACTION_H
 #define ACTION_H
 
+#include <utility>
+
 // Qt headers
-#include <QStringList>
 #include <QHash>
+#include <QStringList>
 
 /** \class Action
  *  \brief An action (for this plugin) consists of a description,
@@ -39,8 +41,8 @@ class Action
 {
   public:
     /// \brief Create a new empty action.
-    explicit Action(const QString &description) : m_description(description) {}
-    Action(const QString &description, const QString &keys);
+    explicit Action(QString description) : m_description(std::move(description)) {}
+    Action(QString description, const QString &keys);
 
     // Commands
     bool AddKey(const QString &key);
@@ -49,7 +51,7 @@ class Action
     /// \return true on success, false otherwise.
     bool RemoveKey(const QString &key)
     {
-        return m_keys.removeAll(key);
+        return m_keys.removeAll(key) != 0;
     }
 
     // Gets
@@ -72,7 +74,7 @@ class Action
     QString     m_description; ///< The actions description.
     QStringList m_keys;        ///< The keys bound to the action.
 };
-typedef QHash<QString, Action*> Context;
+using Context = QHash<QString, Action*>;
 
 /** \class ActionID
  *  \brief A class that uniquely identifies an action.
@@ -89,17 +91,10 @@ class ActionID
      *  \param context The action's context
      *  \param action The action's name
      */
-    ActionID(const QString &context, const QString &action)
-        : m_context(context), m_action(action) {}
-    ActionID(const ActionID &other)
-        : m_context(other.m_context), m_action(other.m_action) {}
-
-    ActionID& operator=(const ActionID &rhs)
-    {
-        m_context = rhs.m_context;
-        m_action = rhs.m_action;
-        return *this;
-    }
+    ActionID(QString context, QString action)
+        : m_context(std::move(context)), m_action(std::move(action)) {}
+    ActionID(const ActionID&) = default;
+    ActionID& operator=(const ActionID&) = default;
 
     /// \brief Returns the context name.
     QString GetContext(void) const { return m_context; }
@@ -117,6 +112,6 @@ class ActionID
     QString m_context;
     QString m_action;
 };
-typedef QList<ActionID> ActionList;
+using ActionList = QList<ActionID>;
 
 #endif /* ACTION_H */

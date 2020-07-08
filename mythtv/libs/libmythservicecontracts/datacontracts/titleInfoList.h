@@ -31,7 +31,7 @@ class SERVICE_PUBLIC TitleInfoList : public QObject
 
     Q_CLASSINFO( "TitleInfos", "type=DTC::TitleInfo");
 
-    Q_PROPERTY( QVariantList TitleInfos READ TitleInfos DESIGNABLE true )
+    Q_PROPERTY( QVariantList TitleInfos READ TitleInfos )
 
     PROPERTYIMP_RO_REF( QVariantList, TitleInfos );
 
@@ -54,7 +54,7 @@ class SERVICE_PUBLIC TitleInfoList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            TitleInfo *pObject = new TitleInfo( this );
+            auto *pObject = new TitleInfo( this );
             m_TitleInfos.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

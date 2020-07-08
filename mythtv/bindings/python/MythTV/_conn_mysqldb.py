@@ -24,6 +24,7 @@ def dbconnect(dbconn, log):
                            use_unicode=True,
                            charset='utf8')
     db.autocommit(True)
+    db.set_sql_mode("")    # reset default sql_mode
     return db
 
 class LoggedCursor( MySQLdb.cursors.Cursor ):
@@ -34,14 +35,18 @@ class LoggedCursor( MySQLdb.cursors.Cursor ):
         super(LoggedCursor, self).__init__(connection)
         self.log = None
         self.ping = ref(self._ping121)
-        if MySQLdb.version_info >= ('1','2','2'):
+        if MySQLdb.version_info >= (1, 2, 2):
             self.ping = ref(self._ping122)
         self.ping()
 
-    def _ping121(self): self._get_db().ping(True)
-    def _ping122(self): self._get_db().ping()
+    def _ping121(self): self._get_db().ping()
+    def _ping122(self): self._get_db().ping(True)
 
-    def _sanitize(self, query): return query.replace('?', '%s')
+    def _sanitize(self, query):
+        if isinstance(query, bytearray):
+            # MySQLdb calls execute() as bytearrays, already sanitized
+            return query
+        return query.replace('?', '%s')
 
     def log_query(self, query, args):
         if isinstance(query, bytearray):

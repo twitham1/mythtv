@@ -14,13 +14,15 @@ class MTV_PUBLIC ScanStreamData :
 {
   public:
     explicit ScanStreamData(bool no_default_pid = false);
-    virtual ~ScanStreamData();
+    ~ScanStreamData() override;
 
-    bool IsRedundant(uint pid, const PSIPTable&) const override; // ATSCStreamData
+    bool IsRedundant(uint pid, const PSIPTable &psip) const override; // ATSCStreamData
     bool HandleTables(uint pid, const PSIPTable &psip) override; // ATSCStreamData
 
+    void AddAllListeningPIDs(void);
     using DVBStreamData::Reset;
     void Reset(void) override; // ATSCStreamData
+    void Reset(uint desired_netid, uint desired_tsid, int desired_serviceid) override; // DVBStreamData
 
     bool HasEITPIDChanges(const uint_vec_t& /*in_use_pids*/) const override // ATSCStreamData
         { return false; }
@@ -34,16 +36,16 @@ class MTV_PUBLIC ScanStreamData :
     void SetFreesatAdditionalSI(bool freesat_si);
 
   private:
-    bool DeleteCachedTable(PSIPTable *psip) const override; // ATSCStreamData
+    bool DeleteCachedTable(const PSIPTable *psip) const override; // ATSCStreamData
     /// listen for additional Freesat service information
-    bool m_dvb_uk_freesat_si {false};
-    bool m_no_default_pid;
+    bool m_dvbUkFreesatSi {false};
+    bool m_noDefaultPid;
 };
 
 inline void ScanStreamData::SetFreesatAdditionalSI(bool freesat_si)
 {
-    QMutexLocker locker(&_listener_lock);
-    m_dvb_uk_freesat_si = freesat_si;
+    QMutexLocker locker(&m_listenerLock);
+    m_dvbUkFreesatSi = freesat_si;
     if (freesat_si)
         AddListeningPID(FREESAT_SI_PID);
     else

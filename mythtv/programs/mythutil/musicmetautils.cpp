@@ -4,6 +4,7 @@
 #include <QDomDocument>
 
 // libmyth* headers
+#include "mythconfig.h"
 #include "exitcodes.h"
 #include "mythlogging.h"
 #include "storagegroup.h"
@@ -177,9 +178,9 @@ static int ExtractImage(const MythUtilCommandLineParser &cmdline)
     return GENERIC_EXIT_OK;
 }
 
-static int ScanMusic(const MythUtilCommandLineParser &/*cmdline*/)
+static int ScanMusic(const MythUtilCommandLineParser &cmdline)
 {
-    MusicFileScanner *fscan = new MusicFileScanner();
+    auto *fscan = new MusicFileScanner(cmdline.toBool("musicforce"));
     QStringList dirList;
 
     if (!StorageGroup::FindDirs("Music", gCoreContext->GetHostName(), &dirList))
@@ -282,7 +283,7 @@ static int CalcTrackLength(const MythUtilCommandLineParser &cmdline)
         }
         AVCodecContext *avctx = avcodec_alloc_context3(pCodec);
         avcodec_parameters_to_context(avctx, st->codecpar);
-        av_codec_set_pkt_timebase(avctx, st->time_base);
+        avctx->pkt_timebase = st->time_base;
 
         avcodec_string(buf, sizeof(buf), avctx, static_cast<int>(false));
 
@@ -339,12 +340,13 @@ static int CalcTrackLength(const MythUtilCommandLineParser &cmdline)
     return GENERIC_EXIT_OK;
 }
 
-typedef struct
+class LyricsGrabber
 {
-    QString name;
-    QString filename;
-    int priority;
-} LyricsGrabber;
+public:
+    QString m_name;
+    QString m_filename;
+    int     m_priority {99};
+};
 
 static int FindLyrics(const MythUtilCommandLineParser &cmdline)
 {
@@ -489,14 +491,16 @@ static int FindLyrics(const MythUtilCommandLineParser &cmdline)
     // query the grabbers to get their priority
     for (int x = 0; x < scripts.count(); x++)
     {
+        QStringList args { scripts.at(x), "-v" };
         QProcess p;
-        p.start(QString("python %1 -v").arg(scripts.at(x)));
+        p.start(PYTHON_EXE, args);
         p.waitForFinished(-1);
         QString result = p.readAllStandardOutput();
 
         QDomDocument domDoc;
         QString errorMsg;
-        int errorLine, errorColumn;
+        int errorLine = 0;
+        int errorColumn = 0;
 
         if (!domDoc.setContent(result, false, &errorMsg, &errorLine, &errorColumn))
         {
@@ -510,11 +514,11 @@ static int FindLyrics(const MythUtilCommandLineParser &cmdline)
         QDomNode itemNode = itemList.item(0);
 
         LyricsGrabber grabber;
-        grabber.name = itemNode.namedItem(QString("name")).toElement().text();
-        grabber.priority = itemNode.namedItem(QString("priority")).toElement().text().toInt();
-        grabber.filename = scripts.at(x);
+        grabber.m_name = itemNode.namedItem(QString("name")).toElement().text();
+        grabber.m_priority = itemNode.namedItem(QString("priority")).toElement().text().toInt();
+        grabber.m_filename = scripts.at(x);
 
-        grabberMap.insert(grabber.priority, grabber);
+        grabberMap.insert(grabber.m_priority, grabber);
     }
 
     // try each grabber in turn until we find a match
@@ -525,24 +529,28 @@ static int FindLyrics(const MythUtilCommandLineParser &cmdline)
 
         ++i;
 
-        if (grabberName != "ALL" && grabberName != grabber.name)
+        if (grabberName != "ALL" && grabberName != grabber.m_name)
             continue;
 
-        LOG(VB_GENERAL, LOG_NOTICE, QString("Trying grabber: %1, Priority: %2").arg(grabber.name).arg(grabber.priority));
-        QString statusMessage = QObject::tr("Searching '%1' for lyrics...").arg(grabber.name);
+        LOG(VB_GENERAL, LOG_NOTICE, QString("Trying grabber: %1, Priority: %2").arg(grabber.m_name).arg(grabber.m_priority));
+        QString statusMessage = QObject::tr("Searching '%1' for lyrics...").arg(grabber.m_name);
         gCoreContext->SendMessage(QString("MUSIC_LYRICS_STATUS %1 %2").arg(songID).arg(statusMessage));
 
         QProcess p;
-        p.start(QString("python %1 --artist=\"%2\" --album=\"%3\" --title=\"%4\" --filename=\"%5\"")
-                        .arg(grabber.filename).arg(artist).arg(album).arg(title).arg(filename));
+        QStringList args { grabber.m_filename,
+                           QString(R"(--artist="%1")").arg(artist),
+                           QString(R"(--album="%1")").arg(album),
+                           QString(R"(--title="%1")").arg(title),
+                           QString(R"(--filename="%1")").arg(filename) };
+        p.start(PYTHON_EXE, args);
         p.waitForFinished(-1);
         QString result = p.readAllStandardOutput();
 
-        LOG(VB_GENERAL, LOG_DEBUG, QString("Grabber: %1, Exited with code: %2").arg(grabber.name).arg(p.exitCode()));
+        LOG(VB_GENERAL, LOG_DEBUG, QString("Grabber: %1, Exited with code: %2").arg(grabber.m_name).arg(p.exitCode()));
 
         if (p.exitCode() == 0)
         {
-            LOG(VB_GENERAL, LOG_NOTICE, QString("Lyrics Found using: %1").arg(grabber.name));
+            LOG(VB_GENERAL, LOG_NOTICE, QString("Lyrics Found using: %1").arg(grabber.m_name));
 
             // save these lyrics to speed up future lookups if it is a DB track
             if (ID_TO_REPO(songID) == RT_Database)

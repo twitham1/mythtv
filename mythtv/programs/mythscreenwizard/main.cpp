@@ -36,10 +36,8 @@
 #include "mythmainwindow.h"
 #include "mythuihelper.h"
 #include "mythcorecontext.h"
-#if CONFIG_DARWIN
-#include "mythuidefines.h"
-#endif
 #include "cleanupguard.h"
+#include "mythdisplay.h"
 
 #define LOC      QString("MythScreenWizard: ")
 #define LOC_WARN QString("MythScreenWizard, Warning: ")
@@ -57,8 +55,6 @@ namespace
         gContext = nullptr;
 
         ReferenceCounter::PrintDebug();
-
-        delete qApp;
 
         SignalHandler::Done();
     }
@@ -83,11 +79,7 @@ static bool resetTheme(QString themedir, const QString badtheme)
 
     MythTranslation::reload();
     GetMythUI()->LoadQtConfig();
-#if CONFIG_DARWIN
-    GetMythMainWindow()->Init(QT_PAINTER);
-#else
     GetMythMainWindow()->Init();
-#endif
     GetMythMainWindow()->ReinitDone();
 
     return RunMenu(themedir, themename);
@@ -97,8 +89,7 @@ static void startAppearWiz(int _x, int _y, int _w, int _h)
 {
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    ScreenWizard *screenwizard = new ScreenWizard(mainStack,
-                                                        "screenwizard");
+    auto *screenwizard = new ScreenWizard(mainStack, "screenwizard");
     screenwizard->SetInitialSettings(_x, _y, _w, _h);
 
     if (screenwizard->Create())
@@ -109,11 +100,6 @@ static void startAppearWiz(int _x, int _y, int _w, int _h)
 
 int main(int argc, char **argv)
 {
-
-#if CONFIG_OMX_RPI
-    setenv("QT_XCB_GL_INTEGRATION","none",0);
-#endif
-
     MythScreenWizardCommandLineParser cmdline;
     if (!cmdline.Parse(argc, argv))
     {
@@ -129,22 +115,17 @@ int main(int argc, char **argv)
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythScreenWizardCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
 
-
-#ifdef Q_OS_MAC
-    // Without this, we can't set focus to any of the CheckBoxSetting, and most
-    // of the MythPushButton widgets, and they don't use the themed background.
-    QApplication::setDesktopSettingsAware(false);
-#endif
-    new QApplication(argc, argv);
+    MythDisplay::ConfigureQtGUI(1, cmdline.toString("display"));
+    QApplication a(argc, argv);
     QCoreApplication::setApplicationName(MYTH_APPNAME_MYTHSCREENWIZARD);
 
-    int retval;
     QString mask("general");
-    if ((retval = cmdline.ConfigureLogging(mask, false)) != GENERIC_EXIT_OK)
+    int retval = cmdline.ConfigureLogging(mask, false);
+    if (retval != GENERIC_EXIT_OK)
         return retval;
 
     CleanupGuard callCleanup(cleanup);
@@ -163,11 +144,6 @@ int main(int argc, char **argv)
 
     if ((retval = cmdline.ConfigureLogging()) != GENERIC_EXIT_OK)
         return retval;
-
-    if (!cmdline.toString("display").isEmpty())
-    {
-        MythUIHelper::SetX11Display(cmdline.toString("display"));
-    }
 
     gContext = new MythContext(MYTH_BINARY_VERSION);
     if (!gContext->Init(true, false, true))
@@ -207,11 +183,7 @@ int main(int argc, char **argv)
     }
 
     MythMainWindow *mainWindow = GetMythMainWindow();
-#if CONFIG_DARWIN
-    mainWindow->Init(OPENGL2_PAINTER);
-#else
     mainWindow->Init();
-#endif
     mainWindow->setWindowTitle(QObject::tr("MythTV Screen Setup Wizard"));
 
     // We must reload the translation after a language change and this
@@ -235,7 +207,7 @@ int main(int argc, char **argv)
 */
 
     startAppearWiz(GuiOffsetX, GuiOffsetY, GuiWidth, GuiHeight);
-    int exitCode = qApp->exec();
+    int exitCode = QCoreApplication::exec();
 
 /*
     if (sysEventHandler)

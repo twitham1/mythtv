@@ -1,5 +1,5 @@
-#ifndef _WEATHERSCREEN_H_
-#define _WEATHERSCREEN_H_
+#ifndef WEATHERSCREEN_H
+#define WEATHERSCREEN_H
 
 // QT headers
 #include <QStringList>
@@ -29,10 +29,10 @@ class WeatherScreen : public MythScreenType
 
   public:
     WeatherScreen(MythScreenStack *parent, ScreenListInfo *screenDefn, int id);
-    ~WeatherScreen() = default;
+    ~WeatherScreen() override = default;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
     static WeatherScreen *loadScreen(MythScreenStack *parent,
                                          ScreenListInfo *screenDefn, int id);
@@ -42,17 +42,17 @@ class WeatherScreen : public MythScreenType
     bool containsKey(const QString &key) { return m_dataValueMap.contains(key); }
     virtual bool canShowScreen();
     void setUnits(units_t units) { m_units = units; }
-    units_t getUnits() { return m_units; }
+    units_t getUnits() const { return m_units; }
     virtual bool usingKeys() { return false; }
-    bool inUse() { return m_inuse; }
+    bool inUse() const { return m_inuse; }
     void setInUse(bool inuse) { m_inuse = inuse; }
-    int getId() { return m_id; }
+    int getId() const { return m_id; }
 
   signals:
     void screenReady(WeatherScreen *);
 
   public slots:
-    virtual void newData(QString loc, units_t units, DataMap data);
+    virtual void newData(const QString& /*loc*/, units_t /*units*/, DataMap data);
 
   protected:
     units_t         m_units      {SI_UNITS};
@@ -74,4 +74,4 @@ class WeatherScreen : public MythScreenType
     int  m_id;
 };
 
-#endif
+#endif // WEATHERSCREEN_H

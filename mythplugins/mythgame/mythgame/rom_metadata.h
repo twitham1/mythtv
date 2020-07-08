@@ -1,25 +1,27 @@
 #ifndef ROMMETADATA_H_
 #define ROMMETADATA_H_
 
-#include <QString>
+#include <utility>
+
 #include <QMap>
+#include <QString>
 
 class RomData
 {
   public:
-    RomData(QString lgenre = "", QString lyear = "",
+    explicit RomData(QString lgenre = "", QString lyear = "",
             QString lcountry = "", QString lgamename = "",
             QString ldescription = "", QString lpublisher = "",
             QString lplatform = "", QString lversion = ""  )
             {
-                m_genre = lgenre;
-                m_year = lyear;
-                m_country = lcountry;
-                m_gamename = lgamename;
-                m_description = ldescription;
-                m_publisher = lpublisher;
-                m_platform = lplatform;
-                m_version = lversion;
+                m_genre = std::move(lgenre);
+                m_year = std::move(lyear);
+                m_country = std::move(lcountry);
+                m_gamename = std::move(lgamename);
+                m_description = std::move(ldescription);
+                m_publisher = std::move(lpublisher);
+                m_platform = std::move(lplatform);
+                m_version = std::move(lversion);
             }
 
     QString Genre() const { return m_genre; }
@@ -42,7 +44,7 @@ class RomData
     QString m_version;
 };
 
-typedef QMap <QString, RomData> RomDBMap;
+using RomDBMap = QMap <QString, RomData>;
 
 QString crcStr(int crc);
 

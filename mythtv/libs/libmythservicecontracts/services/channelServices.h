@@ -41,7 +41,7 @@
 class SERVICE_PUBLIC ChannelServices : public Service
 {
     Q_OBJECT
-    Q_CLASSINFO( "version"    , "1.6" );
+    Q_CLASSINFO( "version"    , "1.9" );
     Q_CLASSINFO( "AddDBChannel_Method",              "POST" )
     Q_CLASSINFO( "UpdateDBChannel_Method",           "POST" )
     Q_CLASSINFO( "RemoveDBChannel_Method",           "POST" )
@@ -76,7 +76,8 @@ class SERVICE_PUBLIC ChannelServices : public Service
                                                              bool           OnlyVisible,
                                                              bool           Details,
                                                              bool           OrderByName,
-                                                             bool           GroupByCallsign ) = 0;
+                                                             bool           GroupByCallsign,
+                                                             bool           OnlyTunable ) = 0;
 
         virtual DTC::ChannelInfo*      GetChannelInfo      ( uint           ChanID     ) = 0;
 
@@ -91,11 +92,13 @@ class SERVICE_PUBLIC ChannelServices : public Service
                                                              uint          ATSCMinorChannel,
                                                              bool          UseEIT,
                                                              bool          Visible,
+                                                             const QString &ExtendedVisible,
                                                              const QString &FrequencyID,
                                                              const QString &Icon,
                                                              const QString &Format,
                                                              const QString &XMLTVID,
-                                                             const QString &DefaultAuthority ) = 0;
+                                                             const QString &DefaultAuthority,
+                                                             uint          ServiceType ) = 0;
 
         virtual bool                   UpdateDBChannel     ( uint          MplexID,
                                                              uint          SourceID,
@@ -108,11 +111,13 @@ class SERVICE_PUBLIC ChannelServices : public Service
                                                              uint          ATSCMinorChannel,
                                                              bool          UseEIT,
                                                              bool          Visible,
+                                                             const QString &ExtendedVisible,
                                                              const QString &FrequencyID,
                                                              const QString &Icon,
                                                              const QString &Format,
                                                              const QString &XMLTVID,
-                                                             const QString &DefaultAuthority ) = 0;
+                                                             const QString &DefaultAuthority,
+                                                             uint          ServiceType ) = 0;
 
         virtual bool                   RemoveDBChannel     ( uint          ChannelID ) = 0;
 
@@ -130,7 +135,10 @@ class SERVICE_PUBLIC ChannelServices : public Service
                                                                    const QString &Password,
                                                                    bool          UseEIT,
                                                                    const QString &ConfigPath,
-                                                                   int           NITId ) = 0;
+                                                                   int           NITId,
+                                                                   uint          BouquetId,
+                                                                   uint          RegionId,
+                                                                   uint          ScanFrequency ) = 0;
 
         virtual bool                      RemoveVideoSource      ( uint          SourceID ) = 0;
 
@@ -143,14 +151,17 @@ class SERVICE_PUBLIC ChannelServices : public Service
                                                                    const QString &Password,
                                                                    bool          UseEIT,
                                                                    const QString &ConfigPath,
-                                                                   int           NITId ) = 0;
+                                                                   int           NITId,
+                                                                   uint          BouquetId,
+                                                                   uint          RegionId,
+                                                                   uint          ScanFrequency ) = 0;
 
         virtual DTC::LineupList*          GetDDLineupList        ( const QString &Source,
                                                                    const QString &UserId,
                                                                    const QString &Password ) = 0;
 
-        virtual int                       FetchChannelsFromSource( const uint SourceId,
-                                                                   const uint CardId,
+        virtual int                       FetchChannelsFromSource( uint       SourceId,
+                                                                   uint       CardId,
                                                                    bool       WaitForFinish ) = 0;
 
         /* Multiplex Methods */

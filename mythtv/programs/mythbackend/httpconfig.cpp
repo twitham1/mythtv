@@ -47,14 +47,14 @@ bool HttpConfig::ProcessRequest(HTTPRequest *request)
         // FIXME, this is always false, what's it for
         // JMS "fixed" by using endsWith()
         if (request->m_sBaseUrl.endsWith("config") &&
-            !m_database_settings.empty())
+            !m_databaseSettings.empty())
         {
             QString checkResult;
             PrintHeader(request->m_response, "/Config/Database");
-            check_settings(m_database_settings, request->m_mapParams,
+            check_settings(m_databaseSettings, request->m_mapParams,
                            checkResult);
-            load_settings(m_database_settings, "");
-            PrintSettings(request->m_response, m_database_settings);
+            load_settings(m_databaseSettings, "");
+            PrintSettings(request->m_response, m_databaseSettings);
             PrintFooter(request->m_response);
             handled = true;
         }
@@ -65,13 +65,13 @@ bool HttpConfig::ProcessRequest(HTTPRequest *request)
 
             if (request->m_sBaseUrl == "/Config/Database")
             {
-                if (check_settings(m_database_settings, request->m_mapParams,
+                if (check_settings(m_databaseSettings, request->m_mapParams,
                                    checkResult))
                     okToSave = true;
             }
             else if (request->m_sBaseUrl == "/Config/General")
             {
-                if (check_settings(m_general_settings, request->m_mapParams,
+                if (check_settings(m_generalSettings, request->m_mapParams,
                                    checkResult))
                     okToSave = true;
             }
@@ -107,22 +107,22 @@ bool HttpConfig::ProcessRequest(HTTPRequest *request)
     }
     else if (request->m_sMethod == "Settings")
     {
-        QString result = "{ \"Error\": \"Unknown Settings List\" }";
+        QString result = R"({ "Error": "Unknown Settings List" })";
         QString fn = GetShareDir() + "backend-config/";
 
         if (request->m_sBaseUrl == "/Config/Database")
         {
             fn += "config_backend_database.xml";
-            parse_settings(m_database_settings, fn);
+            parse_settings(m_databaseSettings, fn);
             result = StringMapToJSON(
-                GetSettingsMap(m_database_settings, gCoreContext->GetHostName()));
+                GetSettingsMap(m_databaseSettings, gCoreContext->GetHostName()));
         }
         else if (request->m_sBaseUrl == "/Config/General")
         {
             fn += "config_backend_general.xml";
-            parse_settings(m_general_settings, fn);
+            parse_settings(m_generalSettings, fn);
             result = StringMapToJSON(
-                GetSettingsMap(m_general_settings, gCoreContext->GetHostName()));
+                GetSettingsMap(m_generalSettings, gCoreContext->GetHostName()));
         }
 
         QTextStream os(&request->m_response);
@@ -204,32 +204,30 @@ bool HttpConfig::ProcessRequest(HTTPRequest *request)
                 QTextStream os(&request->m_response);
                 os << "<ul class=\"jqueryFileTree\" style=\"display: none;\">\r\n";
 
-                for (QStringList::iterator it = entries.begin();
-                     it != entries.end(); ++it)
+                for (const auto & entry : qAsConst(entries))
                 {
-                    QString entry = *it;
                     QStringList parts = entry.split("::");
                     QFileInfo fi(parts[1]);
                     if (dir == "/")
                         dir = "";
                     QString path =
-                            gCoreContext->GenMythURL(host,
-                                                     port,
-                                                     dir + parts[1],
-                                                     storageGroup);
+                            MythCoreContext::GenMythURL(host,
+                                                        port,
+                                                        dir + parts[1],
+                                                        storageGroup);
                     if (entry.startsWith("sgdir::"))
                     {
-                        os << "    <li class=\"directory collapsed\"><a href=\"#\" rel=\""
+                        os << R"(    <li class="directory collapsed"><a href="#" rel=")"
                            << path << "/\">" << parts[1] << "</a></li>\r\n";
                     }
                     else if (entry.startsWith("dir::"))
                     {
-                        os << "    <li class=\"directory collapsed\"><a href=\"#\" rel=\""
+                        os << R"(    <li class="directory collapsed"><a href="#" rel=")"
                            << path << "/\">" << fi.fileName() << "</a></li>\r\n";
                     }
                     else if (entry.startsWith("file::"))
                     {
-                        os << "    <li class=\"file ext_" << fi.suffix() << "\"><a href=\"#\" rel=\""
+                        os << "    <li class=\"file ext_" << fi.suffix() << R"("><a href="#" rel=")"
                            << parts[3] << "\">" << fi.fileName() << "</a></li>\r\n";
                     }
                 }
@@ -245,17 +243,14 @@ bool HttpConfig::ProcessRequest(HTTPRequest *request)
                 os << "<ul class=\"jqueryFileTree\" style=\"display: none;\">\r\n";
 
                 QFileInfoList infoList = dir.entryInfoList();
-                for (QFileInfoList::iterator it  = infoList.begin();
-                                             it != infoList.end();
-                                           ++it )
+                for (const auto & fi : qAsConst(infoList))
                 {
-                    QFileInfo &fi = *it;
                     if (!fi.isDir())
                         continue;
                     if (fi.fileName().startsWith("."))
                         continue;
 
-                    os << "    <li class=\"directory collapsed\"><a href=\"#\" rel=\""
+                    os << R"(    <li class="directory collapsed"><a href="#" rel=")"
                        << fi.absoluteFilePath() << "/\">" << fi.fileName() << "</a></li>\r\n";
                 }
 
@@ -265,17 +260,14 @@ bool HttpConfig::ProcessRequest(HTTPRequest *request)
 
                 if (!dirsOnly)
                 {
-                    for (QFileInfoList::iterator it  = infoList.begin();
-                                                 it != infoList.end();
-                                               ++it )
+                    for (const auto & fi : qAsConst(infoList))
                     {
-                        QFileInfo &fi = *it;
                         if (fi.isDir())
                             continue;
                         if (fi.fileName().startsWith("."))
                             continue;
 
-                        os << "    <li class=\"file ext_" << fi.suffix() << "\"><a href=\"#\" rel=\""
+                        os << "    <li class=\"file ext_" << fi.suffix() << R"("><a href="#" rel=")"
                            << fi.absoluteFilePath() << "\">" << fi.fileName() << "</a></li>\r\n";
                     }
                 }
@@ -315,9 +307,9 @@ bool HttpConfig::ProcessRequest(HTTPRequest *request)
         else
             OpenForm(request->m_response, form, group);
 
-        parse_settings(m_general_settings, fn, group);
-        load_settings(m_general_settings, gCoreContext->GetHostName());
-        PrintSettings(request->m_response, m_general_settings);
+        parse_settings(m_generalSettings, fn, group);
+        load_settings(m_generalSettings, gCoreContext->GetHostName());
+        PrintSettings(request->m_response, m_generalSettings);
 
         if (group.isEmpty())
             PrintFooter(request->m_response);
@@ -341,9 +333,9 @@ bool HttpConfig::ProcessRequest(HTTPRequest *request)
         else
             OpenForm(request->m_response, form, group);
 
-        parse_settings(m_general_settings, fn, group);
-        load_settings(m_general_settings, gCoreContext->GetHostName());
-        PrintSettings(request->m_response, m_general_settings);
+        parse_settings(m_generalSettings, fn, group);
+        load_settings(m_generalSettings, gCoreContext->GetHostName());
+        PrintSettings(request->m_response, m_generalSettings);
 
         if (group.isEmpty())
             PrintFooter(request->m_response);
@@ -395,8 +387,8 @@ void HttpConfig::OpenForm(QBuffer &buffer, const QString &form,
     os.setCodec("UTF-8");
 
     os << "  <form id=\"config_form_" << group << "\">\r\n"
-       << "    <input type=\"hidden\" id=\"__config_form_action__\" value=\"" << form << "\" />\r\n"
-       << "    <input type=\"hidden\" id=\"__group__\" value=\"" << group << "\" />\r\n";
+       << R"(    <input type="hidden" id="__config_form_action__" value=")" << form << "\" />\r\n"
+       << R"(    <input type="hidden" id="__group__" value=")" << group << "\" />\r\n";
 }
 
 void HttpConfig::CloseForm(QBuffer &buffer, const QString &group)
@@ -405,7 +397,7 @@ void HttpConfig::CloseForm(QBuffer &buffer, const QString &group)
 
 //    os << "    <div class=\"config_form_submit\"\r\n"
 //       << "         id=\"config_form_submit\">\r\n";
-    os << "      <input type=\"button\" value=\"Save Changes\" onClick=\"javascript:submitConfigForm('" << group << "')\" />\r\n"
+    os << R"(      <input type="button" value="Save Changes" onClick="javascript:submitConfigForm(')" << group << "')\" />\r\n"
 //       << "    </div>\r\n"
        << "  </form>\r\n";
 }
@@ -425,7 +417,6 @@ void HttpConfig::PrintSettings(QBuffer &buffer, const MythSettingList &settings)
 {
     QTextStream os(&buffer);
 
-    MythSettingList::const_iterator it = settings.begin();
-    for (; it != settings.end(); ++it)
-        os << (*it)->ToHTML(1);
+    for (const auto *setting : qAsConst(settings))
+        os << setting->ToHTML(1);
 }

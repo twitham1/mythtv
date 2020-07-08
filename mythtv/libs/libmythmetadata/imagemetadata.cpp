@@ -111,7 +111,7 @@ int Orientation::GetCurrent(bool compensate)
  * \param transform Rotation/flip to apply
  * \return int New orientation code that will apply the transform to the image
  */
-int Orientation::Apply(int transform)
+int Orientation::Apply(int transform) const
 {
     if (transform == kResetToExif)
         return m_file;
@@ -225,7 +225,7 @@ int Orientation::FromRotation(const QString &degrees)
  * different, the Db orientation
  * \return Text description of orientation
  */
-QString Orientation::Description()
+QString Orientation::Description() const
 {
     return (m_file == m_current)
             ? AsText(m_file)
@@ -275,10 +275,7 @@ protected:
 
     std::string GetTag(const QString &key, bool *exists = nullptr);
 
-    // Clang8 warns that 'AutoPtr' is deprecated. It was apparently
-    // deprecated in glibc-2.27, and the exiv2 library hasn't been
-    // updated yet.
-    Exiv2::Image::AutoPtr m_image;
+    Exiv2::Image::UniquePtr m_image;
     Exiv2::ExifData       m_exifData;
 };
 
@@ -400,7 +397,7 @@ std::string PictureMetaData::GetTag(const QString &key, bool *exists)
         return value;
 
     Exiv2::ExifKey exifKey = Exiv2::ExifKey(key.toStdString());
-    Exiv2::ExifData::iterator exifIt = m_exifData.findKey(exifKey);
+    auto exifIt = m_exifData.findKey(exifKey);
 
     if (exifIt == m_exifData.end())
         return value;
@@ -449,7 +446,8 @@ QDateTime PictureMetaData::GetOriginalDateTime(bool *exists)
 QString PictureMetaData::GetComment(bool *exists)
 {
     // Use User Comment or else Image Description
-    bool comExists, desExists = false;
+    bool comExists = false;
+    bool desExists = false;
 
     std::string comment = GetTag(EXIF_TAG_USERCOMMENT, &comExists);
 
@@ -600,7 +598,7 @@ QStringList VideoMetaData::GetAllTags()
             group.append(prefix);
         }
 
-        foreach (const QString &field, fields)
+        for (const auto& field : qAsConst(fields))
         {
             // Expect label=value
             QStringList parts = field.split('=');
@@ -723,7 +721,7 @@ const QString ImageMetaData::kSeparator = "|-|";
 ImageMetaData::TagMap ImageMetaData::ToMap(const QStringList &tagStrings)
 {
     TagMap tags;
-    foreach (const QString &token, tagStrings)
+    for (const auto& token : qAsConst(tagStrings))
     {
         QStringList parts = FromString(token);
         // Expect Key, Label, Value.

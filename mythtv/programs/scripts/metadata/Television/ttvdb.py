@@ -1451,7 +1451,7 @@ class Season( tvdb_api.Season ):
 class Episode( tvdb_api.Episode ):
     _re_strippart = re.compile('(.*) \([0-9]+\)')
     def fuzzysearch(self, term = None, key = None):
-        if term == None:
+        if term is None:
             raise TypeError("must supply string to search for (contents)")
 
         term = unicode(term).lower()
@@ -1521,7 +1521,11 @@ def searchseries(t, opts, series_season_ep):
     series_name=''
     key = series_season_ep[0].lower()
     if opts.configure != "" and key in override:
-        series_name=override[key][0] # Override series name
+        if override[key][2]:
+            series_name=override[key][2] # Override series name
+            SID = True
+        else:
+            series_name=override[key][0] # Override series name
     else:
         series_name=series_season_ep[0] # Leave the series name alone
     try:
@@ -1639,7 +1643,7 @@ def get_graphics(t, opts, series_season_ep, graphics_type, single_option, langua
     graphics = sorted(graphics, key=lambda k: k['rating'], reverse=True)
     for URL in graphics:
         if graphics_type == 'filename':
-            if URL[graphics_type] == None:
+            if URL[graphics_type] is None:
                 continue
         if language and 'language' in URL:        # Is there a language to filter URLs on?
             if language == URL['language']:
@@ -1749,7 +1753,7 @@ def Getseries_episode_data(t, opts, series_season_ep, language = None):
         genres_string = series_data[u'genre'].encode('utf-8')
     except:
         genres_string=''
-    if genres_string != None and genres_string != '':
+    if genres_string is not None and genres_string != '':
         genres = change_amp(genres_string)
         genres = change_to_commas(genres)
 
@@ -1787,7 +1791,7 @@ def Getseries_episode_data(t, opts, series_season_ep, language = None):
                         continue
                     i = data_keys.index(key) # Include only specific episode data
                 except ValueError:
-                    if series_data[season][episode][key] != None:
+                    if series_data[season][episode][key] is not None:
                         text = series_data[season][episode][key]
                         if isinstance(text, dict):
                             # handle language tuple
@@ -1806,11 +1810,11 @@ def Getseries_episode_data(t, opts, series_season_ep, language = None):
                     continue
                 text = series_data[season][episode][key]
 
-                if text == None and key.title() == 'Director':
+                if text is None and key.title() == 'Director':
                     text = u"Unknown"
                 if isinstance(text, list):
                     text = ', '.join(text)
-                if text == None or text == 'None':
+                if text is None or text == 'None':
                     continue
                 else:
                     # handle language tuple
@@ -1828,7 +1832,7 @@ def Getseries_episode_data(t, opts, series_season_ep, language = None):
                 print(u"Title:%s" % series_data[u'seriesname'])
 
             for key in data_titles:
-                if key_values[index] != None:
+                if key_values[index] is not None:
                     if data_titles[index] == u'ReleaseDate:' and len(key_values[index]) > 4:
                         print(u'%s%s'% (u'Year:', key_values[index][:4]))
                     if key_values[index] != 'None':
@@ -1880,9 +1884,14 @@ def Getseries_episode_numbers(t, opts, series_season_ep):
     global xmlFlag
     series_name=''
     ep_name=''
+    series_sid = None
     key = series_season_ep[0].lower()
     if opts.configure != "" and key in override:
-        series_name=override[key][0] # Override series name
+        if override[key][2]:
+            series_sid=override[key][2] # Override series name
+            SID = True
+        else:
+            series_name=override[key][0] # Override series name
         ep_name=series_season_ep[1]
         if len(override[series_season_ep[0].lower()][1]) != 0: # Are there search-replace strings?
             ep_name=massageEpisode_name(ep_name, series_season_ep)
@@ -1890,7 +1899,10 @@ def Getseries_episode_numbers(t, opts, series_season_ep):
         series_name=series_season_ep[0] # Leave the series name alone
         ep_name=series_season_ep[1] # Leave the episode name alone
 
-    series = search_for_series(t, series_name, opts.language)
+    if series_sid:
+        series = search_for_series(t, series_sid, opts.language)
+    else:
+        series = search_for_series(t, series_name, opts.language)
     season_ep_num = series.fuzzysearch(ep_name, 'episodename')
     if len(season_ep_num) != 0:
         for episode in sorted(season_ep_num, key=lambda ep: _episode_sort(ep), reverse=True):
@@ -1936,7 +1948,11 @@ def initialize_override_dictionary(useroptions, language):
         sys.exit(1)
     massage = {}
     overrides = {}
-    cfg = ConfigParser.SafeConfigParser()
+    overrides_id = {}
+    if IS_PY2:
+        cfg = ConfigParser.SafeConfigParser()
+    else:
+        cfg = ConfigParser.ConfigParser()
     cfg.read(useroptions)
 
     for section in cfg.sections():
@@ -1991,16 +2007,17 @@ def initialize_override_dictionary(useroptions, language):
                     sys.stdout.write("! Invalid Series (no matches found in thetvdb,com) (%s) sid (%s) in config file\n" % (key, sid))
                     sys.exit(1)
                 overrides[key]=unicode(series_name_sid.data[u'seriesName'])   #.encode('utf-8')
+                overrides_id[key] = sid
             continue
 
     for key in overrides.keys():
-        override[key] = [overrides[key],[]]
+        override[key] = [overrides[key],[],overrides_id[key]]
 
     for key in massage.keys():
         if key in override:
             override[key][1]=massage[key]
         else:
-            override[key]=[key, massage[key]]
+            override[key]=[key, massage[key], None]
     return
 # END initialize_override_dictionary
 
@@ -2105,7 +2122,7 @@ def displaySearchXML(tvdb_api):
 
     tvdbQueryXslt = etree.XSLT(etree.parse(u'%s%s' % (tvdb_api.baseXsltDir, u'tvdbQuery.xsl')))
     items = tvdbQueryXslt(tvdb_api.searchTree)
-    if items.getroot() != None:
+    if items.getroot() is not None:
         if len(items.xpath('//item')):
             sys.stdout.write(etree.tostring(items, encoding='UTF-8', method="xml", xml_declaration=True, pretty_print=True, ))
     return 0
@@ -2130,7 +2147,7 @@ def displaySeriesXML(tvdb_api, series_season_ep):
 
     tvdbQueryXslt = etree.XSLT(etree.parse(u'%s%s' % (tvdb_api.baseXsltDir, u'tvdbVideo.xsl')))
     items = tvdbQueryXslt(allDataElement)
-    if items.getroot() != None:
+    if items.getroot() is not None:
         if len(items.xpath('//item')):
             sys.stdout.write(etree.tostring(items, encoding='UTF-8', method="xml", xml_declaration=True, pretty_print=True, ))
     return 0
@@ -2155,7 +2172,7 @@ def displayCollectionXML(tvdb_api):
 
     tvdbCollectionXslt = etree.XSLT(etree.parse(u'%s%s' % (tvdb_api.baseXsltDir, u'tvdbCollection.xsl')))
     items = tvdbCollectionXslt(tvdb_api.seriesInfoTree)
-    if items.getroot() != None:
+    if items.getroot() is not None:
         if len(items.xpath('//item')):
             sys.stdout.write(etree.tostring(items, encoding='UTF-8', method="xml", xml_declaration=True, pretty_print=True, ))
     return 0
@@ -2435,7 +2452,10 @@ def main():
         try:
             key = series_season_ep[0].lower()
             if opts.configure != "" and key in override:
-                allSeries = t._getSeries(override[key][0])
+                if override[key][2]:
+                    allSeries = t._getSeries(override[key][2], True)
+                else:
+                    allSeries = t._getSeries(override[key][0])
             else:
                 allSeries=t._getSeries(series_season_ep[0])
         except tvdb_shownotfound:

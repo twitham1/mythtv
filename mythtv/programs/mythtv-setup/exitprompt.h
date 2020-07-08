@@ -11,14 +11,14 @@ class ExitPrompter : public QObject
 
   public:
     ExitPrompter(void);
-    ~ExitPrompter(void);
+    ~ExitPrompter(void) override;
 
     void customEvent(QEvent *event) override; // QObject
     
   public slots:
     void masterPromptExit(void);
     void handleExit(void);
-    void quit(void);
+    static void quit(void);
     
   private:
     ExitPrompter(const ExitPrompter &);

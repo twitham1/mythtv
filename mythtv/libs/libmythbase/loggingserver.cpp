@@ -62,16 +62,16 @@ static QMap<QString, LoggerBase *> loggerMap;
 
 LogForwardThread                   *logForwardThread = nullptr;
 
-typedef QList<LoggerBase *> LoggerList;
+using LoggerList = QList<LoggerBase *>;
 
-typedef struct {
-    LoggerList *list;
-    qlonglong   epoch;
-} LoggerListItem;
-typedef QMap<QString, LoggerListItem *> ClientMap;
+struct LoggerListItem {
+    LoggerList *m_itemList;
+    qlonglong   m_itemEpoch;
+};
+using  ClientMap = QMap<QString, LoggerListItem *>;
 
-typedef QList<QString> ClientList;
-typedef QMap<LoggerBase *, ClientList *> RevClientMap;
+using  ClientList = QList<QString>;
+using  RevClientMap = QMap<LoggerBase *, ClientList *>;
 
 static QMutex                       logClientMapMutex;
 static ClientMap                    logClientMap;
@@ -83,9 +83,6 @@ static RevClientMap                 logRevClientMap;
 static QMutex                       logMsgListMutex;
 static LogMessageList               logMsgList;
 static QWaitCondition               logMsgListNotEmpty;
-
-#define TIMESTAMP_MAX 30
-#define MAX_STRING_LENGTH (LOGLINE_MAX+120)
 
 /// \brief LoggerBase class constructor.  Adds the new logger instance to the
 ///        loggerMap.
@@ -159,7 +156,7 @@ FileLogger *FileLogger::create(const QString& filename, QMutex *mutex)
     logger = new FileLogger(file);
     mutex->lock();
 
-    ClientList *clients = new ClientList;
+    auto *clients = new ClientList;
     logRevClientMap.insert(logger, clients);
     return logger;
 }
@@ -179,46 +176,36 @@ void FileLogger::reopen(void)
 /// \param item LoggingItem containing the log message to process
 bool FileLogger::logmsg(LoggingItem *item)
 {
-    char                line[MAX_STRING_LENGTH];
-    char                usPart[9];
-    char                timestamp[TIMESTAMP_MAX];
-
     if (!m_opened)
         return false;
 
-    time_t epoch = item->epoch();
-    struct tm tm;
-    localtime_r(&epoch, &tm);
+    QString timestamp = item->getTimestampUs();
+    QChar shortname = item->getLevelChar();
 
-    strftime(timestamp, TIMESTAMP_MAX-8, "%Y-%m-%d %H:%M:%S",
-             (const struct tm *)&tm);
-    snprintf( usPart, 9, ".%06d", (int)(item->usec()) );
-    strcat( timestamp, usPart );
-
-    char shortname;
+    std::string line;
+    if( item->tid() )
     {
-        QMutexLocker locker(&loglevelMapMutex);
-        LoglevelMap::iterator it = loglevelMap.find(item->level());
-        if (it == loglevelMap.end())
-            shortname = '-';
-        else
-            shortname = (*it)->shortname;
+        line = qPrintable(QString("%1 %2 [%3/%4] %5 %6:%7 (%8) - %9\n")
+                          .arg(timestamp, shortname,
+                               QString::number(item->pid()),
+                               QString::number(item->tid()),
+                               item->threadName(), item->file(),
+                               QString::number(item->line()),
+                               item->function(),
+                               item->message()));
+    }
+    else
+    {
+        line = qPrintable(QString("%1 %2 [%3] %5 %6:%7 (%8) - %9\n")
+                          .arg(timestamp, shortname,
+                               QString::number(item->pid()),
+                               item->threadName(), item->file(),
+                               QString::number(item->line()),
+                               item->function(),
+                               item->message()));
     }
 
-    if( item->tid() )
-        snprintf( line, MAX_STRING_LENGTH,
-                  "%s %c [%d/%" PREFIX64 "d] %s %s:%d (%s) - %s\n",
-                  timestamp, shortname, item->pid(), item->tid(),
-                  item->rawThreadName(), item->rawFile(), item->line(),
-                  item->rawFunction(), item->rawMessage() );
-    else
-        snprintf( line, MAX_STRING_LENGTH,
-                  "%s %c [%d] %s %s:%d (%s) - %s\n",
-                  timestamp, shortname, item->pid(), item->rawThreadName(),
-                  item->rawFile(), item->line(), item->rawFunction(),
-                  item->rawMessage() );
-
-    int result = write(m_fd, line, strlen(line));
+    int result = write(m_fd, line.data(), line.size());
 
     if( result == -1 )
     {
@@ -268,7 +255,7 @@ SyslogLogger *SyslogLogger::create(QMutex *mutex, bool open)
     logger = new SyslogLogger(open);
     mutex->lock();
 
-    ClientList *clients = new ClientList;
+    auto *clients = new ClientList;
     logRevClientMap.insert(logger, clients);
     return logger;
 }
@@ -281,20 +268,11 @@ bool SyslogLogger::logmsg(LoggingItem *item)
     if (!m_opened || item->facility() <= 0)
         return false;
 
-    char shortname;
-
-    {
-        QMutexLocker locker(&loglevelMapMutex);
-        LoglevelDef *lev = loglevelMap.value(item->level(), nullptr);
-        if (!lev)
-            shortname = '-';
-        else
-            shortname = lev->shortname;
-    }
+    char shortname = item->getLevelChar();
     syslog(item->level() | item->facility(), "%s[%d]: %c %s %s:%d (%s) %s",
            item->rawAppName(), item->pid(), shortname, item->rawThreadName(),
            item->rawFile(), item->line(), item->rawFunction(),
-           item->rawMessage());
+           qPrintable(item->message()));
 
     return true;
 }
@@ -327,7 +305,7 @@ JournalLogger *JournalLogger::create(QMutex *mutex)
     logger = new JournalLogger();
     mutex->lock();
 
-    ClientList *clients = new ClientList;
+    auto *clients = new ClientList;
     logRevClientMap.insert(logger, clients);
     return logger;
 }
@@ -338,7 +316,7 @@ JournalLogger *JournalLogger::create(QMutex *mutex)
 bool JournalLogger::logmsg(LoggingItem *item)
 {
     sd_journal_send(
-        "MESSAGE=%s", item->rawMessage(),
+        "MESSAGE=%s", qUtf8Printable(item->message()),
         "PRIORITY=%d", item->level(),
         "CODE_FILE=%s", item->rawFile(),
         "CODE_LINE=%d", item->line(),
@@ -399,7 +377,7 @@ DatabaseLogger *DatabaseLogger::create(const QString& table, QMutex *mutex)
     logger = new DatabaseLogger(tble);
     mutex->lock();
 
-    ClientList *clients = new ClientList;
+    auto *clients = new ClientList;
     logRevClientMap.insert(logger, clients);
     return logger;
 }
@@ -425,29 +403,27 @@ bool DatabaseLogger::logmsg(LoggingItem *item)
 
     if (!m_thread->isRunning())
     {
-        m_disabled = true;
         m_disabledTime.start();
     }
 
-    if (!m_disabled && m_thread->queueFull())
+    if (!m_disabledTime.isValid() && m_thread->queueFull())
     {
-        m_disabled = true;
         m_disabledTime.start();
         LOG(VB_GENERAL, LOG_CRIT,
             "Disabling DB Logging: too many messages queued");
         return false;
     }
 
-    if (m_disabled && m_disabledTime.elapsed() > kMinDisabledTime)
+    if (m_disabledTime.isValid() && m_disabledTime.hasExpired(kMinDisabledTime))
     {
         if (isDatabaseReady() && !m_thread->queueFull())
         {
-            m_disabled = false;
+            m_disabledTime.invalidate();
             LOG(VB_GENERAL, LOG_CRIT, "Reenabling DB Logging");
         }
     }
 
-    if (m_disabled)
+    if (m_disabledTime.isValid())
         return false;
 
     m_thread->enqueue(item);
@@ -460,14 +436,7 @@ bool DatabaseLogger::logmsg(LoggingItem *item)
 /// \param item     LoggingItem containing the log message to insert
 bool DatabaseLogger::logqmsg(MSqlQuery &query, LoggingItem *item)
 {
-    char        timestamp[TIMESTAMP_MAX];
-
-    time_t epoch = item->epoch();
-    struct tm tm;
-    localtime_r(&epoch, &tm);
-
-    strftime(timestamp, TIMESTAMP_MAX-8, "%Y-%m-%d %H:%M:%S",
-             (const struct tm *)&tm);
+    QString timestamp = item->getTimestamp();
 
     query.bindValue(":TID",         item->tid());
     query.bindValue(":THREAD",      item->threadName());
@@ -490,7 +459,7 @@ bool DatabaseLogger::logqmsg(MSqlQuery &query, LoggingItem *item)
              || !err.nativeErrorCode().isEmpty()
                 ) &&
             (!m_errorLoggingTime.isValid() ||
-             (m_errorLoggingTime.elapsed() > 1000)))
+             (m_errorLoggingTime.hasExpired(1000))))
         {
             MythDB::DBError("DBLogging", query);
             m_errorLoggingTime.start();
@@ -601,7 +570,7 @@ void DBLoggerThread::run(void)
         // We want the query to be out of scope before the RunEpilog() so
         // shutdown occurs correctly as otherwise the connection appears still
         // in use, and we get a qWarning on shutdown.
-        MSqlQuery *query = new MSqlQuery(MSqlQuery::InitCon());
+        auto *query = new MSqlQuery(MSqlQuery::InitCon());
         m_logger->prepare(*query);
 
         QMutexLocker qLock(&m_queueMutex);
@@ -617,7 +586,7 @@ void DBLoggerThread::run(void)
             if (!item)
                 continue;
 
-            if (item->message()[0] != QChar('\0'))
+            if (!item->message().isEmpty())
             {
                 qLock.unlock();
                 bool logged = m_logger->logqmsg(*query, item);
@@ -809,7 +778,7 @@ void LogForwardThread::forwardMessage(LogMessage *msg)
     // cout << "msg  " << clientId.toLocal8Bit().constData() << endl;
     if (logItem)
     {
-        loggingGetTimeStamp(&logItem->epoch, nullptr);
+        loggingGetTimeStamp(&logItem->m_itemEpoch, nullptr);
     }
     else
     {
@@ -823,14 +792,13 @@ void LogForwardThread::forwardMessage(LogMessage *msg)
         QMutexLocker lock3(&logRevClientMapMutex);
 
         // Need to find or create the loggers
-        LoggerList *loggers = new LoggerList;
-        LoggerBase *logger;
+        auto *loggers = new LoggerList;
 
         // FileLogger from logFile
         QString logfile = item->logFile();
         if (!logfile.isEmpty())
         {
-            logger = FileLogger::create(logfile, lock2.mutex());
+            LoggerBase *logger = FileLogger::create(logfile, lock2.mutex());
 
             ClientList *clients = logRevClientMap.value(logger);
 
@@ -846,7 +814,7 @@ void LogForwardThread::forwardMessage(LogMessage *msg)
         int facility = item->facility();
         if (facility > 0)
         {
-            logger = SyslogLogger::create(lock2.mutex());
+            LoggerBase *logger = SyslogLogger::create(lock2.mutex());
 
             ClientList *clients = logRevClientMap.value(logger);
 
@@ -861,7 +829,7 @@ void LogForwardThread::forwardMessage(LogMessage *msg)
         // Journal Logger
         if (facility == SYSTEMD_JOURNAL_FACILITY)
         {
-            logger = JournalLogger::create(lock2.mutex());
+            LoggerBase *logger = JournalLogger::create(lock2.mutex());
 
             ClientList *clients = logRevClientMap.value(logger);
 
@@ -878,7 +846,7 @@ void LogForwardThread::forwardMessage(LogMessage *msg)
         QString table = item->table();
         if (!table.isEmpty())
         {
-            logger = DatabaseLogger::create(table, lock2.mutex());
+            LoggerBase *logger = DatabaseLogger::create(table, lock2.mutex());
 
             ClientList *clients = logRevClientMap.value(logger);
 
@@ -890,23 +858,20 @@ void LogForwardThread::forwardMessage(LogMessage *msg)
         }
 
         logItem = new LoggerListItem;
-        loggingGetTimeStamp(&logItem->epoch, nullptr);
-        logItem->list = loggers;
+        loggingGetTimeStamp(&logItem->m_itemEpoch, nullptr);
+        logItem->m_itemList = loggers;
         logClientMap.insert(clientId, logItem);
 
         item->DecrRef();
     }
 
-    if (logItem && logItem->list && !logItem->list->isEmpty())
+    if (logItem && logItem->m_itemList && !logItem->m_itemList->isEmpty())
     {
-        LoggerList::iterator it = logItem->list->begin();
         LoggingItem *item = LoggingItem::create(json);
         if (!item)
             return;
-        for (; it != logItem->list->end(); ++it)
-        {
-            (*it)->logmsg(item);
-        }
+        for (auto *it : qAsConst(*logItem->m_itemList))
+            it->logmsg(item);
         item->DecrRef();
     }
 }
@@ -944,7 +909,7 @@ void logForwardStop(void)
 
 void logForwardMessage(const QList<QByteArray> &msg)
 {
-    LogMessage *message = new LogMessage(msg);
+    auto *message = new LogMessage(msg);
     QMutexLocker lock(&logMsgListMutex);
 
     bool wasEmpty = logMsgList.isEmpty();

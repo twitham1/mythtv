@@ -1,10 +1,9 @@
-#ifndef _CLASSICLOGOGEDETECTOR_H_
-#define _CLASSICLOGOGEDETECTOR_H_
+#ifndef CLASSICLOGOGEDETECTOR_H
+#define CLASSICLOGOGEDETECTOR_H
 
 #include "LogoDetectorBase.h"
 
-typedef struct edgemaskentry EdgeMaskEntry;
-typedef struct VideoFrame_ VideoFrame;
+struct EdgeMaskEntry;
 class ClassicCommDetector;
 
 class ClassicLogoDetector : public LogoDetectorBase
@@ -21,7 +20,7 @@ class ClassicLogoDetector : public LogoDetectorBase
     unsigned int getRequiredAvailableBufferForSearch() override; // LogoDetectorBase
 
   protected:
-    virtual ~ClassicLogoDetector() = default;
+    ~ClassicLogoDetector() override;
 
   private:
     void SetLogoMaskArea();
@@ -55,7 +54,7 @@ class ClassicLogoDetector : public LogoDetectorBase
     bool                 m_logoInfoAvailable               {false};
 };
 
-#endif
+#endif // CLASSICLOGOGEDETECTOR_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */
 

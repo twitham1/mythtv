@@ -24,35 +24,31 @@
  *
  */
 
-#ifndef _RINGBUFFER_H_
-#define _RINGBUFFER_H_
+#ifndef RINGBUFFER_H
+#define RINGBUFFER_H
 
-#include <stdio.h>
-#include <stdint.h>
+#include <cstdio>
+#include <cstdint>
 #include <unistd.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif				/* __cplusplus */
-
-#define FULL_BUFFER  -1000
-#define EMPTY_BUFFER  -1000
-	typedef struct ringbuffer {
+#define FULL_BUFFER  (-1000)
+#define EMPTY_BUFFER  (-1000)
+	struct ringbuffer {
 		int read_pos;
 		int write_pos;
 		uint32_t size;
 		uint8_t *buffer;
-	} ringbuffer;
+	};
 
 
 #define DBUF_INDEX 10000
 
-	typedef struct dummy_buffer_s {
+	struct dummy_buffer {
 		uint32_t size;
 		uint32_t fill;
 		ringbuffer time_index;
 		ringbuffer data_index;
-	} dummy_buffer;
+	};
 
 
 	int  ring_init (ringbuffer *rbuf, int size);
@@ -80,9 +76,7 @@ extern "C" {
 	}
 
 	static inline int ring_posdiff(ringbuffer *rbuf, int pos1, int pos2){
-		int diff;
-		
-		diff = (pos2%rbuf->size) - (pos1%rbuf->size);
+		int diff = (pos2%rbuf->size) - (pos1%rbuf->size);
 		if (diff < 0) diff += rbuf->size;
 		return diff;
 	}
@@ -96,16 +90,14 @@ extern "C" {
 	}
 
 	static inline unsigned int ring_free(ringbuffer *rbuf){
-		int free;
-		free = rbuf->read_pos - rbuf->write_pos;
+		int free = rbuf->read_pos - rbuf->write_pos;
 		if (free <= 0) free += rbuf->size;
 		//Note: free is gauranteed to be >=1 from the above
 		return free - 1;
 	}
 
 	static inline unsigned int ring_avail(ringbuffer *rbuf){
-		int avail;
-		avail = rbuf->write_pos - rbuf->read_pos;
+		int avail = rbuf->write_pos - rbuf->read_pos;
 		if (avail < 0) avail += rbuf->size;
 		
 		return avail;
@@ -124,7 +116,4 @@ extern "C" {
         void dummy_destroy(dummy_buffer *dbuf);
 	void ring_show(ringbuffer *rbuf, unsigned int count, uint32_t off);
 
-#ifdef __cplusplus
-}
-#endif				/* __cplusplus */
-#endif /* _RINGBUFFER_H_ */
+#endif /* RINGBUFFER_H */

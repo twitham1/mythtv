@@ -1,6 +1,6 @@
 // -*- Mode: c++ -*-
-#ifndef _PRIVATE_TABLES_H_
-#define _PRIVATE_TABLES_H_
+#ifndef PREMIERE_TABLES_H
+#define PREMIERE_TABLES_H
 
 #include <QString>
 #include <cstdint>  // uint32_t
@@ -29,7 +29,7 @@ class PremiereContentInformationTable : public PSIPTable
     uint DescriptorsLength() const
         { return ((psipdata()[7] & 0x0F) << 8) | psipdata()[8]; }
 
-    uint EventCount(void) const
+    static uint EventCount(void)
         { return 1; }
 
     // descriptor length        x   9.0
@@ -39,7 +39,7 @@ class PremiereContentInformationTable : public PSIPTable
     static bool IsEIT(uint table_id);
 
   private:
-    mutable vector<const unsigned char*> _ptrs; // used to parse
+    mutable vector<const unsigned char*> m_ptrs; // used to parse
 };
 
 class PremiereContentPresentationTable : public PSIPTable
@@ -49,4 +49,4 @@ class PremiereContentPresentationTable : public PSIPTable
     {
     }
 };
-#endif // _PRIVATE_TABLES_H_
+#endif // PREMIERE_TABLES_H

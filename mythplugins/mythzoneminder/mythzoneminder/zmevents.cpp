@@ -181,11 +181,10 @@ void ZMEvents::updateUIList()
 
     m_eventGrid->Reset();
 
-    for (size_t i = 0; i < m_eventList->size(); i++)
+    for (auto *event : *m_eventList)
     {
-        Event *event = m_eventList->at(i);
-
-        MythUIButtonListItem *item = new MythUIButtonListItem(m_eventGrid, "", qVariantFromValue(event));
+        auto *item = new MythUIButtonListItem(m_eventGrid, "",
+                                              QVariant::fromValue(event));
 
         item->SetText(event->eventName());
         item->SetText(event->monitorName(), "camera" );
@@ -227,10 +226,14 @@ void ZMEvents::eventChanged(MythUIButtonListItem *item)
     if (m_eventNoText)
     {
         if (m_eventGrid->GetCount() > 0)
+        {
             m_eventNoText->SetText(QString("%1/%2")
                     .arg(m_eventGrid->GetCurrentPos() + 1).arg(m_eventGrid->GetCount()));
+        }
         else
+        {
             m_eventNoText->SetText("0/0");
+        }
     }
 }
 
@@ -242,7 +245,7 @@ void ZMEvents::eventVisible(MythUIButtonListItem *item)
     if (item->HasImage())
         return;
 
-    Event *event = item->GetData().value<Event*>();
+    auto *event = item->GetData().value<Event*>();
 
     if (event)
     {
@@ -273,8 +276,8 @@ void ZMEvents::playPressed(void)
     {
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-        ZMPlayer *player = new ZMPlayer(mainStack, "ZMPlayer",
-                                        m_eventList, &m_savedPosition);
+        auto *player = new ZMPlayer(mainStack, "ZMPlayer",
+                                    m_eventList, &m_savedPosition);
 
         connect(player, SIGNAL(Exiting()), this, SLOT(playerExited()));
 
@@ -287,7 +290,7 @@ void ZMEvents::playerExited(void)
 {
     // refresh the grid and restore the saved position
 
-    if (m_savedPosition > (int)m_eventList->size() - 1)
+    if (m_savedPosition > m_eventList->size() - 1)
         m_savedPosition = m_eventList->size() - 1;
 
     updateUIList();
@@ -382,9 +385,8 @@ void ZMEvents::setGridLayout(int layout)
     QString layoutName = QString("layout%1").arg(layout);
     QList<MythUIType *> *children = GetAllChildren();
 
-    for (int x = 0; x < children->size(); x++)
+    for (auto *type : qAsConst(*children))
     {
-        MythUIType *type = children->at(x);
         name = type->objectName();
         if (name.startsWith("layout"))
         {
@@ -461,8 +463,7 @@ void ZMEvents::deleteAll(void)
     QString title = tr("Delete All Events?");
     QString msg = tr("Deleting %1 events in this view.").arg(m_eventGrid->GetCount());
 
-    MythConfirmationDialog *dialog = new MythConfirmationDialog(
-            popupStack, title + '\n' + msg, true);
+    auto *dialog = new MythConfirmationDialog(popupStack, title + '\n' + msg, true);
 
     if (dialog->Create())
         popupStack->AddScreen(dialog);

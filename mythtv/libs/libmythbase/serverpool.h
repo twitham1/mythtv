@@ -26,12 +26,12 @@
 
 class PrivUdpSocket;
 
-typedef enum PoolServerTypes
+enum PoolServerType
 {
     kTCPServer,
     kUDPServer,
     kSSLServer
-} PoolServerType;
+};
 
 // Making a 'Priv' server public is a contradiction, it was this or passing
 // through the server type in the newConnection signal which would have required
@@ -40,9 +40,9 @@ class MBASE_PUBLIC PrivTcpServer : public QTcpServer
 {
     Q_OBJECT
   public:
-    PrivTcpServer(QObject *parent = nullptr,
+    explicit PrivTcpServer(QObject *parent = nullptr,
                   PoolServerType type = kTCPServer);
-   ~PrivTcpServer() = default;
+   ~PrivTcpServer() override = default;
 
    PoolServerType GetServerType(void) { return m_serverType; }
 
@@ -63,7 +63,7 @@ class MBASE_PUBLIC ServerPool : public QObject
   public:
     explicit ServerPool(QObject *parent=nullptr)
         : QObject(parent) {}
-   ~ServerPool(void);
+   ~ServerPool(void) override;
 
     static void RefreshDefaultListen(void);
     static QList<QHostAddress> DefaultListen(void);
@@ -89,10 +89,10 @@ class MBASE_PUBLIC ServerPool : public QObject
     qint64 writeDatagram(const QByteArray &datagram,
                          const QHostAddress &addr, quint16 port);
 
-    bool isListening(void)                      { return m_listening;       }
-    int  maxPendingConnections(void)            { return m_maxPendingConn;  }
+    bool isListening(void) const                { return m_listening;       }
+    int  maxPendingConnections(void) const      { return m_maxPendingConn;  }
     void setMaxPendingConnections(int n)        { m_maxPendingConn = n;     }
-    quint16 serverPort(void)                    { return m_port;            }
+    quint16 serverPort(void) const              { return m_port;            }
 
     QNetworkProxy proxy(void)                   { return m_proxy;           }
     void setProxy(const QNetworkProxy &proxy)   { m_proxy = proxy;          }

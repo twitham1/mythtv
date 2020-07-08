@@ -1,5 +1,5 @@
-#ifndef __THEMECHOOSER_H__
-#define __THEMECHOOSER_H__
+#ifndef THEMECHOOSER_H
+#define THEMECHOOSER_H
 
 // Qt headers
 #include <QString>
@@ -29,14 +29,14 @@ class ThemeChooser : public MythScreenType
     Q_OBJECT
 
   public:
-    ThemeChooser(MythScreenStack *parent,
+    explicit ThemeChooser(MythScreenStack *parent,
                const QString &name = "ThemeChooser");
-   ~ThemeChooser();
+   ~ThemeChooser() override;
 
     bool Create(void) override; // MythScreenType
     void Load(void) override; // MythScreenType
     void Init(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent*) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
     void customEvent(QEvent *e) override; // MythUIType
 
   private slots:
@@ -47,7 +47,7 @@ class ThemeChooser : public MythScreenType
     void popupClosed(const QString& which, int result);
     void saveAndReload(void);
     void toggleFullscreenPreview(void);
-    void toggleThemeUpdateNotifications(void);
+    static void toggleThemeUpdateNotifications(void);
     void refreshDownloadableThemes(void);
     void removeTheme(void);
 
@@ -66,7 +66,7 @@ class ThemeChooser : public MythScreenType
         dsExtractingTheme
     };
 
-    ThemeInfo *loadThemeInfo(QFileInfo &theme);
+    ThemeInfo *loadThemeInfo(const QFileInfo &theme);
     void showPopupMenu(void);
     void updateProgressBar(int bytesReceived, int bytesTotal);
     bool removeThemeDir(const QString &dirname);
@@ -101,7 +101,7 @@ class ThemeUpdateChecker : public QObject
 
   public:
     ThemeUpdateChecker(void);
-   ~ThemeUpdateChecker(void);
+   ~ThemeUpdateChecker(void) override;
 
   protected slots:
     void checkForUpdate(void);
@@ -115,6 +115,6 @@ class ThemeUpdateChecker : public QObject
     QString    m_newVersion;
 };
 
-#endif /* THEMECHOOSER */
+#endif /* THEMECHOOSER_H */
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

@@ -26,7 +26,7 @@ bool Wsdl::GetWSDL( HTTPRequest *pRequest )
     if (!pRequest->m_mapParams.contains( "raw" ))
     {
         appendChild( createProcessingInstruction( "xml-stylesheet",
-                    "type=\"text/xsl\" href=\"/xslt/service.xslt\"" ));
+                    R"(type="text/xsl" href="/xslt/service.xslt")" ));
     }
 
     QDomElement  oNode;
@@ -477,7 +477,7 @@ bool Wsdl::IsCustomType( QString &sTypeName )
             break;
     }
 
-    return !((id == -1) || (id < QMetaType::User));
+    return !(id < QMetaType::User);
 }
 
 /////////////////////////////////////////////////////////////////////////////

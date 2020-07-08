@@ -1,5 +1,5 @@
-#ifndef _LINUX_AVC_INFO_H_
-#define _LINUX_AVC_INFO_H_
+#ifndef LINUX_AVC_INFO_H
+#define LINUX_AVC_INFO_H
 
 #ifdef USING_LINUX_FIREWIRE
 
@@ -23,7 +23,7 @@ using namespace std;
 class LinuxAVCInfo : public AVCInfo
 {
   public:
-    LinuxAVCInfo() : m_fw_handle(nullptr) { }
+    LinuxAVCInfo() = default;
 
     bool Update(uint64_t _guid, raw1394handle_t handle,
                 uint _port, uint _node);
@@ -36,16 +36,16 @@ class LinuxAVCInfo : public AVCInfo
         vector<uint8_t>       &result,
         int                    retry_cnt)  override; // AVCInfo
 
-    bool IsPortOpen(void) const { return m_fw_handle; }
+    bool IsPortOpen(void) const { return m_fwHandle; }
 
     /// Returns remote node
     int GetNode(void) const { return m_node; }
 
   public:
-    raw1394handle_t m_fw_handle;
+    raw1394handle_t m_fwHandle {nullptr};
 };
-typedef QMap<uint64_t,LinuxAVCInfo*> avcinfo_list_t;
+using avcinfo_list_t = QMap<uint64_t,LinuxAVCInfo*>;
 
 #endif // USING_LINUX_FIREWIRE
 
-#endif // _LINUX_AVC_INFO_H_
+#endif // LINUX_AVC_INFO_H

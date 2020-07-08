@@ -245,8 +245,7 @@ void MythControls::Close()
         MythScreenStack *popupStack =
                                 GetMythMainWindow()->GetStack("popup stack");
 
-        MythConfirmationDialog *confirmPopup
-                    = new MythConfirmationDialog(popupStack, label, true);
+        auto *confirmPopup = new MythConfirmationDialog(popupStack, label, true);
 
         if (confirmPopup->Create())
             popupStack->AddScreen(confirmPopup);
@@ -289,10 +288,9 @@ void MythControls::SetListContents(
     uilist->Reset();
 
     // add each new string
-    QStringList::const_iterator it = contents.begin();
-    for (; it != contents.end(); ++it)
+    for (const auto & content : qAsConst(contents))
     {
-        MythUIButtonListItem *item = new MythUIButtonListItem(uilist, *it);
+        auto *item = new MythUIButtonListItem(uilist, content);
         item->setDrawArrow(arrows);
     }
 }
@@ -451,7 +449,7 @@ uint MythControls::GetCurrentButton(void)
  */
 QString MythControls::GetCurrentKey(void)
 {
-    MythUIButtonListItem* currentButton;
+    MythUIButtonListItem* currentButton = nullptr;
     if (m_leftListType == kKeyList &&
         (currentButton = m_leftList->GetItemCurrent()))
     {
@@ -509,10 +507,8 @@ void MythControls::LoadData(const QString &hostname)
     m_sortedContexts.insert(m_sortedContexts.begin(),
                             ActionSet::kJumpContext);
 
-    QStringList::const_iterator it = m_sortedContexts.begin();
-    for (; it != m_sortedContexts.end(); ++it)
+    for (const auto & ctx_name : qAsConst(m_sortedContexts))
     {
-        QString ctx_name = *it;
         QStringList actions = m_bindings->GetActions(ctx_name);
         actions.sort();
         m_contexts.insert(ctx_name, actions);
@@ -550,8 +546,7 @@ void MythControls::DeleteKey(void)
     MythScreenStack *popupStack =
                             GetMythMainWindow()->GetStack("popup stack");
 
-    MythConfirmationDialog *confirmPopup =
-            new MythConfirmationDialog(popupStack, label, false);
+    auto *confirmPopup = new MythConfirmationDialog(popupStack, label, false);
 
     if (confirmPopup->Create())
     {
@@ -577,23 +572,26 @@ void MythControls::ResolveConflict(ActionID *conflict, int error_level,
     bool error = (KeyBindings::kKeyBindingError == error_level);
 
     if (error)
+    {
         label = tr("This key binding conflicts with %1 in the %2 context. "
                    "Unable to bind key.")
                     .arg(conflict->GetAction()).arg(conflict->GetContext());
+    }
     else
+    {
         label = tr("This key binding conflicts with %1 in the %2 context. "
                    "Do you want to bind it anyway?")
                     .arg(conflict->GetAction()).arg(conflict->GetContext());
+    }
 
     MythScreenStack *popupStack =
                             GetMythMainWindow()->GetStack("popup stack");
 
-    MythConfirmationDialog *confirmPopup =
-            new MythConfirmationDialog(popupStack, label, !error);
+    auto *confirmPopup = new MythConfirmationDialog(popupStack, label, !error);
 
     if (!error)
     {
-        confirmPopup->SetData(qVariantFromValue(key));
+        confirmPopup->SetData(QVariant::fromValue(key));
         confirmPopup->SetReturnEvent(this, "conflict");
     }
 
@@ -609,7 +607,7 @@ void MythControls::GrabKey(void)
     MythScreenStack *popupStack =
                             GetMythMainWindow()->GetStack("popup stack");
 
-    KeyGrabPopupBox *keyGrabPopup = new KeyGrabPopupBox(popupStack);
+    auto *keyGrabPopup = new KeyGrabPopupBox(popupStack);
 
     if (keyGrabPopup->Create())
         popupStack->AddScreen(keyGrabPopup, false);
@@ -643,7 +641,7 @@ void MythControls::AddKeyToAction(const QString& key, bool ignoreconflict)
     if (!ignoreconflict)
     {
         // Check for first of the potential conflicts.
-        int err_level;
+        int err_level = 0;
         ActionID *conflict = m_bindings->GetConflict(context, key, err_level);
         if (conflict)
         {
@@ -654,10 +652,14 @@ void MythControls::AddKeyToAction(const QString& key, bool ignoreconflict)
     }
 
     if (binding_index < keys.count())
+    {
         m_bindings->ReplaceActionKey(context, action, key,
                                      keys[binding_index]);
+    }
     else
+    {
         m_bindings->AddActionKey(context, action, key);
+    }
 
     RefreshKeyInformation();
 }
@@ -666,7 +668,7 @@ void MythControls::customEvent(QEvent *event)
 {
     if (event->type() == DialogCompletionEvent::kEventType)
     {
-        DialogCompletionEvent *dce = (DialogCompletionEvent*)(event);
+        auto *dce = (DialogCompletionEvent*)(event);
 
         QString resultid  = dce->GetId();
         int     buttonnum = dce->GetResult();
@@ -699,7 +701,8 @@ void MythControls::customEvent(QEvent *event)
         else if (resultid == "view")
         {
             QStringList contents;
-            QString leftcaption, rightcaption;
+            QString leftcaption;
+            QString rightcaption;
 
             if (buttonnum == 0)
             {

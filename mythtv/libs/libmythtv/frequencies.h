@@ -3,6 +3,8 @@
 
 #include "mythtvexp.h"
 
+#include <vector>
+
 /*
  * Worldwide channel/frequency list
  *
@@ -93,21 +95,22 @@
 
 /* --------------------------------------------------------------------- */
 
-typedef struct CHANLIST {
+struct CHANLIST {
     const char *name;
     int   freq;
-} _chanlist;
+};
 
-typedef struct CHANLISTS {
+using CHANLIST_vec = std::vector<struct CHANLIST>;
+
+struct CHANLISTS {
     const char       *name;
-    struct CHANLIST  *list;
-    int               count;
-} _chanlists;
+    const CHANLIST_vec list;
+};
 
-#define CHAN_COUNT(x) (sizeof(x)/sizeof(struct CHANLIST))
+using CHANLISTS_vec = std::vector<struct CHANLISTS>;
 
 /* --------------------------------------------------------------------- */
 
-extern MTV_PUBLIC struct CHANLISTS   chanlists[];
+extern MTV_PUBLIC const CHANLISTS_vec gChanLists;
 
 #endif

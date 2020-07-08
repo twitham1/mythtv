@@ -23,17 +23,6 @@
 #include "exportnative.h"
 #include "themeselector.h"
 
-SelectDestination::SelectDestination(
-    MythScreenStack *parent, bool nativeMode, const QString& name) :
-    MythScreenType(parent, name),
-    m_nativeMode(nativeMode)
-{
-    m_archiveDestination.type = AD_FILE;
-    m_archiveDestination.name = nullptr;
-    m_archiveDestination.description = nullptr;
-    m_archiveDestination.freeSpace = 0LL;
-}
-
 SelectDestination::~SelectDestination(void)
 {
     saveConfiguration();
@@ -77,9 +66,9 @@ bool SelectDestination::Create(void)
 
     for (int x = 0; x < ArchiveDestinationsCount; x++)
     {
-        MythUIButtonListItem *item = new 
+        auto *item = new
             MythUIButtonListItem(m_destinationSelector, tr(ArchiveDestinations[x].name));
-        item->SetData(qVariantFromValue(ArchiveDestinations[x].type));
+        item->SetData(QVariant::fromValue(ArchiveDestinations[x].type));
     }
     connect(m_findButton, SIGNAL(Clicked()), this, SLOT(handleFind()));
 
@@ -129,14 +118,14 @@ void SelectDestination::handleNextPage()
 
     if (m_nativeMode)
     {
-        ExportNative *native = new ExportNative(mainStack, this, m_archiveDestination, "ExportNative");
+        auto *native = new ExportNative(mainStack, this, m_archiveDestination, "ExportNative");
 
         if (native->Create())
             mainStack->AddScreen(native);
     }
     else
     {
-        DVDThemeSelector *theme = new DVDThemeSelector(mainStack, this, m_archiveDestination, "ThemeSelector");
+        auto *theme = new DVDThemeSelector(mainStack, this, m_archiveDestination, "ThemeSelector");
 
         if (theme->Create())
             mainStack->AddScreen(theme);
@@ -248,7 +237,7 @@ void SelectDestination::setDestination(MythUIButtonListItem* item)
             m_doBurnText->Show();
             break;
         case AD_FILE:
-            int64_t dummy;
+            int64_t dummy = 0;
             ArchiveDestinations[itemNo].freeSpace = 
                     getDiskSpace(m_filenameEdit->GetText(), dummy, dummy);
 
@@ -280,7 +269,7 @@ void SelectDestination::handleFind(void)
 {
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    FileSelector *selector = new
+    auto *selector = new
             FileSelector(mainStack, nullptr, FSTYPE_DIRECTORY, m_filenameEdit->GetText(), "*.*");
 
     connect(selector, SIGNAL(haveResult(QString)),
@@ -301,7 +290,7 @@ void SelectDestination::fileFinderClosed(const QString& filename)
 
 void SelectDestination::filenameEditLostFocus()
 {
-    int64_t dummy;
+    int64_t dummy = 0;
     m_archiveDestination.freeSpace = getDiskSpace(m_filenameEdit->GetText(), dummy, dummy);
 
     // if we don't get a valid freespace value it probably means the file doesn't

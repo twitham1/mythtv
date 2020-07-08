@@ -16,12 +16,10 @@
 #define LOC_WARN QString("NewsSite, Warning: ")
 #define LOC_ERR  QString("NewsSite, Error: ")
 
-NewsSite::NewsSite(const QString   &name,
-                   const QString   &url,
-                   const QDateTime &updated,
-                   const bool       podcast) :
-    m_name(name),  m_url(url), m_urlReq(url),
-    m_updated(updated),
+NewsSite::NewsSite(QString name, const QString &url,
+                   QDateTime updated, const bool podcast) :
+    m_name(std::move(name)), m_url(url), m_urlReq(url),
+    m_updated(std::move(updated)),
     m_destDir(GetConfDir()+"/MythNews"),
     m_podcast(podcast)
 {
@@ -158,8 +156,14 @@ void NewsSite::customEvent(QEvent *event)
 {
     if (event->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = static_cast<MythEvent *>(event);
+        auto *me = dynamic_cast<MythEvent *>(event);
+        if (me == nullptr)
+            return;
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList tokens = me->Message().split(" ", QString::SkipEmptyParts);
+#else
+        QStringList tokens = me->Message().split(" ", Qt::SkipEmptyParts);
+#endif
 
         if (tokens.isEmpty())
             return;

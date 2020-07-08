@@ -40,7 +40,7 @@ QString ProgDetails::getRatings(bool recorded, uint chanid, const QDateTime& sta
 {
     QString table = (recorded) ? "recordedrating" : "programrating";
     QString sel = QString(
-        "SELECT system, rating FROM %1 "
+        "SELECT `system`, rating FROM %1 "
         "WHERE chanid  = :CHANID "
         "AND starttime = :STARTTIME").arg(table);
 
@@ -119,9 +119,8 @@ void ProgDetails::addItem(const QString &title, const QString &value,
 
 bool ProgDetails::keyPressEvent(QKeyEvent *event)
 {
-    bool handled;
     QStringList actions;
-    handled = GetMythMainWindow()->TranslateKeyPress("Global", event, actions);
+    bool handled = GetMythMainWindow()->TranslateKeyPress("Global", event, actions);
 
     for (int i = 0; i < actions.size() && !handled; i++)
     {
@@ -166,7 +165,6 @@ void ProgDetails::PowerPriorities(const QString & ptable)
     QString  pwrpri;
     QString  desc;
     QString  adjustmsg;
-    int      adj;
     int      total = 0;
 
     MSqlQuery query(MSqlQuery::InitCon());
@@ -253,7 +251,7 @@ void ProgDetails::PowerPriorities(const QString & ptable)
 
     while (query.next())
     {
-        adj = query.value(0).toInt();
+        int adj = query.value(0).toInt();
         if (adj)
         {
             QString sclause = query.value(1).toString();
@@ -273,9 +271,11 @@ void ProgDetails::PowerPriorities(const QString & ptable)
     }
 
     if (recordid)
+    {
         recmatch = QString("INNER JOIN record "
                            "      ON ( record.recordid = %1 ) ")
                    .arg(recordid);
+    }
 
     for (Itest = tests.begin(); Itest != tests.end(); ++Itest)
     {
@@ -298,7 +298,7 @@ void ProgDetails::PowerPriorities(const QString & ptable)
         adjustmsg = QString("%1 : ").arg((*Itest).first);
         if (query.exec() && query.next())
         {
-            adj = query.value(0).toInt();
+            int adj = query.value(0).toInt();
             if (adj)
             {
                 adjustmsg += tr(" MATCHED, adding %1").arg(adj);
@@ -322,11 +322,20 @@ void ProgDetails::PowerPriorities(const QString & ptable)
 void ProgDetails::loadPage(void)
 {
     MSqlQuery query(MSqlQuery::InitCon());
-    QString category_type, showtype, year, syndicatedEpisodeNum;
-    QString rating, colorcode, title_pronounce;
+    QString category_type;
+    QString showtype;
+    QString year;
+    QString syndicatedEpisodeNum;
+    QString rating;
+    QString colorcode;
+    QString title_pronounce;
     float stars = 0.0;
-    int partnumber = 0, parttotal = 0;
-    int audioprop = 0, videoprop = 0, subtype = 0, generic = 0;
+    int partnumber = 0;
+    int parttotal = 0;
+    int audioprop = 0;
+    int videoprop = 0;
+    int subtype = 0;
+    int generic = 0;
     bool recorded = false;
 
     RecordingRule* record = nullptr;
@@ -439,10 +448,26 @@ void ProgDetails::loadPage(void)
         attr += tr("Widescreen") + ", ";
     if  (videoprop & VID_AVC)
         attr += tr("AVC/H.264") + ", ";
+    if  (videoprop & VID_HEVC)
+        attr += tr("HEVC/H.265") + ", ";
     if  (videoprop & VID_720)
         attr += tr("720p Resolution") + ", ";
-    if  (videoprop & VID_1080)
-        attr += tr("1080i/p Resolution") + ", ";
+
+    if (videoprop & VID_PROGRESSIVE)
+    {
+        if  (videoprop & VID_1080)
+             attr += tr("1080p Resolution") + ", ";
+        if  (videoprop & VID_4K)
+            attr += tr("4K Resolution") + ", ";
+    }
+    else
+    {
+        if  (videoprop & VID_1080)
+            attr += tr("1080i Resolution") + ", ";
+        if  (videoprop & VID_4K)
+            attr += tr("4Ki Resolution") + ", ";
+    }
+
     if  (videoprop & VID_DAMAGED)
         attr += tr("Damaged") + ", ";
 
@@ -468,32 +493,46 @@ void ProgDetails::loadPage(void)
 
     addItem(tr("Description"), s, ProgInfoList::kLevel1);
 
-    QString actors, directors, producers, execProducers;
-    QString writers, guestStars, hosts, adapters;
-    QString presenters, commentators, guests;
+    QString actors;
+    QString directors;
+    QString producers;
+    QString execProducers;
+    QString writers;
+    QString guestStars;
+    QString hosts;
+    QString adapters;
+    QString presenters;
+    QString commentators;
+    QString guests;
 
     if (m_progInfo.GetScheduledEndTime() != m_progInfo.GetScheduledStartTime())
     {
         if (recorded)
+        {
             query.prepare("SELECT role,people.name FROM recordedcredits"
                           " AS credits"
                           " LEFT JOIN people ON credits.person = people.person"
                           " WHERE credits.chanid = :CHANID"
                           " AND credits.starttime = :STARTTIME"
                           " ORDER BY role;");
+        }
         else
+        {
             query.prepare("SELECT role,people.name FROM credits"
                           " LEFT JOIN people ON credits.person = people.person"
                           " WHERE credits.chanid = :CHANID"
                           " AND credits.starttime = :STARTTIME"
                           " ORDER BY role;");
+        }
         query.bindValue(":CHANID",    m_progInfo.GetChanID());
         query.bindValue(":STARTTIME", m_progInfo.GetScheduledStartTime());
 
         if (query.exec() && query.size() > 0)
         {
             QStringList plist;
-            QString rstr, role, pname;
+            QString rstr;
+            QString role;
+            QString pname;
 
             while(query.next())
             {
@@ -623,11 +662,14 @@ void ProgDetails::loadPage(void)
     if (m_progInfo.GetEpisode() > 0)
     {
         if (m_progInfo.GetEpisodeTotal() > 0)
+        {
             s = tr("%1 of %2").arg(m_progInfo.GetEpisode())
                               .arg(m_progInfo.GetEpisodeTotal());
+        }
         else
+        {
             s = QString::number(m_progInfo.GetEpisode());
-
+        }
     }
     addItem(tr("Episode"), s, ProgInfoList::kLevel1);
 
@@ -724,7 +766,7 @@ void ProgDetails::loadPage(void)
         recordingRule = QString("%1, ").arg(m_progInfo.GetRecordingRuleID());
         if (m_progInfo.GetRecordingRuleType() != kNotRecording)
             recordingRule += toString(m_progInfo.GetRecordingRuleType());
-        if (!(record->m_title.isEmpty()))
+        if (record && !record->m_title.isEmpty())
             recordingRule += QString(" \"%2\"").arg(record->m_title);
 
         query.prepare("SELECT last_record, next_record, avg_delay "
@@ -734,13 +776,17 @@ void ProgDetails::loadPage(void)
         if (query.exec() && query.next())
         {
             if (query.value(0).toDateTime().isValid())
+            {
                 lastRecorded = MythDate::toString(
                     MythDate::as_utc(query.value(0).toDateTime()),
                     MythDate::kDateFull | MythDate::kAddYear);
+            }
             if (query.value(1).toDateTime().isValid())
+            {
                 nextRecording = MythDate::toString(
                     MythDate::as_utc(query.value(1).toDateTime()),
                     MythDate::kDateFull | MythDate::kAddYear);
+            }
             if (query.value(2).toInt() > 0)
                 averageTimeShift = tr("%n hour(s)", "",
                                                 query.value(2).toInt());
@@ -770,7 +816,7 @@ void ProgDetails::loadPage(void)
                 }
             }
         }
-        if (record->m_searchType != kManualSearch &&
+        if (record && record->m_searchType != kManualSearch &&
             record->m_description != m_progInfo.GetDescription())
             searchPhrase = record->m_description;
     }
@@ -829,7 +875,7 @@ void ProgDetails::loadPage(void)
     }
     else if (m_progInfo.GetRecordingRuleID())
     {
-        recordingProfile =  record->m_recProfile;
+        recordingProfile = record ? record->m_recProfile : tr("Unknown");
     }
     addItem(tr("Recording Host"), recordingHost, ProgInfoList::kLevel2);
     addItem(tr("Recording Input"), recordingInput, ProgInfoList::kLevel2);

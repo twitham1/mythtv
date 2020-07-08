@@ -73,6 +73,7 @@ class MythDownloadInfo
 
     QString          m_url;
     QUrl             m_redirectedTo;
+    QString         *m_finalUrl                    {nullptr};
     QNetworkRequest *m_request                     {nullptr};
     QNetworkReply   *m_reply                       {nullptr};
     QString          m_outFile;
@@ -125,7 +126,7 @@ class RemoteFileDownloadThread : public QRunnable
     {
         bool ok = false;
 
-        RemoteFile *rf = new RemoteFile(m_dlInfo->m_url, false, false, 0);
+        auto *rf = new RemoteFile(m_dlInfo->m_url, false, false, 0);
         ok = rf->SaveAs(m_dlInfo->m_privData);
         delete rf;
 
@@ -169,7 +170,7 @@ MythDownloadManager *GetMythDownloadManager(void)
     if (downloadManager)
         return downloadManager;
 
-    MythDownloadManager *tmpDLM = new MythDownloadManager();
+    auto *tmpDLM = new MythDownloadManager();
     tmpDLM->start();
     while (!tmpDLM->getQueueThread())
         usleep(10000);
@@ -338,7 +339,7 @@ void MythDownloadManager::queueItem(const QString &url, QNetworkRequest *req,
                                     QObject *caller, const MRequestType reqType,
                                     const bool reload)
 {
-    MythDownloadInfo *dlInfo = new MythDownloadInfo;
+    auto *dlInfo = new MythDownloadInfo;
 
     dlInfo->m_url     = url;
     dlInfo->m_request = req;
@@ -370,9 +371,10 @@ bool MythDownloadManager::processItem(const QString &url, QNetworkRequest *req,
                                       const MRequestType reqType,
                                       const bool reload,
                                       AuthCallback authCallbackFn, void *authArg,
-                                   const QHash<QByteArray, QByteArray> *headers)
+                                      const QHash<QByteArray, QByteArray> *headers,
+                                      QString *finalUrl)
 {
-    MythDownloadInfo *dlInfo = new MythDownloadInfo;
+    auto *dlInfo = new MythDownloadInfo;
 
     dlInfo->m_url      = url;
     dlInfo->m_request  = req;
@@ -384,6 +386,7 @@ bool MythDownloadManager::processItem(const QString &url, QNetworkRequest *req,
     dlInfo->m_authCallback = authCallbackFn;
     dlInfo->m_authArg  = authArg;
     dlInfo->m_headers  = headers;
+    dlInfo->m_finalUrl = finalUrl;
 
     return downloadNow(dlInfo, true);
 }
@@ -453,9 +456,15 @@ bool MythDownloadManager::download(const QString &url, const QString &dest,
  *  \return true if download was successful, false otherwise.
  */
 bool MythDownloadManager::download(const QString &url, QByteArray *data,
-                                   const bool reload)
+                                   const bool reload, QString *finalUrl)
 {
-    return processItem(url, nullptr, QString(), data, kRequestGet, reload);
+    QString redirected;
+    if (!processItem(url, nullptr, QString(), data, kRequestGet, reload,
+                     nullptr, nullptr, nullptr, &redirected))
+        return false;
+    if (!redirected.isEmpty() && finalUrl != nullptr)
+        *finalUrl = redirected;
+    return true;
 }
 
 /** \brief Downloads a URI to a QByteArray in blocking mode.
@@ -467,7 +476,7 @@ bool MythDownloadManager::download(const QString &url, QByteArray *data,
 QNetworkReply *MythDownloadManager::download(const QString &url,
                                              const bool reload)
 {
-    MythDownloadInfo *dlInfo = new MythDownloadInfo;
+    auto *dlInfo = new MythDownloadInfo;
     QNetworkReply *reply = nullptr;
 
     dlInfo->m_url          = url;
@@ -648,8 +657,7 @@ bool MythDownloadManager::postAuth(const QString &url, QByteArray *data,
  */
 void MythDownloadManager::downloadRemoteFile(MythDownloadInfo *dlInfo)
 {
-    RemoteFileDownloadThread *dlThread =
-        new RemoteFileDownloadThread(this, dlInfo);
+    auto *dlThread = new RemoteFileDownloadThread(this, dlInfo);
     MThreadPool::globalInstance()->start(dlThread, "RemoteFileDownload");
 }
 
@@ -661,7 +669,7 @@ void MythDownloadManager::downloadQNetworkRequest(MythDownloadInfo *dlInfo)
     if (!dlInfo)
         return;
 
-    static const char dateFormat[] = "ddd, dd MMM yyyy hh:mm:ss 'GMT'";
+    static const QString kDateFormat = "ddd, dd MMM yyyy hh:mm:ss 'GMT'";
     QUrl qurl(dlInfo->m_url);
     QNetworkRequest request;
 
@@ -716,7 +724,7 @@ void MythDownloadManager::downloadQNetworkRequest(MythDownloadInfo *dlInfo)
             if (!dateString.isNull())
             {
                 QDateTime loadDate =
-                    MythDate::fromString(dateString, dateFormat);
+                    MythDate::fromString(dateString, kDateFormat);
                 loadDate.setTimeSpec(Qt::UTC);
                 if (loadDate.secsTo(now) <= 720)
                 {
@@ -987,10 +995,14 @@ bool MythDownloadManager::downloadNowLinkLocal(MythDownloadInfo *dlInfo, bool de
             QByteArray delim("\r\n\r\n");
             int delimLoc=aBuffer->indexOf(delim);
             if (delimLoc > -1)
+            {
                 *aBuffer = aBuffer->right
                   (aBuffer->size()-delimLoc-4);
+            }
             else
+            {
                 isOK=false;
+            }
         }
         socket.close();
     }
@@ -1023,16 +1035,14 @@ void MythDownloadManager::cancelDownload(const QString &url, bool block)
  */
 void MythDownloadManager::cancelDownload(const QStringList &urls, bool block)
 {
-    MythDownloadInfo *dlInfo;
-
     m_infoLock->lock();
-    foreach (QString url, urls)
+    for (const auto& url : qAsConst(urls))
     {
         QMutableListIterator<MythDownloadInfo*> lit(m_downloadQueue);
         while (lit.hasNext())
         {
             lit.next();
-            dlInfo = lit.value();
+            MythDownloadInfo *dlInfo = lit.value();
             if (dlInfo->m_url == url)
             {
                 if (!m_cancellationQueue.contains(dlInfo))
@@ -1043,7 +1053,7 @@ void MythDownloadManager::cancelDownload(const QStringList &urls, bool block)
 
         if (m_downloadInfos.contains(url))
         {
-            dlInfo = m_downloadInfos[url];
+            MythDownloadInfo *dlInfo = m_downloadInfos[url];
 
             if (!m_cancellationQueue.contains(dlInfo))
                 m_cancellationQueue.append(dlInfo);
@@ -1077,13 +1087,12 @@ void MythDownloadManager::cancelDownload(const QStringList &urls, bool block)
 void MythDownloadManager::downloadCanceled()
 {
     QMutexLocker locker(m_infoLock);
-    MythDownloadInfo *dlInfo;
 
     QMutableListIterator<MythDownloadInfo*> lit(m_cancellationQueue);
     while (lit.hasNext())
     {
         lit.next();
-        dlInfo = lit.value();
+        MythDownloadInfo *dlInfo = lit.value();
         dlInfo->m_lock.lock();
 
         if (dlInfo->m_reply)
@@ -1111,12 +1120,11 @@ void MythDownloadManager::downloadCanceled()
 void MythDownloadManager::removeListener(QObject *caller)
 {
     QMutexLocker locker(m_infoLock);
-    MythDownloadInfo *dlInfo;
 
     QList <MythDownloadInfo*>::iterator lit = m_downloadQueue.begin();
     for (; lit != m_downloadQueue.end(); ++lit)
     {
-        dlInfo = *lit;
+        MythDownloadInfo *dlInfo = *lit;
         if (dlInfo->m_caller == caller)
         {
             dlInfo->m_caller  = nullptr;
@@ -1128,7 +1136,7 @@ void MythDownloadManager::removeListener(QObject *caller)
     QMap <QString, MythDownloadInfo*>::iterator mit = m_downloadInfos.begin();
     for (; mit != m_downloadInfos.end(); ++mit)
     {
-        dlInfo = mit.value();
+        MythDownloadInfo *dlInfo = mit.value();
         if (dlInfo->m_caller == caller)
         {
             dlInfo->m_caller  = nullptr;
@@ -1143,7 +1151,9 @@ void MythDownloadManager::removeListener(QObject *caller)
  */
 void MythDownloadManager::downloadError(QNetworkReply::NetworkError errorCode)
 {
-    QNetworkReply *reply = (QNetworkReply*)sender();
+    auto *reply = dynamic_cast<QNetworkReply *>(sender());
+    if (reply == nullptr)
+        return;
 
     LOG(VB_FILE, LOG_DEBUG, LOC + QString("downloadError %1 ")
                     .arg(errorCode) + reply->errorString() );
@@ -1169,7 +1179,7 @@ void MythDownloadManager::downloadError(QNetworkReply::NetworkError errorCode)
  *  \return empty QUrl if we were not redirected, otherwise the redirected URL
  */
 QUrl MythDownloadManager::redirectUrl(const QUrl& possibleRedirectUrl,
-                                      const QUrl& oldRedirectUrl) const
+                                      const QUrl& oldRedirectUrl)
 {
     LOG(VB_FILE, LOG_DEBUG, LOC + QString("redirectUrl()"));
     QUrl redirectUrl;
@@ -1212,7 +1222,7 @@ void MythDownloadManager::downloadFinished(MythDownloadInfo *dlInfo)
         return;
 
     int statusCode = -1;
-    static const char dateFormat[] = "ddd, dd MMM yyyy hh:mm:ss 'GMT'";
+    static const QString kDateFormat = "ddd, dd MMM yyyy hh:mm:ss 'GMT'";
     QNetworkReply *reply = dlInfo->m_reply;
 
     if (reply)
@@ -1224,6 +1234,9 @@ void MythDownloadManager::downloadFinished(MythDownloadInfo *dlInfo)
             possibleRedirectUrl.isValid() &&
             possibleRedirectUrl.isRelative())  // Turn relative Url to absolute
             possibleRedirectUrl = reply->url().resolved(possibleRedirectUrl);
+
+        if (!possibleRedirectUrl.isEmpty() && dlInfo->m_finalUrl != nullptr)
+            *dlInfo->m_finalUrl = QString(possibleRedirectUrl.toString());
 
         dlInfo->m_redirectedTo =
              redirectUrl(possibleRedirectUrl, dlInfo->m_redirectedTo);
@@ -1320,7 +1333,7 @@ void MythDownloadManager::downloadFinished(MythDownloadInfo *dlInfo)
             QNetworkCacheMetaData::RawHeader newheader;
             QDateTime now = MythDate::current();
             newheader = QNetworkCacheMetaData::RawHeader("Date",
-                                        now.toString(dateFormat).toLatin1());
+                                        now.toString(kDateFormat).toLatin1());
             headers.append(newheader);
             urlData.setRawHeaders(headers);
             m_infoLock->lock();
@@ -1378,9 +1391,11 @@ void MythDownloadManager::downloadFinished(MythDownloadInfo *dlInfo)
 
         m_infoLock->lock();
         if (!m_downloadInfos.remove(dlInfo->m_url))
+        {
             LOG(VB_GENERAL, LOG_ERR, LOC +
                 QString("ERROR download finished but failed to remove url: %1")
                         .arg(dlInfo->m_url));
+        }
 
         if (reply)
             m_downloadReplies.remove(reply);
@@ -1424,7 +1439,9 @@ void MythDownloadManager::downloadFinished(MythDownloadInfo *dlInfo)
 void MythDownloadManager::downloadProgress(qint64 bytesReceived,
                                            qint64 bytesTotal)
 {
-    QNetworkReply *reply = (QNetworkReply*)sender();
+    auto *reply = dynamic_cast<QNetworkReply *>(sender());
+    if (reply == nullptr)
+        return;
 
     LOG(VB_FILE, LOG_DEBUG, LOC +
         QString("downloadProgress(%1, %2) (for reply %3)")
@@ -1541,7 +1558,7 @@ QDateTime MythDownloadManager::GetLastModified(const QString &url)
     // the cache object is less than 20 minutes old,
     // then use the cached header otherwise redownload the header
 
-    static const char dateFormat[] = "ddd, dd MMM yyyy hh:mm:ss 'GMT'";
+    static const QString kDateFormat = "ddd, dd MMM yyyy hh:mm:ss 'GMT'";
     LOG(VB_FILE, LOG_DEBUG, LOC + QString("GetLastModified('%1')").arg(url));
     QDateTime result;
 
@@ -1583,7 +1600,7 @@ QDateTime MythDownloadManager::GetLastModified(const QString &url)
             if (!date.isNull())
             {
                 QDateTime loadDate =
-                    MythDate::fromString(date, dateFormat);
+                    MythDate::fromString(date, kDateFormat);
                 loadDate.setTimeSpec(Qt::UTC);
                 if (loadDate.secsTo(now) <= 1200) // 20 Minutes
                 {
@@ -1595,7 +1612,7 @@ QDateTime MythDownloadManager::GetLastModified(const QString &url)
 
     if (!result.isValid())
     {
-        MythDownloadInfo *dlInfo = new MythDownloadInfo;
+        auto *dlInfo = new MythDownloadInfo;
         dlInfo->m_url      = url;
         dlInfo->m_syncMode = true;
         // Head request, we only want to inspect the headers
@@ -1632,7 +1649,7 @@ void MythDownloadManager::loadCookieJar(const QString &filename)
 {
     QMutexLocker locker(&m_cookieLock);
 
-    MythCookieJar *jar = new MythCookieJar;
+    auto *jar = new MythCookieJar;
     jar->load(filename);
     m_manager->setCookieJar(jar);
 }
@@ -1647,7 +1664,9 @@ void MythDownloadManager::saveCookieJar(const QString &filename)
     if (!m_manager->cookieJar())
         return;
 
-    MythCookieJar *jar = static_cast<MythCookieJar *>(m_manager->cookieJar());
+    auto *jar = dynamic_cast<MythCookieJar *>(m_manager->cookieJar());
+    if (jar == nullptr)
+        return;
     jar->save(filename);
 }
 
@@ -1667,8 +1686,10 @@ QNetworkCookieJar *MythDownloadManager::copyCookieJar(void)
     if (!m_manager->cookieJar())
         return nullptr;
 
-    MythCookieJar *inJar = static_cast<MythCookieJar *>(m_manager->cookieJar());
-    MythCookieJar *outJar = new MythCookieJar;
+    auto *inJar = dynamic_cast<MythCookieJar *>(m_manager->cookieJar());
+    if (inJar == nullptr)
+        return nullptr;
+    auto *outJar = new MythCookieJar;
     outJar->copyAllCookies(*inJar);
 
     return static_cast<QNetworkCookieJar *>(outJar);
@@ -1682,8 +1703,11 @@ void MythDownloadManager::refreshCookieJar(QNetworkCookieJar *jar)
     QMutexLocker locker(&m_cookieLock);
     delete m_inCookieJar;
 
-    MythCookieJar *inJar = static_cast<MythCookieJar *>(jar);
-    MythCookieJar *outJar = new MythCookieJar;
+    auto *inJar = dynamic_cast<MythCookieJar *>(jar);
+    if (inJar == nullptr)
+        return;
+
+    auto *outJar = new MythCookieJar;
     outJar->copyAllCookies(*inJar);
     m_inCookieJar = static_cast<QNetworkCookieJar *>(outJar);
 
@@ -1697,10 +1721,13 @@ void MythDownloadManager::updateCookieJar(void)
 {
     QMutexLocker locker(&m_cookieLock);
 
-    MythCookieJar *inJar = static_cast<MythCookieJar *>(m_inCookieJar);
-    MythCookieJar *outJar = new MythCookieJar;
-    outJar->copyAllCookies(*inJar);
-    m_manager->setCookieJar(static_cast<QNetworkCookieJar *>(outJar));
+    auto *inJar = dynamic_cast<MythCookieJar *>(m_inCookieJar);
+    if (inJar != nullptr)
+    {
+        auto *outJar = new MythCookieJar;
+        outJar->copyAllCookies(*inJar);
+        m_manager->setCookieJar(static_cast<QNetworkCookieJar *>(outJar));
+    }
 
     delete m_inCookieJar;
     m_inCookieJar = nullptr;
@@ -1726,11 +1753,9 @@ QString MythDownloadManager::getHeader(const QUrl& url, const QString& header)
 QString MythDownloadManager::getHeader(const QNetworkCacheMetaData &cacheData,
                                        const QString& header)
 {
-    QNetworkCacheMetaData::RawHeaderList headers = cacheData.rawHeaders();
-
-    for (auto it = headers.begin(); it != headers.end(); ++it)
-        if (QString((*it).first) == header)
-            return QString((*it).second);
+    for (const auto& rh : cacheData.rawHeaders())
+        if (QString(rh.first) == header)
+            return QString(rh.second);
     return QString();
 }
 
@@ -1786,11 +1811,8 @@ void MythCookieJar::save(const QString &filename)
     QList<QNetworkCookie> cookieList = allCookies();
     QTextStream stream(&f);
 
-    for (QList<QNetworkCookie>::iterator it = cookieList.begin();
-         it != cookieList.end(); ++it)
-    {
-        stream << (*it).toRawForm() << endl;
-    }
+    for (const auto& cookie : qAsConst(cookieList))
+        stream << cookie.toRawForm() << endl;
 }
 
 

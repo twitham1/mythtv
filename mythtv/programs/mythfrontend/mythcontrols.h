@@ -38,7 +38,7 @@ class MythUIButton;
 class MythUIImage;
 class MythDialogBox;
 
-typedef enum { kActionsByContext, kKeysByContext, kContextsByKey, } ViewType;
+enum ViewType { kActionsByContext, kKeysByContext, kContextsByKey, };
 
 /**
  *  \class MythControls
@@ -58,17 +58,17 @@ class MythControls : public MythScreenType
      */
     MythControls(MythScreenStack *parent, const char *name)
         : MythScreenType (parent, name) {}
-    ~MythControls();
+    ~MythControls() override;
 
     bool Create(void) override; // MythScreenType
-    void customEvent(QEvent*) override; // MythUIType
+    void customEvent(QEvent *event) override; // MythUIType
 
-    typedef enum
+    enum ListType
     {
         kContextList,
         kKeyList,
         kActionList
-    } ListType;
+    };
 
     // Gets
     QString GetCurrentContext(void);
@@ -83,7 +83,7 @@ class MythControls : public MythScreenType
     void    LoadData(const QString &hostname);
     void    ChangeButtonFocus(int direction);
     void    ChangeView(void);
-    void    SetListContents(MythUIButtonList *uilist,
+    static void    SetListContents(MythUIButtonList *uilist,
                             const QStringList & contents,
                             bool arrows = false);
     void    UpdateRightList(void);
@@ -101,10 +101,10 @@ class MythControls : public MythScreenType
     QString GetTypeDesc(ListType type) const;
 
   private slots:
-    void LeftSelected(MythUIButtonListItem*);
-    void RightSelected(MythUIButtonListItem*);
-    void LeftPressed(MythUIButtonListItem*);
-    void RightPressed(MythUIButtonListItem*);
+    void LeftSelected(MythUIButtonListItem *item);
+    void RightSelected(MythUIButtonListItem *item);
+    void LeftPressed(MythUIButtonListItem *item);
+    void RightPressed(MythUIButtonListItem *item);
     void ActionButtonPressed();
     void RefreshKeyInformation(void);
     void AddKeyToAction(const QString& key, bool ignoreconflict = false);

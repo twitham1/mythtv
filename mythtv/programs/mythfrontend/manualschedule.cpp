@@ -62,6 +62,7 @@ bool ManualSchedule::Create(void)
         return false;
     }
 
+    QString startchan = gCoreContext->GetSetting("DefaultTVChannel", "");
     QString chanorder = gCoreContext->GetSetting("ChannelOrdering", "channum");
     ChannelInfoList channels = ChannelUtil::GetChannels(0, true, "channum,callsign");
     ChannelUtil::SortChannels(channels, chanorder);
@@ -70,12 +71,16 @@ bool ManualSchedule::Create(void)
     {
         QString chantext = channels[i].GetFormatted(ChannelInfo::kChannelLong);
 
-        MythUIButtonListItem *item =
-                            new MythUIButtonListItem(m_channelList, chantext);
+        auto *item = new MythUIButtonListItem(m_channelList, chantext);
         InfoMap infomap;
         channels[i].ToMap(infomap);
         item->SetTextFromMap(infomap);
-        m_chanids.push_back(channels[i].m_chanid);
+        if (channels[i].m_chanNum == startchan)
+        {
+            m_channelList->SetItemCurrent(i);
+            startchan = "";
+        }
+        m_chanids.push_back(channels[i].m_chanId);
     }
 
     for (uint index = 0; index <= 60; index++)
@@ -211,12 +216,12 @@ void ManualSchedule::recordClicked(void)
                   m_chanids[m_channelList->GetCurrentPos()],
                   m_startDateTime, endts);
 
-    RecordingRule *record = new RecordingRule();
+    auto *record = new RecordingRule();
     record->LoadByProgram(&p);
     record->m_searchType = kManualSearch;
 
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-    ScheduleEditor *schededit = new ScheduleEditor(mainStack, record);
+    auto *schededit = new ScheduleEditor(mainStack, record);
     if (schededit->Create())
     {
         mainStack->AddScreen(schededit);

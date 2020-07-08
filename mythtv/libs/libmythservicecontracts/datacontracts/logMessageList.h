@@ -24,9 +24,9 @@ class SERVICE_PUBLIC LogMessageList : public QObject
     Q_CLASSINFO( "Applications", "type=DTC::LabelValue");
     Q_CLASSINFO( "LogMessages", "type=DTC::LogMessage");
 
-    Q_PROPERTY( QVariantList HostNames    READ HostNames    DESIGNABLE true )
-    Q_PROPERTY( QVariantList Applications READ Applications DESIGNABLE true )
-    Q_PROPERTY( QVariantList LogMessages  READ LogMessages  DESIGNABLE true )
+    Q_PROPERTY( QVariantList HostNames    READ HostNames    )
+    Q_PROPERTY( QVariantList Applications READ Applications )
+    Q_PROPERTY( QVariantList LogMessages  READ LogMessages  )
 
     PROPERTYIMP_RO_REF( QVariantList, HostNames    )
     PROPERTYIMP_RO_REF( QVariantList, Applications )
@@ -56,7 +56,7 @@ class SERVICE_PUBLIC LogMessageList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            LabelValue *pObject = new LabelValue( this );
+            auto *pObject = new LabelValue( this );
             m_HostNames.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;
@@ -67,7 +67,7 @@ class SERVICE_PUBLIC LogMessageList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            LabelValue *pObject = new LabelValue( this );
+            auto *pObject = new LabelValue( this );
             m_Applications.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;
@@ -78,7 +78,7 @@ class SERVICE_PUBLIC LogMessageList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            LogMessage *pObject = new LogMessage( this );
+            auto *pObject = new LogMessage( this );
             m_LogMessages.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;
@@ -93,6 +93,7 @@ inline void LogMessageList::InitializeCustomTypes()
     qRegisterMetaType< LogMessageList*  >();
 
     LogMessage::InitializeCustomTypes();
+    LabelValue::InitializeCustomTypes();
 }
 
 } // namespace DTC

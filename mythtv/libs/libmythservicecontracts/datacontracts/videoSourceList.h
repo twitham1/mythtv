@@ -27,7 +27,7 @@ class SERVICE_PUBLIC VideoSourceList : public QObject
     Q_PROPERTY( QString      Version        READ Version         WRITE setVersion        )
     Q_PROPERTY( QString      ProtoVer       READ ProtoVer        WRITE setProtoVer       )
 
-    Q_PROPERTY( QVariantList VideoSources READ VideoSources DESIGNABLE true )
+    Q_PROPERTY( QVariantList VideoSources READ VideoSources )
 
     PROPERTYIMP       ( QDateTime   , AsOf            )
     PROPERTYIMP       ( QString     , Version         )
@@ -58,7 +58,7 @@ class SERVICE_PUBLIC VideoSourceList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            VideoSource *pObject = new VideoSource( this );
+            auto *pObject = new VideoSource( this );
             m_VideoSources.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

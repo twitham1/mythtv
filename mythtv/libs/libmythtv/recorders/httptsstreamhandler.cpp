@@ -5,7 +5,7 @@
 #include <chrono> // for milliseconds
 #include <thread> // for sleep_for
 
-#define LOC QString("HTTPTSSH[%1](%2): ").arg(m_inputid).arg(m_device)
+#define LOC QString("HTTPTSSH[%1](%2): ").arg(m_inputId).arg(m_device)
 
 // BUFFER_SIZE is a multiple of TS_SIZE
 #define TS_SIZE     188
@@ -26,7 +26,7 @@ HTTPTSStreamHandler* HTTPTSStreamHandler::Get(const IPTVTuningData& tuning,
 
     if (it == s_httphandlers.end())
     {
-        HTTPTSStreamHandler* newhandler = new HTTPTSStreamHandler(tuning, inputid);
+        auto* newhandler = new HTTPTSStreamHandler(tuning, inputid);
         newhandler->Start();
         s_httphandlers[devkey] = newhandler;
         s_httphandlers_refcnt[devkey] = 1;
@@ -109,7 +109,7 @@ void HTTPTSStreamHandler::run(void)
     SetRunning(true, false, false);
 
     m_reader   = new HTTPReader(this);
-    while (m_running_desired)
+    while (m_runningDesired)
     {
         if (!m_reader->DownloadStream(m_tuning.GetURL(0)))
         {
@@ -211,10 +211,9 @@ void HTTPReader::WriteBytes()
     QMutexLocker bufferlock(&m_bufferlock);
     int remainder = 0;
     {
-        QMutexLocker locker(&m_parent->m_listener_lock);
-        HTTPTSStreamHandler::StreamDataList::const_iterator sit;
-        sit = m_parent->m_stream_data_list.begin();
-        for (; sit != m_parent->m_stream_data_list.end(); ++sit)
+        QMutexLocker locker(&m_parent->m_listenerLock);
+        for (auto sit = m_parent->m_streamDataList.cbegin();
+             sit != m_parent->m_streamDataList.cend(); ++sit)
         {
             remainder = sit.key()->ProcessData(m_buffer, m_size);
         }

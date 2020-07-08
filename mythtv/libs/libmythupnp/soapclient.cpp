@@ -27,10 +27,11 @@
  *  \param sNamespace   The part of the action before the # character
  *  \param sControlPath The path portion of the command URL
  */
-SOAPClient::SOAPClient(const QUrl    &url,
-                       const QString &sNamespace,
-                       const QString &sControlPath) :
-    m_url(url), m_sNamespace(sNamespace), m_sControlPath(sControlPath)
+SOAPClient::SOAPClient(QUrl    url,
+                       QString sNamespace,
+                       QString sControlPath) :
+    m_url(std::move(url)), m_sNamespace(std::move(sNamespace)),
+    m_sControlPath(std::move(sControlPath))
 {
 }
 
@@ -80,7 +81,11 @@ bool SOAPClient::Init(const QUrl    &url,
 QDomNode SOAPClient::FindNode(
     const QString &sName, const QDomNode &baseNode) const
 {
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList parts = sName.split('/', QString::SkipEmptyParts);
+#else
+    QStringList parts = sName.split('/', Qt::SkipEmptyParts);
+#endif
     return FindNodeInternal(parts, baseNode);
 }
 

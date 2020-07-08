@@ -96,11 +96,8 @@ void LyricsView::customEvent(QEvent *event)
 {
     bool handled = false;
 
-    if (event->type() == MusicPlayerEvent::TrackChangeEvent)
-    {
-        findLyrics();
-    }
-    else if (event->type() == MusicPlayerEvent::PlayedTracksChangedEvent)
+    if ((event->type() == MusicPlayerEvent::TrackChangeEvent) ||
+        (event->type() == MusicPlayerEvent::PlayedTracksChangedEvent))
     {
         findLyrics();
     }
@@ -108,7 +105,7 @@ void LyricsView::customEvent(QEvent *event)
     {
         if (m_autoScroll)
         {
-            OutputEvent *oe = dynamic_cast<OutputEvent *>(event);
+            auto *oe = dynamic_cast<OutputEvent *>(event);
             MusicMetadata *curMeta = gPlayer->getCurrentMetadata();
 
             if (!oe || !curMeta)
@@ -127,7 +124,7 @@ void LyricsView::customEvent(QEvent *event)
             for (int x = 0; x < m_lyricsList->GetCount(); x++)
             {
                 MythUIButtonListItem * item = m_lyricsList->GetItemAt(x);
-                LyricsLine *lyric = item->GetData().value<LyricsLine*>();
+                auto *lyric = item->GetData().value<LyricsLine*>();
                 if (lyric)
                 {
                     if (lyric->m_time > 1000 && rs >= lyric->m_time)
@@ -140,10 +137,10 @@ void LyricsView::customEvent(QEvent *event)
     }
     else if (event->type() == DialogCompletionEvent::kEventType)
     {
-        DialogCompletionEvent *dce = static_cast<DialogCompletionEvent*>(event);
+        auto *dce = dynamic_cast<DialogCompletionEvent*>(event);
 
         // make sure the user didn't ESCAPE out of the menu
-        if (dce->GetResult() < 0)
+        if ((dce == nullptr) || (dce->GetResult() < 0))
             return;
 
         QString resultid   = dce->GetId();
@@ -154,11 +151,8 @@ void LyricsView::customEvent(QEvent *event)
             {
                 saveLyrics();
             }
-            else if (resulttext == tr("Edit Lyrics"))
-            {
-                editLyrics();
-            }
-            else if (resulttext == tr("Add Lyrics"))
+            else if ((resulttext == tr("Edit Lyrics")) ||
+                     (resulttext == tr("Add Lyrics")))
             {
                 editLyrics();
             }
@@ -183,7 +177,7 @@ void LyricsView::customEvent(QEvent *event)
     }
     else if (event->type() == DecoderHandlerEvent::OperationStart)
     {
-        DecoderHandlerEvent *dhe = dynamic_cast<DecoderHandlerEvent*>(event);
+        auto *dhe = dynamic_cast<DecoderHandlerEvent*>(event);
         if (!dhe)
             return;
         if (dhe->getMessage() && m_bufferStatus)
@@ -193,11 +187,12 @@ void LyricsView::customEvent(QEvent *event)
     }
     else if (event->type() == DecoderHandlerEvent::BufferStatus)
     {
-        DecoderHandlerEvent *dhe = dynamic_cast<DecoderHandlerEvent*>(event);
+        auto *dhe = dynamic_cast<DecoderHandlerEvent*>(event);
         if (!dhe)
             return;
 
-        int available, maxSize;
+        int available = 0;
+        int maxSize = 0;
         dhe->getBufferStatus(&available, &maxSize);
 
         if (m_bufferStatus)
@@ -226,7 +221,7 @@ void LyricsView::ShowMenu(void)
 {
     QString label = tr("Actions");
 
-    MythMenu *menu = new MythMenu(label, this, "actionmenu");
+    auto *menu = new MythMenu(label, this, "actionmenu");
 
     if (m_lyricData)
     {
@@ -251,7 +246,7 @@ void LyricsView::ShowMenu(void)
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    MythDialogBox *menuPopup = new MythDialogBox(menu, popupStack, "actionmenu");
+    auto *menuPopup = new MythDialogBox(menu, popupStack, "actionmenu");
 
     if (menuPopup->Create())
         popupStack->AddScreen(menuPopup);
@@ -263,14 +258,14 @@ MythMenu* LyricsView::createFindLyricsMenu(void)
 {
     QString label = tr("Find Lyrics");
 
-    MythMenu *menu = new MythMenu(label, this, "findlyricsmenu");
-    menu->AddItem(tr("Search All Grabbers"), qVariantFromValue(QString("ALL")));
+    auto *menu = new MythMenu(label, this, "findlyricsmenu");
+    menu->AddItem(tr("Search All Grabbers"), QVariant::fromValue(QString("ALL")));
 
     QStringList strList("MUSIC_LYRICS_GETGRABBERS");
     if (gCoreContext->SendReceiveStringList(strList))
     {
         for (int x = 1; x < strList.count(); x++)
-            menu->AddItem(tr("Search %1").arg(strList.at(x)), qVariantFromValue(strList.at(x)));
+            menu->AddItem(tr("Search %1").arg(strList.at(x)), QVariant::fromValue(strList.at(x)));
     }
 
     return menu;
@@ -341,7 +336,7 @@ void LyricsView::setLyricTime(void)
         MythUIButtonListItem *item = m_lyricsList->GetItemCurrent();
         if (item)
         {
-            LyricsLine *lyric = item->GetData().value<LyricsLine*>();
+            auto *lyric = item->GetData().value<LyricsLine*>();
             if (lyric)
             {
                 lyric->m_time = gPlayer->getOutput()->GetAudiotime() - 750;
@@ -458,7 +453,7 @@ void LyricsView::showLyrics(void)
     {
         LyricsLine *line = (*i);
         if (line)
-            new MythUIButtonListItem(m_lyricsList, line->m_lyric, qVariantFromValue(line));
+            new MythUIButtonListItem(m_lyricsList, line->m_lyric, QVariant::fromValue(line));
         ++i;
     }
 
@@ -475,7 +470,7 @@ void LyricsView::editLyrics(void)
 {
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    EditLyricsDialog *editDialog = new EditLyricsDialog(mainStack, m_lyricData);
+    auto *editDialog = new EditLyricsDialog(mainStack, m_lyricData);
 
     if (!editDialog->Create())
     {

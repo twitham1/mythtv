@@ -38,7 +38,7 @@ HEADERS += audio/audiooutputgraph.h
 HEADERS += backendselect.h dbsettings.h
 HEADERS += langsettings.h
 HEADERS +=
-HEADERS += mythcontext.h
+HEADERS += mythaverror.h mythcontext.h
 HEADERS += mythexp.h mythmediamonitor.h
 HEADERS += schemawizard.h
 HEADERS += output.h
@@ -59,13 +59,13 @@ SOURCES += audio/spdifencoder.cpp audio/audiooutputdigitalencoder.cpp
 SOURCES += audio/audiooutputnull.cpp
 SOURCES += audio/audiooutpututil.cpp audio/audiooutputdownmix.cpp
 SOURCES += audio/audioconvert.cpp
-SOURCES += audio/audiosettings.cpp audio/audiooutputsettings.cpp audio/pink.c
+SOURCES += audio/audiosettings.cpp audio/audiooutputsettings.cpp audio/pink.cpp
 SOURCES += audio/volumebase.cpp audio/eldutils.cpp
 SOURCES += audio/audiooutputgraph.cpp
 SOURCES += backendselect.cpp dbsettings.cpp
 SOURCES += langsettings.cpp
 SOURCES +=
-SOURCES += mythcontext.cpp
+SOURCES += mythaverror.cpp mythcontext.cpp
 SOURCES += mythmediamonitor.cpp
 SOURCES += schemawizard.cpp
 SOURCES += output.cpp
@@ -134,7 +134,7 @@ inc.files += audio/audiooutputsettings.h audio/audiooutpututil.h
 inc.files += audio/audioconvert.h
 inc.files += audio/volumebase.h audio/eldutils.h
 inc.files += inetcomms.h schemawizard.h
-inc.files += mythmediamonitor.h
+inc.files += mythaverror.h mythmediamonitor.h
 inc.files += visual.h output.h langsettings.h
 inc.files += mythexp.h storagegroupeditor.h
 inc.files += mythterminal.h       remoteutil.h
@@ -237,26 +237,6 @@ using_jack {
     DEFINES += USING_JACK
     HEADERS += audio/audiooutputjack.h
     SOURCES += audio/audiooutputjack.cpp
-}
-
-using_openmax {
-    DEFINES += USING_OPENMAX
-    HEADERS += omxcontext.h
-    SOURCES += omxcontext.cpp
-    HEADERS += audio/audiooutput_omx.h
-    SOURCES += audio/audiooutput_omx.cpp
-    contains( HAVE_OPENMAX_BROADCOM, yes ) {
-        DEFINES += OMX_SKIP64BIT USING_BROADCOM
-        # Raspbian
-        QMAKE_CXXFLAGS += -isystem /opt/vc/include -isystem /opt/vc/include/IL -isystem /opt/vc/include/interface/vcos/pthreads -isystem /opt/vc/include/interface/vmcs_host/linux
-        # Ubuntu
-        QMAKE_CXXFLAGS += -isystem /usr/include/IL -isystem /usr/include/interface/vcos/pthreads -isystem /usr/include/interface/vmcs_host/linux
-        LIBS += -L/opt/vc/lib -lopenmaxil
-    }
-    contains( HAVE_OPENMAX_BELLAGIO, yes ) {
-        DEFINES += USING_BELLAGIO
-        #LIBS += -lomxil-bellagio
-    }
 }
 
 contains( HAVE_MMX, yes ) {

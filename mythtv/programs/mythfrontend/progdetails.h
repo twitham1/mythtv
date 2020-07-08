@@ -17,14 +17,14 @@ class ProgDetails : public MythScreenType
      ProgDetails(MythScreenStack *parent, const ProgramInfo *progInfo)
          : MythScreenType (parent, "progdetails"),
            m_progInfo(*progInfo), m_infoList(*this) {}
-    ~ProgDetails();
+    ~ProgDetails() override;
 
     bool Create(void) override; // MythScreenType
     void Init(void) override; // MythScreenType
     bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
   private:
-    QString getRatings(bool recorded, uint chanid, const QDateTime& startts);
+    static QString getRatings(bool recorded, uint chanid, const QDateTime& startts);
     void updatePage(void);
     void addItem(const QString &title, const QString &value,
                  ProgInfoList::VisibleLevel level);

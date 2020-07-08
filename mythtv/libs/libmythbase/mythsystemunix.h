@@ -1,7 +1,7 @@
 /// -*- Mode: c++ -*-
 
-#ifndef _MYTHSYSTEM_UNIX_H_
-#define _MYTHSYSTEM_UNIX_H_
+#ifndef MYTHSYSTEM_UNIX_H
+#define MYTHSYSTEM_UNIX_H
 
 #include <csignal>
 #include <sys/select.h>
@@ -23,15 +23,17 @@
 
 class MythSystemLegacyUnix;
 
-typedef QMap<pid_t, QPointer<MythSystemLegacyUnix> > MSMap_t;
-typedef QMap<int, QBuffer *> PMap_t;
-typedef QList<QPointer<MythSystemLegacyUnix> > MSList_t;
+using MSMap_t  = QMap<pid_t, QPointer<MythSystemLegacyUnix> >;
+using PMap_t   = QMap<int, QBuffer *>;
+using MSList_t = QList<QPointer<MythSystemLegacyUnix> >;
 
 class MythSystemLegacyIOHandler: public MThread
 {
     public:
-        explicit MythSystemLegacyIOHandler(bool read);
-        ~MythSystemLegacyIOHandler() { wait(); }
+        explicit MythSystemLegacyIOHandler(bool read)
+            : MThread(QString("SystemIOHandler%1").arg(read ? "R" : "W")),
+              m_read(read) {};
+        ~MythSystemLegacyIOHandler() override { wait(); }
         void   run(void) override; // MThread
 
         void   insert(int fd, QBuffer *buff);
@@ -49,10 +51,10 @@ class MythSystemLegacyIOHandler: public MThread
         QMutex          m_pLock;
         PMap_t          m_pMap;
 
-        fd_set m_fds;
+        fd_set m_fds   {};
         int    m_maxfd {-1};
-        bool   m_read;
-        char   m_readbuf[65536];
+        bool   m_read  {true};
+        char   m_readbuf[65536] {0};
 };
 
 // spawn separate thread for signals to prevent manager
@@ -62,9 +64,9 @@ class MythSystemLegacyManager : public MThread
     public:
         MythSystemLegacyManager()
             : MThread("SystemManager") {}
-        ~MythSystemLegacyManager() { wait(); }
+        ~MythSystemLegacyManager() override { wait(); }
         void run(void) override; // MThread
-        void append(MythSystemLegacyUnix *);
+        void append(MythSystemLegacyUnix *ms);
         void jumpAbort(void);
     private:
         MSMap_t    m_pMap;
@@ -79,7 +81,7 @@ class MythSystemLegacySignalManager : public MThread
     public:
         MythSystemLegacySignalManager()
             : MThread("SystemSignalManager") {}
-        ~MythSystemLegacySignalManager() { wait(); }
+        ~MythSystemLegacySignalManager() override { wait(); }
         void run(void) override; // MThread
     private:
 };
@@ -91,7 +93,7 @@ class MBASE_PUBLIC MythSystemLegacyUnix : public MythSystemLegacyPrivate
 
     public:
         explicit MythSystemLegacyUnix(MythSystemLegacy *parent);
-        ~MythSystemLegacyUnix() = default;
+        ~MythSystemLegacyUnix() override = default;
 
         void Fork(time_t timeout) override; // MythSystemLegacyPrivate
         void Manage(void) override; // MythSystemLegacyPrivate
@@ -111,10 +113,10 @@ class MBASE_PUBLIC MythSystemLegacyUnix : public MythSystemLegacyPrivate
         pid_t       m_pid     {0};
         time_t      m_timeout {0};
 
-        int         m_stdpipe[3];
+        int         m_stdpipe[3] {-1,-1, -1};
 };
 
-#endif // _MYTHSYSTEM_UNIX_H_
+#endif // MYTHSYSTEM_UNIX_H
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __JSONSERIALIZER_H__
-#define __JSONSERIALIZER_H__
+#ifndef JSONSERIALIZER_H
+#define JSONSERIALIZER_H
 
 #include <QTextStream>
 #include <QStringList>
@@ -54,7 +54,7 @@ class UPNP_PUBLIC JSONSerializer : public Serializer
         void RenderList      ( const QVariantList &list );
         void RenderMap       ( const QVariantMap  &map  );
 
-        QString Encode       ( const QString &sIn );
+        static QString Encode       ( const QString &sIn );
 
     public:
 
@@ -66,4 +66,4 @@ class UPNP_PUBLIC JSONSerializer : public Serializer
 
 };
 
-#endif
+#endif // JSONSERIALIZER_H

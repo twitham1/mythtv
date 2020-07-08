@@ -87,10 +87,8 @@ namespace
         QStringList ret;
 
         QList<QByteArray> exts = QImageReader::supportedImageFormats();
-        for (QList<QByteArray>::iterator p = exts.begin(); p != exts.end(); ++p)
-        {
-            ret.append(QString("*.").append(*p));
-        }
+        for (const auto & ext : qAsConst(exts))
+            ret.append(QString("*.").append(ext));
 
         return ret;
     }
@@ -103,7 +101,7 @@ namespace
         MythScreenStack *popupStack =
                 GetMythMainWindow()->GetStack("popup stack");
 
-        MythUIFileBrowser *fb = new MythUIFileBrowser(popupStack, fp);
+        auto *fb = new MythUIFileBrowser(popupStack, fp);
         fb->SetNameFilter(GetSupportedImageExtensionFilter());
         if (fb->Create())
         {
@@ -121,9 +119,8 @@ namespace
 
 void EditRomInfoDialog::customEvent(QEvent *event)
 {
-    if (event->type() == DialogCompletionEvent::kEventType)
+    if (auto *dce = dynamic_cast<DialogCompletionEvent*>(event))
     {
-        DialogCompletionEvent *dce = (DialogCompletionEvent*)(event);
         const QString resultid = dce->GetId();
 
         if (resultid == CEID_FANARTFILE)
@@ -163,10 +160,9 @@ void EditRomInfoDialog::SaveAndExit()
 {
     if (m_retObject)
     {
-        RomInfo *romInfo = new RomInfo(*m_workingRomInfo);
-        DialogCompletionEvent *dce =
-            new DialogCompletionEvent(m_id, 0, "",
-                                      qVariantFromValue(romInfo));
+        auto *romInfo = new RomInfo(*m_workingRomInfo);
+        auto *dce = new DialogCompletionEvent(m_id, 0, "",
+                                              QVariant::fromValue(romInfo));
 
         QApplication::postEvent(m_retObject, dce);
     }

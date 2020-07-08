@@ -1,5 +1,5 @@
-#ifndef _MUSICFILESCANNER_H_
-#define _MUSICFILESCANNER_H_
+#ifndef MUSICFILESCANNER_H
+#define MUSICFILESCANNER_H
 
 // MythTV
 #include "mythmetaexp.h"
@@ -7,7 +7,7 @@
 // Qt headers
 #include <QCoreApplication>
 
-typedef QMap<QString, int> IdCache;
+using IdCache = QMap<QString, int>;
 
 class META_PUBLIC MusicFileScanner
 {
@@ -24,12 +24,12 @@ class META_PUBLIC MusicFileScanner
     struct MusicFileData
     {
         QString startDir;
-        MusicFileLocation location;
+        MusicFileLocation location {kFileSystem};
     };
 
-    typedef QMap <QString, MusicFileData> MusicLoadedMap;
+    using MusicLoadedMap = QMap <QString, MusicFileData>;
     public:
-        MusicFileScanner(void);
+        MusicFileScanner(bool force = false);
         ~MusicFileScanner(void) = default;
 
         void SearchDirs(const QStringList &dirList);
@@ -38,20 +38,20 @@ class META_PUBLIC MusicFileScanner
 
     private:
         void BuildFileList(QString &directory, MusicLoadedMap &music_files, MusicLoadedMap &art_files, int parentid);
-        int  GetDirectoryId(const QString &directory, const int &parentid);
-        bool HasFileChanged(const QString &filename, const QString &date_modified);
+        static int  GetDirectoryId(const QString &directory, const int &parentid);
+        static bool HasFileChanged(const QString &filename, const QString &date_modified);
         void AddFileToDB(const QString &filename, const QString &startDir);
         void RemoveFileFromDB (const QString &filename, const QString &startDir);
         void UpdateFileInDB(const QString &filename, const QString &startDir);
         void ScanMusic(MusicLoadedMap &music_files);
         void ScanArtwork(MusicLoadedMap &music_files);
-        void cleanDB();
-        bool IsArtFile(const QString &filename);
-        bool IsMusicFile(const QString &filename);
+        static void cleanDB();
+        static bool IsArtFile(const QString &filename);
+        static bool IsMusicFile(const QString &filename);
 
-        void updateLastRunEnd(void);
-        void updateLastRunStart(void);
-        void updateLastRunStatus(QString &status);
+        static void updateLastRunEnd(void);
+        static void updateLastRunStart(void);
+        static void updateLastRunStatus(QString &status);
 
         QStringList  m_startDirs;
         IdCache  m_directoryid;
@@ -69,6 +69,8 @@ class META_PUBLIC MusicFileScanner
         uint m_coverartAdded     {0};
         uint m_coverartRemoved   {0};
         uint m_coverartUpdated   {0};
+
+        bool m_forceupdate       {false};
 };
 
-#endif // _MUSICFILESCANNER_H_
+#endif // MUSICFILESCANNER_H

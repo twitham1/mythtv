@@ -3,6 +3,7 @@
 
 // C/C++
 #include <cstdint>
+#include <utility>
 
 // qt
 #include <QObject>
@@ -11,6 +12,7 @@
 #include "mythmetaexp.h"
 #include "mythcorecontext.h"
 #include "musicmetadata.h"
+#include "mythmiscutil.h"
 
 class LyricsData;
 
@@ -18,8 +20,8 @@ class META_PUBLIC LyricsLine
 {
   public:
     LyricsLine() = default;
-    LyricsLine(int time, const QString &lyric) :
-        m_time(time), m_lyric(lyric) { }
+    LyricsLine(int time, QString lyric) :
+        m_time(time), m_lyric(std::move(lyric)) { }
 
     int     m_time {0};
     QString m_lyric;
@@ -33,15 +35,11 @@ class META_PUBLIC LyricsLine
     }
 
   private:
-    QString formatTime(void)
+    QString formatTime(void) const
     {
-        QString res;
-        int minutes = m_time / (1000 * 60);
-        int seconds = m_time  % (1000 * 60) / 1000;
-        int hundredths = (m_time % 1000) / 10;
-
-        res.sprintf("[%02d:%02d.%02d]", minutes, seconds, hundredths);
-        return res;
+        QString timestr = MythFormatTimeMs(m_time,"mm:ss.zzz");
+        timestr.chop(1); // Chop 1 to return hundredths
+        return QString("[%1]").arg(timestr);
     }
 };
 
@@ -53,11 +51,12 @@ class META_PUBLIC LyricsData : public QObject
     LyricsData();
     explicit LyricsData(MusicMetadata *parent)
         : m_parent(parent) {}
-    LyricsData(MusicMetadata *parent, const QString &grabber, const QString &artist,
-               const QString &album, const QString &title, bool syncronized)
-        : m_parent(parent), m_grabber(grabber), m_artist(artist),
-          m_album(album), m_title(title), m_syncronized(syncronized) {}
-    ~LyricsData();
+    LyricsData(MusicMetadata *parent, QString grabber, QString artist,
+               QString album, QString title, bool syncronized)
+        : m_parent(parent), m_grabber(std::move(grabber)),
+          m_artist(std::move(artist)), m_album(std::move(album)),
+          m_title(std::move(title)), m_syncronized(syncronized) {}
+    ~LyricsData() override;
 
     QString grabber(void) { return m_grabber; }
     void setGrabber(const QString &grabber) { m_grabber = grabber; }
@@ -74,10 +73,10 @@ class META_PUBLIC LyricsData : public QObject
     QMap<int, LyricsLine*>* lyrics(void) { return &m_lyricsMap; }
     void setLyrics(const QStringList &lyrics);
 
-    bool syncronized(void) { return m_syncronized; }
+    bool syncronized(void) const { return m_syncronized; }
     void setSyncronized(bool syncronized ) { m_syncronized = syncronized; }
 
-    bool changed(void) { return m_changed; }
+    bool changed(void) const { return m_changed; }
     void setChanged(bool changed) { m_changed = changed; }
 
     enum Status

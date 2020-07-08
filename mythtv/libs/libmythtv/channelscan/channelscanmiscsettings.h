@@ -27,8 +27,8 @@
  *
  */
 
-#ifndef _MISC_SETTINGS_H_
-#define _MISC_SETTINGS_H_
+#ifndef CHANNEL_SCAN_MISC_SETTINGS_H
+#define CHANNEL_SCAN_MISC_SETTINGS_H
 
 #include "standardsettings.h"
 #include "channelscantypes.h"
@@ -111,12 +111,12 @@ class FreeToAirOnly : public TransMythUICheckBoxSetting
   public:
     FreeToAirOnly()
     {
-        setValue(true);
         setLabel(QObject::tr("Unencrypted Only"));
         setHelpText(
             QObject::tr(
                 "If set, only non-encrypted channels will be "
                 "added during the scan."));
+        setValue(true);
     };
 };
 
@@ -125,7 +125,6 @@ class ChannelNumbersOnly : public TransMythUICheckBoxSetting
   public:
     ChannelNumbersOnly()
     {
-        setValue(false);
         setLabel(QObject::tr("Logical Channel Numbers required"));
         setHelpText(
             QObject::tr(
@@ -133,6 +132,7 @@ class ChannelNumbersOnly : public TransMythUICheckBoxSetting
                 "be added during the scan. This will filter out services "
                 "for set-top-box firmware download and video-on-demand "
                 "that can be present on DVB-C networks."));
+        setValue(false);
     };
 };
 
@@ -141,16 +141,49 @@ class CompleteChannelsOnly : public TransMythUICheckBoxSetting
   public:
     CompleteChannelsOnly()
     {
-        setValue(false);
         setLabel(QObject::tr("Complete scan data required"));
         setHelpText(
             QObject::tr(
                 "If set, only services that are present in the PAT, the PMT "
                 "and the SDT and that have a name will be added during the scan. "
-                "On satellites there are typically many incomplete "
-                "channels, such as feeds and offline channels, "
-                "that are not useful in a typical MythTV system. "
+                "On satellites there are many incomplete channels, "
+                "such as feeds and offline channels, "
+                "that are not useful in a MythTV system. "
                 "These are filtered out by this option."));
+        setValue(true);
+    };
+};
+
+class FullChannelSearch : public TransMythUICheckBoxSetting
+{
+  public:
+    FullChannelSearch()
+    {
+        setLabel(QObject::tr("Full search for old channels"));
+        setHelpText(
+            QObject::tr(
+                "If set, compare all channels in the database with the channels found in "
+                "the scan; otherwise only the channels in the same transport are compared. "
+                "This option is useful when you want to keep channel data such as "
+                "the xmltvid and the icon path when doing a rescan "
+                "after channels have been rearranged across transports."));
+        setValue(true);
+    };
+};
+
+class RemoveDuplicates : public TransMythUICheckBoxSetting
+{
+  public:
+    RemoveDuplicates()
+    {
+        setLabel(QObject::tr("Remove duplicates"));
+        setHelpText(
+            QObject::tr(
+                "If set, select the transport stream multiplex with the best signal "
+                "when identical transports are received on different frequencies. "
+                "This option is useful for DVB-T2 and ATSC/OTA when a transport "
+                "can sometimes be received from different transmitters."));
+        setValue(true);
     };
 };
 
@@ -159,12 +192,12 @@ class AddFullTS : public TransMythUICheckBoxSetting
   public:
     AddFullTS()
     {
-        setValue(false);
         setLabel(QObject::tr("Add full Transport Stream channels"));
         setHelpText(
             QObject::tr(
-                "If set, Create MPTS channels, which allow "
+                "If set, create MPTS channels, which allow "
                 "recording of the full, unaltered, transport stream."));
+        setValue(false);
     };
 };
 
@@ -180,6 +213,7 @@ class TrustEncSISetting : public TransMythUICheckBoxSetting
                         "flag is set spuriously. Attention: Enabling this "
                         "option increases the scan time for each encrypted "
                         "channel by a couple of seconds."));
+        setValue(false);
     }
 };
 
@@ -190,7 +224,7 @@ class ScanFrequencykHz: public TransTextEditSetting
     {
         setLabel(QObject::tr("Frequency"));
         setHelpText(QObject::tr("Frequency (Option has no default)\n"
-                                "The frequency for this channel in kHz."));
+                                "The frequency for this transport (multiplex) in kHz."));
     };
 };
 
@@ -201,21 +235,21 @@ class ScanFrequency: public TransTextEditSetting
     {
         setLabel(QObject::tr("Frequency"));
         setHelpText(QObject::tr("Frequency (Option has no default)\n"
-                                "The frequency for this channel in Hz."));
+                                "The frequency for this transport (multiplex) in Hz."));
     };
 };
 
-class ScanSymbolRateDVBS: public TransMythUIComboBoxSetting
+class ScanDVBSSymbolRate: public TransMythUIComboBoxSetting
 {
   public:
-    ScanSymbolRateDVBS() : TransMythUIComboBoxSetting(true)
+    ScanDVBSSymbolRate() : TransMythUIComboBoxSetting(true)
     {
         setLabel(QObject::tr("Symbol Rate"));
         setHelpText(
              QObject::tr(
                 "Symbol Rate (symbols/second).\n"
-                "Most DVB-S transponders transmit at 27.5 "
-                "million symbols per second."));
+                "Most DVB-S transponders transmit at 27500000 "
+                "symbols per second."));
         addSelection("3333000");
         addSelection("22000000");
         addSelection("22500000");
@@ -229,17 +263,17 @@ class ScanSymbolRateDVBS: public TransMythUIComboBoxSetting
     }
 };
 
-class ScanSymbolRateDVBC: public TransMythUIComboBoxSetting
+class ScanDVBCSymbolRate: public TransMythUIComboBoxSetting
 {
   public:
-    ScanSymbolRateDVBC() : TransMythUIComboBoxSetting(true)
+    ScanDVBCSymbolRate() : TransMythUIComboBoxSetting(true)
     {
         setLabel(QObject::tr("Symbol Rate"));
         setHelpText(
              QObject::tr(
                 "Symbol Rate (symbols/second).\n"
-                "Most DVB-C transports transmit at 6.9 or 6.875 "
-                "million symbols per second."));
+                "Most DVB-C transports transmit at 6900000 or 6875000 "
+                "symbols per second."));
         addSelection("3450000");
         addSelection("5000000");
         addSelection("5900000");
@@ -387,15 +421,15 @@ class ScanHierarchy: public TransMythUIComboBoxSetting
     };
 };
 
-class ScanModSys: public TransMythUIComboBoxSetting
+class ScanDVBSModSys: public TransMythUIComboBoxSetting
 {
     public:
-    ScanModSys()
+    ScanDVBSModSys()
     {
-        setLabel(QObject::tr("Mod Sys"));
-        setHelpText(QObject::tr("Modulation system (Default: DVB-S)"));
-        addSelection("DVB-S");
-        addSelection("DVB-S2");
+        setLabel(QObject::tr("Modulation System"));
+        setHelpText(QObject::tr("Modulation system (Default: DVB-S2)"));
+        addSelection("DVB-S",  "DVB-S");
+        addSelection("DVB-S2", "DVB-S2", true);
     };
 };
 
@@ -404,11 +438,24 @@ class ScanDVBTModSys: public TransMythUIComboBoxSetting
     public:
     ScanDVBTModSys()
     {
-        setLabel(QObject::tr("Mod Sys"));
-        setHelpText(QObject::tr("Modulation system (Default: DVB-T)"));
-        addSelection("DVB-T");
-        addSelection("DVB-T2");
+        setLabel(QObject::tr("Modulation System"));
+        setHelpText(QObject::tr("Modulation system (Default: DVB-T2)"));
+        addSelection("DVB-T",  "DVB-T");
+        addSelection("DVB-T2", "DVB-T2", true);
     };
+};
+
+class ScanDVBCModSys : public  TransMythUIComboBoxSetting
+{
+  public:
+    ScanDVBCModSys()
+    {
+        setLabel(QObject::tr("Modulation System"));
+        setHelpText(QObject::tr("Modulation System (Default: DVB-C/A)"));
+        addSelection("DVB-C/A", "DVB-C/A", true);
+        addSelection("DVB-C/B", "DVB-C/B");
+        addSelection("DVB-C/C", "DVB-C/C");
+    }
 };
 
 class ScanRollOff: public TransMythUIComboBoxSetting
@@ -430,10 +477,10 @@ class PaneError : public GroupSetting
   public:
     explicit PaneError(const QString &error)
     {
-        TransTextEditSetting* label = new TransTextEditSetting();
+        auto* label = new TransTextEditSetting();
         label->setValue(error);
         addChild(label);
     }
 };
 
-#endif // _MISC_SETTINGS_H_
+#endif // CHANNEL_SCAN_MISC_SETTINGS_H

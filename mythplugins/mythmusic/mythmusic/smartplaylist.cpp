@@ -32,12 +32,12 @@ using namespace std;
 
 struct SmartPLField
 {
-    QString name;
-    QString sqlName;
-    SmartPLFieldType type;
-    int     minValue;
-    int     maxValue;
-    int     defaultValue;
+    QString          m_name;
+    QString          m_sqlName;
+    SmartPLFieldType m_type;
+    int              m_minValue;
+    int              m_maxValue;
+    int              m_defaultValue;
 };
 
 static SmartPLField SmartPLFields[] =
@@ -61,10 +61,10 @@ static SmartPLField SmartPLFields[] =
 
 struct SmartPLOperator
 {
-    QString name;
-    int     noOfArguments;
-    bool    stringOnly;
-    bool    validForBoolean;
+    QString m_name;
+    int     m_noOfArguments;
+    bool    m_stringOnly;
+    bool    m_validForBoolean;
 };
 
 static SmartPLOperator SmartPLOperators[] =
@@ -89,7 +89,7 @@ static SmartPLOperator *lookupOperator(const QString& name)
 {
     for (int x = 0; x < SmartPLOperatorsCount; x++)
     {
-        if (SmartPLOperators[x].name == name)
+        if (SmartPLOperators[x].m_name == name)
             return &SmartPLOperators[x];
     }
     return nullptr;
@@ -99,7 +99,7 @@ static SmartPLField *lookupField(const QString& name)
 {
     for (int x = 0; x < SmartPLFieldsCount; x++)
     {
-        if (SmartPLFields[x].name == name)
+        if (SmartPLFields[x].m_name == name)
             return &SmartPLFields[x];
     }
     return nullptr;
@@ -146,7 +146,7 @@ static QString evaluateDateValue(QString sDate)
     return sDate;
 }
 
-QString getCriteriaSQL(const QString& fieldName, QString operatorName,
+QString getCriteriaSQL(const QString& fieldName, const QString &operatorName,
                        QString value1, QString value2)
 {
     QString result;
@@ -154,77 +154,75 @@ QString getCriteriaSQL(const QString& fieldName, QString operatorName,
     if (fieldName.isEmpty())
         return result;
 
-    SmartPLField *Field;
-    Field = lookupField(fieldName);
+    SmartPLField *Field = lookupField(fieldName);
     if (!Field)
     {
         return "";
     }
 
-    result = Field->sqlName;
+    result = Field->m_sqlName;
 
-    SmartPLOperator *Operator;
-    Operator = lookupOperator(std::move(operatorName));
+    SmartPLOperator *Operator = lookupOperator(operatorName);
     if (!Operator)
     {
         return QString();
     }
 
     // convert boolean and date values
-    if (Field->type == ftBoolean)
+    if (Field->m_type == ftBoolean)
     {
         // compilation field uses 0 = false;  1 = true
         value1 = (value1 == "Yes") ? "1":"0";
         value2 = (value2 == "Yes") ? "1":"0";
     }
-    else if (Field->type == ftDate)
+    else if (Field->m_type == ftDate)
     {
         value1 = evaluateDateValue(value1);
         value2 = evaluateDateValue(value2);
     }
 
-    if (Operator->name == "is equal to")
+    if (Operator->m_name == "is equal to")
     {
         result = result + " = " + formattedFieldValue(value1);
     }
-    else if (Operator->name == "is not equal to")
+    else if (Operator->m_name == "is not equal to")
     {
         result = result + " != " + formattedFieldValue(value1);
     }
-    else if (Operator->name == "is greater than")
+    else if (Operator->m_name == "is greater than")
     {
         result = result + " > " + formattedFieldValue(value1);
     }
-    else if (Operator->name == "is less than")
+    else if (Operator->m_name == "is less than")
     {
         result = result + " < " + formattedFieldValue(value1);
     }
-    else if (Operator->name == "starts with")
+    else if (Operator->m_name == "starts with")
     {
         result = result + " LIKE " + formattedFieldValue(value1 + QString("%"));
     }
-    else if (Operator->name == "ends with")
+    else if (Operator->m_name == "ends with")
     {
         result = result + " LIKE " + formattedFieldValue(QString("%") + value1);
     }
-    else if (Operator->name == "contains")
+    else if (Operator->m_name == "contains")
     {
         result = result + " LIKE " + formattedFieldValue(QString("%") + value1 + "%");
     }
-    else if (Operator->name == "does not contain")
+    else if (Operator->m_name == "does not contain")
     {
         result = result + " NOT LIKE " + formattedFieldValue(QString("%") + value1 + "%");
     }
-    else if (Operator->name == "is between")
+    else if (Operator->m_name == "is between")
     {
         result = result + " BETWEEN " + formattedFieldValue(value1) +
                           " AND " + formattedFieldValue(value2);
     }
-    else if (Operator->name == "is set")
+    else if (Operator->m_name == "is set")
     {
         result = result + " IS NOT NULL";
     }
-    else if (Operator->name == "is not set")
+    else if (Operator->m_name == "is not set")
     {
         result = result + " IS NULL";
     }
@@ -233,7 +231,7 @@ QString getCriteriaSQL(const QString& fieldName, QString operatorName,
         result.clear();
         LOG(VB_GENERAL, LOG_ERR,
             QString("getCriteriaSQL(): invalid operator '%1'")
-                .arg(Operator->name));
+                .arg(Operator->m_name));
     }
 
     return result;
@@ -245,14 +243,15 @@ QString getOrderBySQL(const QString& orderByFields)
         return QString();
 
     QStringList list = orderByFields.split(",");
-    QString fieldName, result, order;
+    QString fieldName;
+    QString result;
+    QString order;
     bool bFirst = true;
 
     for (int x = 0; x < list.count(); x++)
     {
         fieldName = list[x].trimmed();
-        SmartPLField *Field;
-        Field = lookupField(fieldName.left(fieldName.length() - 4));
+        SmartPLField *Field = lookupField(fieldName.left(fieldName.length() - 4));
         if (Field)
         {
             if (fieldName.right(3) == "(D)")
@@ -263,33 +262,32 @@ QString getOrderBySQL(const QString& orderByFields)
            if (bFirst)
            {
                bFirst = false;
-               result = " ORDER BY " + Field->sqlName + order;
+               result = " ORDER BY " + Field->m_sqlName + order;
            }
            else
-               result += ", " + Field->sqlName + order;
+               result += ", " + Field->m_sqlName + order;
         }
     }
 
     return result;
 }
 
-QString getSQLFieldName(QString fieldName)
+QString getSQLFieldName(const QString &fieldName)
 {
-    SmartPLField *Field;
-    Field = lookupField(std::move(fieldName));
+    SmartPLField *Field = lookupField(fieldName);
     if (!Field)
     {
         return "";
     }
 
-    return Field->sqlName;
+    return Field->m_sqlName;
 }
 
 /*
 ///////////////////////////////////////////////////////////////////////
 */
 
-QString SmartPLCriteriaRow::getSQL(void)
+QString SmartPLCriteriaRow::getSQL(void) const
 {
     if (m_field.isEmpty())
         return QString();
@@ -302,7 +300,7 @@ QString SmartPLCriteriaRow::getSQL(void)
 }
 
 // return false on error
-bool SmartPLCriteriaRow::saveToDatabase(int smartPlaylistID)
+bool SmartPLCriteriaRow::saveToDatabase(int smartPlaylistID) const
 {
     // save playlistitem to database
 
@@ -328,15 +326,15 @@ bool SmartPLCriteriaRow::saveToDatabase(int smartPlaylistID)
     return true;
 }
 
-QString SmartPLCriteriaRow::toString(void)
+QString SmartPLCriteriaRow::toString(void) const
 {
     SmartPLOperator *PLOperator = lookupOperator(m_operator);
     if (PLOperator)
     {
         QString result;
-        if (PLOperator->noOfArguments == 0)
+        if (PLOperator->m_noOfArguments == 0)
             result = m_field + " " + m_operator;
-        else if (PLOperator->noOfArguments == 1)
+        else if (PLOperator->m_noOfArguments == 1)
             result = m_field + " " + m_operator + " " + m_value1;
         else
         {
@@ -401,10 +399,10 @@ bool SmartPlaylistEditor::Create(void)
 
     for (int x = 0; x < SmartPLFieldsCount; x++)
     {
-        if (SmartPLFields[x].name == "")
-            new MythUIButtonListItem(m_orderBySelector, SmartPLFields[x].name);
+        if (SmartPLFields[x].m_name == "")
+            new MythUIButtonListItem(m_orderBySelector, SmartPLFields[x].m_name);
         else
-            new MythUIButtonListItem(m_orderBySelector, SmartPLFields[x].name + " (A)");
+            new MythUIButtonListItem(m_orderBySelector, SmartPLFields[x].m_name + " (A)");
     }
 
     m_limitSpin->SetRange(0, 9999, 10);
@@ -458,10 +456,8 @@ bool SmartPlaylistEditor::keyPressEvent(QKeyEvent *event)
 
 void SmartPlaylistEditor::customEvent(QEvent *event)
 {
-    if (event->type() == DialogCompletionEvent::kEventType)
+    if (auto *dce = dynamic_cast<DialogCompletionEvent*>(event))
     {
-        DialogCompletionEvent *dce = (DialogCompletionEvent*)(event);
-
         // make sure the user didn't ESCAPE out of the menu
         if (dce->GetResult() < 0)
             return;
@@ -475,7 +471,7 @@ void SmartPlaylistEditor::customEvent(QEvent *event)
                 MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
                 QString label = tr("Enter Name Of New Category");
 
-                MythTextInputDialog *input = new MythTextInputDialog(popupStack, label);
+                auto *input = new MythTextInputDialog(popupStack, label);
 
                 connect(input, SIGNAL(haveResult(QString)),
                         SLOT(newCategory(QString)));
@@ -492,7 +488,7 @@ void SmartPlaylistEditor::customEvent(QEvent *event)
                 MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
                 QString label = tr("Enter New Name For Category: %1").arg(m_categorySelector->GetValue());
 
-                MythTextInputDialog *input = new MythTextInputDialog(popupStack, label);
+                auto *input = new MythTextInputDialog(popupStack, label);
 
                 connect(input, SIGNAL(haveResult(QString)),
                         SLOT(renameCategory(QString)));
@@ -519,14 +515,14 @@ void SmartPlaylistEditor::editCriteria(void)
     if (!item)
         return;
 
-    SmartPLCriteriaRow *row = item->GetData().value<SmartPLCriteriaRow*>();
+    auto *row = item->GetData().value<SmartPLCriteriaRow*>();
 
     if (!row)
         return;
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    CriteriaRowEditor *editor = new CriteriaRowEditor(popupStack, row);
+    auto *editor = new CriteriaRowEditor(popupStack, row);
 
     if (!editor->Create())
     {
@@ -558,7 +554,7 @@ void SmartPlaylistEditor::doDeleteCriteria(bool doit)
         if (!item)
             return;
 
-        SmartPLCriteriaRow *row = item->GetData().value<SmartPLCriteriaRow*>();
+        auto *row = item->GetData().value<SmartPLCriteriaRow*>();
 
         if (!row)
             return;
@@ -576,7 +572,7 @@ void SmartPlaylistEditor::addCriteria(void)
     SmartPLCriteriaRow *row = new SmartPLCriteriaRow();
     m_criteriaRows.append(row);
 
-    MythUIButtonListItem *item = new MythUIButtonListItem(m_criteriaList, row->toString(), qVariantFromValue(row));
+    MythUIButtonListItem *item = new MythUIButtonListItem(m_criteriaList, row->toString(), QVariant::fromValue(row));
 
     m_criteriaList->SetItemCurrent(item);
 
@@ -588,7 +584,7 @@ void SmartPlaylistEditor::addCriteria(void)
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    CriteriaRowEditor *editor = new CriteriaRowEditor(popupStack, m_tempCriteriaRow);
+    auto *editor = new CriteriaRowEditor(popupStack, m_tempCriteriaRow);
 
     if (!editor->Create())
     {
@@ -611,7 +607,7 @@ void SmartPlaylistEditor::criteriaChanged()
         m_criteriaRows.append(m_tempCriteriaRow);
 
         item = new MythUIButtonListItem(m_criteriaList, m_tempCriteriaRow->toString(),
-                                        qVariantFromValue(m_tempCriteriaRow));
+                                        QVariant::fromValue(m_tempCriteriaRow));
 
         m_criteriaList->SetItemCurrent(item);
 
@@ -624,7 +620,7 @@ void SmartPlaylistEditor::criteriaChanged()
         if (!item)
             return;
 
-        SmartPLCriteriaRow *row = item->GetData().value<SmartPLCriteriaRow*>();
+        auto *row = item->GetData().value<SmartPLCriteriaRow*>();
 
         if (!row)
             return;
@@ -641,7 +637,7 @@ void SmartPlaylistEditor::showCategoryMenu(void)
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    MythDialogBox *menu = new MythDialogBox(label, popupStack, "actionmenu");
+    auto *menu = new MythDialogBox(label, popupStack, "actionmenu");
 
     if (!menu->Create())
     {
@@ -664,7 +660,7 @@ void SmartPlaylistEditor::showCriteriaMenu(void)
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    MythDialogBox *menu = new MythDialogBox(label, popupStack, "actionmenu");
+    auto *menu = new MythDialogBox(label, popupStack, "actionmenu");
 
     if (!menu->Create())
     {
@@ -757,7 +753,7 @@ void SmartPlaylistEditor::saveClicked(void)
     }
 
     // get smartplaylistid
-    int ID;
+    int ID = -1;
     query.prepare("SELECT smartplaylistid FROM music_smartplaylists "
                   "WHERE categoryid = :CATEGORYID AND name = :NAME;");
     query.bindValue(":CATEGORYID", categoryid);
@@ -783,8 +779,8 @@ void SmartPlaylistEditor::saveClicked(void)
     }
 
     // save smartplaylist items
-    for (int x = 0; x < m_criteriaRows.size(); x++)
-        m_criteriaRows[x]->saveToDatabase(ID);
+    for (const auto & row : qAsConst(m_criteriaRows))
+        row->saveToDatabase(ID);
 
     emit smartPLChanged(category, name);
 
@@ -818,7 +814,7 @@ void SmartPlaylistEditor::loadFromDatabase(const QString& category, const QStrin
     int categoryid = SmartPlaylistEditor::lookupCategoryID(category);
 
     MSqlQuery query(MSqlQuery::InitCon());
-    int ID;
+    int ID = -1;
 
     query.prepare("SELECT smartplaylistid, name, categoryid, matchtype, orderby, limitto "
                   "FROM music_smartplaylists WHERE name = :NAME AND categoryid = :CATEGORYID;");
@@ -878,11 +874,10 @@ void SmartPlaylistEditor::loadFromDatabase(const QString& category, const QStrin
             QString Value1 = query.value(2).toString();
             QString Value2 = query.value(3).toString();
             // load smartplaylist items
-            SmartPLCriteriaRow *row =
-                  new SmartPLCriteriaRow(Field, Operator, Value1, Value2);
+            auto *row = new SmartPLCriteriaRow(Field, Operator, Value1, Value2);
             m_criteriaRows.append(row);
 
-            new MythUIButtonListItem(m_criteriaList, row->toString(), qVariantFromValue(row));
+            new MythUIButtonListItem(m_criteriaList, row->toString(), QVariant::fromValue(row));
         }
     }
     else
@@ -956,7 +951,10 @@ void SmartPlaylistEditor::renameCategory(const QString &category)
 
 QString SmartPlaylistEditor::getSQL(const QString& fields)
 {
-    QString sql, whereClause, orderByClause, limitClause;
+    QString sql;
+    QString whereClause;
+    QString orderByClause;
+    QString limitClause;
     sql = "SELECT " + fields + " FROM music_songs "
           "LEFT JOIN music_artists ON music_songs.artist_id=music_artists.artist_id "
           "LEFT JOIN music_albums ON music_songs.album_id=music_albums.album_id "
@@ -986,9 +984,9 @@ QString SmartPlaylistEditor::getWhereClause(void)
     bool bFirst = true;
     QString sql = "WHERE ";
 
-    for (int x = 0; x <  m_criteriaRows.size(); x++)
+    for (const auto & row : qAsConst(m_criteriaRows))
     {
-        QString criteria = m_criteriaRows[x]->getSQL();
+        QString criteria = row->getSQL();
         if (criteria.isEmpty())
             continue;
 
@@ -1016,7 +1014,7 @@ void SmartPlaylistEditor::showResultsClicked(void)
 
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    SmartPLResultViewer *resultViewer = new SmartPLResultViewer(mainStack);
+    auto *resultViewer = new SmartPLResultViewer(mainStack);
 
     if (!resultViewer->Create())
     {
@@ -1033,7 +1031,7 @@ void SmartPlaylistEditor::orderByClicked(void)
 {
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    SmartPLOrderByDialog *orderByDialog = new SmartPLOrderByDialog(popupStack);
+    auto *orderByDialog = new SmartPLOrderByDialog(popupStack);
 
     if (!orderByDialog->Create())
     {
@@ -1083,15 +1081,15 @@ void SmartPlaylistEditor::getSmartPlaylistCategories(void)
 }
 
 // static function to delete a smartplaylist and any associated smartplaylist items
-bool SmartPlaylistEditor::deleteSmartPlaylist(QString category, const QString& name)
+bool SmartPlaylistEditor::deleteSmartPlaylist(const QString &category, const QString& name)
 {
     // get categoryid
-    int categoryid = SmartPlaylistEditor::lookupCategoryID(std::move(category));
+    int categoryid = SmartPlaylistEditor::lookupCategoryID(category);
 
     MSqlQuery query(MSqlQuery::InitCon());
 
     // get playlist ID
-    int ID;
+    int ID = -1;
     query.prepare("SELECT smartplaylistid FROM music_smartplaylists WHERE name = :NAME "
                   "AND categoryid = :CATEGORYID;");
     query.bindValue(":NAME", name);
@@ -1168,7 +1166,7 @@ bool SmartPlaylistEditor::deleteCategory(const QString& category)
 // static function to lookup the categoryid given its name
 int SmartPlaylistEditor::lookupCategoryID(const QString& category)
 {
-    int ID;
+    int ID = -1;
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare("SELECT categoryid FROM music_smartplaylist_categories "
                   "WHERE name = :CATEGORY;");
@@ -1260,7 +1258,7 @@ bool CriteriaRowEditor::Create(void)
 void CriteriaRowEditor::updateFields(void)
 {
     for (int x = 0; x < SmartPLFieldsCount; x++)
-        new MythUIButtonListItem(m_fieldSelector, SmartPLFields[x].name);
+        new MythUIButtonListItem(m_fieldSelector, SmartPLFields[x].m_name);
 
     m_fieldSelector->SetValue(m_criteriaRow->m_field);
 }
@@ -1268,7 +1266,7 @@ void CriteriaRowEditor::updateFields(void)
 void CriteriaRowEditor::updateOperators(void)
 {
     for (int x = 0; x < SmartPLOperatorsCount; x++)
-        new MythUIButtonListItem(m_operatorSelector, SmartPLOperators[x].name);
+        new MythUIButtonListItem(m_operatorSelector, SmartPLOperators[x].m_name);
 
     m_operatorSelector->SetValue(m_criteriaRow->m_operator);
 }
@@ -1302,20 +1300,19 @@ void CriteriaRowEditor::updateValues(void)
 
 void CriteriaRowEditor::saveClicked()
 {
-    SmartPLField *Field;
-    Field = lookupField(m_fieldSelector->GetValue());
+    SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
     if (!Field)
         return;
 
     m_criteriaRow->m_field = m_fieldSelector->GetValue();
     m_criteriaRow->m_operator = m_operatorSelector->GetValue();
 
-    if (Field->type == ftNumeric)
+    if (Field->m_type == ftNumeric)
     {
         m_criteriaRow->m_value1 = m_value1Spinbox->GetValue();
         m_criteriaRow->m_value2 = m_value2Spinbox->GetValue();
     }
-    else if (Field->type == ftBoolean || Field->type == ftDate)
+    else if (Field->m_type == ftBoolean || Field->m_type == ftDate)
     {
         m_criteriaRow->m_value1 = m_value1Selector->GetValue();
         m_criteriaRow->m_value2 = m_value2Selector->GetValue();
@@ -1326,6 +1323,7 @@ void CriteriaRowEditor::saveClicked()
         m_criteriaRow->m_value2 = m_value2Edit->GetText();
     }
 
+    // NOLINTNEXTLINE(readability-misleading-indentation)
     emit criteriaChanged();
 
     Close();
@@ -1335,34 +1333,28 @@ void CriteriaRowEditor::enableSaveButton()
 {
     bool enabled = false;
 
-    SmartPLField *Field;
-    Field = lookupField(m_fieldSelector->GetValue());
+    SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
 
-    SmartPLOperator *Operator;
-    Operator = lookupOperator(m_operatorSelector->GetValue());
+    SmartPLOperator *Operator = lookupOperator(m_operatorSelector->GetValue());
 
     if (Field && Operator)
     {
-        if (Field->type == ftNumeric || Field->type == ftBoolean)
+        if (Field->m_type == ftNumeric || Field->m_type == ftBoolean)
             enabled = true;
-        else if (Field->type == ftDate)
+        else if (Field->m_type == ftDate)
         {
-            if (Operator->noOfArguments == 0)
-                enabled = true;
-            else if (Operator->noOfArguments == 1 && !m_value1Selector->GetValue().isEmpty())
-                enabled = true;
-            else if (Operator->noOfArguments == 2 && !m_value1Selector->GetValue().isEmpty()
-                                                  && !m_value2Selector->GetValue().isEmpty())
+            if ((Operator->m_noOfArguments == 0) ||
+                (Operator->m_noOfArguments == 1 && !m_value1Selector->GetValue().isEmpty()) ||
+                (Operator->m_noOfArguments == 2 && !m_value1Selector->GetValue().isEmpty()
+                                                  && !m_value2Selector->GetValue().isEmpty()))
                 enabled = true;
         }
         else // ftString
         {
-            if (Operator->noOfArguments == 0)
-                enabled = true;
-            else if (Operator->noOfArguments == 1 && !m_value1Edit->GetText().isEmpty())
-                enabled = true;
-            else if (Operator->noOfArguments == 2 && !m_value1Edit->GetText().isEmpty()
-                                                  && !m_value2Edit->GetText().isEmpty())
+            if ((Operator->m_noOfArguments == 0) ||
+                (Operator->m_noOfArguments == 1 && !m_value1Edit->GetText().isEmpty()) ||
+                (Operator->m_noOfArguments == 2 && !m_value1Edit->GetText().isEmpty()
+                                                  && !m_value2Edit->GetText().isEmpty()))
                 enabled = true;
         }
     }
@@ -1372,12 +1364,11 @@ void CriteriaRowEditor::enableSaveButton()
 
 void CriteriaRowEditor::fieldChanged(void)
 {
-    SmartPLField *Field;
-    Field = lookupField(m_fieldSelector->GetValue());
+    SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
     if (!Field)
         return;
 
-    if (Field->type == ftBoolean)
+    if (Field->m_type == ftBoolean)
     {
         // add yes / no items to combo
         m_value1Selector->Reset();
@@ -1387,7 +1378,7 @@ void CriteriaRowEditor::fieldChanged(void)
         new MythUIButtonListItem(m_value2Selector, "No");
         new MythUIButtonListItem(m_value2Selector, "Yes");
     }
-    else if (Field->type == ftDate)
+    else if (Field->m_type == ftDate)
     {
         // add a couple of date values to the combo
         m_value1Selector->Reset();
@@ -1417,20 +1408,18 @@ void CriteriaRowEditor::fieldChanged(void)
     }
 
     // get list of operators valid for this field type
-    getOperatorList(Field->type);
+    getOperatorList(Field->m_type);
 
     enableSaveButton();
 }
 
 void CriteriaRowEditor::operatorChanged(void)
 {
-    SmartPLField *Field;
-    Field = lookupField(m_fieldSelector->GetValue());
+    SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
     if (!Field)
         return;
 
-    SmartPLOperator *Operator;
-    Operator = lookupOperator(m_operatorSelector->GetValue());
+    SmartPLOperator *Operator = lookupOperator(m_operatorSelector->GetValue());
     if (!Operator)
         return;
 
@@ -1445,42 +1434,42 @@ void CriteriaRowEditor::operatorChanged(void)
     m_value2Spinbox->Hide();
 
     // show spin edits
-    if (Field->type == ftNumeric)
+    if (Field->m_type == ftNumeric)
     {
-        if (Operator->noOfArguments >= 1)
+        if (Operator->m_noOfArguments >= 1)
         {
             m_value1Spinbox->Show();
             int currentValue = m_value1Spinbox->GetIntValue();
-            m_value1Spinbox->SetRange(Field->minValue, Field->maxValue, 1);
+            m_value1Spinbox->SetRange(Field->m_minValue, Field->m_maxValue, 1);
 
-            if (currentValue < Field->minValue || currentValue > Field->maxValue)
-                m_value1Spinbox->SetValue(Field->defaultValue);
+            if (currentValue < Field->m_minValue || currentValue > Field->m_maxValue)
+                m_value1Spinbox->SetValue(Field->m_defaultValue);
         }
 
-        if (Operator->noOfArguments == 2)
+        if (Operator->m_noOfArguments == 2)
         {
             m_value2Spinbox->Show();
             int currentValue = m_value2Spinbox->GetIntValue();
-            m_value2Spinbox->SetRange(Field->minValue, Field->maxValue, 1);
+            m_value2Spinbox->SetRange(Field->m_minValue, Field->m_maxValue, 1);
 
-            if (currentValue < Field->minValue || currentValue > Field->maxValue)
-                m_value2Spinbox->SetValue(Field->defaultValue);
+            if (currentValue < Field->m_minValue || currentValue > Field->m_maxValue)
+                m_value2Spinbox->SetValue(Field->m_defaultValue);
         }
     }
-    else if (Field->type == ftBoolean)
+    else if (Field->m_type == ftBoolean)
     {
         // only show value1combo
         m_value1Selector->Show();
     }
-    else if (Field->type == ftDate)
+    else if (Field->m_type == ftDate)
     {
-        if (Operator->noOfArguments >= 1)
+        if (Operator->m_noOfArguments >= 1)
         {
             m_value1Selector->Show();
             m_value1Button->Show();
         }
 
-        if (Operator->noOfArguments == 2)
+        if (Operator->m_noOfArguments == 2)
         {
             m_value2Selector->Show();
             m_value2Button->Show();
@@ -1488,13 +1477,13 @@ void CriteriaRowEditor::operatorChanged(void)
     }
     else // ftString
     {
-        if (Operator->noOfArguments >= 1)
+        if (Operator->m_noOfArguments >= 1)
         {
             m_value1Edit->Show();
             m_value1Button->Show();
         }
 
-        if (Operator->noOfArguments == 2)
+        if (Operator->m_noOfArguments == 2)
         {
             m_value2Edit->Show();
             m_value2Button->Show();
@@ -1513,14 +1502,14 @@ void CriteriaRowEditor::getOperatorList(SmartPLFieldType fieldType)
     for (int x = 0; x < SmartPLOperatorsCount; x++)
     {
         // don't add operators that only work with string fields
-        if (fieldType != ftString && SmartPLOperators[x].stringOnly)
+        if (fieldType != ftString && SmartPLOperators[x].m_stringOnly)
             continue;
 
         // don't add operators that only work with boolean fields
-        if (fieldType == ftBoolean && !SmartPLOperators[x].validForBoolean)
+        if (fieldType == ftBoolean && !SmartPLOperators[x].m_validForBoolean)
             continue;
 
-        new MythUIButtonListItem(m_operatorSelector, SmartPLOperators[x].name);
+        new MythUIButtonListItem(m_operatorSelector, SmartPLOperators[x].m_name);
     }
 
     // try to set the operatorCombo to the same operator or else the first item
@@ -1558,19 +1547,15 @@ void CriteriaRowEditor::valueButtonClicked(void)
         msg = tr("Select a Title");
         searchList = MusicMetadata::fillFieldList("title");
     }
-    else if (m_fieldSelector->GetValue() == "Last Play")
-    {
-        editDate();
-        return;
-    }
-    else if (m_fieldSelector->GetValue() == "Date Imported")
+    else if ((m_fieldSelector->GetValue() == "Last Play") ||
+             (m_fieldSelector->GetValue() == "Date Imported"))
     {
         editDate();
         return;
     }
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
-    MythUISearchDialog *searchDlg = new MythUISearchDialog(popupStack, msg, searchList, false, s);
+    auto *searchDlg = new MythUISearchDialog(popupStack, msg, searchList, false, s);
 
     if (!searchDlg->Create())
     {
@@ -1594,7 +1579,7 @@ void CriteriaRowEditor::setValue(const QString& value)
 void CriteriaRowEditor::editDate(void)
 {
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
-    SmartPLDateDialog *dateDlg = new SmartPLDateDialog(popupStack);
+    auto *dateDlg = new SmartPLDateDialog(popupStack);
     QString date = GetFocusWidget() == m_value1Button ? m_value1Selector->GetValue() : m_value2Selector->GetValue();
 
     if (!dateDlg->Create())
@@ -1695,7 +1680,7 @@ void SmartPLResultViewer::trackVisible(MythUIButtonListItem *item)
 
     if (item->GetImageFilename().isEmpty())
     {
-        MusicMetadata *mdata = item->GetData().value<MusicMetadata *>();
+        auto *mdata = item->GetData().value<MusicMetadata *>();
         if (mdata)
         {
             QString artFile = mdata->getAlbumArtFile();
@@ -1723,13 +1708,13 @@ void SmartPLResultViewer::showTrackInfo(void)
     if (!item)
         return;
 
-    MusicMetadata *mdata = item->GetData().value<MusicMetadata *>();
+    auto *mdata = item->GetData().value<MusicMetadata *>();
     if (!mdata)
         return;
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    TrackInfoDialog *dlg = new TrackInfoDialog(popupStack, mdata, "trackinfopopup");
+    auto *dlg = new TrackInfoDialog(popupStack, mdata, "trackinfopopup");
 
     if (!dlg->Create())
     {
@@ -1756,7 +1741,7 @@ void SmartPLResultViewer::setSQL(const QString& sql)
                 InfoMap metadataMap;
                 mdata->toMap(metadataMap);
 
-                MythUIButtonListItem *item = new MythUIButtonListItem(m_trackList, "", qVariantFromValue(mdata));
+                auto *item = new MythUIButtonListItem(m_trackList, "", QVariant::fromValue(mdata));
                 item->SetTextFromMap(metadataMap);
             }
         }
@@ -1843,7 +1828,7 @@ void SmartPLOrderByDialog::setFieldList(const QString &fieldList)
 
     for (int x = 0; x < list.count(); x++)
     {
-        MythUIButtonListItem *item = new MythUIButtonListItem(m_fieldList, list[x].trimmed());
+        auto *item = new MythUIButtonListItem(m_fieldList, list[x].trimmed());
         QString state = list[x].contains("(A)") ? "ascending" : "descending";
         item->DisplayState(state, "sortstate");
     }
@@ -1885,7 +1870,7 @@ void SmartPLOrderByDialog::descendingPressed(void)
 
 void SmartPLOrderByDialog::addPressed(void)
 {
-    MythUIButtonListItem *item = new MythUIButtonListItem(m_fieldList, m_orderSelector->GetValue() + " (A)");
+    auto *item = new MythUIButtonListItem(m_fieldList, m_orderSelector->GetValue() + " (A)");
     item->DisplayState("ascending", "sortstate");
 
     orderByChanged();
@@ -1975,7 +1960,7 @@ void SmartPLOrderByDialog::getOrderByFields(void)
 {
     m_orderSelector->Reset();
     for (int x = 1; x < SmartPLFieldsCount; x++)
-        new MythUIButtonListItem(m_orderSelector, SmartPLFields[x].name);
+        new MythUIButtonListItem(m_orderSelector, SmartPLFields[x].m_name);
 }
 
 /*

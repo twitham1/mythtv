@@ -1,5 +1,5 @@
-#ifndef _XMLTVPARSER_H_
-#define _XMLTVPARSER_H_
+#ifndef XMLTVPARSER_H
+#define XMLTVPARSER_H
 
 // Qt headers
 #include <QMap>
@@ -17,17 +17,13 @@ class XMLTVParser
 {
   public:
     XMLTVParser();
-    void lateInit();
-
-    ChannelInfo *parseChannel(QDomElement &element, QUrl &baseUrl);
-    ProgInfo *parseProgram(QDomElement &element);
     bool parseFile(const QString& filename, ChannelInfoList *chanlist,
                    QMap<QString, QList<ProgInfo> > *proglist);
 
   private:
-    unsigned int m_current_year {0};
+    unsigned int m_currentYear {0};
     QString m_movieGrabberPath;
     QString m_tvGrabberPath;
 };
 
-#endif // _XMLTVPARSER_H_
+#endif // XMLTVPARSER_H

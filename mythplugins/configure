@@ -272,7 +272,6 @@ check_lib_cxx(){
 PLUGIN_LIST="
 archive
 browser
-gallery
 game
 music
 netvision
@@ -284,7 +283,6 @@ zmserver
 
 DEPRECATED_PLUGIN_LIST="
 flix
-gallery
 "
 
 CONFIG_LIST="
@@ -314,8 +312,7 @@ ln_s="ln -sf"
 logfile="config.ep"
 
 cc="gcc"
-qmake="qmake"
-python="python"
+python="python3"
 
 targetos=`uname -s`
 
@@ -330,8 +327,6 @@ Generic options:
   --prefix=PREFIX          MythTV install location PREFIX [$prefix]
   --sysroot=SYSROOT        General sysroot location SYSROOT [$sysroot]
   --mythroot=SYSROOT       MythTV specific sysroot location [$mythroot]
-  --qmake=QMAKE            use specified qmake [$qmake]
-  --qmakespecs=QMAKE       use specified qmakespecs [$qmakespecs]
   --python=PATH            Force a specific python executable to use [$python]
   --libdir-name=LIBNAME    install/look for libs in PREFIX/LIBNAME [$libdir_name]
   --help                   print this message
@@ -344,14 +339,6 @@ MythArchive related options:
 
 MythBrowser related options:
   --enable-mythbrowser     build the mythbrowser plugin [$browser]
-
-MythGallery related options:
-  --enable-mythgallery     build the mythgallery plugin [$gallery]
-  --enable-exif            enable reading of EXIF headers [$exif]
-  --enable-new-exif        use libexif > version 0.6.9 [$newexif]
-  --enable-dcraw           use dcraw to view raw photos [$dcraw]
-  --icc-profile=PROFILE    ICC profile for dcraw decoding [$icc]
-  --enable-opengl          enable OpenGL (MythGallery) [$opengl]
 
 MythGame related options:
   --enable-mythgame        build the mythgame plugin [$game]
@@ -402,8 +389,6 @@ fi
 
 CMDLINE_SET="
     logfile
-    qmake
-    qmakespecs
     python
     sysroot
     mythroot
@@ -581,6 +566,7 @@ CXXPPFLAGS=$(cat mythconfig.mak | grep -e "^CXXPPFLAGS=")
 CXXPPFLAGS=${CXXPPFLAGS#CXXPPFLAGS=}
 OPENGLV=$(cat mythconfig.mak | grep -e "^CONFIG_OPENGL_VIDEO=yes")
 OPENGLES=$(cat mythconfig.mak | grep -e "^HAVE_GLES2_GL2_H=yes")
+WEBKIT=$(cat mythconfig.mak | grep -e "^CONFIG_QTWEBKIT=yes")
 
 EXTRALIBS=$(cat mythconfig.mak | grep -e "^EXTRALIBS=")
 EXTRALIBS=${EXTRALIBS#EXTRALIBS=}
@@ -598,42 +584,12 @@ version2num(){
     echo $1 | awk -F. '{ print ( ( $1 * 256 ) + $2 ) * 256 + $3; };'
 }
 
-# qmake-qt5 /usr/lib64/qt5/bin/qmake /usr/lib/x86_64-linux-gnu/qt5/bin/qmake
-if [ x"$qmake" = "xqmake" ]; then
-    CHECK_QMAKE=`which qmake-qt5 2>/dev/null`" /usr/lib64/qt5/bin/qmake /usr/lib/x86_64-linux-gnu/qt5/bin/qmake /usr/lib/i386-linux-gnu/qt5/bin/qmake /usr/lib/arm-linux-gnueabihf/qt5/bin/qmake /usr/local/lib/qt5/bin/qmake `which $qmake 2>/dev/null`"
-else
-    CHECK_QMAKE=`which $qmake 2>/dev/null`" "`which qmake-qt5 2>/dev/null`" /usr/lib64/qt5/bin/qmake /usr/lib/x86_64-linux-gnu/qt5/bin/qmake /usr/lib/i386-linux-gnu/qt5/bin/qmake /usr/lib/arm-linux-gnueabihf/qt5/bin/qmake /usr/local/lib/qt5/bin/qmake"
-fi
-if [ -n "qmakespec" ]; then
-	qmake="$qmake -spec $qmakespec"
-fi
-# try to find a qt5 qmake to use
-found_qmake=''
-for i in $CHECK_QMAKE; do
-    if test -e $i ; then
-        qmake_version=`$i -query QT_VERSION`
-        if [ $(version2num $qmake_version) -ge $QT_MIN_VERSION ]; then
-            found_qmake=$i
-            break;
-        else
-            echo "found qmake at $i but version failed"
-            echo "got version: $qmake_version"
-        fi
-    fi
-done
-if [ x"$found_qmake" = "x" ]; then
-    die "qmake for Qt $QT_MIN_VERSION_STR or newer not found.  Please specify the correct qmake with --qmake="
-else
-    qmake=$found_qmake
-fi
+# Use the qmake specified when building the mythtv directory.
+qmake=$(cat mythconfig.mak | grep -e "^QMAKE=")
+qmake=${qmake#QMAKE=}
 
 # rely on what was discover during MythTV configure
 if enabled opengl && test "$OPENGLV" != "CONFIG_OPENGL_VIDEO=yes"; then
-    disable opengl
-fi
-
-# OpenGL is only used for mythgallery and must not be OpenGL ES!
-if enabled opengl && test "$OPENGLES" = "HAVE_GLES2_GL2_H=yes"; then
     disable opengl
 fi
 
@@ -644,6 +600,13 @@ fi
 
 if ! check_lib libexif/exif-data.h exif_loader_new -lexif ; then
     disable exif
+fi
+
+if enabled browser; then
+    if test "$WEBKIT" != "CONFIG_QTWEBKIT=yes"; then
+        disable browser
+        echo "MythBrowser requires QtWebkit."
+    fi
 fi
 
 if enabled game; then
@@ -716,6 +679,11 @@ if test x"$icc" != x ; then
 fi
 
 if enabled music ; then
+    if test "$WEBKIT" != "CONFIG_QTWEBKIT=yes"; then
+       disable music
+       echo "MythMusic requires QtWebkit."
+    fi
+
     if ! check_lib vorbis/codec.h vorbis_info_init -lvorbis || ! check_lib vorbis/vorbisenc.h vorbis_encode_setup_vbr -lvorbisenc -lvorbis -logg ; then
         disable vorbis
         echo "MythMusic requires vorbis."
@@ -804,13 +772,6 @@ else
   echo "        MythBrowser    plugin will not be built"
 fi
 
-if enabled gallery ; then
-  echo "        MythGallery    plugin will be built"
-  echo "SUBDIRS += mythgallery" >> ./config.pro
-else
-  echo "        MythGallery    plugin will not be built"
-fi
-
 if enabled game ; then
   echo "        MythGame       plugin will be built"
   echo "SUBDIRS += mythgame" >> ./config.pro
@@ -862,89 +823,6 @@ if enabled zoneminder ; then
   fi
 else
   echo "        MythZoneMinder plugin will not be built"
-fi
-
-###########################################################
-#                                                         #
-#   MythGallery related configuration options             #
-#                                                         #
-###########################################################
-
-if enabled gallery ; then
-
-    echo "/*" >  ./mythgallery/mythgallery/config.h
-    echo "    Automatically generated by configure - do not modify" >> ./mythgallery/mythgallery/config.h
-    echo "*/" >> ./mythgallery/mythgallery/config.h
-
-    echo "#" > ./mythgallery/config.pro
-    echo "#    Automatically generated by configure - modify only under penalty of death" >> ./mythgallery/config.pro
-    echo "#" >> ./mythgallery/config.pro
-
-    echo "#" > ./mythgallery/mythgallery/config.pro
-    echo "#    Automatically generated by configure - modify only under penalty of death" >> ./mythgallery/mythgallery/config.pro
-    echo "#" >> ./mythgallery/mythgallery/config.pro
-
-    if enabled opengl ; then
-        echo "        OpenGL         support will be included in MythGallery"
-        echo "#define OPENGL_SUPPORT 1" >> ./mythgallery/mythgallery/config.h
-        echo "CONFIG += opengl" >> ./mythgallery/mythgallery/config.pro
-        echo "HEADERS += glsingleview.h" >> ./mythgallery/mythgallery/config.pro
-        echo "SOURCES += glsingleview.cpp" >> ./mythgallery/mythgallery/config.pro
-    else
-        echo "        OpenGL         support will not be included in MythGallery"
-    fi
-
-    if enabled exif ; then
-        echo "        EXIF           support will be included in MythGallery"
-        echo "#define EXIF_SUPPORT 1" >> ./mythgallery/mythgallery/config.h
-        echo "LIBS += -lexif" >> ./mythgallery/mythgallery/config.pro
-
-        if test x`which pkg-config 2>/dev/null` != x"" ; then
-            if `pkg-config --atleast-version 0.6.9 libexif` ; then
-                echo "#define NEW_LIB_EXIF 1" >> \
-                    ./mythgallery/mythgallery/config.h
-            fi
-        else
-            if test x"$newexif" = x"yes" ; then
-                echo "#define NEW_LIB_EXIF 1" >> \
-                    ./mythgallery/mythgallery/config.h
-            else
-                echo
-                echo "Could not determine libexif version, if it is greater"
-                echo "than or equal to 0.6.9 you need to add"
-                echo "--enable-new-exif to the configure flags"
-                echo
-            fi
-        fi
-    else
-        echo "        EXIF           support will not be included in MythGallery"
-    fi
-
-    if enabled dcraw ; then
-        echo "        Dcraw          support will be included in MythGallery"
-        echo "SUBDIRS += dcrawplugin" >> ./mythgallery/config.pro
-        echo "#define DCRAW_SUPPORT 1" >> ./mythgallery/mythgallery/config.h
-        echo "LIBS += -L../dcrawplugin -ldcrawplugin" >> ./mythgallery/mythgallery/config.pro
-        echo "TARGETDEPS += ../dcrawplugin/libdcrawplugin.a" >> ./mythgallery/mythgallery/config.pro
-
-        echo "/*" >  ./mythgallery/dcrawplugin/config.h
-        echo "    Automatically generated by configure - do not modify" >> ./mythgallery/dcrawplugin/config.h
-        echo "*/" >> ./mythgallery/dcrawplugin/config.h
-
-        if enabled exif ; then
-            echo "#define EXIF_SUPPORT 1" >> ./mythgallery/dcrawplugin/config.h
-
-        fi
-
-        if test x"$icc" != x ; then
-            echo "        ICC profile    $icc"
-            # Quote C escape characters.
-            quoted_icc=`echo "$icc" | sed 's/\\([\\\\"?]\\)/\\\\\\1/g;\$!{s/\$/\\\\/}'`
-            echo "#define ICC_PROFILE \"$quoted_icc\"" >> ./mythgallery/dcrawplugin/config.h
-        fi
-    else
-        echo "        Dcraw          support will not be included in MythGallery"
-    fi
 fi
 
 ###########################################################

@@ -10,15 +10,14 @@
               
 class UPnpMSRR;
                           
-typedef enum 
+enum UPnpMSRRMethod
 {
     MSRR_Unknown                = 0,
     MSRR_GetServiceDescription  = 1,
     MSRR_IsAuthorized           = 2,
     MSRR_RegisterDevice         = 3,
     MSRR_IsValidated            = 4
-
-} UPnpMSRRMethod;
+};
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -34,11 +33,11 @@ class UPNP_PUBLIC  UPnpMSRR : public Eventing
         QString         m_sServiceDescFileName;
         QString         m_sControlUrl;
 
-        UPnpMSRRMethod  GetMethod                  ( const QString &sURI  );
+        static UPnpMSRRMethod  GetMethod                  ( const QString &sURI  );
 
-        void            HandleIsAuthorized         ( HTTPRequest *pRequest );
-        void            HandleRegisterDevice       ( HTTPRequest *pRequest );
-        void            HandleIsValidated          ( HTTPRequest *pRequest );
+        static void            HandleIsAuthorized         ( HTTPRequest *pRequest );
+        static void            HandleRegisterDevice       ( HTTPRequest *pRequest );
+        static void            HandleIsValidated          ( HTTPRequest *pRequest );
 
     protected:
 
@@ -57,7 +56,7 @@ class UPNP_PUBLIC  UPnpMSRR : public Eventing
                  UPnpMSRR( UPnpDevice *pDevice,
                            const QString &sSharePath ); 
 
-        virtual ~UPnpMSRR() = default;
+        ~UPnpMSRR() override = default;
 
         QStringList GetBasePaths() override; // Eventing
 

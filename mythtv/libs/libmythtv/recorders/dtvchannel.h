@@ -4,8 +4,8 @@
  *  Contains base class for digital channels.
  */
 
-#ifndef _DTVCHANNEL_H_
-#define _DTVCHANNEL_H_
+#ifndef DTVCHANNEL_H
+#define DTVCHANNEL_H
 
 // C++ headers
 #include <cstdint>
@@ -35,7 +35,7 @@ class DTVChannel : public ChannelBase
 {
   public:
     explicit DTVChannel(TVRec *parent) : ChannelBase(parent) {}
-    virtual ~DTVChannel();
+    ~DTVChannel() override;
 
     // Commands
     bool SetChannelByString(const QString &chan) override; // ChannelBase
@@ -47,7 +47,7 @@ class DTVChannel : public ChannelBase
     QString GetFormat(void) { return m_tvFormat; }
 
     /// \brief To be used by the channel scanner and possibly the EIT scanner.
-    virtual bool TuneMultiplex(uint mplexid, QString inputname);
+    virtual bool TuneMultiplex(uint mplexid, const QString& inputname);
     /// \brief This performs the actual frequency tuning and in some cases
     ///        input switching.
     ///
@@ -56,7 +56,7 @@ class DTVChannel : public ChannelBase
     /// will need to implement this when adding support for new hardware.
     virtual bool Tune(const DTVMultiplex &tuning) = 0;
     /// \brief Performs IPTV Tuning. Only implemented by IPTVChannel.
-    virtual bool Tune(const IPTVTuningData&, bool /*scanning*/) { return false; }
+    virtual bool Tune(const IPTVTuningData &/*tuning*/, bool /*scanning*/) { return false; }
     /// \brief Leave it up to the implementation to map the channnum
     /// appropriately.
     ///
@@ -124,8 +124,8 @@ class DTVChannel : public ChannelBase
     void RegisterForMaster(const QString &key);
     void DeregisterForMaster(const QString &key);
     static DTVChannel *GetMasterLock(const QString &key);
-    typedef DTVChannel* DTVChannelP;
-    static void ReturnMasterLock(DTVChannelP&);
+    using DTVChannelP = DTVChannel*;
+    static void ReturnMasterLock(DTVChannelP &chan);
 
     /// \brief Returns true if this is the first of a number of multi-rec devs
     virtual bool IsMaster(void) const { return false; }
@@ -148,7 +148,7 @@ class DTVChannel : public ChannelBase
 
   protected:
     /// \brief Sets PSIP table standard: MPEG, DVB, ATSC, or OpenCable
-    void SetSIStandard(const QString&);
+    void SetSIStandard(const QString &si_std);
     void SetDTVInfo(uint atsc_major, uint atsc_minor,
                     uint dvb_orig_netid,
                     uint mpeg_tsid, int mpeg_pnum);
@@ -176,9 +176,9 @@ class DTVChannel : public ChannelBase
     /// This is a generated PMT for RAW pid tuning
     ProgramMapTable         *m_genPMT {nullptr};
 
-    typedef QMap<QString,QList<DTVChannel*> > MasterMap;
+    using MasterMap = QMap<QString,QList<DTVChannel*> >;
     static QReadWriteLock    s_master_map_lock;
     static MasterMap         s_master_map;
 };
 
-#endif // _DTVCHANNEL_H_
+#endif // DTVCHANNEL_H

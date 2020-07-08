@@ -5,8 +5,8 @@
 #include "standardsettings.h"
 #include "mythdbcon.h"
 
-const QString availProfiles[] =
-      {"Default", "Live TV", "High Quality", "Low Quality", "" };
+const std::array<QString,4> kAvailProfiles
+      {"Default", "Live TV", "High Quality", "Low Quality" };
 
 class RecordingProfile;
 class VideoCompressionSettings;
@@ -77,7 +77,7 @@ class MTV_PUBLIC RecordingProfile : public GroupSetting
   public:
     // initializers
     explicit RecordingProfile(const QString& profName = QString());
-    virtual ~RecordingProfile(void);
+    ~RecordingProfile(void) override;
     virtual void loadByID(int id);
     virtual bool loadByType(const QString &name, const QString &cardtype,
                             const QString &videodev);
@@ -102,7 +102,7 @@ class MTV_PUBLIC RecordingProfile : public GroupSetting
     static QString getName(int id);
 
     // Hardcoded DB group values
-    typedef enum RecProfileGroups
+    enum RecProfileGroup
     {
         AllGroups            =  0,
         SoftwareEncoderGroup =  1,
@@ -119,7 +119,7 @@ class MTV_PUBLIC RecordingProfile : public GroupSetting
         ASIGroup             = 15,
         OCURGroup            = 16,
         CetonGroup           = 17
-    } RecProfileGroup;
+    };
 
     static QMap<int, QString> GetProfiles(RecProfileGroup group = AllGroups);
     static QMap<int, QString> GetTranscodingProfiles();
@@ -127,7 +127,7 @@ class MTV_PUBLIC RecordingProfile : public GroupSetting
                                int group, bool foldautodetect = false);
 
     // constants
-    static const uint TranscoderAutodetect = 0; ///< sentinel value
+    static const uint kTranscoderAutodetect = 0; ///< sentinel value
 
   private slots:
     void ResizeTranscode(const QString &val);
@@ -156,17 +156,17 @@ class RecordingProfileEditor :
 
   public:
     RecordingProfileEditor(int id, QString profName);
-    virtual ~RecordingProfileEditor() = default;
+    ~RecordingProfileEditor() override = default;
 
     void Load(void) override; // StandardSetting
 
   public slots:
     void ShowNewProfileDialog();
-    void CreateNewProfile(const QString&);
+    void CreateNewProfile(const QString &profName);
 
   protected:
-    int             group;
-    QString         labelName;
+    int             m_group;
+    QString         m_labelName;
 };
 
 #endif

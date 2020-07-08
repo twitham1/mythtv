@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __UPNPTASKEVENT_H__
-#define __UPNPTASKEVENT_H__
+#ifndef UPNPTASKEVENT_H
+#define UPNPTASKEVENT_H
 
 #include "upnp.h"
 #include "bufferedsocketdevice.h"
@@ -36,7 +36,7 @@ class UPnpEventTask : public Task
 
         // Destructor protected to force use of Release Method
 
-        virtual ~UPnpEventTask();
+        ~UPnpEventTask() override;
 
     public:
 
@@ -45,9 +45,9 @@ class UPnpEventTask : public Task
                        QByteArray  *m_pPayload );
 
         QString Name() override { return( "Event" ); } // Task
-        void Execute( TaskQueue * ) override; // Task
+        void Execute( TaskQueue *pQueue ) override; // Task
 
 };
 
 
-#endif
+#endif // UPNPTASKEVENT_H

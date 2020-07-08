@@ -4,8 +4,8 @@
  *  Distributed as part of MythTV under GPL v2 and later.
  */
 
-#ifndef _FIREWIRECHANNEL_H_
-#define _FIREWIRECHANNEL_H_
+#ifndef FIREWIRECHANNEL_H
+#define FIREWIRECHANNEL_H
 
 #include "tv_rec.h"
 #include "dtvchannel.h"
@@ -17,16 +17,19 @@ class FirewireChannel : public DTVChannel
     friend class FirewireRecorder;
 
   public:
-    FirewireChannel(TVRec *parent, const QString &videodevice,
-                    const FireWireDBOptions &firewire_opts);
-    virtual ~FirewireChannel();
+    FirewireChannel(TVRec *parent, QString videodevice,
+                    FireWireDBOptions firewire_opts);
+    ~FirewireChannel() override;
+
+    FirewireChannel(const FirewireChannel &) = delete;            // not copyable
+    FirewireChannel &operator=(const FirewireChannel &) = delete; // not copyable
 
     // Commands
      bool Open(void) override; // ChannelBase
     void Close(void) override; // ChannelBase
 
     using DTVChannel::Tune;
-    bool Tune(const DTVMultiplex&) override // DTVChannel
+    bool Tune(const DTVMultiplex &/*tuning*/) override // DTVChannel
         { return false; }
     bool Tune(const QString &freqid, int finetune) override; // DTVChannel
     bool Retune(void) override; // ChannelBase
@@ -44,8 +47,6 @@ class FirewireChannel : public DTVChannel
         { return true; }
 
   private:
-    FirewireChannel(const FirewireChannel &) = delete;            // not copyable
-    FirewireChannel &operator=(const FirewireChannel &) = delete; // not copyable
     virtual FirewireDevice::PowerState GetPowerState(void) const;
     virtual FirewireDevice *GetFirewireDevice(void) { return m_device; }
 
@@ -57,4 +58,4 @@ class FirewireChannel : public DTVChannel
     bool               m_isopen          {false};
 };
 
-#endif // _FIREWIRECHANNEL_H_
+#endif // FIREWIRECHANNEL_H

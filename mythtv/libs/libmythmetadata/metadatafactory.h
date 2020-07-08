@@ -1,6 +1,8 @@
 #ifndef METADATAFACTORY_H_
 #define METADATAFACTORY_H_
 
+#include <utility>
+
 // Needed to perform a lookup
 #include "metadatacommon.h"
 #include "metadataimagedownload.h"
@@ -18,9 +20,9 @@ class RecordingRule;
 class META_PUBLIC MetadataFactoryMultiResult : public QEvent
 {
   public:
-    explicit MetadataFactoryMultiResult(MetadataLookupList res)
+    explicit MetadataFactoryMultiResult(const MetadataLookupList& res)
         : QEvent(kEventType), m_results(res) {}
-    ~MetadataFactoryMultiResult() = default;
+    ~MetadataFactoryMultiResult() override;
 
     MetadataLookupList m_results;
 
@@ -38,14 +40,7 @@ class META_PUBLIC MetadataFactorySingleResult : public QEvent
             m_result->IncrRef();
         }
     }
-    ~MetadataFactorySingleResult()
-    {
-        if (m_result)
-        {
-            m_result->DecrRef();
-            m_result = nullptr;
-        }
-    }
+    ~MetadataFactorySingleResult() override;
 
     MetadataLookup *m_result {nullptr};
 
@@ -63,14 +58,7 @@ class META_PUBLIC MetadataFactoryNoResult : public QEvent
             m_result->IncrRef();
         }
     }
-    ~MetadataFactoryNoResult()
-    {
-        if (m_result)
-        {
-            m_result->DecrRef();
-            m_result = nullptr;
-        }
-    }
+    ~MetadataFactoryNoResult() override;
 
     MetadataLookup *m_result {nullptr};
 
@@ -82,9 +70,10 @@ class META_PUBLIC MetadataFactoryVideoChanges : public QEvent
   public:
     MetadataFactoryVideoChanges(QList<int> adds, QList<int> movs,
                                 QList<int>dels) : QEvent(kEventType),
-                                m_additions(adds), m_moved(movs),
-                                m_deleted(dels) {}
-    ~MetadataFactoryVideoChanges() = default;
+                                m_additions(std::move(adds)),
+                                m_moved(std::move(movs)),
+                                m_deleted(std::move(dels)) {}
+    ~MetadataFactoryVideoChanges() override;
 
     QList<int> m_additions; // newly added intids
     QList<int> m_moved; // intids moved to new filename
@@ -99,7 +88,7 @@ class META_PUBLIC MetadataFactory : public QObject
   public:
 
     explicit MetadataFactory(QObject *parent);
-    ~MetadataFactory();
+    ~MetadataFactory() override;
 
     void Lookup(ProgramInfo *pginfo, bool automatic = true,
            bool getimages = true, bool allowgeneric = false);
@@ -125,7 +114,7 @@ class META_PUBLIC MetadataFactory : public QObject
                               m_imagedownload->isRunning() ||
                               m_videoscanner->isRunning(); };
 
-    bool VideoGrabbersFunctional();
+    static bool VideoGrabbersFunctional();
 
   private:
 

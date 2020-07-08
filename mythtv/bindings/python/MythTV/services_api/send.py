@@ -6,6 +6,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from os import fdopen
 
+from xml.etree import ElementTree
 import re
 import sys
 import tempfile
@@ -27,7 +28,7 @@ from ._version import __version__
 # an HTTP POST is potentially dangerous.                     #
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
 
-MYTHTV_VERSION_LIST = ('0.27', '0.28', '29', '30', '31')
+MYTHTV_VERSION_LIST = ('0.27', '0.28', '29', '30', '31', '32')
 
 
 class Send(object):
@@ -140,6 +141,10 @@ class Send(object):
                          its response in XML rather than JSON. Defaults to
                          False.
 
+        opts['rawxml']:  If True, causes the backend to send it's response in
+                         XML as bytes. This can be easily parsed by Python's
+                         'lxml.etree.fromstring()'. Defaults to False.
+
         opts['wrmi']:    If True and there is postdata, the URL is then sent to
                          the server.
 
@@ -249,8 +254,15 @@ class Send(object):
         # TODO: Should handle redirects here (mostly for remote backends.)
         if response.status_code > 299:
             self.logger.debug('%s', response.text)
-            raise RuntimeError('Unexpected status returned: {}: URL was: {}'
-                               .format(response.status_code, url))
+            try:
+                reason = (ElementTree.fromstring(response.text)
+                          .find('errorDescription').text)
+            except ElementTree.ParseError:
+                reason = 'N/A'
+            raise RuntimeError('Unexpected status returned: {}: Reason: "{}" '
+                               'URL was: {}'
+                               .format(response.status_code,
+                                       reason, url))
 
         self._validate_header(response.headers['Server'])
 
@@ -288,6 +300,9 @@ class Send(object):
         if self.opts['usexml']:
             return response.text
 
+        if self.opts['rawxml']:
+            return response.content
+
         try:
             return response.json()
         except ValueError as err:
@@ -312,7 +327,7 @@ class Send(object):
         if not isinstance(self.opts, dict):
             self.opts = {}
 
-        for option in ('noetag', 'nogzip', 'usexml', 'wrmi', 'wsdl'):
+        for option in ('noetag', 'nogzip', 'usexml', 'rawxml', 'wrmi', 'wsdl'):
             try:
                 self.opts[option]
             except (KeyError, TypeError):
@@ -360,8 +375,8 @@ class Send(object):
             raise RuntimeError('usage: postdata must be passed as a dict')
 
         self.logger.debug('The following postdata was included:')
-        for key in self.postdata:
-            self.logger.debug('%15s: %s', key, self.postdata[key])
+        for k, v in self.postdata.items():
+            self.logger.debug('%15s: %s', k, v)
 
         if not self.opts['wrmi']:
             raise RuntimeWarning('wrmi=False')
@@ -388,7 +403,7 @@ class Send(object):
         else:
             self.session.headers.update({'Accept-Encoding': 'gzip,deflate'})
 
-        if self.opts['usexml']:
+        if self.opts['usexml'] or self.opts['rawxml']:
             self.session.headers.update({'Accept': ''})
         else:
             self.session.headers.update({'Accept': 'application/json'})
@@ -405,13 +420,14 @@ class Send(object):
                 if self.postdata:
                     saved_endpoint = self.endpoint
                     saved_postdata = self.postdata
-                    # Need to adjust this if a service other than Frontend is
-                    # added.
+                    saved_opts = self.opts
                     self.send(endpoint='{}/version'.format(
-                        'Myth' if self.endpoint[:8] != 'Frontend'
-                        else 'Frontend'), opts=self.opts)
+                        self.endpoint[:self.endpoint.find('/')],
+                        opts=self.opts))
                     self.endpoint = saved_endpoint
                     self.postdata = saved_postdata
+                    self.opts = saved_opts
+
         except KeyError:
             # Proceed without authentication.
             pass

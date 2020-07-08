@@ -3,15 +3,6 @@
 #include <cstdint> // for intptr_t
 #include "tspacket.h"
 
-const unsigned int TSHeader::kHeaderSize       = 4;
-
-const unsigned int TSPacket::kSize             = 188;
-const unsigned int TSPacket::kPayloadSize      = 188-4;
-
-const unsigned int TSPacket::kDVBEmissionSize  = 204;
-const unsigned int TSPacket::kISDBEmissionSize = 204;
-const unsigned int TSPacket::k8VSBEmissionSize = 208;
-
 const unsigned char TSHeader::kPayloadOnlyHeader[4] =
 {
     SYNC_BYTE,
@@ -41,10 +32,10 @@ QString TSPacket::toString() const
     str.append(QString("raw: 0x%1 0x%2 0x%3 0x%4\n")
                .arg(int(data()[0]),0,16).arg(int(data()[1]),0,16)
                .arg(int(data()[2]),0,16).arg(int(data()[3]),0,16));
-    str.append(QString("                 inSync: %1\n").arg(HasSync()));
-    str.append(QString("         transportError: %1\n").arg(TransportError()));
-    str.append(QString("           payloadStart: %1\n").arg(PayloadStart()));
-    str.append(QString("               priority: %1\n").arg(Priority()));
+    str.append(QString("                 inSync: %1\n").arg(static_cast<int>(HasSync())));
+    str.append(QString("         transportError: %1\n").arg(static_cast<int>(TransportError())));
+    str.append(QString("           payloadStart: %1\n").arg(static_cast<int>(PayloadStart())));
+    str.append(QString("               priority: %1\n").arg(static_cast<int>(Priority())));
     str.append(QString("                    pid: %1\n").arg(PID()));
     str.append(QString("       scrambled (if>1): %1\n")
                .arg(ScramblingControl()));

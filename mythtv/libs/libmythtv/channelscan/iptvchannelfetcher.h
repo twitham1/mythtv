@@ -3,16 +3,18 @@
  *  Distributed as part of MythTV under GPL v2 and later.
  */
 
-#ifndef _IPTVCHANNELFETCHER_H_
-#define _IPTVCHANNELFETCHER_H_
+#ifndef IPTVCHANNELFETCHER_H
+#define IPTVCHANNELFETCHER_H
+
+#include <utility>
 
 // Qt headers
-#include <QString>
-#include <QRunnable>
-#include <QObject>
-#include <QMutex>
-#include <QMap>
 #include <QCoreApplication>
+#include <QMap>
+#include <QMutex>
+#include <QObject>
+#include <QRunnable>
+#include <QString>
 
 // MythTV headers
 #include "iptvtuningdata.h"
@@ -27,8 +29,8 @@ class IPTVChannelInfo
 
   public:
     IPTVChannelInfo() = default;
-    IPTVChannelInfo(const QString &name,
-                    const QString &xmltvid,
+    IPTVChannelInfo(QString name,
+                    QString xmltvid,
                     const QString &data_url,
                     uint data_bitrate,
                     const QString &fec_type,
@@ -37,12 +39,15 @@ class IPTVChannelInfo
                     const QString &fec_url1,
                     uint fec_bitrate1,
                     uint programnumber) :
-        m_name(name), m_xmltvid(xmltvid), m_programNumber(programnumber),
+        m_name(std::move(name)), m_xmltvid(std::move(xmltvid)), m_programNumber(programnumber),
         m_tuning(data_url, data_bitrate,
-                 fec_type, fec_url0, fec_bitrate0, fec_url1, fec_bitrate1)
+                 fec_type, fec_url0, fec_bitrate0, fec_url1, fec_bitrate1,
+                 IPTVTuningData::inValid)
     {
     }
 
+ protected:
+    friend class TestIPTVRecorder;
     bool IsValid(void) const
     {
         return !m_name.isEmpty() && m_tuning.IsValid();
@@ -54,16 +59,16 @@ class IPTVChannelInfo
     uint           m_programNumber {0};
     IPTVTuningData m_tuning;
 };
-typedef QMap<QString,IPTVChannelInfo> fbox_chan_map_t;
+using fbox_chan_map_t = QMap<QString,IPTVChannelInfo>;
 
 class IPTVChannelFetcher : public QRunnable
 {
     Q_DECLARE_TR_FUNCTIONS(IPTVChannelFetcher);
 
   public:
-    IPTVChannelFetcher(uint cardid, const QString &inputname, uint sourceid,
+    IPTVChannelFetcher(uint cardid, QString inputname, uint sourceid,
                        bool is_mpts, ScanMonitor *monitor = nullptr);
-    ~IPTVChannelFetcher();
+    ~IPTVChannelFetcher() override;
 
     void Scan(void);
     void Stop(void);
@@ -74,28 +79,28 @@ class IPTVChannelFetcher : public QRunnable
         const QString &rawdata, IPTVChannelFetcher *fetcher = nullptr);
 
   private:
-    void SetTotalNumChannels(uint val) { m_chan_cnt = (val) ? val : 1; }
-    void SetNumChannelsParsed(uint);
-    void SetNumChannelsInserted(uint);
+    void SetTotalNumChannels(uint val) { m_chanCnt = (val) ? val : 1; }
+    void SetNumChannelsParsed(uint val);
+    void SetNumChannelsInserted(uint val);
     void SetMessage(const QString &status);
 
   protected:
     void run(void) override; // QRunnable
 
   private:
-    ScanMonitor     *m_scan_monitor   {nullptr};
-    uint             m_cardid;
-    QString          m_inputname;
-    uint             m_sourceid;
-    bool             m_is_mpts;
+    ScanMonitor     *m_scanMonitor    {nullptr};
+    uint             m_cardId;
+    QString          m_inputName;
+    uint             m_sourceId;
+    bool             m_isMpts;
     fbox_chan_map_t  m_channels;
-    uint             m_chan_cnt       {1};
-    bool             m_thread_running {false};
-    bool             m_stop_now       {false};
+    uint             m_chanCnt        {1};
+    bool             m_threadRunning  {false};
+    bool             m_stopNow        {false};
     MThread         *m_thread         {nullptr};
     QMutex           m_lock;
 };
 
-#endif // _IPTVCHANNELFETCHER_H_
+#endif // IPTVCHANNELFETCHER_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

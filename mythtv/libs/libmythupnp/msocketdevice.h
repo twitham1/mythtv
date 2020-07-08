@@ -61,7 +61,7 @@ public:
     explicit MSocketDevice(Type type = Stream);
     MSocketDevice(Type type, Protocol protocol, int dummy);
     MSocketDevice(int socket, Type type);
-    virtual ~MSocketDevice();
+    ~MSocketDevice() override;
 
     bool  isValid() const;
     Type  type() const;
@@ -79,34 +79,34 @@ public:
     }
 
     void  close() override; // QIODevice
-    bool  flush();
+    static bool  flush();
 
     // Implementation of QIODevice abstract virtual functions
     qint64  size() const override; // QIODevice
     qint64  pos() const override; // QIODevice
-    bool  seek(qint64) override; // QIODevice
+    bool  seek(qint64 /*pos*/) override; // QIODevice
     bool  atEnd() const override; // QIODevice
 
     bool  blocking() const;
-    virtual void setBlocking(bool);
+    virtual void setBlocking(bool enable);
 
     bool  broadcast() const;
-    virtual void setBroadcast(bool);
+    virtual void setBroadcast(bool enable);
 
     bool  addressReusable() const;
-    virtual void setAddressReusable(bool);
+    virtual void setAddressReusable(bool enable);
 
     int   receiveBufferSize() const;
-    virtual void setReceiveBufferSize(uint);
+    virtual void setReceiveBufferSize(uint size);
     int   sendBufferSize() const;
-    virtual void setSendBufferSize(uint);
+    virtual void setSendBufferSize(uint size);
 
     bool  keepalive() const;
-    virtual void setKeepalive(bool);
+    virtual void setKeepalive(bool enable);
 
-    virtual bool connect(const QHostAddress &, quint16);
+    virtual bool connect(const QHostAddress &addr, quint16 port);
 
-    virtual bool bind(const QHostAddress &, quint16);
+    virtual bool bind(const QHostAddress &address, quint16 port);
     virtual bool listen(int backlog);
     virtual int  accept();
 
@@ -160,19 +160,19 @@ protected:
     qint64 writeData(const char *data, qint64 len) override; // QIODevice
 
 private:
-    int fd;
-    Type t;
-    quint16 p;
-    QHostAddress a;
-    quint16 pp;
-    QHostAddress pa;
-    MSocketDevice::Error e;
-    MSocketDevicePrivate * d;
+    int                   m_fd {-1};
+    Type                  m_t;
+    quint16               m_p  {0};
+    QHostAddress          m_a;
+    quint16               m_pp {0};
+    QHostAddress          m_pa;
+    MSocketDevice::Error  m_e {NoError};
+    MSocketDevicePrivate *d{nullptr}; // NOLINT(readability-identifier-naming)
 
     enum Option { Broadcast, ReceiveBuffer, ReuseAddress, SendBuffer, Keepalive };
 
-    int   option(Option) const;
-    virtual void setOption(Option, int);
+    int   option(Option opt) const;
+    virtual void setOption(Option opt, int v);
 
     void  fetchConnectionParameters();
 #if defined(Q_OS_WIN32) || defined(Q_OS_WINCE)

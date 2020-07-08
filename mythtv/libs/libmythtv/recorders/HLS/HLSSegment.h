@@ -1,5 +1,5 @@
-#ifndef _HLS_Segment_h_
-#define _HLS_Segment_h_
+#ifndef HLS_SEGMENT_H
+#define HLS_SEGMENT_H
 
 #include <cstdint>
 
@@ -13,10 +13,10 @@ class HLSRecSegment
 
     HLSRecSegment(void);
     HLSRecSegment(const HLSRecSegment& rhs);
-    HLSRecSegment(int seq, int duration, const QString& title,
-		  const QUrl& uri);
-    HLSRecSegment(int seq, int duration, const QString& title,
-	       const QUrl& uri, const QString& current_key_path);
+    HLSRecSegment(int seq, int duration, QString title,
+		  QUrl uri);
+    HLSRecSegment(int seq, int duration, QString title,
+                  QUrl uri, const QString& current_key_path);
     ~HLSRecSegment();
 
     HLSRecSegment& operator=(const HLSRecSegment& rhs);
@@ -35,7 +35,7 @@ class HLSRecSegment
     bool DecodeData(const uint8_t *IV, QByteArray& data);
     bool HasKeyPath(void) const { return !m_psz_key_path.isEmpty(); }
     QString KeyPath(void) const { return m_psz_key_path; }
-    void SetKeyPath(const QString path) { m_psz_key_path = path; }
+    void SetKeyPath(const QString& path) { m_psz_key_path = path; }
 #endif
 
   protected:
@@ -53,4 +53,4 @@ class HLSRecSegment
 
 };
 
-#endif
+#endif // HLS_SEGMENT_H

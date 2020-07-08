@@ -95,7 +95,7 @@ bool MythUIShape::ParseElement(
         if (style == "solid" && !color.isEmpty())
         {
             m_fillBrush.setStyle(Qt::SolidPattern);
-            QColor brushColor = QColor(color);
+            auto brushColor = QColor(color);
             brushColor.setAlpha(alpha);
             m_fillBrush.setColor(brushColor);
         }
@@ -123,7 +123,7 @@ bool MythUIShape::ParseElement(
             int orig_width = element.attribute("width", "1").toInt();
             int width = (orig_width) ? max(NormX(orig_width), 1) : 0;
             int alpha = element.attribute("alpha", "255").toInt();
-            QColor lineColor = QColor(color);
+            auto lineColor = QColor(color);
             lineColor.setAlpha(alpha);
             m_linePen.setColor(lineColor);
             m_linePen.setWidth(width);
@@ -149,7 +149,7 @@ bool MythUIShape::ParseElement(
  */
 void MythUIShape::CopyFrom(MythUIType *base)
 {
-    MythUIShape *shape = dynamic_cast<MythUIShape *>(base);
+    auto *shape = dynamic_cast<MythUIShape *>(base);
 
     if (!shape)
     {
@@ -171,6 +171,6 @@ void MythUIShape::CopyFrom(MythUIType *base)
  */
 void MythUIShape::CreateCopy(MythUIType *parent)
 {
-    MythUIShape *shape = new MythUIShape(parent, objectName());
+    auto *shape = new MythUIShape(parent, objectName());
     shape->CopyFrom(this);
 }

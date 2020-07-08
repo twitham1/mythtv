@@ -41,9 +41,8 @@ class VideoDialog : public MythScreenType
                       BRS_USERRATING = 0x20, BRS_INSERTDATE = 0x40,
                       BRS_TVMOVIE = 0x80, BRS_STUDIO = 0x100, btLast };
 
-    typedef simple_ref_ptr<class VideoList> VideoListPtr;
-
-    typedef QPointer<class VideoListDeathDelay> VideoListDeathDelayPtr;
+    using VideoListPtr = simple_ref_ptr<class VideoList>;
+    using VideoListDeathDelayPtr = QPointer<class VideoListDeathDelay>;
 
     static VideoListDeathDelayPtr &GetSavedVideoList();
 
@@ -51,7 +50,7 @@ class VideoDialog : public MythScreenType
     VideoDialog(MythScreenStack *lparent, const QString& lname,
             const VideoListPtr& video_list, DialogType type,
             BrowseType browse);
-    ~VideoDialog();
+    ~VideoDialog() override;
 
     bool Create() override; // MythScreenType
     bool keyPressEvent(QKeyEvent *levent) override; // MythScreenType
@@ -68,9 +67,9 @@ class VideoDialog : public MythScreenType
 
   private slots:
     void UpdatePosition();
-    void UpdateText(MythUIButtonListItem *);
-    void handleSelect(MythUIButtonListItem *);
-    void SetCurrentNode(MythGenericTree *);
+    void UpdateText(MythUIButtonListItem *item);
+    void handleSelect(MythUIButtonListItem *item);
+    void SetCurrentNode(MythGenericTree *node);
 
     void playVideo();
     void playVideoAlt();
@@ -101,7 +100,7 @@ class VideoDialog : public MythScreenType
     void ToggleWatched();
     void ToggleProcess();
     void RemoveVideo();
-    void OnRemoveVideo(bool);
+    void OnRemoveVideo(bool dodelete);
 
     void VideoMenu();
     MythMenu* CreateInfoMenu();
@@ -137,7 +136,7 @@ class VideoDialog : public MythScreenType
     void doVideoScan();
 
   protected slots:
-    void scanFinished(bool);
+    void scanFinished(bool dbChanged);
     void reloadData();
     void refreshData();
     void UpdateItem(MythUIButtonListItem *item);
@@ -150,16 +149,16 @@ class VideoDialog : public MythScreenType
 
     virtual void loadData();
     void fetchVideos();
-    QString RemoteImageCheck(const QString& host, const QString& filename);
-    QString GetCoverImage(MythGenericTree *node);
+    static QString RemoteImageCheck(const QString& host, const QString& filename);
+    static QString GetCoverImage(MythGenericTree *node);
     QString GetFirstImage(MythGenericTree *node, const QString& type,
                           const QString& gpnode = QString(), int levels = 0);
-    QString GetImageFromFolder(VideoMetadata *metadata);
-    QString GetScreenshot(MythGenericTree *node);
-    QString GetBanner(MythGenericTree *node);
-    QString GetFanart(MythGenericTree *node);
+    static QString GetImageFromFolder(VideoMetadata *metadata);
+    static QString GetScreenshot(MythGenericTree *node);
+    static QString GetBanner(MythGenericTree *node);
+    static QString GetFanart(MythGenericTree *node);
 
-    VideoMetadata *GetMetadata(MythUIButtonListItem *item);
+    static VideoMetadata *GetMetadata(MythUIButtonListItem *item);
 
     void handleDirSelect(MythGenericTree *node);
     void handleDynamicDirSelect(MythGenericTree *node);
@@ -221,7 +220,7 @@ class VideoListDeathDelay : public QObject
 
   public:
     explicit VideoListDeathDelay(const VideoDialog::VideoListPtr& toSave);
-    ~VideoListDeathDelay();
+    ~VideoListDeathDelay() override;
 
     VideoDialog::VideoListPtr GetSaved();
     // When exiting MythVideo, we delay destroying the data for kDelayTimeMS

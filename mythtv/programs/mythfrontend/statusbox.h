@@ -1,30 +1,49 @@
 #ifndef STATUSBOX_H_
 #define STATUSBOX_H_
 
-#include <vector> // For std::vector
+// Qt
+#include <QTimer>
 
-using namespace std;
-
+// MythTV
 #include "mythscreentype.h"
+#include "mythuibuttonlist.h"
+
+// Std
+#include <vector> // For std::vector
+using namespace std;
 
 class ProgramInfo;
 class MythUIText;
 class MythUIButtonList;
-class MythUIButtonListItem;
+
 class MythUIStateType;
 
-typedef QMap<QString, unsigned int> recprof2bps_t;
+using recprof2bps_t = QMap<QString, unsigned int>;
+
+class StatusBoxItem : public QTimer, public MythUIButtonListItem
+{
+    Q_OBJECT
+
+  public:
+    StatusBoxItem(MythUIButtonList *lbtype, const QString& text, QVariant data)
+      : MythUIButtonListItem (lbtype, text, data) { }
+
+    void Start(int Interval = 1); // Seconds
+
+  signals:
+    void UpdateRequired(StatusBoxItem* Item);
+};
 
 class StatusBox : public MythScreenType
 {
     Q_OBJECT
   public:
     explicit StatusBox(MythScreenStack *parent);
-   ~StatusBox(void);
+   ~StatusBox(void) override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
-    void customEvent(QEvent*) override; // MythUIType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
+    void customEvent(QEvent *event) override; // MythUIType
 
   signals:
     void updateLog();
@@ -44,14 +63,16 @@ class StatusBox : public MythScreenType
     void doJobQueueStatus();
     void doMachineStatus();
     void doAutoExpireList(bool updateExpList = true);
+    void doDisplayStatus();
+    void doDecoderStatus();
 
   private:
-    void AddLogLine(const QString & line,
-                     const QString & help = "",
-                     const QString & detail = "",
-                     const QString & helpdetail = "",
-                     const QString & state = "",
-                     const QString & data = "");
+    StatusBoxItem* AddLogLine(const QString & line,
+                              const QString & help = "",
+                              const QString & detail = "",
+                              const QString & helpdetail = "",
+                              const QString & state = "",
+                              const QString & data = "");
 
     void getActualRecordedBPS(const QString& hostnames);
 
@@ -61,8 +82,7 @@ class StatusBox : public MythScreenType
     MythUIButtonList  *m_logList         {nullptr};
     MythUIStateType   *m_iconState       {nullptr};
 
-    QMap<int, QString> contentData;
-    recprof2bps_t      recordingProfilesBPS;
+    recprof2bps_t      m_recordingProfilesBps;
 
     vector<ProgramInfo *> m_expList;
 

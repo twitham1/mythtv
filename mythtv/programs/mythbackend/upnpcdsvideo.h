@@ -14,7 +14,7 @@
 #include "mainserver.h"
 #include "upnpcds.h"
               
-typedef QMap<int, QString> IntMap;
+using IntMap = QMap<int, QString>;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -25,7 +25,7 @@ class UPnpCDSVideo : public UPnpCDSExtension
     public:
 
         UPnpCDSVideo( );
-        virtual ~UPnpCDSVideo() = default;
+        ~UPnpCDSVideo() override = default;
 
     protected:
 
@@ -36,12 +36,12 @@ class UPnpCDSVideo : public UPnpCDSExtension
 
         bool LoadMetadata( const UPnpCDSRequest *pRequest,
                            UPnpCDSExtensionResults *pResults,
-                           IDTokenMap tokens,
-                           QString currentToken ) override; // UPnpCDSExtension
+                           const IDTokenMap& tokens,
+                           const QString& currentToken ) override; // UPnpCDSExtension
         bool LoadChildren( const UPnpCDSRequest *pRequest,
                            UPnpCDSExtensionResults *pResults,
-                           IDTokenMap tokens,
-                           QString currentToken ) override; // UPnpCDSExtension
+                           const IDTokenMap& tokens,
+                           const QString& currentToken ) override; // UPnpCDSExtension
     private:
         bool LoadSeries( const UPnpCDSRequest *pRequest,
                      UPnpCDSExtensionResults *pResults,
@@ -55,28 +55,28 @@ class UPnpCDSVideo : public UPnpCDSExtension
                          UPnpCDSExtensionResults *pResults,
                          IDTokenMap tokens );
 
-        bool LoadGenres( const UPnpCDSRequest *pRequest,
-                         UPnpCDSExtensionResults *pResults,
-                         const IDTokenMap& tokens );
+        static bool LoadGenres( const UPnpCDSRequest *pRequest,
+                                UPnpCDSExtensionResults *pResults,
+                                const IDTokenMap& tokens );
 
         bool LoadVideos( const UPnpCDSRequest *pRequest,
                          UPnpCDSExtensionResults *pResults,
                          const IDTokenMap& tokens );
 
 
-        void PopulateArtworkURIS( CDSObject *pItem, int nVidID,
+        static void PopulateArtworkURIS( CDSObject *pItem, int nVidID,
                                   const QUrl &URIBase );
 
         // Common code helpers
-        QString BuildWhereClause( QStringList clauses,
+        static QString BuildWhereClause( QStringList clauses,
                                   IDTokenMap tokens );
-        void    BindValues ( MSqlQuery &query,
+        static void    BindValues ( MSqlQuery &query,
                              IDTokenMap tokens );
 
         QStringMap             m_mapBackendIp;
         QMap<QString, int>     m_mapBackendPort;
 
-        QUrl m_URIBase;
+        QUrl m_uriBase;
 
 };
 

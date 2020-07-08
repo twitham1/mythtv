@@ -27,6 +27,21 @@ const double DEFAULT_WEIGHT = std::pow(0.5, TRAILING_BETA_SHAPE - 1) *
 //! The edges of the distribution get clipped to avoid a singularity.
 const qint64 BETA_CLIP = 60 * 60 * 24;
 
+void MarkedFiles::Add(const ImageIdList& newIds)
+{
+    for (int newid : newIds)
+        insert(newid);
+}
+
+void MarkedFiles::Invert(const ImageIdList &all)
+{
+    QSet tmp;
+    for (int tmpint : all)
+        tmp.insert(tmpint);
+    for (int tmpint : *this)
+        tmp.remove(tmpint);
+    swap(tmp);
+}
 
 /*!
  \brief Get all images/dirs in view
@@ -35,7 +50,7 @@ const qint64 BETA_CLIP = 60 * 60 * 24;
 ImageListK FlatView::GetAllNodes() const
 {
     ImageListK files;
-    foreach (int id, m_sequence)
+    for (int id : qAsConst(m_sequence))
         files.append(m_images.value(id));
     return files;
 }
@@ -74,7 +89,8 @@ bool FlatView::Update(int id)
         return false;
 
     // Get updated image
-    ImageList files, dirs;
+    ImageList files;
+    ImageList dirs;
     ImageIdList ids = ImageIdList() << id;
     if (m_mgr.GetImages(ids, files, dirs) != 1 || files.size() != 1)
         return false;
@@ -203,7 +219,7 @@ void FlatView::Populate(ImageList &files)
     if (files.isEmpty())
         return;
 
-    foreach (ImagePtrK im, files)
+    for (const QSharedPointer<ImageItem> & im : qAsConst(files))
     {
         // Add image to view
         m_images.insert(im->m_id, im);
@@ -216,7 +232,7 @@ void FlatView::Populate(ImageList &files)
     if (files.size() == 1 || m_order == kOrdered || m_order == kShuffle)
     {
         // Default sequence is ordered
-        foreach (ImagePtrK im, files)
+        for (const QSharedPointer<ImageItem> & im : qAsConst(files))
             m_sequence.append(im->m_id);
     }
 
@@ -258,7 +274,7 @@ void FlatView::Populate(ImageList &files)
             double     maxWeight = weights.last();
 
 #if QT_VERSION >= QT_VERSION_CHECK(5,10,0)
-            auto randgen = QRandomGenerator::global();
+            auto *randgen = QRandomGenerator::global();
 #else
             qsrand(QTime::currentTime().msec());
 #endif
@@ -299,17 +315,13 @@ WeightList FlatView::CalculateSeasonalWeights(ImageList &files)
     for (int i = 0; i < files.size(); ++i)
     {
         ImagePtrK im = files.at(i);
-        double weight;
+        double weight = 0;
 
         if (im->m_date == 0)
             weight = DEFAULT_WEIGHT;
         else
         {
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-            QDateTime timestamp = QDateTime::fromTime_t(im->m_date);
-#else
             QDateTime timestamp = QDateTime::fromSecsSinceEpoch(im->m_date);
-#endif
             QDateTime curYearAnniversary =
                     QDateTime(QDate(now.date().year(),
                                     timestamp.date().month(),
@@ -358,7 +370,8 @@ bool FlatView::LoadFromDb(int parentId)
     m_parentId = parentId;
 
     // Load child images of the parent
-    ImageList files, dirs;
+    ImageList files;
+    ImageList dirs;
     m_mgr.GetChildren(m_parentId, files, dirs);
 
     // Load gallery datastore with current dir
@@ -445,8 +458,8 @@ void FlatView::Cache(int id, int parent, const QString &url, const QString &thum
 QString DirCacheEntry::ToString(int id) const
 {
     QStringList ids;
-    for (int i = 0; i < m_thumbs.size(); ++i)
-        ids << QString::number(m_thumbs.at(i).first);
+    for (const auto & thumb : qAsConst(m_thumbs))
+        ids << QString::number(thumb.first);
     return QString("Dir %1 (%2, %3) Thumbs %4 (%5) Parent %6")
             .arg(id).arg(m_fileCount).arg(m_dirCount).arg(ids.join(","))
             .arg(m_thumbCount).arg(m_parent);
@@ -486,9 +499,10 @@ subtree.
 bool DirectoryView::LoadFromDb(int parentId)
 {
     // Determine parent (defaulting to ancestor) & get initial children
-    ImageList files, dirs;
+    ImageList files;
+    ImageList dirs;
     ImagePtr parent;
-    int count;
+    int count = 0;
     // Root is guaranteed to return at least 1 item
     while ((count = m_mgr.GetDirectory(parentId, parent, files, dirs)) == 0)
     {
@@ -508,7 +522,7 @@ bool DirectoryView::LoadFromDb(int parentId)
     }
 
     // Populate all subdirs
-    foreach (ImagePtr im, dirs)
+    for (const ImagePtr & im : qAsConst(dirs))
     {
         if (im)
             // Load sufficient thumbs from each dir as subsequent dirs may be empty
@@ -526,7 +540,7 @@ bool DirectoryView::LoadFromDb(int parentId)
     if (!m_marked.isEmpty())
     {
         QSet<int> ids;
-        foreach (ImagePtrK im, images)
+        for (const QSharedPointer<ImageItem> & im : qAsConst(images))
             ids.insert(im->m_id);
         m_marked.intersect(ids);
     }
@@ -561,7 +575,8 @@ void DirectoryView::LoadDirThumbs(ImageItem &parent, int thumbsNeeded, int level
         return;
 
     // Load child images & dirs
-    ImageList files, dirs;
+    ImageList files;
+    ImageList dirs;
     m_mgr.GetChildren(parent.m_id, files, dirs);
 
     PopulateThumbs(parent, thumbsNeeded, files, dirs, level);
@@ -590,7 +605,7 @@ void DirectoryView::PopulateThumbs(ImageItem &parent, int thumbsNeeded,
     ImagePtr userIm;
     if (parent.m_userThumbnail != 0)
     {
-        foreach (ImagePtr im, files + dirs)
+        for (const ImagePtr & im : files + dirs)
         {
             if (im && im->m_id == parent.m_userThumbnail)
             {
@@ -601,7 +616,8 @@ void DirectoryView::PopulateThumbs(ImageItem &parent, int thumbsNeeded,
     }
 
     // Children to use as thumbnails
-    ImageList thumbFiles, thumbDirs;
+    ImageList thumbFiles;
+    ImageList thumbDirs;
 
     if (!userIm)
     {
@@ -631,12 +647,14 @@ void DirectoryView::PopulateThumbs(ImageItem &parent, int thumbsNeeded,
         // Prevent lengthy/infinite recursion due to deep/cyclic folder
         // structures
         if (++level > 10)
+        {
             LOG(VB_GENERAL, LOG_NOTICE, LOC +
                 "Directory thumbnails are more than 10 levels deep");
+        }
         else
         {
             // Recursively load subdir thumbs to try to get 1 thumb from each
-            foreach (ImagePtr im, thumbDirs)
+            for (const ImagePtr & im : qAsConst(thumbDirs))
             {
                 if (!im)
                     continue;
@@ -661,7 +679,7 @@ void DirectoryView::PopulateThumbs(ImageItem &parent, int thumbsNeeded,
             int i = 0;
             while (thumbsNeeded > 0 && ++i < kMaxFolderThumbnails)
             {
-                foreach (ImagePtrK im, thumbDirs)
+                for (const QSharedPointer<ImageItem> & im : qAsConst(thumbDirs))
                 {
                     if (i < im->m_thumbNails.size())
                     {
@@ -791,7 +809,7 @@ MenuSubjects DirectoryView::GetMenuSubjects()
     // unhiddenMarked is true if 1 or more marked items are not hidden
     bool hiddenMarked   = false;
     bool unhiddenMarked = false;
-    foreach (int id, m_marked)
+    for (int id : qAsConst(m_marked))
     {
         ImagePtrK im = m_images.value(id);
         if (!im)
@@ -848,7 +866,7 @@ void DirectoryView::Cache(ImageItemK &dir, int thumbCount)
     m_dirCache.insert(dir.m_id, cacheEntry);
 
     // Cache images used by dir thumbnails
-    foreach (const ThumbPair &thumb, dir.m_thumbNails)
+    for (const ThumbPair & thumb : qAsConst(dir.m_thumbNails))
     {
         // Do not overwrite any existing image url nor parent.
         // Image url is cached when image is displayed as a child, but not as a

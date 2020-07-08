@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __UPNPTASKNOTIFY_H__
-#define __UPNPTASKNOTIFY_H__
+#ifndef UPNPTASKNOTIFY_H
+#define UPNPTASKNOTIFY_H
 
 // POSIX headers
 #include <sys/types.h>
@@ -35,12 +35,11 @@ class UPnpDevice;
 // Typedefs
 /////////////////////////////////////////////////////////////////////////////
 
-typedef enum
+enum UPnpNotifyNTS
 {
     NTS_alive   = 0,
     NTS_byebye  = 1
-
-} UPnpNotifyNTS;
+};
 
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
@@ -66,7 +65,7 @@ class UPnpNotifyTask : public Task
 
         // Destructor protected to force use of Release Method
 
-        virtual ~UPnpNotifyTask() = default;
+        ~UPnpNotifyTask() override = default;
 
         void     ProcessDevice( MSocketDevice *pSocket, UPnpDevice *pDevice );
         void     SendNotifyMsg( MSocketDevice *pSocket, const QString& sNT, const QString& sUDN );
@@ -76,7 +75,7 @@ class UPnpNotifyTask : public Task
         explicit UPnpNotifyTask( int nServicePort );
 
         QString Name() override { return( "Notify" ); } // Task
-        void Execute( TaskQueue * ) override; // Task
+        void Execute( TaskQueue *pQueue ) override; // Task
 
         // ------------------------------------------------------------------
 
@@ -117,4 +116,4 @@ class UPnpNotifyTask : public Task
 };
 
 
-#endif
+#endif // UPNPTASKNOTIFY_H

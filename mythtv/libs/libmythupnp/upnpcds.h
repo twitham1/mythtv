@@ -13,10 +13,14 @@
 #ifndef UPnpCDS_H_
 #define UPnpCDS_H_
 
+// C++ headers
+#include <utility>
+
+// QT headers
 #include <QList>
 #include <QMap>
-#include <QString>
 #include <QObject>
+#include <QString>
 
 #include "upnp.h"
 #include "upnpcdsobjects.h"
@@ -25,7 +29,7 @@
 
 class UPnpCDS;
 
-typedef enum 
+enum UPnpCDSMethod
 {
     CDSM_Unknown                = 0,
     CDSM_GetServiceDescription  = 1,
@@ -36,18 +40,16 @@ typedef enum
     CDSM_GetSystemUpdateID      = 6,
     CDSM_GetFeatureList         = 7,
     CDSM_GetServiceResetToken   = 8
+};
 
-} UPnpCDSMethod;
-
-typedef enum
+enum UPnpCDSBrowseFlag
 {
     CDS_BrowseUnknown         = 0,
     CDS_BrowseMetadata        = 1,
     CDS_BrowseDirectChildren  = 2
+};
 
-} UPnpCDSBrowseFlag;
-
-typedef enum
+enum UPnpCDSClient
 {
     CDS_ClientDefault         = 0,      // (no special attention required)
     CDS_ClientWMP             = 1,      // Windows Media Player
@@ -55,14 +57,14 @@ typedef enum
     CDS_ClientMP101           = 3,      // Netgear MP101
     CDS_ClientXBox            = 4,      // XBox 360
     CDS_ClientSonyDB          = 5,      // Sony Blu-ray players
-} UPnpCDSClient;
+};
 
-typedef struct
+struct UPnpCDSClientException
 {
     UPnpCDSClient   nClientType;
     QString         sHeaderKey;
     QString         sHeaderValue;
-} UPnpCDSClientException;
+};
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -123,7 +125,7 @@ class UPNP_PUBLIC UPnpCDSExtensionResults
         }
 
         void    Add         ( CDSObject *pObject );
-        void    Add         ( CDSObjects objects );
+        void    Add         ( const CDSObjects& objects );
         QString GetResultXML(FilterMap &filter, bool ignoreChildren = false);
 };
 
@@ -186,16 +188,16 @@ class UPNP_PUBLIC UPnPShortcutFeature : public UPnPFeature
     QString CreateXML() override; // UPnPFeature
 
   private:
-    QString TypeToName(ShortCutType type);
+    static QString TypeToName(ShortCutType type);
     QMap<ShortCutType, QString> m_shortcuts;
 };
 
-typedef QMap<UPnPShortcutFeature::ShortCutType, QString> CDSShortCutList;
+using CDSShortCutList = QMap<UPnPShortcutFeature::ShortCutType, QString>;
 
 //////////////////////////////////////////////////////////////////////////////
 
-typedef QMap<QString, QString> IDTokenMap;
-typedef QPair<QString, QString> IDToken;
+using IDTokenMap = QMap<QString, QString>;
+using IDToken = QPair<QString, QString>;
 
 class UPNP_PUBLIC UPnpCDSExtension
 {
@@ -209,7 +211,7 @@ class UPNP_PUBLIC UPnpCDSExtension
 
     protected:
 
-        QString RemoveToken ( const QString &sToken, const QString &sStr, int num );
+        static QString RemoveToken ( const QString &sToken, const QString &sStr, int num );
 
         // ------------------------------------------------------------------
 
@@ -225,35 +227,35 @@ class UPNP_PUBLIC UPnpCDSExtension
         virtual void CreateRoot ( );
 
         virtual bool LoadMetadata ( const UPnpCDSRequest *pRequest,
-                                     UPnpCDSExtensionResults *pResults,
-                                     IDTokenMap tokens,
-                                     QString currentToken );
+                                    UPnpCDSExtensionResults *pResults,
+                                    const IDTokenMap& tokens,
+                                    const QString& currentToken );
         virtual bool LoadChildren ( const UPnpCDSRequest *pRequest,
                                     UPnpCDSExtensionResults *pResults,
-                                    IDTokenMap tokens,
-                                    QString currentToken );
+                                    const IDTokenMap& tokens,
+                                    const QString& currentToken );
 
-        IDTokenMap TokenizeIDString ( const QString &Id ) const;
-        IDToken    GetCurrentToken  ( const QString &Id ) const;
+        static IDTokenMap TokenizeIDString ( const QString &Id ) ;
+        static IDToken    GetCurrentToken  ( const QString &Id ) ;
 
-        QString    CreateIDString   ( const QString &RequestId,
-                                      const QString &Name,
-                                      int Value );
-        QString    CreateIDString   ( const QString &RequestId,
-                                      const QString &Name,
-                                      const QString &Value );
+        static QString    CreateIDString   ( const QString &RequestId,
+                                             const QString &Name,
+                                             int Value );
+        static QString CreateIDString ( const QString &RequestId,
+                                        const QString &Name,
+                                        const QString &Value );
 
         CDSObject *m_pRoot {nullptr};
 
     public:
 
-        UPnpCDSExtension( QString sName, 
+        UPnpCDSExtension( const QString& sName,
                           QString sExtensionId, 
                           QString sClass )
         {
             m_sName        = QObject::tr(sName.toLatin1().constData());
-            m_sExtensionId = sExtensionId;
-            m_sClass       = sClass;
+            m_sExtensionId = std::move(sExtensionId);
+            m_sClass       = std::move(sClass);
         }
 
         virtual CDSObject *GetRoot ( );
@@ -268,7 +270,7 @@ class UPNP_PUBLIC UPnpCDSExtension
         virtual CDSShortCutList GetShortCuts         () { return m_shortcuts; }
 };
 
-typedef QList<UPnpCDSExtension*> UPnpCDSExtensionList;
+using UPnpCDSExtensionList = QList<UPnpCDSExtension*>;
 
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -293,17 +295,17 @@ class UPNP_PUBLIC UPnpCDS : public Eventing
 
     private:
 
-        UPnpCDSMethod       GetMethod              ( const QString &sURI  );
-        UPnpCDSBrowseFlag   GetBrowseFlag          ( const QString &sFlag );
+        static UPnpCDSMethod       GetMethod              ( const QString &sURI  );
+        static UPnpCDSBrowseFlag   GetBrowseFlag          ( const QString &sFlag );
 
         void            HandleBrowse               ( HTTPRequest *pRequest );
         void            HandleSearch               ( HTTPRequest *pRequest );
-        void            HandleGetSearchCapabilities( HTTPRequest *pRequest );
-        void            HandleGetSortCapabilities  ( HTTPRequest *pRequest );
+        static void     HandleGetSearchCapabilities( HTTPRequest *pRequest );
+        static void     HandleGetSortCapabilities  ( HTTPRequest *pRequest );
         void            HandleGetSystemUpdateID    ( HTTPRequest *pRequest );
         void            HandleGetFeatureList       ( HTTPRequest *pRequest );
         void            HandleGetServiceResetToken ( HTTPRequest *pRequest );
-        void            DetermineClient            ( HTTPRequest *pRequest, UPnpCDSRequest *pCDSRequest );
+        static void     DetermineClient            ( HTTPRequest *pRequest, UPnpCDSRequest *pCDSRequest );
 
     protected:
 
@@ -322,7 +324,7 @@ class UPNP_PUBLIC UPnpCDS : public Eventing
         UPnpCDS( UPnpDevice *pDevice,
                  const QString &sSharePath ); 
 
-        virtual ~UPnpCDS();
+        ~UPnpCDS() override;
 
         void     RegisterExtension  ( UPnpCDSExtension *pExtension );
         void     UnregisterExtension( UPnpCDSExtension *pExtension );

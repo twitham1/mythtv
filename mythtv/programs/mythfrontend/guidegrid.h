@@ -3,6 +3,7 @@
 #define GUIDEGRID_H_
 
 // c++
+#include <utility>
 #include <vector>
 using namespace std;
 
@@ -31,9 +32,9 @@ class QTimer;
 class MythUIButtonList;
 class MythUIGuideGrid;
 
-typedef vector<ChannelInfo>   db_chan_list_t;
-typedef vector<db_chan_list_t> db_chan_list_list_t;
-typedef ProgramInfo *ProgInfoGuideArray[MAX_DISPLAY_CHANS][MAX_DISPLAY_TIMES];
+using db_chan_list_t = vector<ChannelInfo>  ;
+using db_chan_list_list_t = vector<db_chan_list_t>;
+using ProgInfoGuideArray = ProgramInfo *[MAX_DISPLAY_CHANS][MAX_DISPLAY_TIMES];
 
 class JumpToChannel;
 class JumpToChannelListener
@@ -52,7 +53,7 @@ class JumpToChannel : public QObject
 
   public:
     JumpToChannel(
-        JumpToChannelListener *parent, const QString &start_entry,
+        JumpToChannelListener *parent, QString start_entry,
         int start_chan_idx, int cur_chan_idx, uint rows_disp);
 
     bool ProcessEntry(const QStringList &actions, const QKeyEvent *e);
@@ -63,15 +64,15 @@ class JumpToChannel : public QObject
     virtual void deleteLater(void);
 
   private:
-    ~JumpToChannel() = default;
+    ~JumpToChannel() override = default;
     bool Update(void);
 
   private:
     JumpToChannelListener *m_listener {nullptr};
     QString  m_entry;
-    int      m_previous_start_channel_index;
-    int      m_previous_current_channel_index;
-    uint     m_rows_displayed;
+    int      m_previousStartChannelIndex;
+    int      m_previousCurrentChannelIndex;
+    uint     m_rowsDisplayed;
     QTimer  *m_timer                  {nullptr}; // audited ref #5318
 
     static const uint kJumpToChannelTimeout = 3500; // ms
@@ -84,10 +85,10 @@ class JumpToChannel : public QObject
 class GuideUIElement {
 public:
     GuideUIElement(int row, int col, const QRect &area,
-                   const QString &title, const QString &category,
+                   QString title, QString category,
                    int arrow, int recType, int recStat, bool selected)
-        : m_row(row), m_col(col), m_area(area), m_title(title),
-          m_category(category), m_arrow(arrow), m_recType(recType),
+        : m_row(row), m_col(col), m_area(area), m_title(std::move(title)),
+          m_category(std::move(category)), m_arrow(arrow), m_recType(recType),
           m_recStat(recStat), m_selected(selected) {}
     const int m_row;
     const int m_col;
@@ -148,8 +149,8 @@ class GuideGrid : public ScheduleCommon, public JumpToChannelListener
 
     void showProgFinder();
     void channelUpdate();
-    void volumeUpdate(bool);
-    void toggleMute(const bool muteIndividualChannels = false);
+    void volumeUpdate(bool up);
+    void toggleMute(bool muteIndividualChannels = false);
 
     void deleteRule();
 
@@ -158,13 +159,13 @@ class GuideGrid : public ScheduleCommon, public JumpToChannelListener
 
   protected:
     GuideGrid(MythScreenStack *parentStack,
-              uint chanid, const QString &channum,
+              uint chanid, QString channum,
               const QDateTime &startTime,
               TV *player = nullptr,
               bool embedVideo = false,
               bool allowFinder = true,
               int changrpid = -1);
-   ~GuideGrid();
+   ~GuideGrid() override;
     ProgramInfo *GetCurrentProgram(void) const override // ScheduleCommon
         { return m_programInfos[m_currentRow][m_currentCol]; };
 
@@ -241,7 +242,7 @@ private:
     QMap<uint,uint>      m_channelInfoIdx;
 
     vector<ProgramList*> m_programs;
-    ProgInfoGuideArray m_programInfos;
+    ProgInfoGuideArray m_programInfos {};
     ProgramList  m_recList;
 
     QDateTime m_originalStartTime;
@@ -268,7 +269,7 @@ private:
     bool    m_embedVideo                  {false};
     QTimer *m_previewVideoRefreshTimer    {nullptr}; // audited ref #5318
     void    EmbedTVWindow(void);
-    void    HideTVWindow(void);
+    static void    HideTVWindow(void);
     QRect   m_videoRect;
 
     QString m_channelOrdering;

@@ -55,7 +55,7 @@ void MHVisible::Initialise(MHParseNode *p, MHEngine *engine)
 
     if (! pOriginalBox)
     {
-        p->Failure("OriginalBoxSize missing");
+        MHParseNode::Failure("OriginalBoxSize missing");
     }
     else
     {
@@ -155,7 +155,10 @@ void MHVisible::Deactivation(MHEngine *engine)
 // Return the colour, looking up in the palette if necessary.  Used by the sub-classes
 MHRgba MHVisible::GetColour(const MHColour &colour)
 {
-    int red = 0, green = 0, blue = 0, alpha = 0;
+    int red = 0;
+    int green = 0;
+    int blue = 0;
+    int alpha = 0;
     if (colour.IsSet())
     {
         int cSize = colour.m_ColStr.Size();
@@ -803,16 +806,9 @@ void MHSlider::Display(MHEngine *engine)
         colour = GetColour(m_sliderRefColour);
     }
 
-    int major; // Direction of change.
-
+    int major = m_nBoxHeight; // Direction of change.
     if (m_orientation == SliderLeft || m_orientation == SliderRight)
-    {
         major = m_nBoxWidth;
-    }
-    else
-    {
-        major = m_nBoxHeight;
-    }
 
     if (m_max_value <= m_min_value)
     {

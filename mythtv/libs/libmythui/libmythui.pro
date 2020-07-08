@@ -1,11 +1,10 @@
 include ( ../../settings.pro )
 
-QT += xml sql network opengl
+QT += xml sql network widgets
 using_qtwebkit {
-    QT += widgets
     QT += webkitwidgets
-    android: QT += androidextras
 }
+android: QT += androidextras
 
 TEMPLATE = lib
 TARGET = mythui-$$LIBVERSION
@@ -13,18 +12,20 @@ CONFIG += thread dll
 target.path = $${LIBDIR}
 INSTALLS = target
 
+DEPENDPATH  += ./opengl ./platforms ./devices ./vulkan
+INCLUDEPATH += $$DEPENDPATH
 INCLUDEPATH += ../libmythbase
 INCLUDEPATH += ../.. ../
-INCLUDEPATH += ../.. ../../external/FFmpeg
 
 LIBS += -L../libmythbase -lmythbase-$$LIBVERSION
 
 QMAKE_CLEAN += $(TARGET) $(TARGETA) $(TARGETD) $(TARGET0) $(TARGET1) $(TARGET2)
 
 # Input
-HEADERS  = mythmainwindow.h mythpainter.h mythimage.h mythrect.h
-HEADERS += myththemebase.h  mythpainter_qimage.h mythpainter_yuva.h
-HEADERS += mythpainter_qt.h mythmainwindow_internal.h mythuihelper.h
+HEADERS  = mythmainwindowprivate.h mythmainwindow.h mythpainter.h mythimage.h mythrect.h
+HEADERS += mythpainterwindow.h mythpainterwindowqt.h
+HEADERS += myththemebase.h
+HEADERS += mythpainter_qt.h mythuihelper.h
 HEADERS += mythscreenstack.h mythgesture.h mythuitype.h mythscreentype.h
 HEADERS += mythuiimage.h mythuitext.h mythuistatetype.h  xmlparsebase.h
 HEADERS += mythuibutton.h myththemedmenu.h mythdialogbox.h
@@ -32,7 +33,7 @@ HEADERS += mythuiclock.h mythuitextedit.h mythprogressdialog.h mythuispinbox.h
 HEADERS += mythuicheckbox.h mythuibuttonlist.h mythuigroup.h
 HEADERS += mythuiprogressbar.h mythuifilebrowser.h
 HEADERS += screensaver.h screensaver-null.h x11colors.h
-HEADERS += themeinfo.h mythxdisplay.h DisplayRes.h DisplayResScreen.h
+HEADERS += themeinfo.h platforms/mythxdisplay.h mythdisplaymode.h
 HEADERS += mythgenerictree.h mythuibuttontree.h mythuiutils.h
 HEADERS += mythvirtualkeyboard.h mythuishape.h mythuiguidegrid.h
 HEADERS += mythrender_base.h mythfontmanager.h mythuieditbar.h
@@ -40,10 +41,13 @@ HEADERS += mythdisplay.h mythuivideo.h mythudplistener.h
 HEADERS += mythuiexp.h mythuisimpletext.h mythuistatetracker.h
 HEADERS += mythuianimation.h mythuiscrollbar.h
 HEADERS += mythnotificationcenter.h mythnotificationcenter_private.h
-HEADERS += mythuicomposite.h mythnotification.h mythuidefines.h
+HEADERS += mythuicomposite.h mythnotification.h
+HEADERS += mythedid.h
+HEADERS += devices/mythinputdevicehandler.h
 
-SOURCES  = mythmainwindow.cpp mythpainter.cpp mythimage.cpp mythrect.cpp
-SOURCES += myththemebase.cpp  mythpainter_qimage.cpp mythpainter_yuva.cpp
+SOURCES  = mythmainwindowprivate.cpp mythmainwindow.cpp mythpainter.cpp mythimage.cpp mythrect.cpp
+SOURCES += mythpainterwindow.cpp mythpainterwindowqt.cpp
+SOURCES += myththemebase.cpp
 SOURCES += mythpainter_qt.cpp xmlparsebase.cpp mythuihelper.cpp
 SOURCES += mythscreenstack.cpp mythgesture.cpp mythuitype.cpp mythscreentype.cpp
 SOURCES += mythuiimage.cpp mythuitext.cpp mythuifilebrowser.cpp
@@ -53,7 +57,7 @@ SOURCES += mythuiclock.cpp mythuitextedit.cpp mythprogressdialog.cpp
 SOURCES += mythuispinbox.cpp mythuicheckbox.cpp mythuibuttonlist.cpp
 SOURCES += mythuigroup.cpp mythuiprogressbar.cpp
 SOURCES += screensaver.cpp screensaver-null.cpp x11colors.cpp
-SOURCES += themeinfo.cpp mythxdisplay.cpp DisplayRes.cpp DisplayResScreen.cpp
+SOURCES += themeinfo.cpp platforms/mythxdisplay.cpp mythdisplaymode.cpp
 SOURCES += mythgenerictree.cpp mythuibuttontree.cpp mythuiutils.cpp
 SOURCES += mythvirtualkeyboard.cpp mythuishape.cpp mythuiguidegrid.cpp
 SOURCES += mythfontmanager.cpp mythuieditbar.cpp
@@ -62,6 +66,8 @@ SOURCES += mythuisimpletext.cpp mythuistatetracker.cpp
 SOURCES += mythuianimation.cpp mythuiscrollbar.cpp
 SOURCES += mythnotificationcenter.cpp mythnotification.cpp
 SOURCES += mythuicomposite.cpp
+SOURCES += mythedid.cpp
+SOURCES += devices/mythinputdevicehandler.cpp
 
 using_qtwebkit {
 HEADERS += mythuiwebbrowser.h
@@ -93,27 +99,30 @@ INSTALLS += inc
 #	level settings.pro)
 #
 
-using_vdpau {
-    DEFINES += USING_VDPAU
-    HEADERS += mythpainter_vdpau.h   mythrender_vdpau.h
-    SOURCES += mythpainter_vdpau.cpp mythrender_vdpau.cpp
-    LIBS += -lvdpau
-}
-
 using_x11 {
     DEFINES += USING_X11
     HEADERS += screensaver-x11.h
     SOURCES += screensaver-x11.cpp
-    using_xnvctrl {
-        # Add nvidia XV-EXTENSION support
-        HEADERS += util-nvctrl.h
-        SOURCES += util-nvctrl.cpp
-        ! using_xnvctrl_external {
-            INCLUDEPATH += ../../external/libXNVCtrl
-            LIBS += -L../../external/libXNVCtrl -lmythXNVCtrl-$${LIBVERSION}
-            POST_TARGETDEPS += ../../external/libXNVCtrl/libmythXNVCtrl-$${LIBVERSION}.$${QMAKE_EXTENSION_STATICLIB}
-        }
-    }
+    HEADERS += platforms/mythdisplayx11.h
+    SOURCES += platforms/mythdisplayx11.cpp
+}
+
+using_drm {
+    DEFINES += USING_DRM
+    HEADERS += platforms/mythdisplaydrm.h
+    HEADERS += platforms/mythdrmdevice.h
+    SOURCES += platforms/mythdisplaydrm.cpp
+    SOURCES += platforms/mythdrmdevice.cpp
+    QMAKE_CXXFLAGS += $${LIBDRM_CFLAGS}
+}
+
+# Use MMAL as a proxy for Raspberry Pi support
+using_mmal {
+    DEFINES += USING_MMAL
+    HEADERS += platforms/mythdisplayrpi.h
+    SOURCES += platforms/mythdisplayrpi.cpp
+    LIBS    += -L/opt/vc/lib -lvchostif -lvchiq_arm
+    QMAKE_CXXFLAGS += -isystem /opt/vc/include
 }
 
 using_qtdbus {
@@ -124,49 +133,49 @@ using_qtdbus {
 }
 
 macx {
-    HEADERS += screensaver-osx.h   DisplayResOSX.h   util-osx.h
-    SOURCES += screensaver-osx.cpp DisplayResOSX.cpp util-osx.cpp
+    HEADERS += screensaver-osx.h   platforms/mythosxutils.h
+    SOURCES += screensaver-osx.cpp platforms/mythosxutils.cpp
+    HEADERS += platforms/mythdisplayosx.h
+    SOURCES += platforms/mythdisplayosx.cpp
     QMAKE_OBJECTIVE_CFLAGS += $$QMAKE_CXXFLAGS
     QMAKE_OBJECTIVE_CXXFLAGS += $$QMAKE_CXXFLAGS
-    OBJECTIVE_HEADERS += util-osx-cocoa.h
-    OBJECTIVE_SOURCES += util-osx-cocoa.mm
+    OBJECTIVE_HEADERS += platforms/mythutilscocoa.h
+    OBJECTIVE_SOURCES += platforms/mythutilscocoa.mm
     LIBS              += -framework Cocoa -framework IOKit
 
     using_appleremote {
-        HEADERS += AppleRemote.h   AppleRemoteListener.h
-        SOURCES += AppleRemote.cpp AppleRemoteListener.cpp
-        !using_lirc: HEADERS += lircevent.h
-        !using_lirc: SOURCES += lircevent.cpp
+        HEADERS += devices/AppleRemote.h   devices/AppleRemoteListener.h
+        SOURCES += devices/AppleRemote.cpp devices/AppleRemoteListener.cpp
+        !using_lirc: HEADERS += devices/lircevent.h
+        !using_lirc: SOURCES += devices/lircevent.cpp
     }
 }
 
 android {
-    HEADERS += screensaver-android.h
-    SOURCES += screensaver-android.cpp
+    HEADERS += screensaver-android.h   platforms/mythdisplayandroid.h
+    SOURCES += screensaver-android.cpp platforms/mythdisplayandroid.cpp
 }
 
 using_joystick_menu {
     DEFINES += USE_JOYSTICK_MENU
-    HEADERS += jsmenu.h jsmenuevent.h
-    SOURCES += jsmenu.cpp jsmenuevent.cpp
+    HEADERS += devices/jsmenu.h devices/jsmenuevent.h
+    SOURCES += devices/jsmenu.cpp devices/jsmenuevent.cpp
 }
 
 using_lirc {
     DEFINES += USE_LIRC
-    HEADERS += lirc.h   lircevent.h   lirc_client.h
-    SOURCES += lirc.cpp lircevent.cpp lirc_client.c
+    HEADERS += devices/lirc.h   devices/lircevent.h   devices/lirc_client.h
+    SOURCES += devices/lirc.cpp devices/lircevent.cpp devices/lirc_client.cpp
 }
 
 using_libcec {
     DEFINES += USING_LIBCEC
-    HEADERS += cecadapter.h
-    SOURCES += cecadapter.cpp
+    HEADERS += devices/mythcecadapter.h
+    SOURCES += devices/mythcecadapter.cpp
 }
 
 using_xrandr {
     DEFINES += USING_XRANDR
-    HEADERS += DisplayResX.h
-    SOURCES += DisplayResX.cpp
 }
 
 cygwin:DEFINES += _WIN32
@@ -175,48 +184,60 @@ mingw :DEFINES += USING_MINGW
 mingw | win32-msvc*{
     HEADERS += mythpainter_d3d9.h   mythrender_d3d9.h
     SOURCES += mythpainter_d3d9.cpp mythrender_d3d9.cpp
+    HEADERS += platforms/mythdisplaywindows.h
+    SOURCES += platforms/mythdisplaywindows.cpp
     DEFINES += NODRAWTEXT
     LIBS    += -lGdi32 -lUser32
 
     using_dxva2: DEFINES += USING_DXVA2
 }
 
+using_vulkan {
+    DEFINES += USING_VULKAN
+    HEADERS += vulkan/mythpainterwindowvulkan.h
+    HEADERS += vulkan/mythpaintervulkan.h
+    HEADERS += vulkan/mythrendervulkan.h
+    HEADERS += vulkan/mythwindowvulkan.h
+    HEADERS += vulkan/mythtexturevulkan.h
+    HEADERS += vulkan/mythshadervulkan.h
+    HEADERS += vulkan/mythshadersvulkan.h
+    HEADERS += vulkan/mythuniformbuffervulkan.h
+    HEADERS += vulkan/mythcombobuffervulkan.h
+    HEADERS += vulkan/mythdebugvulkan.h
+    SOURCES += vulkan/mythpainterwindowvulkan.cpp
+    SOURCES += vulkan/mythpaintervulkan.cpp
+    SOURCES += vulkan/mythrendervulkan.cpp
+    SOURCES += vulkan/mythwindowvulkan.cpp
+    SOURCES += vulkan/mythtexturevulkan.cpp
+    SOURCES += vulkan/mythshadervulkan.cpp
+    SOURCES += vulkan/mythuniformbuffervulkan.cpp
+    SOURCES += vulkan/mythcombobuffervulkan.cpp
+    SOURCES += vulkan/mythdebugvulkan.cpp
+    using_libglslang: DEFINES += USING_GLSLANG
+}
+
 using_opengl {
-    using_opengl_themepainter:DEFINES += USE_OPENGL_PAINTER
-    SOURCES += mythpainter_ogl.cpp  mythrender_opengl.cpp
-    SOURCES += mythrender_opengl2.cpp
-    HEADERS += mythpainter_ogl.h    mythrender_opengl.h mythrender_opengl_defs.h
-    HEADERS += mythrender_opengl2.h mythrender_opengl_defs2.h
-    using_opengles {
-        DEFINES += USING_OPENGLES
-        HEADERS += mythrender_opengl2es.h
-        SOURCES += mythrender_opengl2es.cpp
-        # For raspberry Pi Raspbian
-        exists(/opt/vc/lib/libbrcmEGL.so) {
-            LIBS += -L/opt/vc/include -lbrcmGLESv2 -lbrcmEGL
-        }
+    DEFINES += USING_OPENGL
+    HEADERS += opengl/mythpainterwindowopengl.h
+    HEADERS += opengl/mythpainteropengl.h
+    HEADERS += opengl/mythrenderopengl.h
+    HEADERS += opengl/mythrenderopengldefs.h
+    HEADERS += opengl/mythrenderopenglshaders.h
+    HEADERS += opengl/mythopenglperf.h
+    HEADERS += opengl/mythegl.h
+    SOURCES += opengl/mythpainterwindowopengl.cpp
+    SOURCES += opengl/mythpainteropengl.cpp
+    SOURCES += opengl/mythrenderopengl.cpp
+    SOURCES += opengl/mythopenglperf.cpp
+    SOURCES += opengl/mythegl.cpp
+
+    using_egl {
+        LIBS    += -lEGL
+        DEFINES += USING_EGL
     }
-    !using_opengles {
-        SOURCES += mythrender_opengl1.cpp
-        HEADERS += mythrender_opengl1.h mythrender_opengl_defs1.h
-    }
-    inc.files += mythpainter_ogl.h
-    QT += opengl
 
     mingw|win32-msvc*:LIBS += -lopengl32
 }
-
-using_openmax {
-    contains( HAVE_OPENMAX_BROADCOM, yes ) {
-        using_opengl {
-            # For raspberry Pi Raspbian
-            exists(/opt/vc/lib/libbrcmEGL.so) {
-                LIBS += -L/opt/vc/lib/ -lbrcmGLESv2 -lbrcmEGL
-            }
-        }
-    }
-}
-
 
 DEFINES += USING_QTWEBKIT
 DEFINES += MUI_API

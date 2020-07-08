@@ -3,8 +3,12 @@
 
 using namespace std;
 
-#include <QString>
+// c++
+#include <utility>
+
+// qt
 #include <QDateTime>
+#include <QString>
 
 #include "mythprotoserverexp.h"
 #include "programinfo.h"
@@ -17,16 +21,16 @@ class PROTOSERVER_PUBLIC DeleteHandler : public ReferenceCounter
   public:
     DeleteHandler(void);
     explicit DeleteHandler(const QString& filename);
-   ~DeleteHandler(void);
+   ~DeleteHandler(void) override;
 
     void Close(void);
 
     QString     GetPath(void)           { return m_path;    }
-    int         GetFD(void)             { return m_fd;      }
-    off_t       GetSize(void)           { return m_size;    }
+    int         GetFD(void) const       { return m_fd;      }
+    off_t       GetSize(void) const     { return m_size;    }
     QDateTime   GetWait(void)           { return m_wait;    }
 
-    void        SetPath(QString path)   { m_path= path;     }
+    void        SetPath(QString path)   { m_path= std::move(path);     }
 
     virtual void DeleteSucceeded(void)  {};
     virtual void DeleteFailed(void)     {};
@@ -35,8 +39,8 @@ class PROTOSERVER_PUBLIC DeleteHandler : public ReferenceCounter
 
   private:
     QString     m_path;
-    int         m_fd;
-    off_t       m_size;
+    int         m_fd   { -1 };
+    off_t       m_size {  0 };
     QDateTime   m_wait;
 
 };

@@ -24,7 +24,7 @@ class EditMetadataCommon : public MythScreenType
     EditMetadataCommon(MythScreenStack *parent, const QString &name)
         : MythScreenType(parent, name) {}
 
-    ~EditMetadataCommon(void);
+    ~EditMetadataCommon(void) override;
 
     bool CreateCommon(void);
 
@@ -37,16 +37,16 @@ class EditMetadataCommon : public MythScreenType
 
   protected slots:
     void showSaveMenu(void);
-    void saveToDatabase(void);
+    static void saveToDatabase(void);
     void saveToMetadata(void);
     void saveAll(void);
     void cleanupAndClose(void);
 
   protected:
-    bool hasMetadataChanged(void);
+    static bool hasMetadataChanged(void);
     void updateMetadata(void);
     void searchForAlbumImages(void);
-    void scanForImages(void);
+    static void scanForImages(void);
 
     static bool           s_metadataOnly;
     static MusicMetadata *s_metadata;
@@ -64,7 +64,7 @@ class EditMetadataDialog : public EditMetadataCommon
   public:
     EditMetadataDialog(MythScreenStack *parent, MusicMetadata *source_metadata);
     explicit EditMetadataDialog(MythScreenStack *parent);
-    ~EditMetadataDialog(void);
+    ~EditMetadataDialog(void) override;
 
     bool Create(void) override; // MythScreenType
 
@@ -145,7 +145,7 @@ class EditAlbumartDialog : public EditMetadataCommon
 
   public:
     explicit EditAlbumartDialog(MythScreenStack *parent);
-    ~EditAlbumartDialog();
+    ~EditAlbumartDialog() override;
 
     bool Create(void) override; // MythScreenType
 
@@ -172,7 +172,7 @@ class EditAlbumartDialog : public EditMetadataCommon
     void startCopyImageToTag(void);
     void copyImageToTag(ImageType imageType);
     void doCopyImageToTag(const AlbumArtImage *image);
-    void removeCachedImage(const AlbumArtImage *image);
+    static void removeCachedImage(const AlbumArtImage *image);
 
     QString         m_imageFilename;
 

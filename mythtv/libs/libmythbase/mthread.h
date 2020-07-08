@@ -1,5 +1,7 @@
-#ifndef _MYTH_THREAD_H_
-#define _MYTH_THREAD_H_
+#ifndef MYTH_THREAD_H
+#define MYTH_THREAD_H
+
+#include <climits>
 
 #include <QThread>
 
@@ -56,6 +58,9 @@ class MBASE_PUBLIC MThread
     explicit MThread(const QString &objectName, QRunnable *runnable);
     virtual ~MThread();
 
+    MThread(const MThread &) = delete;            // not copyable
+    MThread &operator=(const MThread &) = delete; // not copyable
+
     /// \brief Sets up a thread, call this if you reimplement run().
     void RunProlog(void);
     /// \brief Cleans up a thread's resources, call this if you reimplement
@@ -81,7 +86,7 @@ class MBASE_PUBLIC MThread
     /// \brief Use this to exit from the thread if you are using a Qt event loop
     void exit(int retcode = 0);
     /// \brief Tell MThread to start running the thread in the near future.
-    void start(QThread::Priority = QThread::InheritPriority);
+    void start(QThread::Priority p = QThread::InheritPriority);
     /// \brief Kill a thread unsafely.
     ///
     /// This should never be called on a thread while it holds a mutex
@@ -94,7 +99,7 @@ class MBASE_PUBLIC MThread
 
     /// This is to be called on startup in those few threads that
     /// haven't been ported to MThread.
-    static void ThreadSetup(const QString&);
+    static void ThreadSetup(const QString& name);
     /// This is to be called on exit in those few threads that
     /// haven't been ported to MThread.
     static void ThreadCleanup(void);
@@ -113,10 +118,6 @@ class MBASE_PUBLIC MThread
 
     static const int kDefaultStartTimeout;
 
-  private:
-    MThread(const MThread &) = delete;            // not copyable
-    MThread &operator=(const MThread &) = delete; // not copyable
-
   protected:
     /// \brief Runs the Qt event loop unless we have a QRunnable,
     ///        in which case we run the runnable run instead.
@@ -134,8 +135,8 @@ class MBASE_PUBLIC MThread
 
     MThreadInternal *m_thread {nullptr};
     QRunnable *m_runnable     {nullptr};
-    bool m_prolog_executed    {true};
-    bool m_epilog_executed    {true};
+    bool m_prologExecuted     {true};
+    bool m_epilogExecuted     {true};
 };
 
-#endif // _MYTH_THREAD_H_
+#endif // MYTH_THREAD_H

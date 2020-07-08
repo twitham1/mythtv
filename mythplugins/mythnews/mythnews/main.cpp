@@ -13,7 +13,7 @@
 #include <mythmainwindow.h>
 
 // MythNews headers
-#include "dbcheck.h"
+#include "newsdbcheck.h"
 #include "mythnews.h"
 #include "mythnewsconfig.h"
 
@@ -23,7 +23,7 @@ static int RunNews(void)
 {
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    MythNews *mythnews = new MythNews(mainStack, "mythnews");
+    auto *mythnews = new MythNews(mainStack, "mythnews");
 
     if (mythnews->Create())
     {
@@ -54,9 +54,9 @@ static void setupKeys(void)
 
 int mythplugin_init(const char *libversion)
 {
-    if (!gCoreContext->TestPluginVersion("mythnews",
-                                    libversion,
-                                    MYTH_BINARY_VERSION))
+    if (!MythCoreContext::TestPluginVersion("mythnews",
+                                            libversion,
+                                            MYTH_BINARY_VERSION))
         return -1;
 
     gCoreContext->ActivateSettingsCache(false);
@@ -82,7 +82,7 @@ int mythplugin_config(void)
 {
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    MythNewsConfig *mythnewsconfig = new MythNewsConfig(mainStack, "mythnewsconfig");
+    auto *mythnewsconfig = new MythNewsConfig(mainStack, "mythnewsconfig");
 
     if (mythnewsconfig->Create())
     {

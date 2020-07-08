@@ -27,7 +27,6 @@
 // Qt headers
 #include <QByteArray>
 #include <QIODevice>
-#include <QRegExp>
 #include <QStringList>
 #include <utility>
 
@@ -51,8 +50,7 @@ class MythSystemLegacyWrapper : public MythSystem
         if (args.empty())
             return nullptr;
 
-        MythSystemLegacy *legacy =
-            new MythSystemLegacy(args.join(" "), flags);
+        auto *legacy = new MythSystemLegacy(args.join(" "), flags);
 
         if (!startPath.isEmpty())
             legacy->SetDirectory(startPath);
@@ -64,8 +62,7 @@ class MythSystemLegacyWrapper : public MythSystem
             return nullptr;
         }
 
-        MythSystemLegacyWrapper *wrapper =
-            new MythSystemLegacyWrapper(legacy, flags);
+        auto *wrapper = new MythSystemLegacyWrapper(legacy, flags);
 
         // TODO implement cpuPriority and diskPriority
         return wrapper;
@@ -206,22 +203,22 @@ class MythSystemLegacyWrapper : public MythSystem
 MythSystem *MythSystem::Create(
     const QStringList &args,
     uint flags,
-    QString startPath,
+    const QString& startPath,
     Priority cpuPriority,
     Priority diskPriority)
 {
     return MythSystemLegacyWrapper::Create(
-        args, flags, std::move(startPath), cpuPriority, diskPriority);
+        args, flags, startPath, cpuPriority, diskPriority);
 }
 
 MythSystem *MythSystem::Create(
     const QString& args,
     uint flags,
-    QString startPath,
+    const QString& startPath,
     Priority cpuPriority,
     Priority diskPriority)
 {
     return MythSystem::Create(
-        args.split(QRegExp("\\s+")), flags, std::move(startPath),
+        args.simplified().split(' '), flags, startPath,
         cpuPriority, diskPriority);
 }

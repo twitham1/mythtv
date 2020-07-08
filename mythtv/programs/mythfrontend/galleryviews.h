@@ -11,6 +11,9 @@
 #ifndef GALLERYVIEWS_H
 #define GALLERYVIEWS_H
 
+#include <utility>
+
+// MythTV headers
 #include "imagemanager.h"
 
 
@@ -24,20 +27,20 @@ enum SlideOrderType {
 
 
 //! Seasonal weightings for images in a view
-typedef QVector<double> WeightList;
+using WeightList = QVector<double>;
 
 
 //! A container of images/dirs that have been marked
 class MarkedFiles : public QSet<int>
 {
 public:
-    MarkedFiles() : QSet() {}
+    MarkedFiles() = default;
     void Initialise(int id)      { m_valid = true; m_parent = id; clear();}
     void Clear()                 { m_valid = false; clear(); }
-    bool IsFor(int id)           { return m_valid && m_parent == id; }
-    void Add(ImageIdList newIds) { unite(newIds.toSet()); }
+    bool IsFor(int id) const     { return m_valid && m_parent == id; }
+    void Add(const ImageIdList& newIds);
     void Add(int id)             { insert(id); }
-    void Invert(ImageIdList all) { QSet tmp(all.toSet() - *this); swap(tmp); }
+    void Invert(const ImageIdList& all);
 
 private:
     bool m_valid  {false};
@@ -50,12 +53,12 @@ class MenuSubjects
 {
 public:
     MenuSubjects() = default;
-    MenuSubjects(ImagePtrK selection, int childCount,
+    MenuSubjects(const ImagePtrK& selection, int childCount,
                  MarkedFiles &marked, MarkedFiles &prevMarked,
                  bool hiddenMarked, bool unhiddenMarked)
         : m_selected(selection),
           m_selectedMarked(selection && marked.contains(selection->m_id)),
-          m_markedId(marked.toList()),  m_prevMarkedId(prevMarked.toList()),
+          m_markedId(marked.values()),  m_prevMarkedId(prevMarked.values()),
           m_childCount(childCount),
           m_hiddenMarked(hiddenMarked), m_unhiddenMarked(unhiddenMarked)
     {}
@@ -75,10 +78,10 @@ class FileCacheEntry
 public:
     // Default constructor for QHash 'undefined entry'
     FileCacheEntry() = default;
-    FileCacheEntry(int parent, const QString &url, const QString &thumbUrl)
-        : m_parent(parent), m_url(url), m_thumbUrl(thumbUrl)  {}
+    FileCacheEntry(int parent, QString url, QString thumbUrl)
+        : m_parent(parent), m_url(std::move(url)), m_thumbUrl(std::move(thumbUrl))  {}
 
-    QString ToString(int id)
+    QString ToString(int id) const
     { return QString("File %1 Parent %2").arg(id).arg(m_parent); }
 
     int     m_parent {GALLERY_DB_ID};
@@ -144,9 +147,9 @@ class DirCacheEntry
 public:
     DirCacheEntry() = default;
     DirCacheEntry(int parentId, int dirs, int files,
-                  const QList<ThumbPair> &thumbs, int thumbCount)
+                  QList<ThumbPair> thumbs, int thumbCount)
         : m_parent(parentId), m_thumbCount(thumbCount),
-          m_dirCount(dirs), m_fileCount(files), m_thumbs(thumbs) {}
+          m_dirCount(dirs), m_fileCount(files), m_thumbs(std::move(thumbs)) {}
 
     QString ToString(int id) const;
 
@@ -167,7 +170,7 @@ thumbnails from their subtree
 class DirectoryView : public FlatView
 {
 public:
-    explicit DirectoryView(SlideOrderType);
+    explicit DirectoryView(SlideOrderType order);
 
     ImagePtrK GetParent() const
     { return m_sequence.isEmpty() ? ImagePtrK() : m_images.value(m_sequence.at(0)); }
@@ -179,21 +182,21 @@ public:
     QStringList  RemoveImage(int id, bool deleted = false);
     void         ClearCache();
     void         MarkAll();
-    void         Mark(int, bool);
+    void         Mark(int id, bool mark);
     void         InvertMarked();
     void         ClearMarked();
     bool         IsMarked(int id) const
     { return m_marked.contains(id) || m_prevMarked.contains(id); }
 
 protected:
-    void         SetDirectory(int);
-    void         LoadDirThumbs(ImageItem &, int thumbsNeeded, int level = 0);
-    void         PopulateThumbs(ImageItem &, int thumbsNeeded,
+    void         SetDirectory(int newParent);
+    void         LoadDirThumbs(ImageItem &parent, int thumbsNeeded, int level = 0);
+    void         PopulateThumbs(ImageItem &parent, int thumbsNeeded,
                                 const ImageList &files, const ImageList &dirs,
                                 int level = 0);
     ImageIdList  GetChildren() const  { return m_sequence.mid(1); }
-    bool         PopulateFromCache(ImageItem &, int required);
-    void         Cache(ImageItemK &, int thumbCount);
+    bool         PopulateFromCache(ImageItem &dir, int required);
+    void         Cache(ImageItemK &dir, int thumbCount);
 
     MarkedFiles m_marked;       //!< Marked items in current dir/view
     MarkedFiles m_prevMarked;   //!< Marked items in previous dir

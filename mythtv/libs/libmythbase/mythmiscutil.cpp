@@ -45,6 +45,8 @@ using namespace std;
 #include <QUrl>
 #include <QHostAddress>
 #include <QDataStream>
+#include <QRegularExpression>
+#include <QRegularExpressionMatchIterator>
 
 // Myth headers
 #include "mythcorecontext.h"
@@ -63,7 +65,7 @@ using namespace std;
 bool getUptime(time_t &uptime)
 {
 #ifdef __linux__
-    struct sysinfo sinfo;
+    struct sysinfo sinfo {};
     if (sysinfo(&sinfo) == -1)
     {
         LOG(VB_GENERAL, LOG_ERR, "sysinfo() error");
@@ -109,7 +111,7 @@ bool getMemStats(int &totalMB, int &freeMB, int &totalVM, int &freeVM)
 {
 #ifdef __linux__
     const size_t MB = (1024*1024);
-    struct sysinfo sinfo;
+    struct sysinfo sinfo {};
     if (sysinfo(&sinfo) == -1)
     {
         LOG(VB_GENERAL, LOG_ERR,
@@ -121,7 +123,7 @@ bool getMemStats(int &totalMB, int &freeMB, int &totalVM, int &freeVM)
     freeMB  = (int)((sinfo.freeram   * sinfo.mem_unit)/MB);
     totalVM = (int)((sinfo.totalswap * sinfo.mem_unit)/MB);
     freeVM  = (int)((sinfo.freeswap  * sinfo.mem_unit)/MB);
-
+    return true;
 #elif CONFIG_DARWIN
     mach_port_t             mp;
     mach_msg_type_number_t  count;
@@ -156,18 +158,30 @@ bool getMemStats(int &totalMB, int &freeMB, int &totalVM, int &freeVM)
     free = getDiskSpace("/private/var/vm", total, used);
     totalVM = (int)(total >> 10);
     freeVM = (int)(free >> 10);
-
+    return true;
 #else
     Q_UNUSED(totalMB);
     Q_UNUSED(freeMB);
     Q_UNUSED(totalVM);
     Q_UNUSED(freeVM);
-    LOG(VB_GENERAL, LOG_NOTICE, "getMemStats(): Unknown platform. "
-        "How do I get the memory stats?");
     return false;
 #endif
+}
 
-    return true;
+/** \fn getLoadAvgs()
+ *  \brief Returns the system load averages.
+ *  \return A std::array<double,3> containing the system load
+ *          averages.  If the system call fails or is unsupported,
+ *          returns array containing all -1.
+ */
+loadArray getLoadAvgs (void)
+{
+#if !defined(_WIN32) && !defined(Q_OS_ANDROID)
+    loadArray loads;
+    if (getloadavg(loads.data(), loads.size()) != -1)
+        return loads;
+#endif
+    return {-1, -1, -1};
 }
 
 /**
@@ -239,7 +253,7 @@ bool ping(const QString &host, int timeout)
                          kMSProcessEvents) == GENERIC_EXIT_OK;
 #else
     QString addrstr =
-        gCoreContext->resolveAddress(host, gCoreContext->ResolveAny, true);
+        MythCoreContext::resolveAddress(host, gCoreContext->ResolveAny, true);
     QHostAddress addr = QHostAddress(addrstr);
 #if defined(__FreeBSD__) || CONFIG_DARWIN
     QString timeoutparam("-t");
@@ -262,7 +276,7 @@ bool ping(const QString &host, int timeout)
  */
 bool telnet(const QString &host, int port)
 {
-    MythSocket *s = new MythSocket();
+    auto *s = new MythSocket();
 
     bool connected = s->ConnectToHost(host, port);
     s->DecrRef();
@@ -295,15 +309,18 @@ long long copy(QFile &dst, QFile &src, uint block_size)
 {
     uint buflen = (block_size < 1024) ? (16 * 1024) : block_size;
     char *buf = new char[buflen];
-    bool odst = false, osrc = false;
+    bool odst = false;
+    bool osrc = false;
 
     if (!buf)
         return -1LL;
 
     if (!dst.isWritable() && !dst.isOpen())
+    {
         odst = dst.open(QIODevice::Unbuffered |
                         QIODevice::WriteOnly  |
                         QIODevice::Truncate);
+    }
 
     if (!src.isReadable() && !src.isOpen())
         osrc = src.open(QIODevice::Unbuffered|QIODevice::ReadOnly);
@@ -312,8 +329,8 @@ long long copy(QFile &dst, QFile &src, uint block_size)
     long long total_bytes = 0LL;
     while (ok)
     {
-        long long rlen, off = 0;
-        rlen = src.read(buf, buflen);
+        long long off = 0;
+        long long rlen = src.read(buf, buflen);
         if (rlen<0)
         {
             LOG(VB_GENERAL, LOG_ERR, "read error");
@@ -470,7 +487,7 @@ int intResponse(const QString &query, int def)
     QString str_resp = getResponse(query, QString("%1").arg(def));
     if (str_resp.isEmpty())
         return def;
-    bool ok;
+    bool ok = false;
     int resp = str_resp.toInt(&ok);
     return (ok ? resp : def);
 }
@@ -498,7 +515,7 @@ QString getSymlinkTarget(const QString &start_file,
     }
 
     for (uint i = 0; (i <= maxLinks) && fi.isSymLink() &&
-             !(link = fi.readLink()).isEmpty(); i++)
+             !(link = fi.symLinkTarget()).isEmpty(); i++)
     {
         cur_file = (link[0] == '/') ?
             link : // absolute link
@@ -538,9 +555,7 @@ bool IsMACAddress(const QString& MAC)
         return false;
     }
 
-    int y;
-    bool ok;
-    for (y = 0; y < 6; y++)
+    for (int y = 0; y < 6; y++)
     {
         if (tokens[y].isEmpty())
         {
@@ -550,6 +565,7 @@ bool IsMACAddress(const QString& MAC)
             return false;
         }
 
+        bool ok = false;
         int value = tokens[y].toInt(&ok, 16);
         if (!ok)
         {
@@ -619,10 +635,8 @@ bool WakeOnLAN(const QString& MAC)
 {
     char msg[1024] = "\xFF\xFF\xFF\xFF\xFF\xFF";
     int  msglen = 6;
-    int  x, y;
     QStringList tokens = MAC.split(':');
     int macaddr[6];
-    bool ok;
 
     if (tokens.size() != 6)
     {
@@ -631,8 +645,9 @@ bool WakeOnLAN(const QString& MAC)
         return false;
     }
 
-    for (y = 0; y < 6; y++)
+    for (int y = 0; y < 6; y++)
     {
+        bool ok = false;
         macaddr[y] = tokens[y].toInt(&ok, 16);
 
         if (!ok)
@@ -643,9 +658,9 @@ bool WakeOnLAN(const QString& MAC)
         }
     }
 
-    for (x = 0; x < 16; x++)
-        for (y = 0; y < 6; y++)
-            msg[msglen++] = macaddr[y];
+    for (int x = 0; x < 16; x++)
+        for (int y : macaddr)
+            msg[msglen++] = y;
 
     LOG(VB_NETWORK, LOG_INFO,
             QString("WakeOnLan(): Sending WOL packet to %1").arg(MAC));
@@ -736,17 +751,17 @@ void myth_yield(void)
 #include <asm/unistd.h>
 
 #if defined(__i386__)
-# define __NR_ioprio_set  289
-# define __NR_ioprio_get  290
+# define NR_ioprio_set  289
+# define NR_ioprio_get  290
 #elif defined(__ppc__)
-# define __NR_ioprio_set  273
-# define __NR_ioprio_get  274
+# define NR_ioprio_set  273
+# define NR_ioprio_get  274
 #elif defined(__x86_64__)
-# define __NR_ioprio_set  251
-# define __NR_ioprio_get  252
+# define NR_ioprio_set  251
+# define NR_ioprio_get  252
 #elif defined(__ia64__)
-# define __NR_ioprio_set  1274
-# define __NR_ioprio_get  1275
+# define NR_ioprio_set  1274
+# define NR_ioprio_get  1275
 #endif
 
 #define IOPRIO_BITS             (16)
@@ -767,17 +782,17 @@ bool myth_ioprio(int val)
     int new_ioprio = IOPRIO_PRIO_VALUE(new_ioclass, new_iodata);
 
     int pid = getpid();
-    int old_ioprio = syscall(__NR_ioprio_get, IOPRIO_WHO_PROCESS, pid);
+    int old_ioprio = syscall(NR_ioprio_get, IOPRIO_WHO_PROCESS, pid);
     if (old_ioprio == new_ioprio)
         return true;
 
-    int ret = syscall(__NR_ioprio_set, IOPRIO_WHO_PROCESS, pid, new_ioprio);
+    int ret = syscall(NR_ioprio_set, IOPRIO_WHO_PROCESS, pid, new_ioprio);
 
     if (-1 == ret && EPERM == errno && IOPRIO_CLASS_BE != new_ioclass)
     {
         new_iodata = (new_ioclass == IOPRIO_CLASS_RT) ? 0 : 7;
         new_ioprio = IOPRIO_PRIO_VALUE(IOPRIO_CLASS_BE, new_iodata);
-        ret = syscall(__NR_ioprio_set, IOPRIO_WHO_PROCESS, pid, new_ioprio);
+        ret = syscall(NR_ioprio_set, IOPRIO_WHO_PROCESS, pid, new_ioprio);
     }
 
     return 0 == ret;
@@ -836,8 +851,6 @@ bool MythRemoveDirectory(QDir &aDir)
 void setHttpProxy(void)
 {
     QString       LOC = "setHttpProxy() - ";
-    QNetworkProxy p;
-
 
     // Set http proxy for the application if specified in environment variable
     QString var(getenv("http_proxy"));
@@ -868,20 +881,25 @@ void setHttpProxy(void)
             url.setPort(port);
         }
         else if (!ping(host, 1))
+        {
             LOG(VB_GENERAL, LOG_ERR, LOC +
                 QString("cannot locate host %1").arg(host) +
                 "\n\t\t\tPlease check HTTP_PROXY environment variable!");
+        }
         else if (!telnet(host,port))
+        {
             LOG(VB_GENERAL, LOG_ERR, LOC +
                 QString("%1:%2 - cannot connect!").arg(host).arg(port) +
                 "\n\t\t\tPlease check HTTP_PROXY environment variable!");
+        }
 
 #if 0
         LOG(VB_NETWORK, LOG_DEBUG, LOC + QString("using http://%1:%2@%3:%4")
                 .arg(url.userName()).arg(url.password())
                 .arg(host).arg(port));
 #endif
-        p = QNetworkProxy(QNetworkProxy::HttpCachingProxy,
+        QNetworkProxy p =
+            QNetworkProxy(QNetworkProxy::HttpCachingProxy,
                           host, port, url.userName(), url.password());
         QNetworkProxy::setApplicationProxy(p);
         return;
@@ -896,7 +914,7 @@ void setHttpProxy(void)
 
     proxies = QNetworkProxyFactory::systemProxyForQuery(query);
 
-    Q_FOREACH (p, proxies)
+    for (const auto& p : qAsConst(proxies))
     {
         QString host = p.hostName();
         int     port = p.port();
@@ -920,10 +938,14 @@ void setHttpProxy(void)
         QString url;
 
         if (!p.user().isEmpty())
+        {
             url = "http://%1:%2@%3:%4",
             url = url.arg(p.user()).arg(p.password());
+        }
         else
+        {
             url = "http://%1:%2";
+        }
 
         url = url.arg(p.hostName()).arg(p.port());
         setenv("HTTP_PROXY", url.toLatin1(), 1);
@@ -937,13 +959,11 @@ void setHttpProxy(void)
 
 void wrapList(QStringList &list, int width)
 {
-    int i;
-
     // if this is triggered, something has gone seriously wrong
     // the result won't really be usable, but at least it won't crash
     width = max(width, 5);
 
-    for(i = 0; i < list.size(); i++)
+    for (int i = 0; i < list.size(); i++)
     {
         QString string = list.at(i);
 
@@ -985,26 +1005,26 @@ void wrapList(QStringList &list, int width)
 
 QString xml_indent(uint level)
 {
-    static QReadWriteLock rw_lock;
-    static QMap<uint,QString> cache;
+    static QReadWriteLock s_rwLock;
+    static QMap<uint,QString> s_cache;
 
-    rw_lock.lockForRead();
-    QMap<uint,QString>::const_iterator it = cache.find(level);
-    if (it != cache.end())
+    s_rwLock.lockForRead();
+    QMap<uint,QString>::const_iterator it = s_cache.find(level);
+    if (it != s_cache.end())
     {
         QString tmp = *it;
-        rw_lock.unlock();
+        s_rwLock.unlock();
         return tmp;
     }
-    rw_lock.unlock();
+    s_rwLock.unlock();
 
     QString ret = "";
     for (uint i = 0; i < level; i++)
         ret += "    ";
 
-    rw_lock.lockForWrite();
-    cache[level] = ret;
-    rw_lock.unlock();
+    s_rwLock.lockForWrite();
+    s_cache[level] = ret;
+    s_rwLock.unlock();
 
     return ret;
 }
@@ -1207,6 +1227,81 @@ int naturalCompare(const QString &_a, const QString &_b, Qt::CaseSensitivity cas
     }
 
     return currA->isNull() ? -1 : + 1;
+}
+
+QString MythFormatTimeMs(int msecs, QString fmt)
+{
+    return QTime::fromMSecsSinceStartOfDay(msecs).toString(fmt);
+}
+
+QString MythFormatTime(int secs, QString fmt)
+{
+    return QTime::fromMSecsSinceStartOfDay(secs*1000).toString(fmt);
+}
+
+/*
+ * States for the command line parser.
+ */
+enum states {
+    START,     // No current token.
+    INTEXT,    // Collecting token text.
+    INSQUOTE,  // Collecting token, inside single quotes.
+    INDQUOTE,  // Collecting token, inside double quotes.
+    ESCTEXT,   // Saw backslash. Returns to generic text.
+    ESCSQUOTE, // Saw backslash. Returns to single quotes.
+    ESCDQUOTE, // Saw backslash. Returns to double quotes.
+};
+
+/*
+ * Parse a string into separate tokens. This function understands
+ * quoting and the escape character.
+ */
+QStringList MythSplitCommandString(const QString &line)
+{
+    QStringList fields;
+    states state = START;
+    int tokenStart = -1;
+
+    for (int i = 0; i < line.size(); i++)
+    {
+        const QChar c = line.at(i);
+
+        switch (state) {
+          case START:
+            tokenStart = i;
+            if      (c.isSpace()) break;
+            if      (c == '\'') state = INSQUOTE;
+            else if (c == '\"') state = INDQUOTE;
+            else if (c == '\\') state = ESCTEXT;
+            else                state = INTEXT;
+            break;
+          case INTEXT:
+            if (c.isSpace()) {
+                fields += line.mid(tokenStart, i - tokenStart);
+                state = START;
+                break;
+            }
+            else if (c == '\'') state = INSQUOTE;
+            else if (c == '\"') state = INDQUOTE;
+            else if (c == '\\') state = ESCTEXT;
+            break;
+          case INSQUOTE:
+            if      (c == '\'') state = INTEXT;
+            else if (c == '\\') state = ESCSQUOTE;
+            break;
+          case INDQUOTE:
+            if      (c == '\"') state = INTEXT;
+            else if (c == '\\') state = ESCDQUOTE;
+            break;
+          case ESCTEXT:   state = INTEXT;   break;
+          case ESCSQUOTE: state = INSQUOTE; break;
+          case ESCDQUOTE: state = INDQUOTE; break;
+        }
+    }
+
+    if (state != START)
+        fields += line.mid(tokenStart);
+    return fields;
 }
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

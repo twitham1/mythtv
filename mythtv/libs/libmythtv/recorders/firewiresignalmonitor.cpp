@@ -90,7 +90,7 @@ void FirewireSignalMonitor::HandlePAT(const ProgramAssociationTable *pat)
 {
     AddFlags(kDTVSigMon_PATSeen);
 
-    FirewireChannel *fwchan = dynamic_cast<FirewireChannel*>(m_channel);
+    auto *fwchan = dynamic_cast<FirewireChannel*>(m_channel);
     if (!fwchan)
         return;
 
@@ -137,9 +137,12 @@ void FirewireSignalMonitor::RunTableMonitor(void)
 
     LOG(VB_CHANNEL, LOG_INFO, LOC + "RunTableMonitor(): -- begin");
 
-    FirewireChannel *lchan = dynamic_cast<FirewireChannel*>(m_channel);
+    auto *lchan = dynamic_cast<FirewireChannel*>(m_channel);
     if (!lchan)
     {
+        // clang-tidy assumes that if the result of dynamic_cast is
+        // nullptr that the thing being casted must also be a nullptr.
+        // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
         LOG(VB_CHANNEL, LOG_INFO, LOC + "RunTableMonitor(): -- err");
         while (m_dtvMonitorRunning)
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -209,7 +212,7 @@ void FirewireSignalMonitor::UpdateValues(void)
     }
     m_stb_needs_to_wait_for_power = false;
 
-    FirewireChannel *fwchan = dynamic_cast<FirewireChannel*>(m_channel);
+    auto *fwchan = dynamic_cast<FirewireChannel*>(m_channel);
     if (!fwchan)
         return;
 

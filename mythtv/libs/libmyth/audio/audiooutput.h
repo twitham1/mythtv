@@ -1,16 +1,19 @@
 #ifndef AUDIOOUTPUT
 #define AUDIOOUTPUT
 
+#include <utility>
+
 // Qt headers
+#include <QCoreApplication>
 #include <QString>
 #include <QVector>
-#include <QCoreApplication>
 
 // MythTV headers
 #include "compat.h"
 #include "audiosettings.h"
 #include "audiooutputsettings.h"
 #include "mythcorecontext.h"
+#include "mythaverror.h"
 #include "volumebase.h"
 #include "output.h"
 
@@ -32,9 +35,9 @@ class MPUBLIC AudioOutput : public VolumeBase, public OutputListeners
         AudioOutputSettings m_settings;
         AudioDeviceConfig(void) :
             m_settings(AudioOutputSettings(true)) { };
-        AudioDeviceConfig(const QString &name,
-                          const QString &desc) :
-            m_name(name), m_desc(desc),
+        AudioDeviceConfig(QString name,
+                          QString desc) :
+            m_name(std::move(name)), m_desc(std::move(desc)),
             m_settings(AudioOutputSettings(true)) { };
         AudioDeviceConfig(const AudioDeviceConfig &) = default;
         AudioDeviceConfig(AudioDeviceConfig &&) = default;
@@ -42,7 +45,7 @@ class MPUBLIC AudioOutput : public VolumeBase, public OutputListeners
         AudioDeviceConfig &operator= (AudioDeviceConfig &&) = default;
     };
 
-    typedef QVector<AudioDeviceConfig> ADCVect;
+    using ADCVect = QVector<AudioDeviceConfig>;
 
     static void Cleanup(void);
     static ADCVect* GetOutputList(void);
@@ -154,7 +157,7 @@ class MPUBLIC AudioOutput : public VolumeBase, public OutputListeners
     virtual bool IsUpmixing(void)   { return false; }
     virtual bool ToggleUpmix(void)  { return false; }
     virtual bool CanUpmix(void)     { return false; }
-    bool PulseStatus(void) { return m_pulsewassuspended; }
+    bool PulseStatus(void) const { return m_pulseWasSuspended; }
 
     /**
      * \param fmt The audio format in question.
@@ -187,9 +190,9 @@ class MPUBLIC AudioOutput : public VolumeBase, public OutputListeners
                     uint8_t *buffer, int &data_size,
                     const AVPacket *pkt);
     /**
-     * MAX_SIZE_BUFFER is the maximum size of a buffer to be used with DecodeAudio
+     * kMaxSizeBuffer is the maximum size of a buffer to be used with DecodeAudio
      */
-    static const int MAX_SIZE_BUFFER = 384000;
+    static const int kMaxSizeBuffer = 384000;
 
   protected:
     void Error(const QString &msg);
@@ -200,7 +203,7 @@ class MPUBLIC AudioOutput : public VolumeBase, public OutputListeners
 
     QString m_lastError;
     QString m_lastWarn;
-    bool    m_pulsewassuspended {false};
+    bool    m_pulseWasSuspended {false};
     AVFrame *m_frame            {nullptr};
 };
 

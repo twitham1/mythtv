@@ -76,9 +76,8 @@ MythUIText::~MythUIText()
     delete m_Font;
     m_Font = nullptr;
 
-    QVector<QTextLayout *>::iterator Ilayout;
-    for (Ilayout = m_Layouts.begin(); Ilayout != m_Layouts.end(); ++Ilayout)
-        delete *Ilayout;
+    for (auto *layout : qAsConst(m_Layouts))
+        delete layout;
 }
 
 void MythUIText::Reset()
@@ -102,7 +101,7 @@ void MythUIText::ResetMap(const InfoMap &map)
     if (newText.isEmpty())
         newText = GetDefaultText();
 
-    QRegExp regexp("%(([^\\|%]+)?\\||\\|(.))?([\\w#]+)(\\|(.+))?%");
+    QRegExp regexp(R"(%(([^\|%]+)?\||\|(.))?([\w#]+)(\|(.+))?%)");
     regexp.setMinimal(true);
 
     bool replaced = map.contains(objectName());
@@ -111,7 +110,7 @@ void MythUIText::ResetMap(const InfoMap &map)
     {
         int pos = 0;
 
-        QString translatedTemplate = qApp->translate("ThemeUI",
+        QString translatedTemplate = QCoreApplication::translate("ThemeUI",
                                                      newText.toUtf8());
 
         while ((pos = regexp.indexIn(translatedTemplate, pos)) != -1)
@@ -163,14 +162,14 @@ void MythUIText::SetTextFromMap(const InfoMap &map)
     if (newText.isEmpty())
         newText = GetDefaultText();
 
-    QRegExp regexp("%(([^\\|%]+)?\\||\\|(.))?([\\w#]+)(\\|(.+))?%");
+    QRegExp regexp(R"(%(([^\|%]+)?\||\|(.))?([\w#]+)(\|(.+))?%)");
     regexp.setMinimal(true);
 
     if (!newText.isEmpty() && newText.contains(regexp))
     {
         int pos = 0;
 
-        QString translatedTemplate = qApp->translate("ThemeUI",
+        QString translatedTemplate = QCoreApplication::translate("ThemeUI",
                                                      newText.toUtf8());
 
         QString tempString = translatedTemplate;
@@ -280,7 +279,7 @@ void MythUIText::SetJustification(int just)
     }
 }
 
-int MythUIText::GetJustification(void)
+int MythUIText::GetJustification(void) const
 {
     return m_Justification;
 }
@@ -400,29 +399,13 @@ void MythUIText::DrawSelf(MythPainter *p, int xoffset, int yoffset,
     if (GetFontProperties()->hasOutline())
     {
         QColor outlineColor;
-        int    outlineSize, outlineAlpha;
+        int    outlineSize = 0;
+        int    outlineAlpha = 255;
 
         GetFontProperties()->GetOutline(outlineColor, outlineSize,
                                         outlineAlpha);
 
         MythPoint  outline(outlineSize, outlineSize);
-
-#if QT_VERSION < QT_VERSION_CHECK(5,6,0) // else done in MythUIText::FormatTemplate
-        QTextLayout::FormatRange range;
-
-        outlineColor.setAlpha(outlineAlpha);
-
-        outline.NormPoint(); // scale it to screen resolution
-
-        QPen pen;
-        pen.setBrush(outlineColor);
-        pen.setWidth(outline.x());
-
-        range.start = 0;
-        range.length = m_CutMessage.size();
-        range.format.setTextOutline(pen);
-        formats.push_back(range);
-#endif
 
         drawrect.setX(drawrect.x() - outline.x());
         drawrect.setWidth(drawrect.width() + outline.x());
@@ -441,7 +424,7 @@ void MythUIText::DrawSelf(MythPainter *p, int xoffset, int yoffset,
     {
         QPoint shadowOffset;
         QColor shadowColor;
-        int    shadowAlpha;
+        int    shadowAlpha = 255;
 
         GetFontProperties()->GetShadow(shadowOffset, shadowColor, shadowAlpha);
 
@@ -462,19 +445,17 @@ void MythUIText::DrawSelf(MythPainter *p, int xoffset, int yoffset,
 
 bool MythUIText::FormatTemplate(QString & paragraph, QTextLayout *layout)
 {
-#if QT_VERSION >= QT_VERSION_CHECK(5,6,0)
     layout->clearFormats();
-#endif
 
     FormatVector formats;
     QTextLayout::FormatRange range;
     QString fontname;
     bool    res = false;  // Return true if paragraph changed.
 
-#if QT_VERSION >= QT_VERSION_CHECK(5,6,0) // else done in DrawSelf
     if (GetFontProperties()->hasOutline())
     {
-        int outlineSize, outlineAlpha;
+        int outlineSize = 0;
+        int outlineAlpha = 255;
         QColor outlineColor;
 
         GetFontProperties()->GetOutline(outlineColor, outlineSize,
@@ -494,12 +475,12 @@ bool MythUIText::FormatTemplate(QString & paragraph, QTextLayout *layout)
         range.format.setTextOutline(pen);
         formats.push_back(range);
     }
-#endif
 
     range.start = 0;
     range.length = 0;
 
-    int pos = 0, end = 0;
+    int pos = 0;
+    int end = 0;
     while ((pos = paragraph.indexOf("[font]", pos, Qt::CaseInsensitive)) != -1)
     {
         if ((end = paragraph.indexOf("[/font]", pos + 1, Qt::CaseInsensitive))
@@ -530,8 +511,12 @@ bool MythUIText::FormatTemplate(QString & paragraph, QTextLayout *layout)
                 range.start = pos;
                 range.length = -1;  // Need to find the end of the effect
                 range.format.setFont(fnt->face());
+#if QT_VERSION < QT_VERSION_CHECK(5,15,0)
                 range.format.setFontStyleHint(QFont::SansSerif,
                                               QFont::OpenGLCompatible);
+#else
+                range.format.setFontStyleHint(QFont::SansSerif);
+#endif
                 range.format.setForeground(fnt->GetBrush());
             }
             else
@@ -568,10 +553,8 @@ bool MythUIText::FormatTemplate(QString & paragraph, QTextLayout *layout)
             .arg(fontname));
     }
 
-#if QT_VERSION >= QT_VERSION_CHECK(5,6,0)
     if (!formats.empty())
         layout->setFormats(formats);
-#endif
 
     return res;
 }
@@ -663,9 +646,8 @@ bool MythUIText::Layout(QString & paragraph, QTextLayout *layout, bool final,
          * bearing will be negative if the char 'leans' over the "width"
          */
             QFontMetrics fm(GetFontProperties()->face());
-            int bearing;
 
-            bearing = fm.leftBearing(m_CutMessage[last_line]);
+            int bearing = fm.leftBearing(m_CutMessage[last_line]);
             if (m_leftBearing > bearing)
                 m_leftBearing = bearing;
             bearing = fm.rightBearing
@@ -686,27 +668,22 @@ bool MythUIText::LayoutParagraphs(const QStringList & paragraphs,
                                   int & num_lines, bool final)
 {
     QStringList::const_iterator Ipara;
-    QVector<QTextLayout *>::iterator Ilayout;
-    QTextLayout *layout;
-    QString para;
     bool    overflow = false;
-    qreal   saved_height;
-    QRectF  saved_rect;
-    int     idx;
+    int     idx = 0;
 
-    for (Ilayout = m_Layouts.begin(); Ilayout != m_Layouts.end(); ++Ilayout)
-        (*Ilayout)->clearLayout();
+    for (auto *layout : qAsConst(m_Layouts))
+        layout->clearLayout();
 
     for (Ipara = paragraphs.begin(), idx = 0;
          Ipara != paragraphs.end(); ++Ipara, ++idx)
     {
-        layout = m_Layouts[idx];
+        QTextLayout *layout = m_Layouts[idx];
         layout->setTextOption(textoption);
         layout->setFont(m_Font->face());
 
-        para = *Ipara;
-        saved_height = height;
-        saved_rect = min_rect;
+        QString para = *Ipara;
+        qreal saved_height = height;
+        QRectF saved_rect = min_rect;
         if (!Layout(para, layout, final, overflow, width, height, false,
                     last_line_width, min_rect, num_lines))
         {
@@ -726,25 +703,23 @@ bool MythUIText::LayoutParagraphs(const QStringList & paragraphs,
 bool MythUIText::GetNarrowWidth(const QStringList & paragraphs,
                                 const QTextOption & textoption, qreal & width)
 {
-    qreal    height, last_line_width, lines;
-    int      best_width, too_narrow, last_width = -1;
+    qreal    last_line_width = NAN;
+    int      last_width = -1;
     int      num_lines = 0;
-    int      line_height = 0;
-    int      attempt = 0;
     Qt::TextElideMode cutdown = m_Cutdown;
     m_Cutdown = Qt::ElideNone;
 
-    line_height = m_Leading + m_lineHeight;
+    int line_height = m_Leading + m_lineHeight;
     width = m_Area.width() / 2.0;
-    best_width = m_Area.width();
-    too_narrow = 0;
+    int best_width = m_Area.width();
+    int too_narrow = 0;
 
-    for (attempt = 0; attempt < 10; ++attempt)
+    for (int attempt = 0; attempt < 10; ++attempt)
     {
         QRectF min_rect;
 
         m_drawRect.setWidth(0);
-        height = 0;
+        qreal height = 0;
 
         LayoutParagraphs(paragraphs, textoption, width, height,
                          min_rect, last_line_width, num_lines, false);
@@ -758,11 +733,10 @@ bool MythUIText::GetNarrowWidth(const QStringList & paragraphs,
                 too_narrow = width;
 
             // Too narrow?  How many lines didn't fit?
-            lines = static_cast<int>
-                    ((height - m_drawRect.height()) / line_height);
+            qreal lines = roundf((height - m_drawRect.height()) / line_height);
             lines -= (1.0 - last_line_width / width);
             width += (lines * width) /
-                     (m_drawRect.height() / line_height);
+                ((double)m_drawRect.height() / line_height);
 
             if (width > best_width || static_cast<int>(width) == last_width)
             {
@@ -776,8 +750,7 @@ bool MythUIText::GetNarrowWidth(const QStringList & paragraphs,
             if (best_width > width)
                 best_width = width;
 
-            lines = static_cast<int>
-                    (m_Area.height() - height) / line_height;
+            qreal lines = floor((m_Area.height() - height) / line_height);
             if (lines >= 1)
             {
                 // Too wide?
@@ -821,7 +794,6 @@ void MythUIText::FillCutMessage(void)
     if (m_Area.isNull())
         return;
 
-    qreal  width, height;
     QRectF min_rect;
     QFontMetrics fm(GetFontProperties()->face());
 
@@ -832,18 +804,18 @@ void MythUIText::FillCutMessage(void)
 
     if (m_Message != m_DefaultMessage)
     {
-        bool isNumber;
+        bool isNumber = false;
         int value = m_Message.toInt(&isNumber);
 
         if (isNumber && m_TemplateText.contains("%n"))
         {
-            m_CutMessage = qApp->translate("ThemeUI",
+            m_CutMessage = QCoreApplication::translate("ThemeUI",
                                            m_TemplateText.toUtf8(), nullptr,
                                            qAbs(value));
         }
         else if (m_TemplateText.contains("%1"))
         {
-            QString tmp = qApp->translate("ThemeUI", m_TemplateText.toUtf8());
+            QString tmp = QCoreApplication::translate("ThemeUI", m_TemplateText.toUtf8());
             m_CutMessage = tmp.arg(m_Message);
         }
     }
@@ -913,22 +885,27 @@ void MythUIText::FillCutMessage(void)
         QTextOption textoption(static_cast<Qt::Alignment>(m_Justification));
         textoption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
 
-        int   idx, num_lines;
-        qreal last_line_width;
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList paragraphs = m_CutMessage.split('\n',
                                                     QString::KeepEmptyParts);
+#else
+        QStringList paragraphs = m_CutMessage.split('\n', Qt::KeepEmptyParts);
+#endif
 
-        for (idx = m_Layouts.size(); idx < paragraphs.size(); ++idx)
+        for (int idx = m_Layouts.size(); idx < paragraphs.size(); ++idx)
             m_Layouts.push_back(new QTextLayout);
 
+        qreal width = NAN;
         if (m_MultiLine && m_ShrinkNarrow &&
             m_MinSize.isValid() && !m_CutMessage.isEmpty())
             GetNarrowWidth(paragraphs, textoption, width);
         else
             width = m_Area.width();
 
-        height = 0;
+        qreal height = 0;
         m_leftBearing = m_rightBearing = 0;
+        int   num_lines = 0;
+        qreal last_line_width = NAN;
         LayoutParagraphs(paragraphs, textoption, width, height,
                          min_rect, last_line_width, num_lines, true);
 
@@ -1058,7 +1035,7 @@ int MythUIText::MoveCursor(int lines)
     int lineCount = 0;
     int currPos = 0;
     int layoutStartPos = 0;
-    int xPos;
+    int xPos = 0;
 
     for (int x = 0; x < m_Layouts.count(); x++)
     {
@@ -1143,9 +1120,10 @@ QPoint MythUIText::CursorPosition(int text_offset)
         return m_cursorPos;
     m_textCursor = text_offset;
 
-    QVector<QTextLayout *>::const_iterator Ipara;
+    QVector<QTextLayout *>::const_iterator Ipara = nullptr;
     QPoint pos;
-    int    x, y, mid, line_height;
+    int    x = 0;
+    int    y = 0;
     int    offset = text_offset;
 
     for (Ipara = m_Layouts.constBegin(); Ipara != m_Layouts.constEnd(); ++Ipara)
@@ -1169,7 +1147,7 @@ QPoint MythUIText::CursorPosition(int text_offset)
         return m_Area.topLeft().toQPoint();
     }
 
-    mid = m_drawRect.width() / 2;
+    int mid = m_drawRect.width() / 2;
     if (m_Canvas.width() <= m_drawRect.width() || pos.x() <= mid)
         x = 0;  // start
     else if (pos.x() >= m_Canvas.width() - mid) // end
@@ -1183,7 +1161,7 @@ QPoint MythUIText::CursorPosition(int text_offset)
         pos.setX(pos.x() - x);
     }
 
-    line_height = m_lineHeight + m_Leading;
+    int line_height = m_lineHeight + m_Leading;
     mid = m_Area.height() / 2;
     mid -= (mid % line_height);
     y = pos.y() - mid;
@@ -1249,8 +1227,6 @@ void MythUIText::Pulse(void)
 
     if (m_scrolling)
     {
-        int whole;
-
         if (m_scrollPause > 0)
             --m_scrollPause;
         else
@@ -1261,7 +1237,7 @@ void MythUIText::Pulse(void)
                 m_scrollPos += m_scrollForwardRate;
         }
 
-        whole = static_cast<int>(m_scrollPos);
+        int whole = static_cast<int>(m_scrollPos);
         if (m_scrollPosWhole != whole)
         {
             int shift = whole - m_scrollPosWhole;
@@ -1451,16 +1427,13 @@ bool MythUIText::ParseElement(
     {
         if (element.attribute("lang", "").isEmpty())
         {
-            m_Message = qApp->translate("ThemeUI",
+            m_Message = QCoreApplication::translate("ThemeUI",
                                         parseText(element).toUtf8());
         }
-        else if (element.attribute("lang", "").toLower() ==
-                 gCoreContext->GetLanguageAndVariant())
-        {
-            m_Message = parseText(element);
-        }
-        else if (element.attribute("lang", "").toLower() ==
-                 gCoreContext->GetLanguage())
+        else if ((element.attribute("lang", "").toLower() ==
+                  gCoreContext->GetLanguageAndVariant()) ||
+                 (element.attribute("lang", "").toLower() ==
+                  gCoreContext->GetLanguage()))
         {
             m_Message = parseText(element);
         }
@@ -1629,7 +1602,7 @@ bool MythUIText::ParseElement(
 
 void MythUIText::CopyFrom(MythUIType *base)
 {
-    MythUIText *text = dynamic_cast<MythUIText *>(base);
+    auto *text = dynamic_cast<MythUIText *>(base);
 
     if (!text)
     {
@@ -1696,7 +1669,7 @@ void MythUIText::CopyFrom(MythUIType *base)
 
 void MythUIText::CreateCopy(MythUIType *parent)
 {
-    MythUIText *text = new MythUIText(parent, objectName());
+    auto *text = new MythUIText(parent, objectName());
     text->CopyFrom(this);
 }
 

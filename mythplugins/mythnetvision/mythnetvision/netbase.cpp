@@ -172,20 +172,19 @@ void NetBase::ShowWebVideo()
 void NetBase::RunCmdWithoutScreensaver(const QString &cmd)
 {
     GetMythMainWindow()->PauseIdleTimer(true);
-    GetMythUI()->DisableScreensaver();
+    MythUIHelper::DisableScreensaver();
     GetMythMainWindow()->AllowInput(false);
     myth_system(cmd, kMSDontDisableDrawing);
     GetMythMainWindow()->AllowInput(true);
     GetMythMainWindow()->PauseIdleTimer(false);
-    GetMythUI()->RestoreScreensaver();
+    MythUIHelper::RestoreScreensaver();
 }
 
 void NetBase::SlotDeleteVideo()
 {
     QString message = tr("Are you sure you want to delete this file?");
 
-    MythConfirmationDialog *confirmdialog =
-        new MythConfirmationDialog(m_popupStack, message);
+    auto *confirmdialog = new MythConfirmationDialog(m_popupStack, message);
 
     if (confirmdialog->Create())
     {
@@ -223,8 +222,14 @@ void NetBase::customEvent(QEvent *event)
 {
     if (event->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = static_cast<MythEvent *>(event);
+        auto *me = dynamic_cast<MythEvent *>(event);
+        if (me == nullptr)
+            return;
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList tokens = me->Message().split(" ", QString::SkipEmptyParts);
+#else
+        QStringList tokens = me->Message().split(" ", Qt::SkipEmptyParts);
+#endif
 
         if (tokens.isEmpty())
             return;

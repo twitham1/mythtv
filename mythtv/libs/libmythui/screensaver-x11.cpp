@@ -46,12 +46,13 @@ class ScreenSaverX11Private
                 LOG(VB_GENERAL, LOG_INFO, LOC + "XScreenSaver support enabled");
         }
 
-        m_display = OpenMythXDisplay();
+        m_display = MythXDisplay::OpenMythXDisplay(false);
         if (m_display)
         {
-            int dummy0, dummy1;
-            m_dpmsaware = DPMSQueryExtension(m_display->GetDisplay(),
-                                            &dummy0, &dummy1);
+            int dummy0 = 0;
+            int dummy1 = 0;
+            m_dpmsaware = (DPMSQueryExtension(m_display->GetDisplay(),
+                                            &dummy0, &dummy1) != 0);
         }
         else
         {
@@ -59,9 +60,9 @@ class ScreenSaverX11Private
                 "Failed to open connection to X11 server");
         }
 
-        if (m_dpmsaware)
+        if (m_dpmsaware && m_display)
         {
-            CARD16 power_level;
+            CARD16 power_level = 0;
 
             /* If someone runs into X server weirdness that goes away when
              * they externally disable DPMS, then the 'dpmsenabled' test should
@@ -71,7 +72,7 @@ class ScreenSaverX11Private
 
             DPMSInfo(m_display->GetDisplay(), &power_level, &m_dpmsenabled);
 
-            if (m_dpmsenabled)
+            if (static_cast<bool>(m_dpmsenabled))
                 LOG(VB_GENERAL, LOG_INFO, LOC + "DPMS is active.");
             else
                 LOG(VB_GENERAL, LOG_INFO, LOC + "DPMS is disabled.");
@@ -93,7 +94,7 @@ class ScreenSaverX11Private
         return m_xscreensaverRunning;
     }
 
-    bool IsDPMSEnabled(void) const { return m_dpmsenabled; }
+    bool IsDPMSEnabled(void) const { return static_cast<bool>(m_dpmsenabled); }
 
     void StopTimer(void)
     {
@@ -159,24 +160,24 @@ class ScreenSaverX11Private
 
     void SaveScreenSaver(void)
     {
-        if (!m_state.saved && m_display)
+        if (!m_state.m_saved && m_display)
         {
-            XGetScreenSaver(m_display->GetDisplay(), &m_state.timeout,
-                            &m_state.interval, &m_state.preferblank,
-                            &m_state.allowexposure);
-            m_state.saved = true;
+            XGetScreenSaver(m_display->GetDisplay(), &m_state.m_timeout,
+                            &m_state.m_interval, &m_state.m_preferblank,
+                            &m_state.m_allowexposure);
+            m_state.m_saved = true;
         }
     }
 
     void RestoreScreenSaver(void)
     {
-        if (m_state.saved && m_display)
+        if (m_state.m_saved && m_display)
         {
-            XSetScreenSaver(m_display->GetDisplay(), m_state.timeout,
-                            m_state.interval, m_state.preferblank,
-                            m_state.allowexposure);
+            XSetScreenSaver(m_display->GetDisplay(), m_state.m_timeout,
+                            m_state.m_interval, m_state.m_preferblank,
+                            m_state.m_allowexposure);
             m_display->Sync();
-            m_state.saved = false;
+            m_state.m_saved = false;
         }
     }
 
@@ -186,8 +187,8 @@ class ScreenSaverX11Private
             return;
 
         QDateTime current_time = MythDate::current();
-        if ((!m_last_deactivated.isValid()) ||
-            (m_last_deactivated.secsTo(current_time) > 30))
+        if ((!m_lastDeactivated.isValid()) ||
+            (m_lastDeactivated.secsTo(current_time) > 30))
         {
             if (m_xscreensaverRunning)
             {
@@ -198,7 +199,7 @@ class ScreenSaverX11Private
                             kMSDontDisableDrawing |
                             kMSRunBackground);
             }
-            m_last_deactivated = current_time;
+            m_lastDeactivated = current_time;
         }
     }
 
@@ -207,23 +208,23 @@ class ScreenSaverX11Private
     {
       public:
         ScreenSaverState() = default;
-        bool saved        {false};
-        int timeout       {-1};
-        int interval      {-1};
-        int preferblank   {-1};
-        int allowexposure {-1};
+        bool m_saved         {false};
+        int  m_timeout       {-1};
+        int  m_interval      {-1};
+        int  m_preferblank   {-1};
+        int  m_allowexposure {-1};
     };
 
   private:
     bool m_dpmsaware           {false};
     bool m_dpmsdeactivated     {false}; ///< true if we disabled DPMS
     bool m_xscreensaverRunning {false};
-    BOOL m_dpmsenabled         {false};
+    BOOL m_dpmsenabled         {static_cast<BOOL>(false)};
 
     int m_timeoutInterval      {-1};
     QTimer *m_resetTimer       {nullptr};
 
-    QDateTime m_last_deactivated;
+    QDateTime m_lastDeactivated;
 
     ScreenSaverState m_state;
     MythXDisplay *m_display    {nullptr};
@@ -310,7 +311,7 @@ bool ScreenSaverX11::Asleep(void)
     if (d->DeactivatedDPMS())
         return false;
 
-    BOOL on;
+    BOOL on = static_cast<BOOL>(false);
     CARD16 power_level = DPMSModeOn;
 
     if (d->m_display)

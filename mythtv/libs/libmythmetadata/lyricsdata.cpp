@@ -103,9 +103,11 @@ void LyricsData::findLyrics(const QString &grabber)
     QString album = m_parent->Album().isEmpty() ? "*Unknown*" : m_parent->Album();
 
     if (!m_parent->isDBTrack())
+    {
         slist << artist
               << album
               << title;
+    }
 
    LOG(VB_NETWORK, LOG_INFO, QString("LyricsData:: Sending command %1").arg(slist.join('~')));
 
@@ -183,8 +185,7 @@ void LyricsData::customEvent(QEvent *event)
 {
     if (event->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = static_cast<MythEvent*>(event);
-
+        auto *me = dynamic_cast<MythEvent*>(event);
         if (!me)
             return;
 
@@ -231,7 +232,8 @@ void LyricsData::loadLyrics(const QString &xmlData)
 {
     QDomDocument domDoc;
     QString errorMsg;
-    int errorLine, errorColumn;
+    int errorLine = 0;
+    int errorColumn = 0;
 
     if (!domDoc.setContent(xmlData, false, &errorMsg, &errorLine, &errorColumn))
     {
@@ -267,9 +269,9 @@ void LyricsData::loadLyrics(const QString &xmlData)
         {
             QStringList times;
             int lastind = 0;
-            while (lyric.indexOf(QRegExp("\\[\\d\\d:\\d\\d\\]"),
+            while (lyric.indexOf(QRegExp(R"(\[\d\d:\d\d\])"),
                                  lastind) == lastind ||
-                   lyric.indexOf(QRegExp("\\[\\d\\d:\\d\\d\\.\\d\\d\\]"),
+                   lyric.indexOf(QRegExp(R"(\[\d\d:\d\d\.\d\d\])"),
                                  lastind) == lastind)
             {
                 if (lyric[lastind+6] == '.')
@@ -318,7 +320,7 @@ void LyricsData::setLyrics(const QStringList &lyrics)
     {
         QString lyric = lyrics.at(x);
 
-        LyricsLine *line = new LyricsLine;
+        auto *line = new LyricsLine;
 
         if (lyric.startsWith("[offset:"))
         {
@@ -330,8 +332,8 @@ void LyricsData::setLyrics(const QStringList &lyrics)
             if (!lyric.isEmpty())
             {
                 // does the line start with a time code like [12:34] or [12:34.56]
-                if (lyric.indexOf(QRegExp("\\[\\d\\d:\\d\\d\\]"), 0) == 0 ||
-                    lyric.indexOf(QRegExp("\\[\\d\\d:\\d\\d\\.\\d\\d\\]"), 0) == 0)
+                if (lyric.indexOf(QRegExp(R"(\[\d\d:\d\d\])"), 0) == 0 ||
+                    lyric.indexOf(QRegExp(R"(\[\d\d:\d\d\.\d\d\])"), 0) == 0)
                 {
                     int minutes = lyric.mid(1, 2).toInt();
                     int seconds = lyric.mid(4, 2).toInt();

@@ -32,8 +32,7 @@
 void *ViewScheduled::RunViewScheduled(void *player, bool showTV)
 {
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-    ViewScheduled *vsb = new ViewScheduled(mainStack, static_cast<TV*>(player),
-                                           showTV);
+    auto *vsb = new ViewScheduled(mainStack, static_cast<TV*>(player), showTV);
 
     if (vsb->Create())
         mainStack->AddScreen(vsb, (player == nullptr));
@@ -60,7 +59,7 @@ ViewScheduled::~ViewScheduled()
     if (m_player)
     {
         QString message = QString("VIEWSCHEDULED_EXITING");
-        qApp->postEvent(m_player, new MythEvent(message));
+        QCoreApplication::postEvent(m_player, new MythEvent(message));
     }
 }
 
@@ -200,8 +199,7 @@ void ViewScheduled::ShowMenu(void)
     QString label = tr("Options");
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
-    MythDialogBox *menuPopup = new MythDialogBox(label, popupStack,
-                                                 "menuPopup");
+    auto *menuPopup = new MythDialogBox(label, popupStack, "menuPopup");
 
     if (menuPopup->Create())
     {
@@ -239,13 +237,13 @@ void ViewScheduled::LoadList(bool useExistingData)
     MythUIButtonListItem *currentItem = m_schedulesList->GetItemCurrent();
 
     QString callsign;
-    QDateTime startts, recstartts;
+    QDateTime startts;
+    QDateTime recstartts;
     QDate group = m_currentGroup;
 
     if (currentItem)
     {
-        ProgramInfo *currentpginfo = currentItem->GetData()
-                                        .value<ProgramInfo*>();
+        auto *currentpginfo = currentItem->GetData().value<ProgramInfo*>();
         if (currentpginfo)
         {
             callsign   = currentpginfo->GetChannelSchedulingID();
@@ -267,7 +265,7 @@ void ViewScheduled::LoadList(bool useExistingData)
     if (!useExistingData)
         LoadFromScheduler(m_recList, m_conflictBool);
 
-    ProgramList::iterator pit = m_recList.begin();
+    auto pit = m_recList.begin();
     QString currentDate;
     m_recgroupList[m_defaultGroup] = ProgramList(false);
     m_recgroupList[m_defaultGroup].setAutoDelete(false);
@@ -322,7 +320,7 @@ void ViewScheduled::LoadList(bool useExistingData)
                     dateit.key(), MythDate::kDateFull | MythDate::kSimplify);
 
             new MythUIButtonListItem(m_groupList, label,
-                                     qVariantFromValue(dateit.key()));
+                                     QVariant::fromValue(dateit.key()));
             ++dateit;
         }
 
@@ -332,7 +330,7 @@ void ViewScheduled::LoadList(bool useExistingData)
         else
             m_currentGroup = m_defaultGroup;
 
-        m_groupList->SetValueByData(qVariantFromValue(m_currentGroup));
+        m_groupList->SetValueByData(QVariant::fromValue(m_currentGroup));
     }
 
     FillList();
@@ -343,8 +341,7 @@ void ViewScheduled::LoadList(bool useExistingData)
         ProgramList plist = m_recgroupList[m_currentGroup];
 
         int listPos = ((int) plist.size()) - 1;
-        int i;
-        for (i = listPos; i >= 0; --i)
+        for (int i = listPos; i >= 0; --i)
         {
             ProgramInfo *pginfo = plist[i];
             if (callsign == pginfo->GetChannelSchedulingID() &&
@@ -369,7 +366,7 @@ void ViewScheduled::ChangeGroup(MythUIButtonListItem* item)
     if (!item || m_recList.empty())
         return;
 
-    QDate group = item->GetData().value<QDate>();
+    auto group = item->GetData().value<QDate>();
 
     m_currentGroup = group;
 
@@ -397,7 +394,7 @@ void ViewScheduled::FillList()
 
     plist = m_recgroupList[m_currentGroup];
 
-    ProgramList::iterator pit = plist.begin();
+    auto pit = plist.begin();
     while (pit != plist.end())
     {
         ProgramInfo *pginfo = *pit;
@@ -441,9 +438,8 @@ void ViewScheduled::FillList()
         else
             state = "warning";
 
-        MythUIButtonListItem *item =
-                                new MythUIButtonListItem(m_schedulesList,"",
-                                                    qVariantFromValue(pginfo));
+        auto *item = new MythUIButtonListItem(m_schedulesList,"",
+                                              QVariant::fromValue(pginfo));
 
         InfoMap infoMap;
         pginfo->ToMap(infoMap);
@@ -462,13 +458,11 @@ void ViewScheduled::FillList()
         if (m_conflictBool)
         {
             // Find first conflict and store in m_conflictDate field
-            ProgramList::const_iterator it = plist.begin();
-            for (; it != plist.end(); ++it)
+            for (auto & conflict : plist)
             {
-                ProgramInfo &p = **it;
-                if (p.GetRecordingStatus() == RecStatus::Conflict)
+                if (conflict->GetRecordingStatus() == RecStatus::Conflict)
                 {
-                    m_conflictDate = p.GetRecordingStartTime()
+                    m_conflictDate = conflict->GetRecordingStartTime()
                         .toLocalTime().date();
                     break;
                 }
@@ -501,7 +495,7 @@ void ViewScheduled::updateInfo(MythUIButtonListItem *item)
     if (!item)
         return;
 
-    ProgramInfo *pginfo = item->GetData().value<ProgramInfo*> ();
+    auto *pginfo = item->GetData().value<ProgramInfo*> ();
     if (pginfo)
     {
         InfoMap infoMap;
@@ -525,11 +519,11 @@ void ViewScheduled::deleteRule()
     if (!item)
         return;
 
-    ProgramInfo *pginfo = item->GetData().value<ProgramInfo*>();
+    auto *pginfo = item->GetData().value<ProgramInfo*>();
     if (!pginfo)
         return;
 
-    RecordingRule *record = new RecordingRule();
+    auto *record = new RecordingRule();
     if (!record->LoadByProgram(pginfo))
     {
         delete record;
@@ -541,11 +535,10 @@ void ViewScheduled::deleteRule()
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    MythConfirmationDialog *okPopup = new MythConfirmationDialog(popupStack,
-                                                                 message, true);
+    auto *okPopup = new MythConfirmationDialog(popupStack, message, true);
 
     okPopup->SetReturnEvent(this, "deleterule");
-    okPopup->SetData(qVariantFromValue(record));
+    okPopup->SetData(QVariant::fromValue(record));
 
     if (okPopup->Create())
         popupStack->AddScreen(okPopup);
@@ -583,9 +576,11 @@ void ViewScheduled::customEvent(QEvent *event)
 {
     if (event->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = static_cast<MythEvent *>(event);
-        const QString& message = me->Message();
+        auto *me = dynamic_cast<MythEvent *>(event);
+        if (me == nullptr)
+            return;
 
+        const QString& message = me->Message();
         if (message != "SCHEDULE_CHANGE")
             return;
 
@@ -602,7 +597,7 @@ void ViewScheduled::customEvent(QEvent *event)
     }
     else if (event->type() == DialogCompletionEvent::kEventType)
     {
-        DialogCompletionEvent *dce = (DialogCompletionEvent*)(event);
+        auto *dce = (DialogCompletionEvent*)(event);
 
         QString resultid   = dce->GetId();
         QString resulttext = dce->GetResultText();
@@ -610,8 +605,7 @@ void ViewScheduled::customEvent(QEvent *event)
 
         if (resultid == "deleterule")
         {
-            RecordingRule *record =
-                dce->GetData().value<RecordingRule *>();
+            auto *record = dce->GetData().value<RecordingRule *>();
             if (record)
             {
                 if (buttonnum > 0)

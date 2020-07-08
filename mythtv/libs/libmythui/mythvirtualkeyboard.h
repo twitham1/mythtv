@@ -25,7 +25,7 @@ struct KeyDefinition
 
 struct KeyEventDefinition
 {
-    int keyCode;
+    int keyCode {0};
     Qt::KeyboardModifiers modifiers;
 };
 
@@ -45,7 +45,7 @@ class MUI_PUBLIC MythUIVirtualKeyboard : public MythScreenType
 
   public:
     MythUIVirtualKeyboard(MythScreenStack *parentStack,  MythUITextEdit *m_parentEdit);
-    ~MythUIVirtualKeyboard() = default;
+    ~MythUIVirtualKeyboard() override = default;
     bool Create(void) override; // MythScreenType
     bool keyPressEvent(QKeyEvent *e) override; // MythScreenType
 
@@ -68,9 +68,9 @@ class MUI_PUBLIC MythUIVirtualKeyboard : public MythScreenType
     void loadKeyDefinitions(const QString &lang);
     void parseKey(const QDomElement &element);
     void updateKeys(bool connectSignals = false);
-    QString decodeChar(QString c);
-    QString getKeyText(const KeyDefinition& key);
-    void loadEventKeyDefinitions(KeyEventDefinition *keyDef, const QString &action);
+    static QString decodeChar(QString c);
+    QString getKeyText(const KeyDefinition& key) const;
+    static void loadEventKeyDefinitions(KeyEventDefinition *keyDef, const QString &action);
 
     MythUITextEdit *m_parentEdit   {nullptr};
     PopupPosition   m_preferredPos;

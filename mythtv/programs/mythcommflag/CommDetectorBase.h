@@ -1,5 +1,5 @@
-#ifndef _CommDetectorBase_H_
-#define _CommDetectorBase_H_
+#ifndef COMMDETECTOR_BASE_H
+#define COMMDETECTOR_BASE_H
 
 #include <iostream>
 using namespace std;
@@ -11,13 +11,13 @@ using namespace std;
 
 #define MAX_BLANK_FRAMES 180
 
-typedef enum commMapValues {
+enum CommMapValue {
     MARK_START   = 0,
     MARK_END     = 1,
     MARK_PRESENT = 2,
-} CommMapValue;
+};
 
-typedef QMap<uint64_t, CommMapValue> show_map_t;
+using show_map_t = QMap<uint64_t, CommMapValue>;
 
 /** \class CommDetectorBase
  *  \brief Abstract base class for all CommDetectors.
@@ -29,7 +29,7 @@ class CommDetectorBase : public QObject
     Q_OBJECT
 
 public:
-    CommDetectorBase();
+    CommDetectorBase() = default;
 
     virtual bool go() = 0;
     void stop();
@@ -50,13 +50,11 @@ signals:
     void breathe();
 
 protected:    
-    ~CommDetectorBase() = default;
-    bool m_bPaused;
-    bool m_bStop;    
-    
+    ~CommDetectorBase() override = default;
+    bool m_bPaused { false };
+    bool m_bStop   { false };
 };
 
-#endif
-
+#endif // COMMDETECTOR_BASE_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

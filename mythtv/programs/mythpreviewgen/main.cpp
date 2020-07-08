@@ -76,7 +76,7 @@ int preview_helper(uint chanid, QDateTime starttime,
     if (setpriority(PRIO_PROCESS, 0, 9))
         LOG(VB_GENERAL, LOG_ERR, "Setting priority failed." + ENO);
 
-    if (!QFileInfo(infile).isReadable() && (!chanid || !starttime.isValid()))
+    if (!QFileInfo(infile).isReadable() && ((chanid == 0U) || !starttime.isValid()))
         ProgramInfo::QueryKeyFromPathname(infile, chanid, starttime);
 
     ProgramInfo *pginfo = nullptr;
@@ -112,8 +112,8 @@ int preview_helper(uint chanid, QDateTime starttime,
         return GENERIC_EXIT_NOT_OK;
     }
 
-    PreviewGenerator *previewgen = new PreviewGenerator(
-        pginfo, QString(), PreviewGenerator::kLocal);
+    auto *previewgen = new PreviewGenerator(pginfo, QString(),
+                                            PreviewGenerator::kLocal);
 
     if (previewFrameNumber >= 0)
         previewgen->SetPreviewTimeAsFrameNumber(previewFrameNumber);
@@ -148,7 +148,7 @@ int main(int argc, char **argv)
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythPreviewGeneratorCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
 
@@ -163,8 +163,8 @@ int main(int argc, char **argv)
 #endif
     QCoreApplication::setApplicationName(MYTH_APPNAME_MYTHPREVIEWGEN);
 
-    int retval;
-    if ((retval = cmdline.ConfigureLogging()) != GENERIC_EXIT_OK)
+    int retval = cmdline.ConfigureLogging();
+    if (retval != GENERIC_EXIT_OK)
         return retval;
 
     if ((!cmdline.toBool("chanid") || !cmdline.toBool("starttime")) &&

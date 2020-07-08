@@ -26,30 +26,30 @@
 #include "cardutil.h"
 #include "exitcodes.h"
 
-const char* V4L2encStreamHandler::s_stream_types[] =
+const std::array<const std::string,15> V4L2encStreamHandler::kStreamTypes
 {
     "MPEG-2 PS", "MPEG-2 TS",     "MPEG-1 VCD",    "PES AV",
     "",          "PES V",          "",             "PES A",
     "",          "",              "DVD",           "VCD",
-    "SVCD",      "DVD-Special 1", "DVD-Special 2", nullptr
+    "SVCD",      "DVD-Special 1", "DVD-Special 2"
 };
 
-const int V4L2encStreamHandler::s_audio_rateL1[] =
+const std::array<const int,14> V4L2encStreamHandler::kAudioRateL1
 {
-    32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, 0
+    32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448
 };
 
-const int V4L2encStreamHandler::s_audio_rateL2[] =
+const std::array<const int,14> V4L2encStreamHandler::kAudioRateL2
 {
-    32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 0
+    32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384
 };
 
-const int V4L2encStreamHandler::s_audio_rateL3[] =
+const std::array<const int,14> V4L2encStreamHandler::kAudioRateL3
 {
-    32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0
+    32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320
 };
 
-#define LOC      QString("V4L2SH[%1](%2): ").arg(m_inputid).arg(m_device)
+#define LOC      QString("V4L2SH[%1](%2): ").arg(m_inputId).arg(m_device)
 
 QMap<QString,V4L2encStreamHandler*> V4L2encStreamHandler::s_handlers;
 QMap<QString,uint>                  V4L2encStreamHandler::s_handlers_refcnt;
@@ -66,9 +66,7 @@ V4L2encStreamHandler *V4L2encStreamHandler::Get(const QString &devname,
 
     if (it == s_handlers.end())
     {
-        V4L2encStreamHandler *newhandler = new V4L2encStreamHandler(devname,
-                                                                    audioinput,
-                                                                    inputid);
+        auto *newhandler = new V4L2encStreamHandler(devname, audioinput, inputid);
 
         s_handlers[devkey] = newhandler;
         s_handlers_refcnt[devkey] = 1;
@@ -142,7 +140,7 @@ bool V4L2encStreamHandler::Status(bool &failed, bool &failing)
 V4L2encStreamHandler::V4L2encStreamHandler(const QString & device,
                                            int audio_input, int inputid)
     : StreamHandler(device, inputid)
-    , m_audio_input(audio_input)
+    , m_audioInput(audio_input)
 {
     setObjectName("V4L2encSH");
 
@@ -192,21 +190,19 @@ void V4L2encStreamHandler::run(void)
     bool      gap = false;
     QDateTime gap_start;
 
-    int len, remainder = 0;
-
     QByteArray buffer;
     char* pkt_buf = new char[PACKET_SIZE + 1];
 
     SetRunning(true, true, false);
 
-    while (m_running_desired && !m_bError)
+    while (m_runningDesired && !m_bError)
     {
         // Get V4L2 data
-        if (m_streaming_cnt.load() == 0)
+        if (m_streamingCnt.load() == 0)
         {
             LOG(VB_RECORD, LOG_INFO, LOC + "Waiting for stream start.");
-            QMutexLocker locker(&m_start_stop_lock);
-            m_running_state_changed.wait(&m_start_stop_lock, 5000);
+            QMutexLocker locker(&m_startStopLock);
+            m_runningStateChanged.wait(&m_startStopLock, 5000);
             continue;
         }
 
@@ -215,7 +211,7 @@ void V4L2encStreamHandler::run(void)
         if (!m_drb)
             break;
 
-        len = m_drb->Read(reinterpret_cast<unsigned char *>(pkt_buf),
+        int len = m_drb->Read(reinterpret_cast<unsigned char *>(pkt_buf),
                           PACKET_SIZE);
         if (m_drb->IsErrored())
         {
@@ -278,9 +274,11 @@ void V4L2encStreamHandler::run(void)
         if (len < 0)
         {
             if (errno != EAGAIN)
+            {
                 LOG(VB_GENERAL, LOG_ERR, LOC +
                     QString("run() -- error reading from: %1")
                     .arg(m_device) + ENO);
+            }
             continue;
         }
 
@@ -290,25 +288,27 @@ void V4L2encStreamHandler::run(void)
         if (len < static_cast<int>(TSPacket::kSize))
             continue;
 
-        if (!m_listener_lock.tryLock())
+        if (!m_listenerLock.tryLock())
             continue;
 
-        if (m_stream_data_list.empty())
+        if (m_streamDataList.empty())
         {
             LOG(VB_GENERAL, LOG_ERR, LOC +
                 QString("run() -- _stream_data_list is empty, %1 buffered")
                 .arg(buffer.size()));
-            m_listener_lock.unlock();
+            m_listenerLock.unlock();
             continue;
         }
 
-        StreamDataList::const_iterator sit = m_stream_data_list.begin();
-        for (; sit != m_stream_data_list.end(); ++sit)
+        int remainder = 0;
+        for (auto sit = m_streamDataList.cbegin(); sit != m_streamDataList.cend(); ++sit)
+        {
             remainder = sit.key()->ProcessData
                         (reinterpret_cast<const uint8_t *>
                          (buffer.constData()), len);
+        }
 
-        m_listener_lock.unlock();
+        m_listenerLock.unlock();
 
         if (remainder > 0 && (len > remainder)) // leftover bytes
             buffer.remove(0, len - remainder);
@@ -319,7 +319,7 @@ void V4L2encStreamHandler::run(void)
     QString tmp(m_error);
     LOG(VB_GENERAL, LOG_WARNING, LOC +
         QString("_running_desired(%1)  _error(%2)")
-                .arg(m_running_desired).arg(tmp));
+                .arg(m_runningDesired).arg(tmp));
 
     LOG(VB_RECORD, LOG_INFO, LOC + "run() -- finishing up");
     StopEncoding();
@@ -344,8 +344,8 @@ bool V4L2encStreamHandler::Open(void)
     }
     Close();
 
-    QMutexLocker lock(&m_stream_lock);
-    m_v4l2.Open(m_device, m_vbi_device);
+    QMutexLocker lock(&m_streamLock);
+    m_v4l2.Open(m_device, m_vbiDevice);
     if (!m_v4l2.IsOpen())
     {
         m_error = QString("Open of '%1' failed: ").arg(m_device) + ENO;
@@ -396,7 +396,7 @@ bool V4L2encStreamHandler::Open(void)
 
 bool V4L2encStreamHandler::Configure(void)
 {
-    if (m_streaming_cnt.load() > 0)
+    if (m_streamingCnt.load() > 0)
     {
         LOG(VB_RECORD, LOG_INFO, LOC + "Configure() -- Already configured.");
         return true;
@@ -416,44 +416,44 @@ bool V4L2encStreamHandler::Configure(void)
         SetLanguageMode();    // we don't care if this fails...
 
     if (m_v4l2.HasAudioSupport())
-        m_v4l2.SetVolume(m_audio_volume);  // we don't care if this fails...
+        m_v4l2.SetVolume(m_audioVolume);  // we don't care if this fails...
 
-    if (m_desired_stream_type >= 0)
-        m_v4l2.SetStreamType(m_desired_stream_type);
+    if (m_desiredStreamType >= 0)
+        m_v4l2.SetStreamType(m_desiredStreamType);
 
     LOG(VB_RECORD, LOG_INFO, LOC + QString("Options for %1")
         .arg(m_v4l2.StreamTypeDesc(GetStreamType())));
 
-    if (m_aspect_ratio >= 0)
-        m_v4l2.SetVideoAspect(m_aspect_ratio);
+    if (m_aspectRatio >= 0)
+        m_v4l2.SetVideoAspect(m_aspectRatio);
 
-    if (m_bitrate_mode < 0)
-        m_bitrate_mode = m_high_bitrate_mode;
-    if (m_max_bitrate < 0 && m_high_peak_bitrate > 0)
-        m_max_bitrate = m_high_peak_bitrate;
-    if (m_bitrate < 0 && m_high_bitrate > 0)
-        m_bitrate = m_high_bitrate;
+    if (m_bitrateMode < 0)
+        m_bitrateMode = m_highBitrateMode;
+    if (m_maxBitrate < 0 && m_highPeakBitrate > 0)
+        m_maxBitrate = m_highPeakBitrate;
+    if (m_bitrate < 0 && m_highBitrate > 0)
+        m_bitrate = m_highBitrate;
 
-    m_max_bitrate = std::max(m_max_bitrate, m_bitrate);
+    m_maxBitrate = std::max(m_maxBitrate, m_bitrate);
 
-    if (m_bitrate_mode >= 0)
-        m_v4l2.SetVideoBitrateMode(m_bitrate_mode);
+    if (m_bitrateMode >= 0)
+        m_v4l2.SetVideoBitrateMode(m_bitrateMode);
     if (m_bitrate > 0)
         m_v4l2.SetVideoBitrate(m_bitrate * 1000);
-    if (m_max_bitrate > 0)
-        m_v4l2.SetVideoBitratePeak(m_max_bitrate * 1000);
+    if (m_maxBitrate > 0)
+        m_v4l2.SetVideoBitratePeak(m_maxBitrate * 1000);
 
-    if (m_audio_input >= 0)
-        m_v4l2.SetAudioInput(m_audio_input);
+    if (m_audioInput >= 0)
+        m_v4l2.SetAudioInput(m_audioInput);
     else
         LOG(VB_CHANNEL, LOG_WARNING, "Audio input not set.");
 
-    if (m_audio_codec >= 0)
-        m_v4l2.SetAudioCodec(m_audio_codec);
-    if (m_audio_samplerate >= 0)
-        m_v4l2.SetAudioSamplingRate(m_audio_samplerate);
-    if (m_audio_bitrateL2 >= 0)
-        m_v4l2.SetAudioBitrateL2(m_audio_bitrateL2);
+    if (m_audioCodec >= 0)
+        m_v4l2.SetAudioCodec(m_audioCodec);
+    if (m_audioSampleRate >= 0)
+        m_v4l2.SetAudioSamplingRate(m_audioSampleRate);
+    if (m_audioBitrateL2 >= 0)
+        m_v4l2.SetAudioBitrateL2(m_audioBitrateL2);
 
     ConfigureVBI();
 
@@ -491,15 +491,15 @@ void V4L2encStreamHandler::Close(void)
         LOG(VB_RECORD, LOG_INFO, LOC + "Closed.");
     }
 
-    m_streaming_cnt.fetchAndStoreAcquire(0);
+    m_streamingCnt.fetchAndStoreAcquire(0);
 }
 
 bool V4L2encStreamHandler::StartEncoding(void)
 {
     LOG(VB_RECORD, LOG_INFO, LOC + "StartEncoding() -- begin");
-    int old_cnt;
+    int old_cnt = 0;
 
-    QMutexLocker lock(&m_stream_lock);
+    QMutexLocker lock(&m_streamLock);
 
     if (!IsOpen())
     {
@@ -507,7 +507,7 @@ bool V4L2encStreamHandler::StartEncoding(void)
         return false;
     }
 
-    if ((old_cnt = m_streaming_cnt.load()) == 0)
+    if ((old_cnt = m_streamingCnt.load()) == 0)
     {
         // Start encoding
 
@@ -524,9 +524,9 @@ bool V4L2encStreamHandler::StartEncoding(void)
             }
         }
 
-        if (m_pause_encoding_allowed)
-            m_pause_encoding_allowed = m_v4l2.ResumeEncoding();
-        if (!m_pause_encoding_allowed)
+        if (m_pauseEncodingAllowed)
+            m_pauseEncodingAllowed = m_v4l2.ResumeEncoding();
+        if (!m_pauseEncodingAllowed)
             m_v4l2.StartEncoding();
 
         // (at least) with the 3.10 kernel, the V4L2_ENC_CMD_START does
@@ -536,7 +536,7 @@ bool V4L2encStreamHandler::StartEncoding(void)
         int idx = 1;
         for ( ; idx < 50; ++idx)
         {
-            uint8_t dummy;
+            uint8_t dummy = 0;
             int len = read(m_fd, &dummy, 0);
             if (len >= 0)
             {
@@ -590,13 +590,13 @@ bool V4L2encStreamHandler::StartEncoding(void)
     else
         LOG(VB_RECORD, LOG_INFO, LOC + "Already encoding");
 
-    QMutexLocker listen_lock(&m_listener_lock);
+    QMutexLocker listen_lock(&m_listenerLock);
 
-    m_streaming_cnt.ref();
+    m_streamingCnt.ref();
 
     LOG(VB_RECORD, LOG_INFO, LOC +
         QString("StartEncoding() -- %1->%2 listeners")
-        .arg(old_cnt).arg(m_streaming_cnt.load()));
+        .arg(old_cnt).arg(m_streamingCnt.load()));
 
     LOG(VB_RECORD, LOG_INFO, LOC + "StartEncoding() -- end");
 
@@ -605,7 +605,7 @@ bool V4L2encStreamHandler::StartEncoding(void)
 
 bool V4L2encStreamHandler::StopEncoding(void)
 {
-    int old_cnt = m_streaming_cnt.load();
+    int old_cnt = m_streamingCnt.load();
 
     if (old_cnt == 0)
     {
@@ -613,13 +613,13 @@ bool V4L2encStreamHandler::StopEncoding(void)
         return true;
     }
 
-    QMutexLocker lock(&m_stream_lock);
+    QMutexLocker lock(&m_streamLock);
 
-    if (m_streaming_cnt.deref())
+    if (m_streamingCnt.deref())
     {
         LOG(VB_RECORD, LOG_INFO, LOC +
             QString("StopEncoding() -- delayed, still have %1 listeners")
-            .arg(m_streaming_cnt.load()));
+            .arg(m_streamingCnt.load()));
         return true;
     }
 
@@ -634,9 +634,9 @@ bool V4L2encStreamHandler::StopEncoding(void)
     if (m_drb)
         m_drb->SetRequestPause(true);
 
-    if (m_pause_encoding_allowed)
-        m_pause_encoding_allowed = m_v4l2.PauseEncoding();
-    if (!m_pause_encoding_allowed)
+    if (m_pauseEncodingAllowed)
+        m_pauseEncodingAllowed = m_v4l2.PauseEncoding();
+    if (!m_pauseEncodingAllowed)
         m_v4l2.StopEncoding();
 
     // allow last bits of data through..
@@ -649,7 +649,7 @@ bool V4L2encStreamHandler::StopEncoding(void)
 
     LOG(VB_RECORD, LOG_INFO, LOC +
         QString("StopEncoding() -- %1->%2 listeners")
-        .arg(old_cnt).arg(m_streaming_cnt.load()));
+        .arg(old_cnt).arg(m_streamingCnt.load()));
 
     return true;
 }
@@ -672,24 +672,24 @@ void V4L2encStreamHandler::PriorityEvent(int fd)
 /// Set audio language mode
 bool V4L2encStreamHandler::SetLanguageMode(void)
 {
-    if (m_lang_mode < 0)
+    if (m_langMode < 0)
         return true;
 
-    if (V4L2_TUNER_MODE_LANG1_LANG2      == m_lang_mode &&
-        V4L2_MPEG_AUDIO_ENCODING_LAYER_1 == m_audio_layer)
+    if (V4L2_TUNER_MODE_LANG1_LANG2      == m_langMode &&
+        V4L2_MPEG_AUDIO_ENCODING_LAYER_1 == m_audioLayer)
     {
         LOG(VB_GENERAL, LOG_WARNING, LOC +
             "SetLanguageMode() -- Dual audio mode incompatible "
             "with Layer I audio. Falling back to Main Language");
-        m_lang_mode = V4L2_TUNER_MODE_LANG1;
+        m_langMode = V4L2_TUNER_MODE_LANG1;
     }
 
-    return m_v4l2.SetLanguageMode(m_lang_mode);
+    return m_v4l2.SetLanguageMode(m_langMode);
 }
 
-static int find_index(const int *audio_rate, int value)
+static int find_index(const std::array<const int,14> &audio_rate, int value)
 {
-    for (uint i = 0; audio_rate[i] != 0; ++i)
+    for (size_t i = 0; i < audio_rate.size(); ++i)
     {
         if (audio_rate[i] == value)
             return i;
@@ -700,7 +700,7 @@ static int find_index(const int *audio_rate, int value)
 
 bool V4L2encStreamHandler::SetOption(const QString &opt, int value)
 {
-    if (m_streaming_cnt.load() > 0)
+    if (m_streamingCnt.load() > 0)
         return true;
 
     if (opt == "width")
@@ -708,32 +708,38 @@ bool V4L2encStreamHandler::SetOption(const QString &opt, int value)
     else if (opt == "height")
         m_height = value;
     else if (opt == "mpeg2bitratemode")
-        m_bitrate_mode = value ? V4L2_MPEG_VIDEO_BITRATE_MODE_CBR :
+    {
+        m_bitrateMode = value ? V4L2_MPEG_VIDEO_BITRATE_MODE_CBR :
                          V4L2_MPEG_VIDEO_BITRATE_MODE_VBR;
+    }
     else if (opt == "mpeg2bitrate")
+    {
         m_bitrate = value;
+    }
     else if (opt == "mpeg2maxbitrate")
-        m_max_bitrate = value;
+    {
+        m_maxBitrate = value;
+    }
     else if (opt == "samplerate")
     {
         switch (value)
         {
             case 32000:
-              m_audio_samplerate = V4L2_MPEG_AUDIO_SAMPLING_FREQ_32000;
+              m_audioSampleRate = V4L2_MPEG_AUDIO_SAMPLING_FREQ_32000;
               break;
             case 44100:
-              m_audio_samplerate = V4L2_MPEG_AUDIO_SAMPLING_FREQ_44100;
+              m_audioSampleRate = V4L2_MPEG_AUDIO_SAMPLING_FREQ_44100;
               break;
             case 48000:
             default:
-              m_audio_samplerate = V4L2_MPEG_AUDIO_SAMPLING_FREQ_48000;
+              m_audioSampleRate = V4L2_MPEG_AUDIO_SAMPLING_FREQ_48000;
         }
     }
     else if (opt == "mpeg2audbitratel1")
     {
-        int index = find_index(s_audio_rateL1, value);
+        int index = find_index(kAudioRateL1, value);
         if (index >= 0)
-            m_audio_bitrateL1 = index;
+            m_audioBitrateL1 = index;
         else
         {
             LOG(VB_GENERAL, LOG_ERR, LOC + "Audiorate(L1): " +
@@ -743,9 +749,9 @@ bool V4L2encStreamHandler::SetOption(const QString &opt, int value)
     }
     else if (opt == "mpeg2audbitratel2")
     {
-        int index = find_index(s_audio_rateL2, value);
+        int index = find_index(kAudioRateL2, value);
         if (index >= 0)
-            m_audio_bitrateL2 = index;
+            m_audioBitrateL2 = index;
         else
         {
             LOG(VB_GENERAL, LOG_ERR, LOC + "Audiorate(L2): " +
@@ -755,9 +761,9 @@ bool V4L2encStreamHandler::SetOption(const QString &opt, int value)
     }
     else if (opt == "mpeg2audbitratel3")
     {
-        int index = find_index(s_audio_rateL3, value);
+        int index = find_index(kAudioRateL3, value);
         if (index >= 0)
-            m_audio_bitrateL3 = index;
+            m_audioBitrateL3 = index;
         else
         {
             LOG(VB_GENERAL, LOG_ERR, LOC + "Audiorate(L2): " +
@@ -766,32 +772,32 @@ bool V4L2encStreamHandler::SetOption(const QString &opt, int value)
         }
     }
     else if (opt == "mpeg2audvolume")
-        m_audio_volume = value;
+        m_audioVolume = value;
     else if (opt == "low_mpegbitratemode")
-        m_low_bitrate_mode = value;
+        m_lowBitrateMode = value;
     else if (opt == "medium_mpegbitratemode")
-        m_medium_bitrate_mode = value;
+        m_mediumBitrateMode = value;
     else if (opt == "high_mpegbitratemode")
-        m_high_bitrate_mode = value;
+        m_highBitrateMode = value;
     else if (opt.endsWith("avgbitrate"))
     {
         if (opt.startsWith("low"))
-            m_low_bitrate = value;
+            m_lowBitrate = value;
         else if (opt.startsWith("medium"))
-            m_medium_bitrate = value;
+            m_mediumBitrate = value;
         else if (opt.startsWith("high"))
-            m_high_bitrate = value;
+            m_highBitrate = value;
         else
             return false;
     }
     else if (opt.endsWith("peakbitrate"))
     {
         if (opt.startsWith("low"))
-            m_low_peak_bitrate = value;
+            m_lowPeakBitrate = value;
         else if (opt.startsWith("medium"))
-            m_medium_peak_bitrate = value;
+            m_mediumPeakBitrate = value;
         else if (opt.startsWith("high"))
-            m_high_peak_bitrate = value;
+            m_highPeakBitrate = value;
         else
             return false;
     }
@@ -805,25 +811,25 @@ bool V4L2encStreamHandler::SetOption(const QString &opt, int value)
 
 int V4L2encStreamHandler::GetStreamType(void)
 {
-    if (m_stream_type == -1)
-        m_stream_type = m_v4l2.GetStreamType();
-    return m_stream_type;
+    if (m_streamType == -1)
+        m_streamType = m_v4l2.GetStreamType();
+    return m_streamType;
 }
 
 bool V4L2encStreamHandler::SetOption(const QString &opt, const QString &value)
 {
-    if (m_streaming_cnt.load() > 0)
+    if (m_streamingCnt.load() > 0)
         return true;
 
     if (opt == "vbidevice")
-        m_vbi_device = value;
+        m_vbiDevice = value;
     else if (opt == "mpeg2streamtype")
     {
-        for (size_t i = 0; i < sizeof(s_stream_types) / sizeof(char*); ++i)
+        for (size_t i = 0; i < kStreamTypes.size(); ++i)
         {
-            if (QString(s_stream_types[i]) == value)
+            if (QString::fromStdString(kStreamTypes[i]) == value)
             {
-                m_desired_stream_type = i;
+                m_desiredStreamType = i;
                 return true;
             }
         }
@@ -844,38 +850,38 @@ bool V4L2encStreamHandler::SetOption(const QString &opt, const QString &value)
         switch (lang_mode)
         {
             case 1:
-              m_lang_mode = V4L2_TUNER_MODE_LANG2;
+              m_langMode = V4L2_TUNER_MODE_LANG2;
               break;
             case 2:
-              m_lang_mode = V4L2_TUNER_MODE_LANG1_LANG2;
+              m_langMode = V4L2_TUNER_MODE_LANG1_LANG2;
               break;
             case 0:
             default:
-              m_lang_mode = V4L2_TUNER_MODE_LANG1;
+              m_langMode = V4L2_TUNER_MODE_LANG1;
               break;
         }
     }
     else if (opt == "mpeg2aspectratio")
     {
         if (value == "Square")
-            m_aspect_ratio = V4L2_MPEG_VIDEO_ASPECT_1x1;
+            m_aspectRatio = V4L2_MPEG_VIDEO_ASPECT_1x1;
         else if (value == "4:3")
-            m_aspect_ratio = V4L2_MPEG_VIDEO_ASPECT_4x3;
+            m_aspectRatio = V4L2_MPEG_VIDEO_ASPECT_4x3;
         else if (value == "16:9")
-            m_aspect_ratio = V4L2_MPEG_VIDEO_ASPECT_16x9;
+            m_aspectRatio = V4L2_MPEG_VIDEO_ASPECT_16x9;    // NOLINT(bugprone-branch-clone)
         else if (value == "2.21:1")
-            m_aspect_ratio = V4L2_MPEG_VIDEO_ASPECT_221x100;
+            m_aspectRatio = V4L2_MPEG_VIDEO_ASPECT_221x100;
         else
-            m_aspect_ratio = V4L2_MPEG_VIDEO_ASPECT_16x9;
+            m_aspectRatio = V4L2_MPEG_VIDEO_ASPECT_16x9;
     }
     else if (opt == "mpeg2audtype")
     {
         if (value == "Layer I")
-            m_audio_layer = V4L2_MPEG_AUDIO_ENCODING_LAYER_1; // plus one?
+            m_audioLayer = V4L2_MPEG_AUDIO_ENCODING_LAYER_1; // plus one?
         else if (value == "Layer II")
-            m_audio_layer = V4L2_MPEG_AUDIO_ENCODING_LAYER_2;
+            m_audioLayer = V4L2_MPEG_AUDIO_ENCODING_LAYER_2;
         else if (value == "Layer III")
-            m_audio_layer = V4L2_MPEG_AUDIO_ENCODING_LAYER_3;
+            m_audioLayer = V4L2_MPEG_AUDIO_ENCODING_LAYER_3;
         else
         {
             LOG(VB_GENERAL, LOG_ERR, LOC + "MPEG2 audio layer: " +
@@ -887,7 +893,7 @@ bool V4L2encStreamHandler::SetOption(const QString &opt, const QString &value)
         if (value.startsWith("V4L2:"))
         {
             // Find the value in the options returns by the driver
-            m_audio_codec = m_v4l2.GetOptionValue
+            m_audioCodec = m_v4l2.GetOptionValue
                             (DriverOption::AUDIO_ENCODING, value.mid(5));
         }
     }
@@ -901,7 +907,7 @@ bool V4L2encStreamHandler::SetOption(const QString &opt, const QString &value)
 
 bool V4L2encStreamHandler::HasLock(void)
 {
-    if (m_streaming_cnt.load() > 0)
+    if (m_streamingCnt.load() > 0)
         return true;
 
     return true;
@@ -909,16 +915,16 @@ bool V4L2encStreamHandler::HasLock(void)
 
 int V4L2encStreamHandler::GetSignalStrength(void)
 {
-    if (m_streaming_cnt.load() > 0)
+    if (m_streamingCnt.load() > 0)
     {
         LOG(VB_RECORD, LOG_INFO, LOC + QString("GetSignalStrength() -- "
                                                "returning cached value (%1)")
-            .arg(m_signal_strength));
-        return m_signal_strength;
+            .arg(m_signalStrength));
+        return m_signalStrength;
     }
 
-    m_signal_strength = m_v4l2.GetSignalStrength();
-    return m_signal_strength;
+    m_signalStrength = m_v4l2.GetSignalStrength();
+    return m_signalStrength;
 }
 
 void V4L2encStreamHandler::SetBitrate(int bitrate, int maxbitrate,
@@ -954,7 +960,8 @@ bool V4L2encStreamHandler::SetBitrateForResolution(void)
 {
     m_width = m_height = -1;
 
-    int width, height, pix;
+    int width = 0;
+    int height = 0;
     int idx = 0;
     for ( ; idx < 10; ++idx)
     {
@@ -963,7 +970,7 @@ bool V4L2encStreamHandler::SetBitrateForResolution(void)
         if (idx == 5)
         {
             m_v4l2.Close();
-            m_v4l2.Open(m_device, m_vbi_device);
+            m_v4l2.Open(m_device, m_vbiDevice);
         }
         std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
@@ -972,34 +979,34 @@ bool V4L2encStreamHandler::SetBitrateForResolution(void)
 
     m_width  = width;
     m_height = height;
-    pix      = width * height;
+    int pix = width * height;
 
-    int old_mode = m_bitrate_mode;
-    int old_max  = m_max_bitrate;
+    int old_mode = m_bitrateMode;
+    int old_max  = m_maxBitrate;
     int old_avg  = m_bitrate;
 
-    if (m_low_bitrate > 0 && pix <= 768*1080)
+    if (m_lowBitrate > 0 && pix <= 768*1080)
     {
-        m_bitrate_mode = m_low_bitrate_mode;
-        m_max_bitrate = m_low_peak_bitrate;
-        m_bitrate    = m_low_bitrate;
+        m_bitrateMode = m_lowBitrateMode;
+        m_maxBitrate = m_lowPeakBitrate;
+        m_bitrate    = m_lowBitrate;
     }
-    else if (m_high_bitrate > 0 && pix >= 1920*1080)
+    else if (m_highBitrate > 0 && pix >= 1920*1080)
     {
-        m_bitrate_mode = m_high_bitrate_mode;
-        m_max_bitrate = m_high_peak_bitrate;
-        m_bitrate    = m_high_bitrate;
+        m_bitrateMode = m_highBitrateMode;
+        m_maxBitrate = m_highPeakBitrate;
+        m_bitrate    = m_highBitrate;
     }
-    else if (m_medium_bitrate > 0)
+    else if (m_mediumBitrate > 0)
     {
-        m_bitrate_mode = m_medium_bitrate_mode;
-        m_max_bitrate = m_medium_peak_bitrate;
-        m_bitrate    = m_medium_bitrate;
+        m_bitrateMode = m_mediumBitrateMode;
+        m_maxBitrate = m_mediumPeakBitrate;
+        m_bitrate    = m_mediumBitrate;
     }
-    m_max_bitrate = std::max(m_max_bitrate, m_bitrate);
+    m_maxBitrate = std::max(m_maxBitrate, m_bitrate);
 
-    if ((old_max != m_max_bitrate) || (old_avg != m_bitrate) ||
-        old_mode != m_bitrate_mode)
+    if ((old_max != m_maxBitrate) || (old_avg != m_bitrate) ||
+        old_mode != m_bitrateMode)
     {
         if (old_mode == V4L2_MPEG_VIDEO_BITRATE_MODE_CBR)
         {
@@ -1012,7 +1019,7 @@ bool V4L2encStreamHandler::SetBitrateForResolution(void)
                 QString("Old bitrate %1/%2 VBR").arg(old_avg).arg(old_max));
         }
 
-        SetBitrate(m_bitrate, m_max_bitrate, m_bitrate_mode, "New");
+        SetBitrate(m_bitrate, m_maxBitrate, m_bitrateMode, "New");
     }
 
     return true;

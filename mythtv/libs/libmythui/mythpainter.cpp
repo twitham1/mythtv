@@ -5,6 +5,7 @@
 // QT headers
 #include <QRect>
 #include <QPainter>
+#include <QPainterPath>
 
 // libmythbase headers
 #include "mythlogging.h"
@@ -21,9 +22,7 @@
 
 MythPainter::MythPainter()
 {
-    SetMaximumCacheSizes(
-        gCoreContext->GetNumSetting("UIPainterMaxCacheHW",64),
-        gCoreContext->GetNumSetting("UIPainterMaxCacheSW",48) );
+    SetMaximumCacheSizes(64, 48);
 }
 
 void MythPainter::Teardown(void)
@@ -39,9 +38,8 @@ void MythPainter::Teardown(void)
             .arg(m_allocatedImages.size()));
     }
 
-    QSet<MythImage*>::iterator it = m_allocatedImages.begin();
-    for (; it !=  m_allocatedImages.end(); ++it)
-        (*it)->SetParent(nullptr);
+    for (auto *image : qAsConst(m_allocatedImages))
+        image->SetParent(nullptr);
     m_allocatedImages.clear();
 }
 
@@ -204,13 +202,13 @@ void MythPainter::DrawTextPriv(MythImage *im, const QString &msg, int flags,
 
     QColor outlineColor;
     int outlineSize = 0;
-    int outlineAlpha;
+    int outlineAlpha = 255;
     if (font.hasOutline())
         font.GetOutline(outlineColor, outlineSize, outlineAlpha);
 
     QPoint shadowOffset(0, 0);
     QColor shadowColor;
-    int shadowAlpha;
+    int shadowAlpha = 255;
     if (font.hasShadow())
         font.GetShadow(shadowOffset, shadowColor, shadowAlpha);
 
@@ -259,7 +257,9 @@ void MythPainter::DrawTextPriv(MythImage *im, const QString &msg, int flags,
 
     QPainter tmp(&pm);
     QFont tmpfont = font.face();
+#if QT_VERSION < QT_VERSION_CHECK(5,15,0)
     tmpfont.setStyleStrategy(QFont::OpenGLCompatible);
+#endif
     tmp.setFont(tmpfont);
 
     QPainterPath path;
@@ -354,11 +354,11 @@ MythImage *MythPainter::GetImageFromString(const QString &msg,
                        QString::number(font.color().rgba()) + msg;
 
     MythImage *im = nullptr;
-    if (m_StringToImageMap.contains(incoming))
+    if (m_stringToImageMap.contains(incoming))
     {
-        m_StringExpireList.remove(incoming);
-        m_StringExpireList.push_back(incoming);
-        im = m_StringToImageMap[incoming];
+        m_stringExpireList.remove(incoming);
+        m_stringExpireList.push_back(incoming);
+        im = m_stringToImageMap[incoming];
         if (im)
             im->IncrRef();
     }
@@ -369,10 +369,10 @@ MythImage *MythPainter::GetImageFromString(const QString &msg,
         DrawTextPriv(im, msg, flags, r, font);
 
         im->IncrRef();
-        m_SoftwareCacheSize += im->bytesPerLine() * im->height();
-        m_StringToImageMap[incoming] = im;
-        m_StringExpireList.push_back(incoming);
-        ExpireImages(m_MaxSoftwareCacheSize);
+        m_softwareCacheSize += im->bytesPerLine() * im->height();
+        m_stringToImageMap[incoming] = im;
+        m_stringExpireList.push_back(incoming);
+        ExpireImages(m_maxSoftwareCacheSize);
     }
     return im;
 }
@@ -382,8 +382,6 @@ MythImage *MythPainter::GetImageFromTextLayout(const LayoutVector &layouts,
                                                const MythFontProperties &font,
                                                QRect &canvas, QRect &dest)
 {
-    LayoutVector::const_iterator Ipara;
-
     QString incoming = QString::number(canvas.x()) +
                        QString::number(canvas.y()) +
                        QString::number(canvas.width()) +
@@ -392,15 +390,15 @@ MythImage *MythPainter::GetImageFromTextLayout(const LayoutVector &layouts,
                        QString::number(dest.height()) +
                        font.GetHash();
 
-    for (Ipara = layouts.begin(); Ipara != layouts.end(); ++Ipara)
-        incoming += (*Ipara)->text();
+    for (auto *layout : qAsConst(layouts))
+        incoming += layout->text();
 
     MythImage *im = nullptr;
-    if (m_StringToImageMap.contains(incoming))
+    if (m_stringToImageMap.contains(incoming))
     {
-        m_StringExpireList.remove(incoming);
-        m_StringExpireList.push_back(incoming);
-        im = m_StringToImageMap[incoming];
+        m_stringExpireList.remove(incoming);
+        m_stringExpireList.push_back(incoming);
+        im = m_stringToImageMap[incoming];
         if (im)
             im->IncrRef();
     }
@@ -424,7 +422,9 @@ MythImage *MythPainter::GetImageFromTextLayout(const LayoutVector &layouts,
         clip.setSize(canvas.size());
 
         QFont tmpfont = font.face();
+#if QT_VERSION < QT_VERSION_CHECK(5,15,0)
         tmpfont.setStyleStrategy(QFont::OpenGLCompatible);
+#endif
         painter.setFont(tmpfont);
         painter.setRenderHint(QPainter::Antialiasing);
 
@@ -433,7 +433,7 @@ MythImage *MythPainter::GetImageFromTextLayout(const LayoutVector &layouts,
             QRect  shadowRect;
             QPoint shadowOffset;
             QColor shadowColor;
-            int    shadowAlpha;
+            int    shadowAlpha = 255;
 
             font.GetShadow(shadowOffset, shadowColor, shadowAlpha);
             shadowColor.setAlpha(shadowAlpha);
@@ -445,19 +445,15 @@ MythImage *MythPainter::GetImageFromTextLayout(const LayoutVector &layouts,
             shadowRect.translate(shadow.x(), shadow.y());
 
             painter.setPen(shadowColor);
-            for (Ipara = layouts.begin(); Ipara != layouts.end(); ++Ipara)
-                (*Ipara)->draw(&painter, shadowRect.topLeft(), formats, clip);
+            for (auto *layout : qAsConst(layouts))
+                layout->draw(&painter, shadowRect.topLeft(), formats, clip);
         }
 
         painter.setPen(QPen(font.GetBrush(), 0));
-        for (Ipara = layouts.begin(); Ipara != layouts.end(); ++Ipara)
+        for (auto *layout : qAsConst(layouts))
         {
-#if QT_VERSION >= QT_VERSION_CHECK(5,6,0)
-            (*Ipara)->draw(&painter, canvas.topLeft(),
-                           (*Ipara)->formats(), clip);
-#else
-            (*Ipara)->draw(&painter, canvas.topLeft(), formats, clip);
-#endif
+            layout->draw(&painter, canvas.topLeft(),
+                           layout->formats(), clip);
         }
         painter.end();
 
@@ -465,10 +461,10 @@ MythImage *MythPainter::GetImageFromTextLayout(const LayoutVector &layouts,
         im->Assign(pm.copy(0, 0, dest.width(), dest.height()));
 
         im->IncrRef();
-        m_SoftwareCacheSize += im->bytesPerLine() * im->height();
-        m_StringToImageMap[incoming] = im;
-        m_StringExpireList.push_back(incoming);
-        ExpireImages(m_MaxSoftwareCacheSize);
+        m_softwareCacheSize += im->bytesPerLine() * im->height();
+        m_stringToImageMap[incoming] = im;
+        m_stringExpireList.push_back(incoming);
+        ExpireImages(m_maxSoftwareCacheSize);
     }
     return im;
 }
@@ -494,7 +490,10 @@ MythImage* MythPainter::GetImageFromRect(const QRect &area, int radius,
     QString incoming("R");
     if (fillBrush.style() == Qt::LinearGradientPattern && fillBrush.gradient())
     {
-        const QLinearGradient *gradient = static_cast<const QLinearGradient*>(fillBrush.gradient());
+        // The Q*Gradient classes are not polymorohic, and therefore
+        // dynamic_cast can't be used here.
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto *gradient = static_cast<const QLinearGradient*>(fillBrush.gradient());
         if (gradient)
         {
             incoming = QString::number(
@@ -503,11 +502,11 @@ MythImage* MythPainter::GetImageFromRect(const QRect &area, int radius,
                              ((0xfff & (uint64_t)gradient->finalStop().x()) << 24) +
                              ((0xfff & (uint64_t)gradient->finalStop().y()) << 36));
             QGradientStops stops = gradient->stops();
-            for (int i = 0; i < stops.size(); i++)
+            for (const auto & stop : qAsConst(stops))
             {
                 incoming += QString::number(
-                             ((0xfff * (uint64_t)(stops[i].first * 100))) +
-                             ((uint64_t)stops[i].second.rgba() << 12));
+                             ((0xfff * (uint64_t)(stop.first * 100))) +
+                             ((uint64_t)stop.second.rgba() << 12));
             }
         }
     }
@@ -515,11 +514,11 @@ MythImage* MythPainter::GetImageFromRect(const QRect &area, int radius,
     incoming += QString::number(hash1) + QString::number(hash2);
 
     MythImage *im = nullptr;
-    if (m_StringToImageMap.contains(incoming))
+    if (m_stringToImageMap.contains(incoming))
     {
-        m_StringExpireList.remove(incoming);
-        m_StringExpireList.push_back(incoming);
-        im = m_StringToImageMap[incoming];
+        m_stringExpireList.remove(incoming);
+        m_stringExpireList.push_back(incoming);
+        im = m_stringToImageMap[incoming];
         if (im)
             im->IncrRef();
     }
@@ -530,10 +529,10 @@ MythImage* MythPainter::GetImageFromRect(const QRect &area, int radius,
         DrawRectPriv(im, area, radius, ellipse, fillBrush, linePen);
 
         im->IncrRef();
-        m_SoftwareCacheSize += (im->bytesPerLine() * im->height());
-        m_StringToImageMap[incoming] = im;
-        m_StringExpireList.push_back(incoming);
-        ExpireImages(m_MaxSoftwareCacheSize);
+        m_softwareCacheSize += (im->bytesPerLine() * im->height());
+        m_stringToImageMap[incoming] = im;
+        m_stringExpireList.push_back(incoming);
+        ExpireImages(m_maxSoftwareCacheSize);
     }
     return im;
 }
@@ -567,30 +566,30 @@ void MythPainter::CheckFormatImage(MythImage *im)
 void MythPainter::ExpireImages(int64_t max)
 {
     bool recompute = false;
-    while (!m_StringExpireList.empty())
+    while (!m_stringExpireList.empty())
     {
-        if (m_SoftwareCacheSize < max)
+        if (m_softwareCacheSize < max)
             break;
 
-        QString oldmsg = m_StringExpireList.front();
-        m_StringExpireList.pop_front();
+        QString oldmsg = m_stringExpireList.front();
+        m_stringExpireList.pop_front();
 
         QMap<QString, MythImage*>::iterator it =
-            m_StringToImageMap.find(oldmsg);
-        if (it == m_StringToImageMap.end())
+            m_stringToImageMap.find(oldmsg);
+        if (it == m_stringToImageMap.end())
         {
             recompute = true;
             continue;
         }
         MythImage *oldim = *it;
-        it = m_StringToImageMap.erase(it);
+        it = m_stringToImageMap.erase(it);
 
         if (oldim)
         {
-            m_SoftwareCacheSize -= oldim->bytesPerLine() * oldim->height();
-            if (m_SoftwareCacheSize < 0)
+            m_softwareCacheSize -= oldim->bytesPerLine() * oldim->height();
+            if (m_softwareCacheSize < 0)
             {
-                m_SoftwareCacheSize = 0;
+                m_softwareCacheSize = 0;
                 recompute = true;
             }
             oldim->DecrRef();
@@ -598,10 +597,9 @@ void MythPainter::ExpireImages(int64_t max)
     }
     if (recompute)
     {
-        m_SoftwareCacheSize = 0;
-        QMap<QString, MythImage*>::iterator it = m_StringToImageMap.begin();
-        for (; it != m_StringToImageMap.end(); ++it)
-            m_SoftwareCacheSize += (*it)->bytesPerLine() * (*it)->height();
+        m_softwareCacheSize = 0;
+        for (auto *img : qAsConst(m_stringToImageMap))
+            m_softwareCacheSize += img->bytesPerLine() * img->height();
     }
 }
 
@@ -609,23 +607,23 @@ void MythPainter::ExpireImages(int64_t max)
 void MythPainter::SetMaximumCacheSizes(int hardware, int software)
 {
     const int64_t kOneMeg = 1024 * 1024;
-    m_MaxHardwareCacheSize = kOneMeg * hardware;
-    m_MaxSoftwareCacheSize = kOneMeg * software;
+    m_maxHardwareCacheSize = kOneMeg * hardware;
+    m_maxSoftwareCacheSize = kOneMeg * software;
 
     bool err = false;
-    if (m_MaxHardwareCacheSize < 0)
+    if (m_maxHardwareCacheSize < 0)
     {
-        m_MaxHardwareCacheSize = 0;
+        m_maxHardwareCacheSize = 0;
         err = true;
     }
-    if (m_MaxSoftwareCacheSize < 0)
+    if (m_maxSoftwareCacheSize < 0)
     {
-        m_MaxSoftwareCacheSize = kOneMeg * 48;
+        m_maxSoftwareCacheSize = kOneMeg * 48;
         err = true;
     }
 
     LOG((err) ? VB_GENERAL : VB_GUI, (err) ? LOG_ERR : LOG_INFO,
-        QString("MythPainter cache sizes: Hardware %1 MB, Software %2 MB")
-        .arg(m_MaxHardwareCacheSize / kOneMeg)
-        .arg(m_MaxSoftwareCacheSize / kOneMeg));
+        QString("MythPainter cache sizes: Hardware %1MB, Software %2MB")
+        .arg(m_maxHardwareCacheSize / kOneMeg)
+        .arg(m_maxSoftwareCacheSize / kOneMeg));
 }

@@ -45,8 +45,6 @@
 #define LE_INT64(v)      (*((uint64_t *)(v)))
 #endif
 
-#define SIZE_ARRAY(x) (sizeof(x) / sizeof((x)[0]))
-
 enum eld_versions
 {
     ELD_VER_CEA_861D    = 2,
@@ -62,7 +60,7 @@ enum cea_edid_versions
     CEA_EDID_VER_RESERVED  = 4,
 };
 
-static const char *cea_speaker_allocation_names[] = {
+static const std::array<const QString,11> cea_speaker_allocation_names {
     /*  0 */ "FL/FR",
     /*  1 */ "LFE",
     /*  2 */ "FC",
@@ -76,7 +74,7 @@ static const char *cea_speaker_allocation_names[] = {
     /* 10 */ "FCH",
 };
 
-static const char *eld_connection_type_names[4] = {
+static const std::array<const QString,4> eld_connection_type_names {
     "HDMI",
     "DisplayPort",
     "2-reserved",
@@ -92,7 +90,7 @@ enum cea_audio_coding_xtypes
     XTYPE_FIRST_RESERVED = 4,
 };
 
-static const char *audiotype_names[] = {
+static const std::array<const QString,18> audiotype_names {
     /*  0 */ "undefined",
     /*  1 */ "LPCM",
     /*  2 */ "AC3",
@@ -136,7 +134,7 @@ static const char *audiotype_names[] = {
 #define SNDRV_PCM_RATE_176400           (1<<11)         /* 176400Hz */
 #define SNDRV_PCM_RATE_192000           (1<<12)         /* 192000Hz */
 
-static int cea_sampling_frequencies[8] = {
+static const std::array<const int,8> cea_sampling_frequencies {
     0,                       /* 0: Refer to Stream Header */
     SNDRV_PCM_RATE_32000,    /* 1:  32000Hz */
     SNDRV_PCM_RATE_44100,    /* 2:  44100Hz */
@@ -158,6 +156,11 @@ ELD::ELD(const char *buf, int size)
     update_eld(buf, size);
 }
 
+ELD::ELD(const ELD &rhs)
+{
+    m_e = rhs.m_e;
+}
+
 ELD::ELD()
 {
     m_e.formats = 0LL;
@@ -175,11 +178,9 @@ ELD& ELD::operator=(const ELD &rhs)
 void ELD::update_sad(int index,
                      const char *buf)
 {
-    int val;
-
     cea_sad *a = m_e.sad + index;
 
-    val = GRAB_BITS(buf, 1, 0, 7);
+    int val = GRAB_BITS(buf, 1, 0, 7);
     a->rates = 0;
     for (int i = 0; i < 7; i++)
         if ((val & (1 << i)) != 0)
@@ -215,17 +216,9 @@ void ELD::update_sad(int index,
             break;
 
         case TYPE_SACD:
-            break;
-
         case TYPE_EAC3:
-            break;
-
         case TYPE_DTS_HD:
-            break;
-
         case TYPE_MLP:
-            break;
-
         case TYPE_DST:
             break;
 
@@ -252,8 +245,7 @@ void ELD::update_sad(int index,
 
 int ELD::update_eld(const char *buf, int size)
 {
-    int mnl;
-    int i;
+    int mnl = 0;
 
     m_e.eld_ver = GRAB_BITS(buf, 0, 3, 5);
     if (m_e.eld_ver != ELD_VER_CEA_861D &&
@@ -298,7 +290,7 @@ int ELD::update_eld(const char *buf, int size)
         m_e.monitor_name[mnl] = '\0';
     }
 
-    for (i = 0; i < m_e.sad_count; i++)
+    for (int i = 0; i < m_e.sad_count; i++)
     {
         if (ELD_FIXED_BYTES + mnl + 3 * (i + 1) > size)
         {
@@ -328,12 +320,12 @@ int ELD::update_eld(const char *buf, int size)
  */
 QString ELD::print_pcm_rates(int pcm)
 {
-    unsigned int rates[] = {
+    static const std::array<const uint32_t,12> rates {
         5512, 8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200,
         96000, 176400, 192000 };
     QString result = QString();
 
-    for (size_t i = 0; i < SIZE_ARRAY(rates); i++)
+    for (size_t i = 0; i < rates.size(); i++)
     {
         if ((pcm & (1 << i)) != 0)
         {
@@ -349,10 +341,10 @@ QString ELD::print_pcm_rates(int pcm)
  */
 QString ELD::print_pcm_bits(int pcm)
 {
-    unsigned int bits[] = { 16, 20, 24 };
+    static const std::array<const uint8_t,3> bits { 16, 20, 24 };
     QString result = QString();
 
-    for (size_t i = 0; i < SIZE_ARRAY(bits); i++)
+    for (size_t i = 0; i < bits.size(); i++)
     {
         if ((pcm & (1 << i)) != 0)
         {
@@ -386,11 +378,11 @@ QString ELD::sad_desc(int index)
         .arg(buf2);
 }
 
-QString ELD::channel_allocation_desc()
+QString ELD::channel_allocation_desc() const
 {
     QString result = QString();
 
-    for (size_t i = 0; i < sizeof(cea_speaker_allocation_names) / sizeof(char *); i++)
+    for (size_t i = 0; i < cea_speaker_allocation_names.size(); i++)
     {
         if ((m_e.spk_alloc & (1 << i)) != 0)
         {
@@ -400,7 +392,7 @@ QString ELD::channel_allocation_desc()
     return result;
 }
 
-QString ELD::eld_version_name()
+QString ELD::eld_version_name() const
 {
     switch (m_e.eld_ver)
     {
@@ -410,7 +402,7 @@ QString ELD::eld_version_name()
     }
 }
 
-QString ELD::edid_version_name()
+QString ELD::edid_version_name() const
 {
     switch (m_e.cea_edid_ver)
     {
@@ -422,7 +414,7 @@ QString ELD::edid_version_name()
     }
 }
 
-QString ELD::info_desc()
+QString ELD::info_desc() const
 {
     QString result = QString("manufacture_id\t\t0x%1\n")
         .arg(m_e.manufacture_id, 0, 16);
@@ -435,15 +427,13 @@ QString ELD::info_desc()
     return result;
 }
 
-bool ELD::isValid()
+bool ELD::isValid() const
 {
     return m_e.eld_valid;
 }
 
 void ELD::show()
 {
-    int i;
-
     if (!isValid())
     {
         VBAUDIO("Invalid ELD");
@@ -461,7 +451,7 @@ void ELD::show()
     VBAUDIO(QString("max LPCM channels = %1").arg(maxLPCMChannels()));
     VBAUDIO(QString("max channels = %1").arg(maxChannels()));
     VBAUDIO(QString("supported codecs = %1").arg(codecs_desc()));
-    for (i = 0; i < m_e.sad_count; i++)
+    for (int i = 0; i < m_e.sad_count; i++)
     {
         VBAUDIO(sad_desc(i));
     }
@@ -472,7 +462,7 @@ QString ELD::product_name()
     return QString(m_e.monitor_name);
 }
 
-QString ELD::connection_name()
+QString ELD::connection_name() const
 {
     return eld_connection_type_names[m_e.conn_type];
 }
@@ -504,11 +494,11 @@ int ELD::maxChannels()
     return channels;
 }
 
-QString ELD::codecs_desc()
+QString ELD::codecs_desc() const
 {
     QString result = QString();
     bool found_one = false;
-    for (size_t i = 0; i < SIZE_ARRAY(audiotype_names); i++)
+    for (size_t i = 0; i < audiotype_names.size(); i++)
     {
         if ((m_e.formats & (1 << i)) != 0)
         {

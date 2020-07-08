@@ -1,25 +1,27 @@
 
 #include "x11colors.h"
 
+#include <vector>
+
 #include <QMutex>
 #include <QMutexLocker>
 #include <QMap>
 
 struct colormap
 {
-    const char *name;
-    unsigned char r, g, b;
+    const char *m_name;
+    unsigned char m_r, m_g, m_b;
 };
 
 QColor createColor(const QString &color)
 {
-    static QMutex x11colormapLock;
-    static QMap<QString, QColor> x11colormap;
+    static QMutex s_x11ColorMapLock;
+    static QMap<QString, QColor> s_x11ColorMap;
 
-    QMutexLocker locker(&x11colormapLock);
-    if (x11colormap.empty())
+    QMutexLocker locker(&s_x11ColorMapLock);
+    if (s_x11ColorMap.empty())
     {
-        static const colormap cmap[] = {
+        static const std::vector<colormap> kCMap {{
         { "snow", 255, 250, 250},
         { "ghost", 248, 248, 255},
         { "ghostwhite", 248, 248, 255},
@@ -772,16 +774,18 @@ QColor createColor(const QString &color)
         { "darkred", 139, 0, 0},
         { "light", 144, 238, 144},
         { "lightgreen", 144, 238, 144}
-        };
+        }};
 
-        for (size_t i = 0; i < (sizeof(cmap) / sizeof(cmap[0])); i++)
-            x11colormap[QString(cmap[i].name)] = QColor(cmap[i].r,
-                                                        cmap[i].g,
-                                                        cmap[i].b);
+        for (auto entry : kCMap)
+        {
+            s_x11ColorMap[QString(entry.m_name)] = QColor(entry.m_r,
+                                                          entry.m_g,
+                                                          entry.m_b);
+        }
     }
 
-    QMap<QString, QColor>::const_iterator it = x11colormap.find(color.toLower());
-    if (it != x11colormap.end())
+    QMap<QString, QColor>::const_iterator it = s_x11ColorMap.find(color.toLower());
+    if (it != s_x11ColorMap.end())
         return it.value();
 
     return {color};

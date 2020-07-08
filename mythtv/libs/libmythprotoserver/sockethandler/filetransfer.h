@@ -16,7 +16,7 @@ using namespace std;
 #include "sockethandler.h"
 
 class ProgramInfo;
-class RingBuffer;
+class MythMediaBuffer;
 
 class FileTransfer : public SocketHandler
 {
@@ -28,7 +28,7 @@ class FileTransfer : public SocketHandler
                  MythSocketManager *parent, bool write);
 
     bool isOpen(void);
-    bool ReOpen(QString newFilename = "");
+    bool ReOpen(const QString& newFilename = "");
 
     void Stop(void);
 
@@ -52,7 +52,7 @@ class FileTransfer : public SocketHandler
     QWaitCondition m_readsUnlockedCond;
 
     ProgramInfo *m_pginfo {nullptr};
-    RingBuffer  *m_rbuffer {nullptr};
+    MythMediaBuffer  *m_rbuffer {nullptr};
     bool m_ateof {false};
 
     vector<char> m_requestBuffer;

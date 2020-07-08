@@ -22,9 +22,7 @@
 
 #define LOC      QString("MythUIVirtualKeyboard: ")
 
-static const int numcomps = 95;
-
-static const QString comps[numcomps][3] = {
+static const std::array<std::array<QString,3>,95> comps {{
         {"!", "!", (QChar)0xa1},    {"c", "/", (QChar)0xa2},
         {"l", "-", (QChar)0xa3},    {"o", "x", (QChar)0xa4},
         {"y", "-", (QChar)0xa5},    {"|", "|", (QChar)0xa6},
@@ -73,7 +71,7 @@ static const QString comps[numcomps][3] = {
         {"u", "^", (QChar)0xfb},    {"u", "\"", (QChar)0xfc},
         {"y", "'", (QChar)0xfd},    {"t", "h", (QChar)0xfe},
         {"y", "\"", (QChar)0xff}
-};
+}};
 
 MythUIVirtualKeyboard::MythUIVirtualKeyboard(MythScreenStack *parentStack, MythUITextEdit *parentEdit)
           : MythScreenType(parentStack, "MythUIVirtualKeyboard")
@@ -102,9 +100,7 @@ bool MythUIVirtualKeyboard::Create()
     loadKeyDefinitions(gCoreContext->GetLanguageAndVariant());
     updateKeys(true);
 
-    int screenWidth, screenHeight;
-    float xmult, ymult;
-    GetMythUI()->GetScreenSettings(screenWidth, xmult, screenHeight, ymult);
+    QSize screensize = GetMythUI()->GetScreenSettings().size();
     MythRect editArea = m_parentEdit->GetArea();
     MythRect area = GetArea();
     MythPoint newPos;
@@ -134,20 +130,20 @@ bool MythUIVirtualKeyboard::Create()
             break;
 
         case VK_POSTOPDIALOG:
-            newPos = QPoint(screenWidth / 2 - area.width() / 2, 5);
+            newPos = QPoint(screensize.width() / 2 - area.width() / 2, 5);
             break;
 
         case VK_POSBOTTOMDIALOG:
-            newPos = QPoint(screenWidth / 2 - area.width() / 2, screenHeight - 5 - area.height());
+            newPos = QPoint(screensize.width() / 2 - area.width() / 2, screensize.height() - 5 - area.height());
             break;
 
         case VK_POSCENTERDIALOG:
-            newPos = QPoint(screenWidth / 2 - area.width() / 2, screenHeight / 2 - area.height() / 2);
+            newPos = QPoint(screensize.width() / 2 - area.width() / 2, screensize.height() / 2 - area.height() / 2);
             break;
 
         default:
             // VK_POSBELOWEDIT
-            if (editArea.y() + editArea.height() + area.height() + 5 < screenHeight)
+            if (editArea.y() + editArea.height() + area.height() + 5 < screensize.height())
             {
                 newPos = QPoint(editArea.x() + editArea.width() / 2 - area.width() / 2,
                                 editArea.y() + editArea.height() + 5);
@@ -163,12 +159,12 @@ bool MythUIVirtualKeyboard::Create()
     // make sure the popup doesn't go off screen
     if (newPos.x() < 5)
         newPos.setX(5);
-    if (newPos.x() + area.width() + 5 > screenWidth)
-        newPos.setX(screenWidth - area.width() - 5);
+    if (newPos.x() + area.width() + 5 > screensize.width())
+        newPos.setX(screensize.width() - area.width() - 5);
     if (newPos.y() < 5)
         newPos.setY(5);
-    if (newPos.y() + area.height() + 5 > screenHeight)
-        newPos.setY(screenHeight - area.height() - 5);
+    if (newPos.y() + area.height() + 5 > screensize.width())
+        newPos.setY(screensize.width() - area.height() - 5);
 
     SetPosition(newPos);
 
@@ -230,8 +226,14 @@ void MythUIVirtualKeyboard::loadKeyDefinitions(const QString &lang)
 
 void MythUIVirtualKeyboard::parseKey(const QDomElement &element)
 {
-    QString left, right, up, down;
-    QString normal, shift, alt, altshift;
+    QString left;
+    QString right;
+    QString up;
+    QString down;
+    QString normal;
+    QString shift;
+    QString alt;
+    QString altshift;
 
     QString name = element.attribute("name");
     QString type = element.attribute("type");
@@ -280,9 +282,9 @@ void MythUIVirtualKeyboard::parseKey(const QDomElement &element)
 void MythUIVirtualKeyboard::updateKeys(bool connectSignals)
 {
     QList<MythUIType *> *children = GetAllChildren();
-    for (int i = 0; i < children->size(); ++i)
+    for (auto *child : qAsConst(*children))
     {
-        MythUIButton *button = dynamic_cast<MythUIButton *>(children->at(i));
+        auto *button = dynamic_cast<MythUIButton *>(child);
         if (button)
         {
             if (m_keyMap.contains(button->objectName()))
@@ -335,9 +337,11 @@ void MythUIVirtualKeyboard::updateKeys(bool connectSignals)
                 }
             }
             else
+            {
                 LOG(VB_GENERAL, LOG_WARNING,
                     QString("WARNING - Key '%1' not found in map")
                         .arg(button->objectName()));
+            }
         }
     }
 }
@@ -412,17 +416,17 @@ void MythUIVirtualKeyboard::charClicked(void)
         else
         {
             // Produce the composed key.
-            for (int i = 0; i < numcomps; i++)
+            for (const auto & comp : comps)
             {
-                if ((m_composeStr == comps[i][0]) && (c == comps[i][1]))
+                if ((m_composeStr == comp[0]) && (c == comp[1]))
                 {
-                    c = comps[i][2];
+                    c = comp[2];
 
                     emit keyPressed(c);
 
                     if (m_parentEdit)
                     {
-                        QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, 0, Qt::NoModifier, c);
+                        auto *event = new QKeyEvent(QEvent::KeyPress, 0, Qt::NoModifier, c);
                         m_parentEdit->keyPressEvent(event);
                     }
 
@@ -442,7 +446,7 @@ void MythUIVirtualKeyboard::charClicked(void)
 
         if (m_parentEdit)
         {
-            QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, 0, Qt::NoModifier, c);
+            auto *event = new QKeyEvent(QEvent::KeyPress, 0, Qt::NoModifier, c);
             m_parentEdit->keyPressEvent(event);
         }
 
@@ -483,7 +487,7 @@ void MythUIVirtualKeyboard::delClicked(void)
     if (m_parentEdit)
     {
         //QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier, "");
-        QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Backspace, Qt::NoModifier, "");
+        auto *event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Backspace, Qt::NoModifier, "");
         m_parentEdit->keyPressEvent(event);
     }
 }
@@ -494,7 +498,7 @@ void MythUIVirtualKeyboard::backClicked(void)
 
     if (m_parentEdit)
     {
-        QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Backspace, Qt::NoModifier, "");
+        auto *event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Backspace, Qt::NoModifier, "");
         m_parentEdit->keyPressEvent(event);
     }
 }
@@ -530,7 +534,7 @@ void MythUIVirtualKeyboard::returnClicked(void)
     if (m_shift)
     {
         emit keyPressed("{NEWLINE}");
-        QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, m_newlineKey.keyCode, m_newlineKey.modifiers, "");
+        auto *event = new QKeyEvent(QEvent::KeyPress, m_newlineKey.keyCode, m_newlineKey.modifiers, "");
         m_parentEdit->keyPressEvent(event);
     }
     else
@@ -544,13 +548,13 @@ void MythUIVirtualKeyboard::moveleftClicked(void)
         if (m_shift)
         {
             emit keyPressed("{MOVEUP}");
-            QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, m_upKey.keyCode, m_upKey.modifiers, "");
+            auto *event = new QKeyEvent(QEvent::KeyPress, m_upKey.keyCode, m_upKey.modifiers, "");
             m_parentEdit->keyPressEvent(event);
         }
         else
         {
             emit keyPressed("{MOVELEFT}");
-            QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, m_leftKey.keyCode, m_leftKey.modifiers,"");
+            auto *event = new QKeyEvent(QEvent::KeyPress, m_leftKey.keyCode, m_leftKey.modifiers,"");
             m_parentEdit->keyPressEvent(event);
         }
     }
@@ -563,13 +567,13 @@ void MythUIVirtualKeyboard::moverightClicked(void)
         if (m_shift)
         {
             emit keyPressed("{MOVEDOWN}");
-            QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, m_downKey.keyCode, m_downKey.modifiers, "");
+            auto *event = new QKeyEvent(QEvent::KeyPress, m_downKey.keyCode, m_downKey.modifiers, "");
             m_parentEdit->keyPressEvent(event);
         }
         else
         {
             emit keyPressed("{MOVERIGHT}");
-            QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, m_rightKey.keyCode, m_rightKey.modifiers,"");
+            auto *event = new QKeyEvent(QEvent::KeyPress, m_rightKey.keyCode, m_rightKey.modifiers,"");
             m_parentEdit->keyPressEvent(event);
         }
     }
@@ -584,7 +588,7 @@ QString MythUIVirtualKeyboard::decodeChar(QString c)
         if (c.startsWith("0x"))
         {
             QString sCode = c.left(6);
-            bool bOK;
+            bool bOK = false;
             short nCode = sCode.toShort(&bOK, 16);
 
             c = c.mid(6);
@@ -608,7 +612,7 @@ QString MythUIVirtualKeyboard::decodeChar(QString c)
     return res;
 }
 
-QString MythUIVirtualKeyboard::getKeyText(const KeyDefinition& key)
+QString MythUIVirtualKeyboard::getKeyText(const KeyDefinition& key) const
 {
 
     if (m_shift)
@@ -626,8 +630,12 @@ QString MythUIVirtualKeyboard::getKeyText(const KeyDefinition& key)
 
 void MythUIVirtualKeyboard::loadEventKeyDefinitions(KeyEventDefinition *keyDef, const QString &action)
 {
-    QString keylist = GetMythMainWindow()->GetKey("Global", action);
+    QString keylist = MythMainWindow::GetKey("Global", action);
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList keys = keylist.split(',', QString::SkipEmptyParts);
+#else
+    QStringList keys = keylist.split(',', Qt::SkipEmptyParts);
+#endif
     if (keys.empty())
         return;
 

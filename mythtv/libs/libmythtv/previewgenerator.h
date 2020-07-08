@@ -21,7 +21,7 @@ class MythSocket;
 class QObject;
 class QEvent;
 
-typedef QMap<QString,QDateTime> FileTimeStampMap;
+using FileTimeStampMap = QMap<QString,QDateTime>;
 
 class MTV_PUBLIC PreviewGenerator : public QObject, public MThread
 {
@@ -36,7 +36,7 @@ class MTV_PUBLIC PreviewGenerator : public QObject, public MThread
     Q_OBJECT
 
   public:
-    typedef enum Mode
+    enum Mode
     {
         kNone           = 0x0,
         kLocal          = 0x1,
@@ -44,11 +44,11 @@ class MTV_PUBLIC PreviewGenerator : public QObject, public MThread
         kLocalAndRemote = 0x3,
         kForceLocal     = 0x5,
         kModeMask       = 0x7,
-    } Mode;
+    };
 
   public:
     PreviewGenerator(const ProgramInfo *pginfo,
-                     const QString     &token,
+                     QString            token,
                      Mode               mode = kLocal);
 
     void SetPreviewTime(long long time, bool in_seconds)
@@ -57,7 +57,7 @@ class MTV_PUBLIC PreviewGenerator : public QObject, public MThread
         { SetPreviewTime(seconds_in, true); }
     void SetPreviewTimeAsFrameNumber(long long frame_number)
         { SetPreviewTime(frame_number, false); }
-    void SetOutputFilename(const QString&);
+    void SetOutputFilename(const QString &fileName);
     void SetOutputSize(const QSize &size) { m_outSize = size; }
 
     QString GetToken(void) const { return m_token; }
@@ -65,13 +65,13 @@ class MTV_PUBLIC PreviewGenerator : public QObject, public MThread
     void run(void) override; // MThread
     bool Run(void);
 
-    void AttachSignals(QObject*);
+    void AttachSignals(QObject *obj);
 
   public slots:
     void deleteLater();
 
   protected:
-    virtual ~PreviewGenerator();
+    ~PreviewGenerator() override;
     void TeardownAll(void);
 
     bool RemotePreviewRun(void);

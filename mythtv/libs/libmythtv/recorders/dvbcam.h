@@ -18,13 +18,13 @@ class cCiHandler;
 class MThread;
 class DVBCam;
 
-typedef QMap<const ChannelBase*, ProgramMapTable*> pmt_list_t;
+using pmt_list_t = QMap<const ChannelBase*, ProgramMapTable*>;
 
 class DVBCam : public QRunnable
 {
   public:
-    explicit DVBCam(const QString &device);
-    ~DVBCam();
+    explicit DVBCam(QString device);
+    ~DVBCam() override;
 
     bool Start(void);
     bool Stop(void);

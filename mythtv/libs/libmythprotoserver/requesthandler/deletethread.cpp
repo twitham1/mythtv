@@ -27,7 +27,7 @@ using namespace std;
 */
 
 DeleteThread::DeleteThread(void) :
-    MThread("Delete"), m_increment(9961472), m_run(true)
+    MThread("Delete")
 {
     m_slow = (bool) gCoreContext->GetNumSetting("TruncateDeletesSlowly", 0);
     m_link = (bool) gCoreContext->GetNumSetting("DeletesFollowLinks", 0);
@@ -73,7 +73,7 @@ bool DeleteThread::AddFile(const QString& path)
         return false;
 
     QMutexLocker lock(&m_newlock);
-    DeleteHandler *handler = new DeleteHandler(path);
+    auto *handler = new DeleteHandler(path);
     m_newfiles << handler;
     return true;
 }
@@ -96,7 +96,7 @@ void DeleteThread::ProcessNew(void)
     while (true)
     {
         // pull a new path from the stack
-        DeleteHandler *handler;
+        DeleteHandler *handler = nullptr;
         {
             QMutexLocker lock(&m_newlock);
             if (m_newfiles.isEmpty())

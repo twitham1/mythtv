@@ -161,12 +161,14 @@ void ServerPool::SelectDefaultListen(bool force)
                     // IPv4 address is not defined, populate one
                     // restrict autoconfiguration to RFC1918 private networks
                     static QPair<QHostAddress, int>
-                       privNet1 = QHostAddress::parseSubnet("10.0.0.0/8"),
-                       privNet2 = QHostAddress::parseSubnet("172.16.0.0/12"),
-                       privNet3 = QHostAddress::parseSubnet("192.168.0.0/16");
+                       s_privNet1 = QHostAddress::parseSubnet("10.0.0.0/8");
+                    static QPair<QHostAddress, int>
+                       s_privNet2 = QHostAddress::parseSubnet("172.16.0.0/12");
+                    static QPair<QHostAddress, int>
+                       s_privNet3 = QHostAddress::parseSubnet("192.168.0.0/16");
 
-                    if (ip.isInSubnet(privNet1) || ip.isInSubnet(privNet2) ||
-                        ip.isInSubnet(privNet3))
+                    if (ip.isInSubnet(s_privNet1) || ip.isInSubnet(s_privNet2) ||
+                        ip.isInSubnet(s_privNet3))
                     {
                         LOG(VB_GENERAL, LOG_DEBUG,
                                 QString("Adding '%1' to address list.")
@@ -181,9 +183,11 @@ void ServerPool::SelectDefaultListen(bool force)
                         naList_4.append(*qnai);
                     }
                     else
+                    {
                         LOG(VB_GENERAL, LOG_DEBUG, QString("Skipping "
                            "non-private address during IPv4 autoselection: %1")
                                     .arg(PRETTYIP_(ip)));
+                    }
                 }
 
                 else
@@ -237,13 +241,17 @@ void ServerPool::SelectDefaultListen(bool force)
                 else if (config_v6.isNull())
                 {
                     if (ip.isInSubnet(kLinkLocal6))
+                    {
                         LOG(VB_GENERAL, LOG_DEBUG,
                             QString("Adding link-local '%1' to address list.")
                                 .arg(PRETTYIP_(ip)));
+                    }
                     else
+                    {
                         LOG(VB_GENERAL, LOG_DEBUG,
                             QString("Adding '%1' to address list.")
                                 .arg(PRETTYIP_(ip)));
+                    }
 
                     naList_6.append(*qnai);
                 }
@@ -341,9 +349,11 @@ QList<QHostAddress> ServerPool::DefaultBroadcastIPv4(void)
     QList<QHostAddress> blist;
     QList<QNetworkAddressEntry>::const_iterator it;
     for (it = naList_4.begin(); it != naList_4.end(); ++it)
+    {
         if (!blist.contains(it->broadcast()) && (it->prefixLength() != 32) &&
                 (it->ip() != QHostAddress::LocalHost))
             blist << it->broadcast();
+    }
 
     return blist;
 }
@@ -396,7 +406,7 @@ bool ServerPool::listen(QList<QHostAddress> addrs, quint16 port,
           && ! gCoreContext->GetBoolSetting("IPv6Support",true))
             continue;
 
-        PrivTcpServer *server = new PrivTcpServer(this, servertype);
+        auto *server = new PrivTcpServer(this, servertype);
             connect(server, &PrivTcpServer::newConnection,
                 this,   &ServerPool::newTcpConnection);
 
@@ -525,7 +535,7 @@ bool ServerPool::bind(QList<QHostAddress> addrs, quint16 port,
             }
         }
 
-        PrivUdpSocket *socket = new PrivUdpSocket(this, host);
+        auto *socket = new PrivUdpSocket(this, host);
 
         if (socket->bind(*it, port))
         {
@@ -631,11 +641,11 @@ void ServerPool::newTcpConnection(qt_socket_fd_t socket)
 {
     // Ignore connections from an SSL server for now, these are only handled
     // by HttpServer which overrides newTcpConnection
-    PrivTcpServer *server = dynamic_cast<PrivTcpServer *>(QObject::sender());
+    auto *server = dynamic_cast<PrivTcpServer *>(QObject::sender());
     if (!server || server->GetServerType() == kSSLServer)
         return;
 
-    QTcpSocket *qsock = new QTcpSocket(this);
+    auto *qsock = new QTcpSocket(this);
     if (qsock->setSocketDescriptor(socket)
        && gCoreContext->CheckSubnet(qsock))
     {
@@ -647,7 +657,7 @@ void ServerPool::newTcpConnection(qt_socket_fd_t socket)
 
 void ServerPool::newUdpDatagram(void)
 {
-    QUdpSocket *socket = dynamic_cast<QUdpSocket*>(sender());
+    auto *socket = dynamic_cast<QUdpSocket*>(sender());
 
     while (socket->state() == QAbstractSocket::BoundState &&
            socket->hasPendingDatagrams())
@@ -655,7 +665,7 @@ void ServerPool::newUdpDatagram(void)
         QByteArray buffer;
         buffer.resize(socket->pendingDatagramSize());
         QHostAddress sender;
-        quint16 senderPort;
+        quint16 senderPort = 0;
 
         socket->readDatagram(buffer.data(), buffer.size(),
                              &sender, &senderPort);

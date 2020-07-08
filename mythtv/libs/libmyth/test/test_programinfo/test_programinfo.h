@@ -27,7 +27,7 @@ class TestProgramInfo : public QObject
 {
     Q_OBJECT
   private:
-    ProgramInfo mockMovie (QString const &inetref, QString const &programid, QString const &title, unsigned int year)
+    static ProgramInfo mockMovie (QString const &inetref, QString const &programid, QString const &title, unsigned int year)
     {
         return ProgramInfo (
             (uint) 0, /* recordedid */
@@ -42,7 +42,7 @@ class TestProgramInfo : public QObject
             "", /* syndicated episode */
             "", /* category */
 
-            (uint) -1, /* chanid */
+            UINT_MAX, /* chanid */
             "", /* channum */
             "", /* chansign */
             "", /* channame */
@@ -81,12 +81,12 @@ class TestProgramInfo : public QObject
 
             RecStatus::Unknown, /* rec status */
 
-            (uint) -1, /* record id */
+            UINT_MAX, /* record id */
 
-            RecordingDupInTypes::kDupsUnset, /* dupin */
+            RecordingDupInType::kDupsUnset, /* dupin */
             RecordingDupMethodType::kDupCheckUnset, /* dupmethod */
 
-            (uint) -1, /* find id */
+            UINT_MAX, /* find id */
 
             (uint) 0, /* programflags */
             (uint) 0, /* audio props */
@@ -97,33 +97,33 @@ class TestProgramInfo : public QObject
         );
     }
 
-    QString draculalist = "Dracula||Its a movie.|0|0|0|||4294967295|||||0|"
+    QString m_draculaList = "Dracula||Its a movie.|0|0|0|||4294967295|||||0|"
         "946684800|946690200|4294967295||0|0|0|0|0|4294967295|0|0|0|946684800|"
         "946690200|0|Default|||tt0051554|11868|4294967295|0||Default|0|0|"
         "Default|0|0|0|1958|0|0|1|0||4294967295";
-    QString flash34list = "The Flash (2014)|The New Rogues|Barry continues to "
+    QString m_flash34List = "The Flash (2014)|The New Rogues|Barry continues to "
         "train Jesse ...|3|4|23|syndicatedepisode|Drama|1514|514|WNUVDT|"
         "WNUBDT (WNUV-DT)|/recordings/1514_20161025235800.ts|6056109800|"
         "1477439880|1477443720|0|localhost|0|0|0|0|0|0|0|15|8|1477439880|"
         "1477443720|0|Default||EP01922936|EP019229360055|ttvdb.py_279121|"
         "1477444354|0|2016-10-25|Default|0|0|Default|0|0|0|2016|0|0|4|715|"
         "Prime A-1|4294967295";
-    QString supergirl23list = "Supergirl|Welcome to Earth|An attack is made "
+    QString m_supergirl23List = "Supergirl|Welcome to Earth|An attack is made "
         "on the President as hot-button...|2|3|23|syndicatedepisode|Drama|"
         "1514|514|WNUVDT|WNUBDT (WNUV-DT)|/recordings/1514_20161024235800.ts|"
         "6056109670|1477353480|1477357320|0|localhost|0|0|0|0|0|0|0|15|8|"
         "1477353480|1477357320|0|Default||EP02185451|EP021854510025|"
         "ttvdb.py_295759|1477444354|0|2016-10-24|Default|0|0|Default|0|0|0|"
         "2016|0|0|4|711|Prime A-0|4294967295";
-    ProgramInfo dracula;
-    ProgramInfo flash34;
-    ProgramInfo supergirl23;
+    ProgramInfo m_dracula;
+    ProgramInfo m_flash34;
+    ProgramInfo m_supergirl23;
 
   private slots:
     void initTestCase()
     {
-        dracula = ProgramInfo(mockMovie ("11868", "tt0051554", "Dracula", 1958));
-        flash34 = ProgramInfo
+        m_dracula = ProgramInfo(mockMovie ("11868", "tt0051554", "Dracula", 1958));
+        m_flash34 = ProgramInfo
             (715,
              "The Flash (2014)", "",
              "The New Rogues", "",
@@ -145,7 +145,7 @@ class TestProgramInfo : public QObject
              kDupsInAll, kDupCheckSubThenDesc,
              0, 0, 0, 0, 0, "Prime A-1",
              QDateTime());
-        supergirl23 = ProgramInfo
+        m_supergirl23 = ProgramInfo
             (711,
              "Supergirl", "",
              "Welcome to Earth", "",
@@ -176,7 +176,7 @@ class TestProgramInfo : public QObject
     /**
      * test for https://code.mythtv.org/trac/ticket/12049
      */
-    void programFromVideo_test(void)
+    static void programFromVideo_test(void)
     {
         ProgramInfo program (
             "/pathname",
@@ -209,7 +209,7 @@ class TestProgramInfo : public QObject
     /**
      * test comparing programmes
      */
-    void movieComparison_test(void)
+    static void movieComparison_test(void)
     {
         /* tt0021814 - Dracula (1931) */
         ProgramInfo programA (mockMovie ("128", "tt0021814", "Dracula", 1931));
@@ -244,43 +244,41 @@ class TestProgramInfo : public QObject
     void programToStringList_test(void)
     {
         QStringList program_list;
-        dracula.ToStringList(program_list);
+        m_dracula.ToStringList(program_list);
         QVERIFY(program_list.size() == NUMPROGRAMLINES);
-        QVERIFY(program_list.join('|') == draculalist);
+        QVERIFY(program_list.join('|') == m_draculaList);
         ProgramInfo alucard(program_list);
-        QVERIFY(dracula == alucard);
+        QVERIFY(m_dracula == alucard);
 
         program_list.clear();
-        flash34.ToStringList(program_list);
+        m_flash34.ToStringList(program_list);
         QVERIFY(program_list.size() == NUMPROGRAMLINES);
-        QVERIFY(program_list.join('|') == flash34list);
+        QVERIFY(program_list.join('|') == m_flash34List);
         ProgramInfo hsalf34(program_list);
-        QVERIFY(flash34 == hsalf34);
+        QVERIFY(m_flash34 == hsalf34);
 
         program_list.clear();
-        supergirl23.ToStringList(program_list);
+        m_supergirl23.ToStringList(program_list);
         QVERIFY(program_list.size() == NUMPROGRAMLINES);
-        QVERIFY(program_list.join('|') == supergirl23list);
+        QVERIFY(program_list.join('|') == m_supergirl23List);
         ProgramInfo lrigrepus23(program_list);
-        QVERIFY(supergirl23 == lrigrepus23);
+        QVERIFY(m_supergirl23 == lrigrepus23);
 
-#if QT_VERSION >= QT_VERSION_CHECK(5,8,0)
         // Test accepting an empty string for an invalid QDateTime
         program_list.clear();
-        supergirl23.ToStringList(program_list);
+        m_supergirl23.ToStringList(program_list);
         QVERIFY(program_list.size() == NUMPROGRAMLINES);
         program_list[51] = "";
         ProgramInfo lrigrepus23b(program_list);
-        QVERIFY(supergirl23 == lrigrepus23b);
-#endif
+        QVERIFY(m_supergirl23 == lrigrepus23b);
 
         // Test a failure
         program_list.clear();
-        supergirl23.ToStringList(program_list);
+        m_supergirl23.ToStringList(program_list);
         program_list[1] = "Welcome to Earth 2";
         ProgramInfo lrigrepus23c(program_list);
         QEXPECT_FAIL("", "Intentionally changed title.", Abort);
-        QVERIFY(supergirl23 == lrigrepus23c);
+        QVERIFY(m_supergirl23 == lrigrepus23c);
     }
 
     void programSorting_test(void)
@@ -295,16 +293,16 @@ class TestProgramInfo : public QObject
         QVERIFY (program_list.join('|') == dracula2);
         program_list.clear();
 
-        flash34.ToStringList(program_list);
-        QVERIFY (program_list.join('|') == flash34list);
+        m_flash34.ToStringList(program_list);
+        QVERIFY (program_list.join('|') == m_flash34List);
         program_list.clear();
 
-        supergirl23.ToStringList(program_list);
-        QVERIFY (program_list.join('|') == supergirl23list);
+        m_supergirl23.ToStringList(program_list);
+        QVERIFY (program_list.join('|') == m_supergirl23List);
         program_list.clear();
 
-        QCOMPARE (flash34.GetSortTitle(), QString("flash (2014)"));
-        QCOMPARE (flash34.GetSortSubtitle(), QString("new rogues"));
-        QVERIFY (flash34.GetSortTitle() < supergirl23.GetSortTitle());
+        QCOMPARE (m_flash34.GetSortTitle(), QString("flash (2014)"));
+        QCOMPARE (m_flash34.GetSortSubtitle(), QString("new rogues"));
+        QVERIFY (m_flash34.GetSortTitle() < m_supergirl23.GetSortTitle());
     }
 };

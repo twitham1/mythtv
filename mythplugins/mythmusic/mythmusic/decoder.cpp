@@ -52,7 +52,7 @@ void Decoder::setOutput(AudioOutput *o)
 
 void Decoder::error(const QString &e)
 {
-    QString *str = new QString(e.toUtf8());
+    auto *str = new QString(e.toUtf8());
     DecoderEvent ev(str);
     dispatch(ev);
 }
@@ -79,9 +79,8 @@ QStringList Decoder::all()
 
     QStringList l;
 
-    QList<DecoderFactory*>::iterator it = factories->begin();
-    for (; it != factories->end(); ++it)
-        l += (*it)->description();
+    for (const auto & factory : qAsConst(*factories))
+        l += factory->description();
 
     return l;
 }
@@ -90,10 +89,9 @@ bool Decoder::supports(const QString &source)
 {
     checkFactories();
 
-    QList<DecoderFactory*>::iterator it = factories->begin();
-    for (; it != factories->end(); ++it)
+    for (const auto & factory : qAsConst(*factories))
     {
-        if ((*it)->supports(source))
+        if (factory->supports(source))
             return true;
     }
 
@@ -109,11 +107,10 @@ Decoder *Decoder::create(const QString &source, AudioOutput *output, bool deleta
 {
     checkFactories();
 
-    QList<DecoderFactory*>::iterator it = factories->begin();
-    for (; it != factories->end(); ++it)
+    for (const auto & factory : qAsConst(*factories))
     {
-        if ((*it)->supports(source))
-            return (*it)->create(source, output, deletable);
+        if (factory->supports(source))
+            return factory->create(source, output, deletable);
     }
 
     return nullptr;

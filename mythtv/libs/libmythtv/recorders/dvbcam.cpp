@@ -33,11 +33,13 @@
  *
  */
 
-#include <iostream>
-#include <vector>
-#include <map>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <map>
+#include <utility>
+#include <vector>
+
 using namespace std;
 
 #include <fcntl.h>
@@ -59,8 +61,8 @@ using namespace std;
 
 #define LOC QString("DVB#%1 CA: ").arg(m_device)
 
-DVBCam::DVBCam(const QString &aDevice)
-    : m_device(aDevice)
+DVBCam::DVBCam(QString aDevice)
+    : m_device(std::move(aDevice))
 {
     QString dvbdev = CardUtil::GetDeviceName(DVB_DEV_CA, m_device);
     QByteArray dev = dvbdev.toLatin1();
@@ -175,9 +177,11 @@ void DVBCam::HandleUserIO(void)
                     .arg(menu->BottomText()));
 
         for (int i=0; i<menu->NumEntries(); i++)
+        {
             if (menu->Entry(i) != nullptr)
                 LOG(VB_DVBCAM, LOG_INFO, LOC + QString("CAM: Menu Entry: %1")
                         .arg(menu->Entry(i)));
+        }
 
         if (menu->Selectable())
         {
@@ -370,10 +374,14 @@ void DVBCam::SendPMT(const ProgramMapTable &pmt, uint cplm)
                 .arg(cplm_info[cplm]).arg(s));
 
         if (!m_ciHandler->SetCaPmt(capmt, s))
+        {
             LOG(success ? VB_DVBCAM : VB_GENERAL, LOG_ERR,
                 LOC + "CA_PMT send failed!");
+        }
         else
+        {
             success = true;
+        }
     }
 }
 

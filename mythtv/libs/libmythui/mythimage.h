@@ -3,16 +3,21 @@
 
 // Base class, inherited by painter-specific classes.
 
+// C++ headers
+#include <utility>
+
+// QT headers
 #include <QImage>
+#include <QImageReader>
 #include <QMutex>
 #include <QPixmap>
-#include <QImageReader>
 
 #include "referencecounter.h"
 #include "mythpainter.h"
 
-enum ReflectAxis {ReflectHorizontal, ReflectVertical};
-enum FillDirection {FillLeftToRight, FillTopToBottom};
+enum class ReflectAxis {Horizontal, Vertical};
+enum class FillDirection {LeftToRight, TopToBottom};
+enum class BoundaryWanted {No, Yes};
 
 class QNetworkReply;
 class MythUIHelper;
@@ -20,7 +25,7 @@ class MythUIHelper;
 class MUI_PUBLIC MythImageReader: public QImageReader
 {
   public:
-    explicit MythImageReader(const QString &fileName);
+    explicit MythImageReader(QString fileName);
    ~MythImageReader();
 
   private:
@@ -34,7 +39,7 @@ class MUI_PUBLIC MythImage : public QImage, public ReferenceCounter
     static QImage ApplyExifOrientation(QImage &image, int orientation);
 
     /// Creates a reference counted image, call DecrRef() to delete.
-    MythImage(MythPainter *parent, const char *name = "MythImage");
+    explicit MythImage(MythPainter *parent, const char *name = "MythImage");
 
     MythPainter* GetParent(void)        { return m_Parent;   }
     void SetParent(MythPainter *parent) { m_Parent = parent; }
@@ -48,9 +53,6 @@ class MUI_PUBLIC MythImage : public QImage, public ReferenceCounter
     bool IsGradient() const { return m_isGradient; }
     bool IsReflected() const { return m_isReflected; }
     bool IsOriented() const { return m_isOriented; }
-
-    void SetToYUV(void) { m_isYUV = true; }
-    void ConvertToYUV(void);
 
     void Assign(const QImage &img);
     void Assign(const QPixmap &pix);
@@ -77,12 +79,12 @@ class MUI_PUBLIC MythImage : public QImage, public ReferenceCounter
     static MythImage *Gradient(MythPainter *painter,
                                const QSize & size, const QColor &begin,
                                const QColor &end, uint alpha,
-                               FillDirection direction = FillTopToBottom);
+                               FillDirection direction = FillDirection::TopToBottom);
 
     void SetID(unsigned int id) { m_imageId = id; }
     unsigned int GetID(void) const { return m_imageId; }
 
-    void SetFileName(QString fname) { m_FileName = fname; }
+    void SetFileName(QString fname) { m_FileName = std::move(fname); }
     QString GetFileName(void) const { return m_FileName; }
 
     void setIsReflected(bool reflected) { m_isReflected = reflected; }
@@ -100,11 +102,11 @@ class MUI_PUBLIC MythImage : public QImage, public ReferenceCounter
     }
 
   protected:
-    virtual ~MythImage();
+    ~MythImage() override;
     static void MakeGradient(QImage &image, const QColor &begin,
                              const QColor &end, int alpha,
-                             bool drawBoundary=true,
-                             FillDirection direction = FillTopToBottom);
+                             BoundaryWanted drawBoundary = BoundaryWanted::Yes,
+                             FillDirection direction = FillDirection::TopToBottom);
 
     bool           m_Changed       {false};
     MythPainter   *m_Parent        {nullptr};
@@ -113,11 +115,10 @@ class MUI_PUBLIC MythImage : public QImage, public ReferenceCounter
     QColor         m_gradBegin     {"#000000"};
     QColor         m_gradEnd       {"#FFFFFF"};
     int            m_gradAlpha     {255};
-    FillDirection  m_gradDirection {FillTopToBottom};
+    FillDirection  m_gradDirection {FillDirection::TopToBottom};
 
     bool           m_isOriented    {false};
     bool           m_isReflected   {false};
-    bool           m_isYUV         {false};
 
     unsigned int   m_imageId       {0};
 

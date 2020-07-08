@@ -34,8 +34,8 @@ class SystemEventThread : public QRunnable
      *  \param cmd       Command line to run for this System Event
      *  \param eventName Optional System Event name for this command
      */
-    SystemEventThread(const QString &cmd, QString eventName = "")
-      : m_command(cmd), m_event(std::move(eventName)) {};
+    explicit SystemEventThread(QString cmd, QString eventName = "")
+      : m_command(std::move(cmd)), m_event(std::move(eventName)) {};
 
     /** \fn SystemEventThread::run()
      *  \brief Runs the System Event handler command
@@ -187,13 +187,13 @@ void MythSystemEventHandler::SubstituteMatches(const QStringList &tokens,
 
     // 1st, try loading RecordingInfo / ProgramInfo
     RecordingInfo recinfo(chanid, recstartts);
-    bool loaded = recinfo.GetChanID();
+    bool loaded = recinfo.GetChanID() != 0U;
     if (loaded)
         recinfo.SubstituteMatches(command);
     else
     {
         // 2rd Try searching for RecordingInfo
-        RecordingInfo::LoadStatus status;
+        RecordingInfo::LoadStatus status = RecordingInfo::kNoProgram;
         RecordingInfo recinfo2(chanid, recstartts, false, 0, &status);
         if (status == RecordingInfo::kFoundProgram)
             recinfo2.SubstituteMatches(command);
@@ -228,7 +228,11 @@ void MythSystemEventHandler::SubstituteMatches(const QStringList &tokens,
 QString MythSystemEventHandler::EventNameToSetting(const QString &name)
 {
     QString result("EventCmd");
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList parts = name.toLower().split('_', QString::SkipEmptyParts);
+#else
+    QStringList parts = name.toLower().split('_', Qt::SkipEmptyParts);
+#endif
 
     QStringList::Iterator it = parts.begin();
     while (it != parts.end())
@@ -261,7 +265,9 @@ void MythSystemEventHandler::customEvent(QEvent *e)
 {
     if (e->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = static_cast<MythEvent *>(e);
+        auto *me = dynamic_cast<MythEvent *>(e);
+        if (me == nullptr)
+            return;
         QString msg = me->Message().simplified();
 
         if (msg == "CLEAR_SETTINGS_CACHE")
@@ -280,7 +286,11 @@ void MythSystemEventHandler::customEvent(QEvent *e)
             (!msg.startsWith("LOCAL_SYSTEM_EVENT ")))
             return;
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList tokens = msg.split(' ', QString::SkipEmptyParts);
+#else
+        QStringList tokens = msg.split(' ', Qt::SkipEmptyParts);
+#endif
 
         // Return if this event is for another host
         if ((tokens.size() >= 4) &&
@@ -296,7 +306,7 @@ void MythSystemEventHandler::customEvent(QEvent *e)
         {
             SubstituteMatches(tokens, cmd);
 
-            SystemEventThread *eventThread = new SystemEventThread(cmd);
+            auto *eventThread = new SystemEventThread(cmd);
             MThreadPool::globalInstance()->startReserved(
                 eventThread, "SystemEvent");
         }
@@ -310,8 +320,7 @@ void MythSystemEventHandler::customEvent(QEvent *e)
             LOG(VB_GENERAL, LOG_INFO, LOC +
                 QString("Starting thread for command '%1'").arg(cmd));
 
-            SystemEventThread *eventThread =
-                new SystemEventThread(cmd, tokens[1]);
+            auto *eventThread = new SystemEventThread(cmd, tokens[1]);
             MThreadPool::globalInstance()->startReserved(
                 eventThread, "SystemEvent");
         }
@@ -357,14 +366,18 @@ void SendMythSystemRecEvent(const QString &msg, const RecordingInfo *pginfo)
 void SendMythSystemPlayEvent(const QString &msg, const ProgramInfo *pginfo)
 {
     if (pginfo)
+    {
         gCoreContext->SendSystemEvent(
             QString("%1 HOSTNAME %2 CHANID %3 STARTTIME %4")
                     .arg(msg).arg(gCoreContext->GetHostName())
                     .arg(pginfo->GetChanID())
                     .arg(pginfo->GetRecordingStartTime(MythDate::ISODate)));
+    }
     else
+    {
         LOG(VB_GENERAL, LOG_ERR, LOC + "SendMythSystemPlayEvent() called with "
                                        "empty ProgramInfo");
+    }
 }
 
 /****************************************************************************/

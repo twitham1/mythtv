@@ -92,10 +92,10 @@ ThumbFinder::ThumbFinder(MythScreenStack *parent, ArchiveItem *archiveItem,
 {
     // copy thumbList so we can abandon changes if required
     m_thumbList.clear();
-    for (int x = 0; x < m_archiveItem->thumbList.size(); x++)
+    for (const auto *item : qAsConst(m_archiveItem->thumbList))
     {
-        ThumbImage *thumb = new ThumbImage;
-        *thumb = *m_archiveItem->thumbList.at(x);
+        auto *thumb = new ThumbImage;
+        *thumb = *item;
         m_thumbList.append(thumb);
     }
 }
@@ -288,10 +288,10 @@ void ThumbFinder::savePressed()
          delete m_archiveItem->thumbList.takeFirst();
     m_archiveItem->thumbList.clear();
 
-    for (int x = 0; x < m_thumbList.size(); x++)
+    for (const auto *item : qAsConst(m_thumbList))
     {
-        ThumbImage *thumb = new ThumbImage;
-        *thumb = *m_thumbList.at(x);
+        auto *thumb = new ThumbImage;
+        *thumb = *item;
         m_archiveItem->thumbList.append(thumb);
     }
 
@@ -400,22 +400,14 @@ void ThumbFinder::updateThumb(void)
     m_imageGrid->SetRedraw();
 }
 
-QString ThumbFinder::frameToTime(int64_t frame, bool addFrame)
+QString ThumbFinder::frameToTime(int64_t frame, bool addFrame) const
 {
-    int hour, min, sec;
-    QString str;
-
-    sec = (int) (frame / m_fps);
+    int sec = (int) (frame / m_fps);
     frame = frame - (int) (sec * m_fps);
-    min = sec / 60;
-    sec %= 60;
-    hour = min / 60;
-    min %= 60;
 
+    QString str = MythFormatTime(sec, "HH:mm:ss");
     if (addFrame)
-        str = str.sprintf("%01d:%02d:%02d.%02d", hour, min, sec, (int) frame);
-    else
-        str = str.sprintf("%02d:%02d:%02d", hour, min, sec);
+        str += QString(".%1").arg(frame,10,2,QChar('0'));
     return str;
 }
 
@@ -443,7 +435,7 @@ bool ThumbFinder::getThumbImages()
     m_updateFrame = true;
     getFrameImage();
 
-    int chapterLen;
+    int chapterLen = 0;
     if (m_thumbCount)
         chapterLen = m_finalDuration / m_thumbCount;
     else
@@ -479,7 +471,7 @@ bool ThumbFinder::getThumbImages()
 
     new MythUIButtonListItem(m_imageGrid, thumb->caption, thumb->filename);
 
-    qApp->processEvents();
+    QCoreApplication::processEvents();
 
     for (int x = 1; x <= m_thumbCount; x++)
     {
@@ -495,16 +487,13 @@ bool ThumbFinder::getThumbImages()
 
         if (!thumb)
         {
-            QString time;
-            int chapter, hour, min, sec;
+            int chapter = chapterLen * (x - 1);
+            int hour = chapter / 3600;
+            int min = (chapter % 3600) / 60;
+            int sec = chapter % 60;
+            QString time = QString::asprintf("%02d:%02d:%02d", hour, min, sec);
 
-            chapter = chapterLen * (x - 1);
-            hour = chapter / 3600;
-            min = (chapter % 3600) / 60;
-            sec = chapter % 60;
-            time = time.sprintf("%02d:%02d:%02d", hour, min, sec);
-
-            int64_t frame = (int64_t) (chapter * ceil(m_fps));
+            auto frame = (int64_t) (chapter * ceil(m_fps));
 
             // no thumb available create a new one
             thumb = new ThumbImage;
@@ -517,11 +506,11 @@ bool ThumbFinder::getThumbImages()
             m_frameFile = thumb->filename;
 
         seekToFrame(thumb->frame);
-        qApp->processEvents();
+        QCoreApplication::processEvents();
         getFrameImage();
-        qApp->processEvents();
+        QCoreApplication::processEvents();
         new MythUIButtonListItem(m_imageGrid, thumb->caption, thumb->filename);
-        qApp->processEvents();
+        QCoreApplication::processEvents();
     }
 
     m_frameFile = origFrameFile;
@@ -595,8 +584,7 @@ bool ThumbFinder::initAVCodec(const QString &inFile)
     }
 
     // get the codec context for the video stream
-    m_codecCtx = gCodecMap->getCodecContext
-        (m_inputFC->streams[m_videostream]);
+    m_codecCtx = m_codecMap.getCodecContext(m_inputFC->streams[m_videostream]);
     m_codecCtx->debug_mv = 0;
     m_codecCtx->debug = 0;
     m_codecCtx->workaround_bugs = 1;
@@ -694,11 +682,9 @@ bool ThumbFinder::seekToFrame(int frame, bool checkPos)
 
 bool ThumbFinder::seekForward()
 {
-    int inc;
     int64_t currentFrame = (m_currentPTS - m_startPTS) / m_frameTime;
-    int64_t newFrame;
 
-    inc = SeekAmounts[m_currentSeek].amount;
+    int inc = SeekAmounts[m_currentSeek].amount;
 
     if (inc == -1)
         inc = 1;
@@ -722,7 +708,7 @@ bool ThumbFinder::seekForward()
     else
         inc = (int) (inc * ceil(m_fps));
 
-    newFrame = currentFrame + inc - m_offset;
+    int64_t newFrame = currentFrame + inc - m_offset;
     if (newFrame == currentFrame + 1)
         getFrameImage(false);
     else
@@ -733,11 +719,9 @@ bool ThumbFinder::seekForward()
 
 bool ThumbFinder::seekBackward()
 {
-    int inc;
-    int64_t newFrame;
     int64_t currentFrame = (m_currentPTS - m_startPTS) / m_frameTime;
 
-    inc = SeekAmounts[m_currentSeek].amount;
+    int inc = SeekAmounts[m_currentSeek].amount;
     if (inc == -1)
         inc = -1;
     else if (inc == -2)
@@ -761,7 +745,7 @@ bool ThumbFinder::seekBackward()
     else
         inc = (int) (-inc * ceil(m_fps));
 
-    newFrame = currentFrame + inc - m_offset;
+    int64_t newFrame = currentFrame + inc - m_offset;
     seekToFrame(newFrame);
 
     return true;
@@ -778,7 +762,6 @@ bool ThumbFinder::getFrameImage(bool needKeyFrame, int64_t requiredPTS)
     av_init_packet(&pkt);
 
     bool frameFinished = false;
-    int keyFrame;
     int frameCount = 0;
     bool gotKeyFrame = false;
 
@@ -788,7 +771,7 @@ bool ThumbFinder::getFrameImage(bool needKeyFrame, int64_t requiredPTS)
         {
             frameCount++;
 
-            keyFrame = pkt.flags & AV_PKT_FLAG_KEY;
+            int keyFrame = pkt.flags & AV_PKT_FLAG_KEY;
 
             if (m_startPTS == -1 && pkt.dts != AV_NOPTS_VALUE)
             {
@@ -864,8 +847,7 @@ void ThumbFinder::closeAVCodec()
     delete[] m_outputbuf;
 
     // close the codec
-    gCodecMap->freeCodecContext
-        (m_inputFC->streams[m_videostream]);
+    m_codecMap.freeCodecContext(m_inputFC->streams[m_videostream]);
 
     // close the video file
     m_inputFC.Close();
@@ -874,7 +856,7 @@ void ThumbFinder::closeAVCodec()
 void ThumbFinder::ShowMenu()
 {
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
-    MythDialogBox *menuPopup = new MythDialogBox(tr("Menu"), popupStack, "actionmenu");
+    auto *menuPopup = new MythDialogBox(tr("Menu"), popupStack, "actionmenu");
 
     if (menuPopup->Create())
         popupStack->AddScreen(menuPopup);
@@ -891,7 +873,7 @@ void ThumbFinder::updatePositionBar(int64_t frame)
         return;
 
     QSize size = m_positionImage->GetArea().size();
-    QPixmap *pixmap = new QPixmap(size.width(), size.height());
+    auto *pixmap = new QPixmap(size.width(), size.height());
 
     QPainter p(pixmap);
     QBrush brush(Qt::green);
@@ -903,14 +885,12 @@ void ThumbFinder::updatePositionBar(int64_t frame)
     frm_dir_map_t::const_iterator it;
 
     brush.setColor(Qt::red);
-    double startdelta, enddelta;
 
     for (it = m_deleteMap.begin(); it != m_deleteMap.end(); ++it)
     {
+        double startdelta = size.width();
         if (it.key() != 0)
             startdelta = (m_archiveItem->duration * m_fps) / it.key();
-        else
-            startdelta = size.width();
 
         ++it;
         if (it == m_deleteMap.end())
@@ -919,10 +899,10 @@ void ThumbFinder::updatePositionBar(int64_t frame)
             break;
         }
 
+        double enddelta = size.width();
         if (it.key() != 0)
             enddelta = (m_archiveItem->duration * m_fps) / it.key();
-        else
-            enddelta = size.width();
+
         int start = (int) (size.width() / startdelta);
         int end = (int) (size.width() / enddelta);
         p.fillRect(start - 1, 0, end - start, size.height(), brush);

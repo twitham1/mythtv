@@ -27,17 +27,15 @@ static QString extract_query_list(
 {
     QString list;
 
-    MythSettingList::const_iterator it = settings.begin();
-    for (; it != settings.end(); ++it)
+    for (const auto *val : qAsConst(settings))
     {
-        const MythSettingGroup *group =
-            dynamic_cast<const MythSettingGroup*>(*it);
+        const auto *group = dynamic_cast<const MythSettingGroup*>(val);
         if (group)
         {
             list += extract_query_list(group->m_settings, stype);
             continue;
         }
-        const MythSetting *setting = dynamic_cast<const MythSetting*>(*it);
+        const auto *setting = dynamic_cast<const MythSetting*>(val);
         if (setting && (setting->m_stype == stype))
             list += QString(",'%1'").arg(setting->m_value);
     }
@@ -51,17 +49,15 @@ static void fill_setting(
     MythSettingBase *sb, const QMap<QString,QString> &map,
     MythSetting::SettingType stype)
 {
-    const MythSettingGroup *group =
-        dynamic_cast<const MythSettingGroup*>(sb);
+    const auto *group = dynamic_cast<const MythSettingGroup*>(sb);
     if (group)
     {
-        MythSettingList::const_iterator it = group->m_settings.begin();
-        for (; it != group->m_settings.end(); ++it)
-            fill_setting(*it, map, stype);
+        for (auto *setting : qAsConst(group->m_settings))
+            fill_setting(setting, map, stype);
         return;
     }
 
-    MythSetting *setting = dynamic_cast<MythSetting*>(sb);
+    auto *setting = dynamic_cast<MythSetting*>(sb);
     if (setting && (setting->m_stype == stype))
     {
         QMap<QString,QString>::const_iterator it = map.find(setting->m_value);
@@ -88,8 +84,8 @@ static void fill_setting(
         else if (MythSetting::kFrequencyTable == setting->m_dtype)
         {
             setting->m_data_list.clear();
-            for (uint i = 0; chanlists[i].name; i++)
-                setting->m_data_list.push_back(chanlists[i].name);
+            for (const auto &list : gChanLists)
+                setting->m_data_list.push_back(list.name);
             setting->m_display_list = setting->m_data_list;
             do_option_check = true;
         }
@@ -100,7 +96,7 @@ static void fill_setting(
                 !setting->m_data_list.contains(setting->m_data.toLower(),
                                                Qt::CaseInsensitive))
             {
-                bool ok;
+                bool ok = false;
                 long long idata = setting->m_data.toLongLong(&ok);
                 if (ok)
                 {
@@ -132,9 +128,8 @@ static void fill_settings(
     while (query.next())
         map[query.value(0).toString()] = query.value(1).toString();
 
-    MythSettingList::const_iterator it = settings.begin();
-    for (; it != settings.end(); ++it)
-        fill_setting(*it, map, stype);
+    for (auto *setting : qAsConst(settings))
+        fill_setting(setting, map, stype);
 }
 
 QString MythSettingGroup::ToHTML(uint depth) const
@@ -149,9 +144,8 @@ QString MythSettingGroup::ToHTML(uint depth) const
             .arg(depth+1).arg(m_human_label).arg(depth+1);
     }
 
-    MythSettingList::const_iterator it = m_settings.begin();
-    for (; it != m_settings.end(); ++it)
-        ret += (*it)->ToHTML(depth+1);
+    for (const auto *setting : qAsConst(m_settings))
+        ret += setting->ToHTML(depth+1);
 
     ret += indent(depth) +"</div>";
 
@@ -170,16 +164,12 @@ QString MythSetting::ToHTML(uint level) const
         case kInteger:
         case kIntegerRange:
         case kUnsignedInteger:
-            size = 20;
-            break;
         case kTimeOfDay:
+        case kIPAddress:
             size = 20;
             break;
         case kString:
             size = 60;
-            break;
-        case kIPAddress:
-            size = 20;
             break;
         case kCheckBox:
         case kSelect:
@@ -414,11 +404,11 @@ QStringList GetSettingValueList(const QString &type)
     if (type == "LocalIPAddress")
     {
         QList<QHostAddress> list = QNetworkInterface::allAddresses();
-        for (uint i = 0; i < (uint)list.size(); i++)
+        for (const auto & addr : qAsConst(list))
         {
-            if (list[i].toString().contains(":"))
+            if (addr.toString().contains(":"))
                 continue; // ignore IP6 addresses for now
-            sList << list[i].toString();
+            sList << addr.toString();
         }
 
         if (sList.isEmpty())
@@ -457,8 +447,7 @@ QString StringListToJSON(const QString &key,
 {
     QString result;
 
-    QStringList::const_iterator it = sList.begin();
-    for (; it != sList.end(); ++it)
+    for (const auto & item : qAsConst(sList))
     {
         if (result.isEmpty())
             result += QString("{ \"%1\" : [ ").arg(key);
@@ -466,7 +455,7 @@ QString StringListToJSON(const QString &key,
             result += ", ";
 
         // FIXME, howto encode double quotes in JSON?
-        result += "\"" + *it + "\"";
+        result += "\"" + item + "\"";
     }
 
     if (!result.isEmpty())
@@ -510,7 +499,7 @@ bool parse_dom(MythSettingList &settings, const QDomElement &element,
                 tmpIncludeAllChildren = true;
             }
 
-            MythSettingGroup *g = new MythSettingGroup(
+            auto *g = new MythSettingGroup(
                 m_human_label, m_unique_label, m_ecma_script);
 
             if ((e.hasChildNodes()) &&
@@ -624,7 +613,7 @@ bool parse_dom(MythSettingList &settings, const QDomElement &element,
                 return false;
             }
 
-            MythSetting *s = new MythSetting(
+            auto *s = new MythSetting(
                 m["value"], m["default_data"], stype,
                 m["label"], m["help_text"], dtype,
                 data_list, display_list, range_min, range_max,
@@ -739,7 +728,7 @@ bool check_settings(MythSettingList &/*database_settings*/,
         else
             result += ", ";
 
-        result += QString("\"%1\": \"DEBUG: New value for '%2' would be '%3'\"")
+        result += QString(R"("%1": "DEBUG: New value for '%2' would be '%3'")")
                           .arg(it.key()).arg(it.key()).arg(*it);
     }
 

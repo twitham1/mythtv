@@ -1,6 +1,7 @@
 #ifndef MUSICDATA_H_
 #define MUSICDATA_H_
 
+#include <utility>
 
 // qt
 #include <QRunnable>
@@ -20,8 +21,8 @@ class AllStream;
 class SendStringListThread : public QRunnable
 {
   public:
-    explicit SendStringListThread(const QStringList &strList)
-        : m_strList(strList) {}
+    explicit SendStringListThread(QStringList strList)
+        : m_strList(std::move(strList)) {}
 
     void run() override // QRunnable
     {
@@ -41,13 +42,13 @@ class MusicData : public QObject
   public:
 
     MusicData() = default;
-    ~MusicData();
+    ~MusicData() override;
 
-    void scanMusic(void);
-    void loadMusic(void);
+    static void scanMusic(void);
+    void loadMusic(void) const;
 
   public slots:
-    void reloadMusic(void);
+    void reloadMusic(void) const;
 
   public:
     PlaylistContainer  *m_all_playlists {nullptr};

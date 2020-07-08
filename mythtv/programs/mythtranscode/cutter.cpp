@@ -13,14 +13,13 @@ void Cutter::SetCutList(frm_dir_map_t &deleteMap, PlayerContext *ctx)
     // Break each cut into two parts, the first for
     // the player and the second for the transcode loop.
     frm_dir_map_t           remainingCutList;
-    frm_dir_map_t::Iterator it;
     int64_t                 start = 0;
-    int64_t                 leadinLength;
+    int64_t                 leadinLength = 0;
 
     m_tracker.SetPlayerContext(ctx);
     m_foreshortenedCutList.clear();
 
-    for (it = deleteMap.begin(); it != deleteMap.end(); ++it)
+    for (auto it = deleteMap.begin(); it != deleteMap.end(); ++it)
     {
         switch(it.value())
         {
@@ -109,9 +108,11 @@ bool Cutter::InhibitUseVideoFrame()
     m_videoFramesToCut--;
 
     if(m_videoFramesToCut == 0)
+    {
         LOG(VB_GENERAL, LOG_INFO,
             QString("Clean cut: end of video cut; audio frames left "
                     "to cut %1") .arg(m_audioFramesToCut));
+    }
 
     return true;
 }
@@ -132,9 +133,11 @@ bool Cutter::InhibitUseAudioFrames(int64_t frames, long *totalAudio)
         // so gets us closer to zero left to drop
         m_audioFramesToCut -= frames;
         if(m_audioFramesToCut == 0)
+        {
             LOG(VB_GENERAL, LOG_INFO,
                 QString("Clean cut: end of audio cut; vidio frames left "
                         "to cut %1") .arg(m_videoFramesToCut));
+        }
         return true;
     }
 

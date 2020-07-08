@@ -14,7 +14,7 @@ bool operator==(const RomInfo& a, const RomInfo& b)
     return a.Romname() == b.Romname();
 }
 
-void RomInfo::SaveToDatabase()
+void RomInfo::SaveToDatabase() const
 {
     MSqlQuery query(MSqlQuery::InitCon());
 
@@ -29,7 +29,7 @@ void RomInfo::SaveToDatabase()
             .arg(Romname()));
 
         query.prepare("INSERT INTO gamemetadata "
-                      "(system, romname, gamename, genre, year, gametype, "
+                      "(`system`, romname, gamename, genre, year, gametype, "
                       "rompath, country, crc_value, diskcount, display, plot, "
                       "publisher, version, fanart, boxart, screenshot) "
                       "VALUES (:SYSTEM, :ROMNAME, :GAMENAME, :GENRE, :YEAR, "
@@ -91,7 +91,7 @@ void RomInfo::SaveToDatabase()
     }
 }
 
-void RomInfo::DeleteFromDatabase()
+void RomInfo::DeleteFromDatabase() const
 {
     LOG(VB_GENERAL, LOG_INFO, LOC + QString("Removing %1 - %2").arg(Rompath())
             .arg(Romname()));
@@ -160,9 +160,9 @@ bool RomInfo::FindImage(QString BaseFileName, QString *result)
 
 
     BaseFileName.truncate(dotLocation + 1);
-    for (QStringList::Iterator i = graphic_formats.begin(); i != graphic_formats.end(); i++)
+    for (const auto & format : qAsConst(graphic_formats))
     {
-        *result = BaseFileName + *i;
+        *result = BaseFileName + format;
         if (QFile::exists(*result))
             return true;
     }
@@ -231,7 +231,7 @@ void RomInfo::setFavorite(bool updateDatabase)
     }
 }
 
-QString RomInfo::getExtension()
+QString RomInfo::getExtension() const
 {
     int pos = Romname().lastIndexOf(".");
     if (pos == -1)
@@ -255,10 +255,10 @@ void RomInfo::fillData()
 
     QString systemtype;
     if (m_system != "") {
-        systemtype  += " AND system = :SYSTEM ";
+        systemtype  += " AND `system` = :SYSTEM ";
     }
 
-    QString thequery = "SELECT system,gamename,genre,year,romname,favorite,"
+    QString thequery = "SELECT `system`,gamename,genre,year,romname,favorite,"
                        "rompath,country,crc_value,diskcount,gametype,plot,publisher,"
                        "version,screenshot,fanart,boxart,inetref,intid FROM gamemetadata "
                        "WHERE gamename = :GAMENAME "
@@ -297,7 +297,7 @@ void RomInfo::fillData()
     // systems available to play it.
     if (RomCount() > 1)
     {
-        query.prepare("SELECT DISTINCT system FROM gamemetadata "
+        query.prepare("SELECT DISTINCT `system` FROM gamemetadata "
                       "WHERE romname = :ROMNAME");
         query.bindValue(":ROMNAME", Romname());
         if (!query.exec())
@@ -323,7 +323,7 @@ QList<RomInfo*> RomInfo::GetAllRomInfo()
 
     MSqlQuery query(MSqlQuery::InitCon());
 
-    QString querystr = "SELECT intid,system,romname,gamename,genre,year,publisher,"
+    QString querystr = "SELECT intid,`system`,romname,gamename,genre,year,publisher,"
                        "favorite,rompath,screenshot,fanart,plot,boxart,"
                        "gametype,diskcount,country,crc_value,inetref,display,"
                        "version FROM gamemetadata ORDER BY diskcount DESC";
@@ -338,7 +338,7 @@ QList<RomInfo*> RomInfo::GetAllRomInfo()
 
     while (query.next())
     {
-        RomInfo *add = new RomInfo(
+        auto *add = new RomInfo(
                            query.value(0).toInt(),
                            query.value(2).toString(),
                            query.value(1).toString(),
@@ -371,7 +371,7 @@ RomInfo *RomInfo::GetRomInfoById(int id)
 
     MSqlQuery query(MSqlQuery::InitCon());
 
-    QString querystr = "SELECT intid,system,romname,gamename,genre,year,publisher,"
+    QString querystr = "SELECT intid,`system`,romname,gamename,genre,year,publisher,"
                        "favorite,rompath,screenshot,fanart,plot,boxart,"
                        "gametype,diskcount,country,crc_value,inetref,display,"
                        "version FROM gamemetadata WHERE intid = :INTID";
@@ -413,7 +413,7 @@ RomInfo *RomInfo::GetRomInfoById(int id)
     return ret;
 }
 
-QString RomInfo::toString()
+QString RomInfo::toString() const
 {
     return QString ("Rom Info:\n"
                "ID: %1\n"

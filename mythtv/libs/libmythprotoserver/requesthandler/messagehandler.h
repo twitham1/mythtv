@@ -1,5 +1,5 @@
-#ifndef _MESSAGEHANDLER_H_
-#define _MESSAGEHANDLER_H_
+#ifndef MESSAGEHANDLER_H
+#define MESSAGEHANDLER_H
 
 #include <QEvent>
 #include <QStringList>
@@ -19,8 +19,8 @@ class PROTOSERVER_PUBLIC MessageHandler : public SocketRequestHandler
     void customEvent(QEvent *e) override; // QObject
 
   private:
-    bool HandleInbound(SocketHandler *sock, QStringList &slist);
-    bool HandleOutbound(SocketHandler *sock, QStringList &slist);
+    static bool HandleInbound(SocketHandler *sock, QStringList &slist);
+    static bool HandleOutbound(SocketHandler *sock, QStringList &slist);
 };
 
-#endif
+#endif // MESSAGEHANDLER_H

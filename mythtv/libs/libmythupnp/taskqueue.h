@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __TASKQUEUE_H__
-#define __TASKQUEUE_H__
+#ifndef TASKQUEUE_H
+#define TASKQUEUE_H
 
 // POSIX headers
 #include <sys/types.h>
@@ -40,7 +40,7 @@ class TaskQueue;
 // Typedefs
 /////////////////////////////////////////////////////////////////////////////
 
-typedef std::multimap< TaskTime, Task *> TaskMap;
+using TaskMap = std::multimap< TaskTime, Task *>;
 
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
@@ -60,8 +60,7 @@ class Task : public ReferenceCounter
     protected:
 
         // Destructor protected to force use of Release Method
-
-        virtual        ~Task() = default;
+        ~Task() override = default;
 
     public:
 
@@ -111,7 +110,7 @@ class UPNP_PUBLIC TaskQueue : public MThread
         static TaskQueue* Instance();
         static void Shutdown();
 
-        virtual ~TaskQueue();
+        ~TaskQueue() override;
 
         void  RequestTerminate   ( );
 
@@ -124,4 +123,4 @@ class UPNP_PUBLIC TaskQueue : public MThread
                                                                 
 };
 
-#endif
+#endif // TASKQUEUE_H

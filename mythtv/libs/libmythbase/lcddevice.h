@@ -1,13 +1,17 @@
 #ifndef LCDDEVICE_H_
 #define LCDDEVICE_H_
 
+#include <utility>
+
+// Qt headers
+#include <QList>
+#include <QMutex>
 #include <QObject>
 #include <QStringList>
-#include <QMutex>
-#include <QList>
 
 class QTimer;
 
+// MythTV headers
 #include "mythbaseexp.h"
 
 enum CHECKED_STATE {CHECKED = 0, UNCHECKED, NOTCHECKABLE };
@@ -18,10 +22,10 @@ class MBASE_PUBLIC LCDMenuItem
 {
   public:
     LCDMenuItem(bool item_selected, CHECKED_STATE item_checked,
-                const QString& item_name, unsigned int item_indent  = 0,
+                QString  item_name, unsigned int item_indent  = 0,
                 bool item_scroll = false) :
             m_selected(item_selected),  m_checked(item_checked),
-            m_name(item_name),          m_scroll(item_scroll),
+            m_name(std::move(item_name)),          m_scroll(item_scroll),
             m_indent(item_indent),      m_scrollPosition(item_indent)
     {
     }
@@ -55,12 +59,12 @@ enum TEXT_ALIGNMENT {ALIGN_LEFT, ALIGN_RIGHT, ALIGN_CENTERED };
 class MBASE_PUBLIC LCDTextItem
 {
   public:
-    LCDTextItem(unsigned int row, TEXT_ALIGNMENT align, const QString &text,
-                const QString &screen = "Generic", bool scroll = false,
-                const QString &widget = "textWidget") :
+    LCDTextItem(unsigned int row, TEXT_ALIGNMENT align, QString text,
+                QString screen = "Generic", bool scroll = false,
+                QString widget = "textWidget") :
                 m_itemRow(row),     m_itemAlignment(align),
-                m_itemText(text),   m_itemScreen(screen),
-                m_itemWidget(widget),   m_itemScrollable(scroll)
+                m_itemText(std::move(text)),   m_itemScreen(std::move(screen)),
+                m_itemWidget(std::move(widget)),   m_itemScrollable(scroll)
     {
     }
 
@@ -69,7 +73,7 @@ class MBASE_PUBLIC LCDTextItem
     QString getText() const { return m_itemText; }
     QString getScreen() const { return m_itemScreen; }
     QString getWidget() const { return m_itemWidget; }
-    int getScroll() const { return m_itemScrollable; }
+    bool getScroll() const { return m_itemScrollable; }
 
     void setRow(unsigned int value) { m_itemRow = value; }
     void setAlignment(TEXT_ALIGNMENT value) { m_itemAlignment = value; }
@@ -165,6 +169,7 @@ enum LCDFunctionSet {
 class MBASE_PUBLIC LCD : public QObject
 {
     Q_OBJECT
+    friend class TestLcdDevice;
 
   protected:
     LCD();
@@ -174,7 +179,7 @@ class MBASE_PUBLIC LCD : public QObject
     static bool m_enabled;
 
   public:
-   ~LCD();
+   ~LCD() override;
 
     enum {
         MUSIC_REPEAT_NONE  = 0,
@@ -284,8 +289,8 @@ class MBASE_PUBLIC LCD : public QObject
 
     void stopAll(void);
 
-    uint getLCDHeight(void) { return m_lcdHeight; }
-    uint getLCDWidth(void) { return m_lcdWidth; }
+    uint getLCDHeight(void) const { return m_lcdHeight; }
+    uint getLCDWidth(void) const { return m_lcdWidth; }
 
     void resetServer(void); // tell the mythlcdserver to reload its settings
 
@@ -299,10 +304,10 @@ signals:
     void sendToServer(const QString &someText);
 
   private:
-    bool startLCDServer(void);
+    static bool startLCDServer(void);
     void init();
     void handleKeyPress(const QString &keyPressed);
-    QString quotedString(const QString &string);
+    static QString quotedString(const QString &string);
     void describeServer();
 
   private slots:
@@ -317,7 +322,7 @@ signals:
     bool     m_connected        {false};
 
     QTimer *m_retryTimer        {nullptr};
-    QTimer *m_LEDTimer          {nullptr};
+    QTimer *m_ledTimer          {nullptr};
 
     QString m_sendBuffer;
     QString m_lastCommand;
@@ -342,7 +347,7 @@ signals:
 
     int     m_lcdLedMask        {0};
 
-    int (*GetLEDMask)(void)     {nullptr};
+    int (*m_getLEDMask)(void)   {nullptr};
 };
 
 #endif

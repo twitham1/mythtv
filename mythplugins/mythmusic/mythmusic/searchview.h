@@ -20,10 +20,10 @@ class SearchView : public MusicCommon
     Q_OBJECT
   public:
     SearchView(MythScreenStack *parent, MythScreenType *parentScreen);
-    ~SearchView(void) = default;
+    ~SearchView(void) override = default;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MusicCommon
+    bool keyPressEvent(QKeyEvent *event) override; // MusicCommon
 
     void ShowMenu(void) override; // MusicCommon
 
@@ -35,8 +35,8 @@ class SearchView : public MusicCommon
     void fieldSelected(MythUIButtonListItem *item);
     void criteriaChanged(void);
 
-    void trackClicked(MythUIButtonListItem *item);
-    void trackVisible(MythUIButtonListItem *item);
+    static void trackClicked(MythUIButtonListItem *item);
+    static void trackVisible(MythUIButtonListItem *item);
 
   private:
     bool                 m_playTrack    {false};

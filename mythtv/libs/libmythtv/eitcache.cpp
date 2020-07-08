@@ -21,11 +21,7 @@ const uint EITCache::kVersionMax = 31;
 EITCache::EITCache()
 {
     // 24 hours ago
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-    m_lastPruneTime = MythDate::current().toUTC().toTime_t() - 86400;
-#else
     m_lastPruneTime = MythDate::current().toUTC().toSecsSinceEpoch() - 86400;
-#endif
 }
 
 EITCache::~EITCache()
@@ -51,13 +47,13 @@ QString EITCache::GetStatistics(void) const
 {
     QMutexLocker locker(&m_eventMapLock);
     return QString(
-        "EITCache::statistics: Accesses: %1, Hits: %2, "
-        "Table Upgrades %3, New Versions: %4, New Endtimes: %5, Entries: %6, "
-        "Pruned Entries: %7, Pruned Hits: %8, Future Hits: %9, Wrong Channel Hits %10, "
-        "Hit Ratio %11.")
-        .arg(m_accessCnt).arg(m_hitCnt).arg(m_tblChgCnt).arg(m_verChgCnt).arg(m_endChgCnt)
-        .arg(m_entryCnt).arg(m_pruneCnt).arg(m_prunedHitCnt).arg(m_futureHitCnt)
-        .arg(m_wrongChannelHitCnt)
+        "EITCache stats: Access:%1 Hits:%2 "
+        "Table:%3 Version:%4 Endtime:%5 New:%6 "
+        "Pruned:%7 Pruned Hits:%8 Future:%9 Wrong Channel:%10 "
+        "Hit Ratio:%11")
+        .arg(m_accessCnt).arg(m_hitCnt)
+        .arg(m_tblChgCnt).arg(m_verChgCnt).arg(m_endChgCnt).arg(m_entryCnt)
+        .arg(m_pruneCnt).arg(m_prunedHitCnt).arg(m_futureHitCnt).arg(m_wrongChannelHitCnt)
         .arg((m_hitCnt+m_prunedHitCnt+m_futureHitCnt+m_wrongChannelHitCnt)/(double)m_accessCnt);
 }
 
@@ -154,11 +150,7 @@ static bool lock_channel(uint chanid, uint endtime)
                 .arg(chanid));
         return false;
     }
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-    uint now = MythDate::current().toTime_t();
-#else
     uint now = MythDate::current().toSecsSinceEpoch();
-#endif
     qstr = "INSERT INTO eit_cache "
            "       ( chanid,  endtime,  status) "
            "VALUES (:CHANID, :ENDTIME, :STATUS)";
@@ -194,11 +186,7 @@ static void unlock_channel(uint chanid, uint updated)
         MythDB::DBError("Error deleting channel lock", query);
 
     // inserting statistics
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-    uint now = MythDate::current().toTime_t();
-#else
     uint now = MythDate::current().toSecsSinceEpoch();
-#endif
     qstr = "REPLACE INTO eit_cache "
            "       ( chanid,  eventid,  endtime,  status) "
            "VALUES (:CHANID, :EVENTID, :ENDTIME, :STATUS)";
@@ -239,7 +227,7 @@ event_map_t * EITCache::LoadChannel(uint chanid)
         return nullptr;
     }
 
-    event_map_t * eventMap = new event_map_t();
+    auto *eventMap = new event_map_t();
 
     while (query.next())
     {
@@ -293,13 +281,17 @@ bool EITCache::WriteChannelToDB(QStringList &value_clauses, uint chanid)
     unlock_channel(chanid, updated);
 
     if (updated)
+    {
         LOG(VB_EIT, LOG_INFO, LOC + QString("Writing %1 modified entries of %2 "
                                       "for channel %3 to database.")
                 .arg(updated).arg(size).arg(chanid));
+    }
     if (removed)
+    {
         LOG(VB_EIT, LOG_INFO, LOC + QString("Removed %1 old entries of %2 "
                                       "for channel %3 from cache.")
                 .arg(removed).arg(size).arg(chanid));
+    }
     m_pruneCnt += removed;
 
     return true;
@@ -381,9 +373,7 @@ bool EITCache::IsNewEIT(uint chanid,  uint tableid,   uint version,
             m_tblChgCnt++;
         }
         else if ((extract_table_id(*it) == tableid) &&
-                 ((extract_version(*it) < version) ||
-                  ((extract_version(*it) == kVersionMax) &&
-                   version < kVersionMax)))
+                 (extract_version(*it) != version))
         {
             // EIT updated version on current table
             m_verChgCnt++;
@@ -415,11 +405,7 @@ uint EITCache::PruneOldEntries(uint timestamp)
 {
     if (VERBOSE_LEVEL_CHECK(VB_EIT, LOG_INFO))
     {
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-        QDateTime tmptime = MythDate::fromTime_t(timestamp);
-#else
         QDateTime tmptime = MythDate::fromSecsSinceEpoch(timestamp);
-#endif
         LOG(VB_EIT, LOG_INFO,
             LOC + "Pruning all entries that ended before UTC " +
             tmptime.toString(Qt::ISODate));
@@ -438,7 +424,7 @@ uint EITCache::PruneOldEntries(uint timestamp)
 
 
 /** \fn EITCache::ClearChannelLocks(void)
- *  \brief removes old channel locks, use it only at master b<ackend start
+ *  \brief removes old channel locks, use it only at master backend start
  */
 void EITCache::ClearChannelLocks(void)
 {

@@ -2,8 +2,8 @@
  * vim: set expandtab tabstop=4 shiftwidth=4:
  */
 
-#ifndef _PANE_DVBS2_H_
-#define _PANE_DVBS2_H_
+#ifndef PANE_DVBS2_H
+#define PANE_DVBS2_H
 
 // MythTV headers
 #include "channelscanmiscsettings.h"
@@ -19,32 +19,41 @@ class PaneDVBS2 : public GroupSetting
                                      {this,
                                       m_pfrequency  = new ScanFrequencykHz(),
                                       m_ppolarity   = new ScanPolarity(),
-                                      m_psymbolrate = new ScanSymbolRateDVBS(),
-                                      m_pmod_sys    = new ScanModSys(),
-                                      m_pfec        = new ScanFec(),
+                                      m_psymbolrate = new ScanDVBSSymbolRate(),
                                       m_pmodulation = new ScanDVBSModulation(),
+                                      m_pmodsys     = new ScanDVBSModSys(),
+                                      m_pfec        = new ScanFec(),
                                       m_pinversion  = new ScanInversion(),
                                       m_prolloff    = new ScanRollOff()});
     }
 
     QString frequency(void)  const { return m_pfrequency->getValue();  }
     QString symbolrate(void) const { return m_psymbolrate->getValue(); }
+    QString modulation(void) const { return m_pmodulation->getValue(); }
+    QString modsys(void)     const { return m_pmodsys->getValue();     }
     QString inversion(void)  const { return m_pinversion->getValue();  }
     QString fec(void)        const { return m_pfec->getValue();        }
     QString polarity(void)   const { return m_ppolarity->getValue();   }
-    QString modulation(void) const { return m_pmodulation->getValue(); }
-    QString mod_sys(void)    const { return m_pmod_sys->getValue();    }
     QString rolloff(void)    const { return m_prolloff->getValue();    }
+
+    void setFrequency(uint frequency)             { m_pfrequency->setValue(frequency);  }
+    void setSymbolrate(const QString& symbolrate) { m_psymbolrate->setValue(symbolrate);}
+    void setModulation(const QString& modulation) { m_pmodulation->setValue(modulation);}
+    void setModSys(const QString& modsys)         { m_pmodsys->setValue(modsys);        }
+    void setInversion(const QString& inversion)   { m_pinversion->setValue(inversion);  }
+    void setFec(const QString& fec)               { m_pfec->setValue(fec);              }
+    void setPolarity(const QString& polarity)     { m_ppolarity->setValue(polarity);    }
+    void setRolloff(const QString& rolloff)       { m_prolloff->setValue(rolloff);      }
 
   protected:
     ScanFrequencykHz   *m_pfrequency  {nullptr};
-    ScanSymbolRateDVBS *m_psymbolrate {nullptr};
-    ScanInversion      *m_pinversion  {nullptr};
+    ScanDVBSSymbolRate *m_psymbolrate {nullptr};
+    ScanDVBSModulation *m_pmodulation {nullptr};
+    ScanDVBSModSys     *m_pmodsys     {nullptr};
     ScanFec            *m_pfec        {nullptr};
     ScanPolarity       *m_ppolarity   {nullptr};
-    ScanDVBSModulation *m_pmodulation {nullptr};
-    ScanModSys         *m_pmod_sys    {nullptr};
+    ScanInversion      *m_pinversion  {nullptr};
     ScanRollOff        *m_prolloff    {nullptr};
 };
 
-#endif // _PANE_DVBS2_H_
+#endif // PANE_DVBS2_H

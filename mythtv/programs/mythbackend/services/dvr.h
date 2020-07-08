@@ -90,6 +90,8 @@ class Dvr : public DvrServices
 
         bool              RescheduleRecordings( void ) override; // DvrServices
 
+        bool              AllowReRecord       ( int             RecordedId ) override;
+
         bool              UpdateRecordedWatchedStatus ( int   RecordedId,
                                                         int   ChanId,
                                                         const QDateTime &recstarttsRaw,
@@ -173,6 +175,7 @@ class Dvr : public DvrServices
                                                 uint      PreferredInput,
                                                 int       StartOffset,
                                                 int       EndOffset,
+                                                QDateTime lastrectsRaw,
                                                 QString   DupMethod,
                                                 QString   DupIn,
                                                 uint      Filter,
@@ -316,7 +319,7 @@ class ScriptableDvr : public QObject
 
     public:
 
-        Q_INVOKABLE ScriptableDvr( QScriptEngine *pEngine, QObject *parent = nullptr ) : QObject( parent )
+        Q_INVOKABLE explicit ScriptableDvr( QScriptEngine *pEngine, QObject *parent = nullptr ) : QObject( parent )
         {
             m_pEngine = pEngine;
         }
@@ -491,7 +494,8 @@ class ScriptableDvr : public QObject
                                     rule->Inetref(),        rule->Type(),
                                     rule->SearchType(),     rule->RecPriority(),
                                     rule->PreferredInput(), rule->StartOffset(),
-                                    rule->EndOffset(),      rule->DupMethod(),
+                                    rule->EndOffset(),      rule->LastRecorded(),
+                                    rule->DupMethod(),
                                     rule->DupIn(),          rule->Filter(),
                                     rule->RecProfile(),     rule->RecGroup(),
                                     rule->StorageGroup(),   rule->PlayGroup(),
@@ -571,8 +575,8 @@ class ScriptableDvr : public QObject
                                      bool      MakeOverride )
         {
             SCRIPT_CATCH_EXCEPTION( nullptr,
-                return m_obj.GetRecordSchedule( RecordId,  Template, RecordedId,
-                                                ChanId, StartTime, MakeOverride);
+                return m_obj.GetRecordSchedule( RecordId,  std::move(Template), RecordedId,
+                                                ChanId, std::move(StartTime), MakeOverride);
             )
         }
 
@@ -611,42 +615,42 @@ class ScriptableDvr : public QObject
         QString RecTypeToString( QString RecType )
         {
             SCRIPT_CATCH_EXCEPTION( QString(),
-                return m_obj.RecTypeToString( RecType );
+                return m_obj.RecTypeToString( std::move(RecType) );
             )
         }
 
         QString RecTypeToDescription( QString RecType )
         {
             SCRIPT_CATCH_EXCEPTION( QString(),
-                return m_obj.RecTypeToDescription( RecType );
+                return m_obj.RecTypeToDescription( std::move(RecType) );
             )
         }
 
         QString DupMethodToString( QString DupMethod )
         {
             SCRIPT_CATCH_EXCEPTION( QString(),
-                return m_obj.DupMethodToString( DupMethod );
+                return m_obj.DupMethodToString( std::move(DupMethod) );
             )
         }
 
         QString DupMethodToDescription( QString DupMethod )
         {
             SCRIPT_CATCH_EXCEPTION( QString(),
-                return m_obj.DupMethodToDescription( DupMethod );
+                return m_obj.DupMethodToDescription( std::move(DupMethod) );
             )
         }
 
         QString DupInToString( QString DupIn )
         {
             SCRIPT_CATCH_EXCEPTION( QString(),
-                return m_obj.DupInToString( DupIn );
+                return m_obj.DupInToString( std::move(DupIn) );
             )
         }
 
         QString DupInToDescription( QString DupIn )
         {
             SCRIPT_CATCH_EXCEPTION( QString(),
-                return m_obj.DupInToDescription( DupIn );
+                return m_obj.DupInToDescription( std::move(DupIn) );
             )
         }
 
@@ -664,14 +668,15 @@ class ScriptableDvr : public QObject
                                              JobName,
                                              JobId,
                                              RecordedId,
-                                             JobStartTime,
-                                             RemoteHost,
-                                             JobArgs );
+                                             std::move(JobStartTime),
+                                             std::move(RemoteHost),
+                                             std::move(JobArgs) );
             )
         }
 
 };
 
+// NOLINTNEXTLINE(modernize-use-auto)
 Q_SCRIPT_DECLARE_QMETAOBJECT_MYTHTV( ScriptableDvr, QObject*)
 
 #endif

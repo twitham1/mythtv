@@ -14,10 +14,14 @@
 #ifndef IMAGETHUMBS_H
 #define IMAGETHUMBS_H
 
+#include <utility>
+
+// Qt headers
 #include <QMap>
 #include <QMutex>
 #include <QWaitCondition>
 
+// MythTV headers
 #include "imagetypes.h"
 #include "mthread.h"
 
@@ -45,9 +49,9 @@ public:
      \param priority Request priority
      \param notify If true a 'thumbnail exists' event will be broadcast when done.
     */
-    ThumbTask(QString action, ImagePtrK im,
+    ThumbTask(QString action, const ImagePtrK& im,
               int priority = kUrgentPriority, bool notify = false)
-        : m_action(action), m_priority(priority), m_notify(notify)
+        : m_action(std::move(action)), m_priority(priority), m_notify(notify)
     { m_images.append(im); }
 
     /*!
@@ -58,10 +62,10 @@ public:
      \param priority Request priority
      \param notify If true a 'thumbnail exists' event will be broadcast when done.
     */
-    ThumbTask(QString action, const ImageListK &list,
+    ThumbTask(QString action, ImageListK list,
               int priority = kUrgentPriority, bool notify = false)
-        : m_images(list),
-          m_action(action),
+        : m_images(std::move(list)),
+          m_action(std::move(action)),
           m_priority(priority),
           m_notify(notify)      {}
 
@@ -75,7 +79,7 @@ public:
     bool m_notify;
 };
 
-typedef QSharedPointer<ThumbTask> TaskPtr;
+using TaskPtr = QSharedPointer<ThumbTask>;
 
 
 //! A generator worker thread
@@ -90,7 +94,7 @@ public:
     */
     ThumbThread(const QString &name, DBFS *const dbfs)
         : MThread(name), m_dbfs(*dbfs) {}
-    ~ThumbThread();
+    ~ThumbThread() override;
 
     void cancel();
     void Enqueue(const TaskPtr &task);
@@ -104,7 +108,7 @@ private:
     Q_DISABLE_COPY(ThumbThread)
 
     //! A priority queue where 0 is highest priority
-    typedef QMultiMap<int, TaskPtr> ThumbQueue;
+    using ThumbQueue = QMultiMap<int, TaskPtr>;
 
     QString CreateThumbnail(ImagePtrK im, int thumbPriority);
     static void RemoveTasks(ThumbQueue &queue, int devId);
@@ -123,7 +127,7 @@ template <class DBFS>
 class META_PUBLIC ImageThumb
 {
 public:
-    explicit ImageThumb(DBFS *const dbfs);
+    explicit ImageThumb(DBFS *dbfs);
     ~ImageThumb();
 
     void    ClearThumbs(int devId, const QString &action);

@@ -28,13 +28,6 @@ using namespace std;
 MythUIGuideGrid::MythUIGuideGrid(MythUIType *parent, const QString &name)
     : MythUIType(parent, name)
 {
-    // themeable setting defaults
-    for (uint x = 0; x < RECSTATUSSIZE; x++)
-        m_recImages[x] = nullptr;
-
-    for (uint x = 0; x < ARROWIMAGESIZE; x++)
-        m_arrowImages[x] = nullptr;
-
     m_font = new MythFontProperties();
 
     QMap<QString, QString> catColors;
@@ -219,7 +212,7 @@ bool MythUIGuideGrid::ParseElement(
 
 void MythUIGuideGrid::CopyFrom(MythUIType *base)
 {
-    MythUIGuideGrid *gg = dynamic_cast<MythUIGuideGrid *>(base);
+    auto *gg = dynamic_cast<MythUIGuideGrid *>(base);
 
     if (!gg)
     {
@@ -254,7 +247,7 @@ void MythUIGuideGrid::CopyFrom(MythUIType *base)
 
 void MythUIGuideGrid::CreateCopy(MythUIType *parent)
 {
-    MythUIGuideGrid *gg = new MythUIGuideGrid(parent, objectName());
+    auto *gg = new MythUIGuideGrid(parent, objectName());
     gg->CopyFrom(this);
 }
 
@@ -295,12 +288,8 @@ void MythUIGuideGrid::DrawSelf(MythPainter *p, int xoffset, int yoffset,
     p->SetClipRect(clipRect);
     for (int i = 0; i < m_rowCount; i++)
     {
-        QList<UIGTCon *>::iterator it = m_allData[i].begin();
-
-        for (; it != m_allData[i].end(); ++it)
+        for (auto *data : qAsConst(m_allData[i]))
         {
-            UIGTCon *data = *it;
-
             if (data->m_recStat == 0)
                 drawBackground(p, xoffset, yoffset, data, alphaMod);
             else if (data->m_recStat == 1)
@@ -317,11 +306,8 @@ void MythUIGuideGrid::DrawSelf(MythPainter *p, int xoffset, int yoffset,
 
     for (int i = 0; i < m_rowCount; i++)
     {
-        QList<UIGTCon *>::iterator it = m_allData[i].begin();
-
-        for (; it != m_allData[i].end(); ++it)
+        for (auto *data : qAsConst(m_allData[i]))
         {
-            UIGTCon *data = *it;
             drawRecDecoration(p, xoffset, yoffset, data, alphaMod);
         }
     }
@@ -512,8 +498,8 @@ void MythUIGuideGrid::drawBox(MythPainter *p, int xoffset, int yoffset, UIGTCon 
     area.translate(xoffset, yoffset);		// Convert to global coordinates
     area.adjust(breakin, breakin, -breakin, -breakin);
 
-    static const QPen nopen(Qt::NoPen);
-    p->DrawRect(area, QBrush(calcColor(color, m_categoryAlpha)), nopen, alphaMod);
+    static const QPen kNoPen(Qt::NoPen);
+    p->DrawRect(area, QBrush(calcColor(color, m_categoryAlpha)), kNoPen, alphaMod);
 }
 
 /** \fn MythUIGuideGrid::drawBackground(MythPainter *, int, int, UIGTCon *, int)
@@ -556,12 +542,12 @@ void MythUIGuideGrid::drawBackground(MythPainter *p, int xoffset, int yoffset, U
         {
             if (area.bottom() < m_progPastCol)
             {
-                fillColor = fillColor.dark();
+                fillColor = fillColor.darker();
                 area.adjust(breakin, breakin, -breakin, -breakin);
             }
             else
             {
-                overColor = fillColor.dark();
+                overColor = fillColor.darker();
                 int first = m_progPastCol - area.top();
                 int second = area.height() - first;
                 overArea = area;
@@ -582,12 +568,12 @@ void MythUIGuideGrid::drawBackground(MythPainter *p, int xoffset, int yoffset, U
         {
             if (area.right() < m_progPastCol)
             {
-                fillColor = fillColor.dark();
+                fillColor = fillColor.darker();
                 area.adjust(breakin, breakin, -breakin, -breakin);
             }
             else
             {
-                overColor = fillColor.dark();
+                overColor = fillColor.darker();
                 int first = m_progPastCol - area.left();
                 int second = area.width() - first;
                 overArea = area;
@@ -609,13 +595,13 @@ void MythUIGuideGrid::drawBackground(MythPainter *p, int xoffset, int yoffset, U
     if (area.height() <= 1)
         area.setHeight(2);
 
-    static const QPen nopen(Qt::NoPen);
+    static const QPen kNoPen(Qt::NoPen);
     area.translate(xoffset, yoffset);		// Convert to global coordinates
-    p->DrawRect(area, QBrush(fillColor), nopen, alphaMod);
+    p->DrawRect(area, QBrush(fillColor), kNoPen, alphaMod);
 
     if (overArea.width() > 0) {
         overArea.translate(xoffset, yoffset);	// Convert to global coordinates
-        p->DrawRect(overArea, QBrush(overColor), nopen, alphaMod);
+        p->DrawRect(overArea, QBrush(overColor), kNoPen, alphaMod);
     }
 }
 
@@ -696,7 +682,7 @@ void MythUIGuideGrid::SetProgramInfo(int row, int col, const QRect &area,
                                      bool selected)
 {
     (void)col;
-    UIGTCon *data = new UIGTCon(area, title, genre, arrow, recType, recStat);
+    auto *data = new UIGTCon(area, title, genre, arrow, recType, recStat);
     m_allData[row].append(data);
 
     if (m_drawCategoryColors)
@@ -781,7 +767,7 @@ void MythUIGuideGrid::SetCategoryColors(const QMap<QString, QString> &catC)
 
 void MythUIGuideGrid::LoadImage(int recType, const QString &file)
 {
-    MythUIImage *uiimage = new MythUIImage(file, this, "guidegrid image");
+    auto *uiimage = new MythUIImage(file, this, "guidegrid image");
     uiimage->m_imageProperties.m_isThemeImage = true;
     uiimage->SetVisible(false);
     uiimage->Load(false);
@@ -793,7 +779,7 @@ void MythUIGuideGrid::LoadImage(int recType, const QString &file)
 
 void MythUIGuideGrid::SetArrow(int direction, const QString &file)
 {
-    MythUIImage *uiimage = new MythUIImage(file, this, "guidegrid arrow");
+    auto *uiimage = new MythUIImage(file, this, "guidegrid arrow");
     uiimage->m_imageProperties.m_isThemeImage = true;
     uiimage->SetVisible(false);
     uiimage->Load(false);

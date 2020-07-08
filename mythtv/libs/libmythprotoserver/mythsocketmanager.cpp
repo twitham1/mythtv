@@ -56,7 +56,7 @@ void MythServer::newTcpConnection(qt_socket_fd_t socket)
 }
 
 MythSocketManager::MythSocketManager() :
-    m_server(nullptr), m_threadPool("MythSocketManager")
+    m_threadPool("MythSocketManager")
 {
 }
 
@@ -105,7 +105,7 @@ bool MythSocketManager::Listen(int port)
 void MythSocketManager::newConnection(qt_socket_fd_t sd)
 {
     QMutexLocker locker(&m_socketListLock);
-    MythSocket *ms = new MythSocket(sd, this);
+    auto *ms = new MythSocket(sd, this);
     if (ms->IsConnected())
         m_socketList.insert(ms);
     else
@@ -201,7 +201,11 @@ void MythSocketManager::ProcessRequestWork(MythSocket *sock)
         return;
 
     QString line = listline[0].simplified();
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList tokens = line.split(' ', QString::SkipEmptyParts);
+#else
+    QStringList tokens = line.split(' ', Qt::SkipEmptyParts);
+#endif
     QString command = tokens[0];
 
     bool handled = false;
@@ -321,9 +325,11 @@ void MythSocketManager::ProcessRequestWork(MythSocket *sock)
     if (!handled)
     {
         if (command == "BACKEND_MESSAGE")
+        {
             // never respond to these... ever, even if they are not otherwise
             // handled by something in m_handlerMap
             return;
+        }
 
         listline.clear();
         listline << "ERROR" << "unknown command";

@@ -19,8 +19,8 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#ifndef _MYTHSYSTEMLEGACY_H_
-#define _MYTHSYSTEMLEGACY_H_
+#ifndef MYTHSYSTEMLEGACY_H
+#define MYTHSYSTEMLEGACY_H
 
 #include "mythbaseexp.h"
 
@@ -46,8 +46,8 @@
 
 #ifdef __cplusplus
 
+#include "exitcodes.h"  // included for GENERIC_EXIT_OK
 #include "mythsystem.h" // included for MythSystemFlag and MythSignal
-typedef MythSystemMask MythSystemFlag;
 
 #include <QStringList>
 #include <QSemaphore>
@@ -56,8 +56,7 @@ typedef MythSystemMask MythSystemFlag;
 #include <QString>
 #include <QMap> // FIXME: This shouldn't be needed, Setting_t is not public
 
-// FIXME: _t is not how we name types in MythTV...
-typedef QMap<QString, bool> Setting_t;
+using Setting = QMap<QString, bool>;
 
 void MBASE_PUBLIC ShutdownMythSystemLegacy(void);
 
@@ -71,18 +70,18 @@ class MBASE_PUBLIC MythSystemLegacy : public QObject
     Q_OBJECT;
 
   public:
-    explicit MythSystemLegacy(QObject * = nullptr);
-    MythSystemLegacy(const QString &, uint, QObject * = nullptr);
-    MythSystemLegacy(const QString &, const QStringList &, uint,
-                     QObject * = nullptr);
-    ~MythSystemLegacy(void);
+    explicit MythSystemLegacy(QObject *parent = nullptr);
+    MythSystemLegacy(const QString &command, uint flags, QObject *parent = nullptr);
+    MythSystemLegacy(const QString &command, const QStringList &args, uint flags,
+                     QObject *parent = nullptr);
+    ~MythSystemLegacy(void) override;
 
     // FIXME: We should not allow a MythSystemLegacy to be reused for a new command.
-    void SetCommand(const QString &, uint);
+    void SetCommand(const QString &command, uint flags);
     // FIXME: We should not allow a MythSystemLegacy to be reused for a new command.
-    void SetCommand(const QString &, const QStringList &, uint);
+    void SetCommand(const QString &command, const QStringList &args, uint flags);
     // FIXME: This should only be in the constructor
-    void SetDirectory(const QString &);
+    void SetDirectory(const QString &directory);
     // FIXME: This should only be in the constructor
     bool SetNice(int nice);
     // FIXME: This should only be in the constructor
@@ -94,7 +93,7 @@ class MBASE_PUBLIC MythSystemLegacy : public QObject
     // FIXME: This should just return a bool telling us if we hit the timeout.
     uint Wait(time_t timeout = 0);
 
-    int Write(const QByteArray&);
+    int Write(const QByteArray &ba);
     QByteArray Read(int size);
     QByteArray ReadErr(int size);
     // FIXME: We should not return a reference here
@@ -104,7 +103,7 @@ class MBASE_PUBLIC MythSystemLegacy : public QObject
 
     // FIXME: Can Term be wrapped into Signal?
     void Term(bool force = false);
-    void Signal(MythSignal);
+    void Signal(MythSignal sig);
 
     // FIXME: Should be IsBackground() + documented
     bool isBackground(void)   { return GetSetting("RunInBackground"); }
@@ -121,7 +120,7 @@ class MBASE_PUBLIC MythSystemLegacy : public QObject
     // FIXME: Rename "GetExitStatus" and document that this does not
     //        block until an exit status exists.
     // FIXME: Document what this actually returns.
-    uint GetStatus(void)             { return m_status; }
+    uint GetStatus(void) const       { return m_status; }
     // FIXME Make private.
     void SetStatus(uint status)      { m_status = status; }
 
@@ -140,17 +139,17 @@ class MBASE_PUBLIC MythSystemLegacy : public QObject
     QString& GetCommand(void)        { return m_command; }
     // FIXME: Eliminate. We should not allow setting the command
     //        after construcion.
-    void SetCommand(QString &cmd)    { m_command = cmd; }
+    void SetCommand(const QString &cmd)    { m_command = cmd; }
 
     // FIXME: We should not return a reference here
     // FIXME: Rename "GetArguments"
     QStringList &GetArgs(void)       { return m_args; }
     // FIXME: Eliminate. We should not allow setting the arguements
     //        after construcion.
-    void SetArgs(QStringList &args)  { m_args = args; }
+    void SetArgs(const QStringList &args)  { m_args = args; }
 
-    int GetNice(void)                { return m_nice; }
-    int GetIOPrio(void)              { return m_ioprio; }
+    int GetNice(void) const          { return m_nice; }
+    int GetIOPrio(void) const        { return m_ioprio; }
 
     // FIXME: We should not return a pointer to a QBuffer
     QBuffer *GetBuffer(int index)    { return &m_stdbuff[index]; }
@@ -174,13 +173,14 @@ class MBASE_PUBLIC MythSystemLegacy : public QObject
   private:
     Q_DISABLE_COPY(MythSystemLegacy)
     void initializePrivate(void);
+    // NOLINTNEXTLINE(readability-identifier-naming)
     MythSystemLegacyPrivate *d {nullptr}; // FIXME we generally call this m_priv in MythTV
 
   protected:
     void ProcessFlags(uint flags);
 
     // FIXME if we already have a private helper, why all this?
-    uint        m_status;
+    uint        m_status {GENERIC_EXIT_OK};
     QSemaphore  m_semReady;
 
     QString     m_command;
@@ -191,7 +191,7 @@ class MBASE_PUBLIC MythSystemLegacy : public QObject
     int         m_nice   {0};
     int         m_ioprio {0};
 
-    Setting_t   m_settings;
+    Setting     m_settings;
     QBuffer     m_stdbuff[3];
 };
 
@@ -205,7 +205,7 @@ extern "C"
 #endif // __cplusplus
 MBASE_PUBLIC uint myth_system_c(char *command, uint flags, uint timeout);
 
-#endif // _MYTHSYSTEMLEGACY_H_
+#endif // MYTHSYSTEMLEGACY_H
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
  */

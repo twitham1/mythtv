@@ -1,12 +1,13 @@
 #ifndef VIDEOVISUAL_H
 #define VIDEOVISUAL_H
 
-#include "stdint.h"
+#include <cstdint>
 
 #include <QRect>
 #include <QList>
 #include <QDateTime>
 
+#include "mythtvexp.h"
 #include "mythlogging.h"
 #include "visual.h"
 #include "mythrender_base.h"
@@ -36,7 +37,7 @@ class VisualNode
     long   m_offset;
 };
 
-class VideoVisual : public MythTV::Visual
+class MTV_PUBLIC VideoVisual : public MythTV::Visual
 {
   public:
     static bool CanVisualise(AudioPlayer *audio, MythRender *render);
@@ -45,7 +46,7 @@ class VideoVisual : public MythTV::Visual
     static QStringList GetVisualiserList(RenderType type);
 
     VideoVisual(AudioPlayer *audio, MythRender *render);
-   ~VideoVisual();
+   ~VideoVisual() override;
 
     virtual void Draw(const QRect &area, MythPainter *painter,
                       QPaintDevice* device) = 0;

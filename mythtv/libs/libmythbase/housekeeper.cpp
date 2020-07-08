@@ -98,26 +98,22 @@ HouseKeeperTask::HouseKeeperTask(const QString &dbTag, HouseKeeperScope scope,
                                  HouseKeeperStartup startup):
     ReferenceCounter(dbTag), m_dbTag(dbTag), m_scope(scope),
     m_startup(startup),
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-    m_lastRun(MythDate::fromTime_t(0)),
-    m_lastSuccess(MythDate::fromTime_t(0)),
-    m_lastUpdate(MythDate::fromTime_t(0))
-#else
     m_lastRun(MythDate::fromSecsSinceEpoch(0)),
     m_lastSuccess(MythDate::fromSecsSinceEpoch(0)),
     m_lastUpdate(MythDate::fromSecsSinceEpoch(0))
-#endif
 {
 }
 
-bool HouseKeeperTask::CheckRun(QDateTime now)
+bool HouseKeeperTask::CheckRun(const QDateTime& now)
 {
     LOG(VB_GENERAL, LOG_DEBUG, QString("Checking to run %1").arg(GetTag()));
     bool check = false;
-    if (!m_confirm && !m_running && (check = DoCheckRun(std::move(now))))
+    if (!m_confirm && !m_running && (check = DoCheckRun(now)))
+    {
         // if m_confirm is already set, the task is already in the queue
         // and should not be queued a second time
         m_confirm = true;
+    }
     return check;
 }
 
@@ -153,12 +149,16 @@ bool HouseKeeperTask::Run(void)
     bool res = DoRun();
     m_running = false;
     if (!res)
+    {
         LOG(VB_GENERAL, LOG_INFO, QString("HouseKeeperTask '%1' Failed.")
                                 .arg(m_dbTag));
+    }
     else
+    {
         LOG(VB_GENERAL, LOG_INFO,
                 QString("HouseKeeperTask '%1' Finished Successfully.")
                     .arg(m_dbTag));
+    }
     return res;
 }
 
@@ -184,13 +184,8 @@ void HouseKeeperTask::QueryLast(void)
 
         MSqlQuery query(MSqlQuery::InitCon());
 
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-        m_lastRun = MythDate::fromTime_t(0);
-        m_lastSuccess = MythDate::fromTime_t(0);
-#else
         m_lastRun = MythDate::fromSecsSinceEpoch(0);
         m_lastSuccess = MythDate::fromSecsSinceEpoch(0);
-#endif
 
         if (m_scope == kHKGlobal)
         {
@@ -218,7 +213,7 @@ void HouseKeeperTask::QueryLast(void)
     m_lastUpdate = MythDate::current();
 }
 
-QDateTime HouseKeeperTask::UpdateLastRun(QDateTime last, bool successful)
+QDateTime HouseKeeperTask::UpdateLastRun(const QDateTime& last, bool successful)
 {
     m_lastRun = last;
     if (successful)
@@ -231,45 +226,53 @@ QDateTime HouseKeeperTask::UpdateLastRun(QDateTime last, bool successful)
         if (!query.isConnected())
             return last;
 
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-        if (m_lastRun == MythDate::fromTime_t(0))
-#else
         if (m_lastRun == MythDate::fromSecsSinceEpoch(0))
-#endif
         {
             // not previously set, perform insert
 
             if (m_scope == kHKGlobal)
+            {
                 query.prepare("INSERT INTO housekeeping"
                               "         (tag, lastrun, lastsuccess)"
                               "     VALUES (:TAG, :TIME, :STIME)");
+            }
             else
+            {
                 query.prepare("INSERT INTO housekeeping"
                               "         (tag, hostname, lastrun, lastsuccess)"
                               "     VALUES (:TAG, :HOST, :TIME, :STIME)");
+            }
         }
         else
         {
             // previously set, perform update
 
             if (m_scope == kHKGlobal)
+            {
                 query.prepare("UPDATE housekeeping SET lastrun=:TIME,"
                               "                        lastsuccess=:STIME"
                               " WHERE tag = :TAG"
                               "   AND hostname IS NULL");
+            }
             else
+            {
                 query.prepare("UPDATE housekeeping SET lastrun=:TIME,"
                               "                        lastsuccess=:STIME"
                               " WHERE tag = :TAG"
                               "   AND hostname = :HOST");
+            }
         }
 
         if (m_scope == kHKGlobal)
+        {
             LOG(VB_GENERAL, LOG_DEBUG,
                     QString("Updating global run time for %1").arg(m_dbTag));
+        }
         else
+        {
             LOG(VB_GENERAL, LOG_DEBUG,
                     QString("Updating local run time for %1").arg(m_dbTag));
+        }
 
         if (m_scope == kHKLocal)
             query.bindValue(":HOST", gCoreContext->GetHostName());
@@ -295,7 +298,7 @@ QDateTime HouseKeeperTask::UpdateLastRun(QDateTime last, bool successful)
     return last;
 }
 
-void HouseKeeperTask::SetLastRun(QDateTime last, bool successful)
+void HouseKeeperTask::SetLastRun(const QDateTime &last, bool successful)
 {
     m_lastRun = last;
     if (successful)
@@ -332,9 +335,11 @@ void PeriodicHouseKeeperTask::CalculateWindow(void)
 {
     int period = m_period;
     if (GetLastRun() > GetLastSuccess())
+    {
         // last attempt was not successful
         // try shortened period
         period = m_retry;
+    }
 
     m_windowElapsed.first =
                     (uint32_t)((float)period * m_windowPercent.first);
@@ -349,7 +354,7 @@ void PeriodicHouseKeeperTask::SetWindow(float min, float max)
     CalculateWindow();
 }
 
-QDateTime PeriodicHouseKeeperTask::UpdateLastRun(QDateTime last,
+QDateTime PeriodicHouseKeeperTask::UpdateLastRun(const QDateTime& last,
                                                  bool successful)
 {
     QDateTime res = HouseKeeperTask::UpdateLastRun(last, successful);
@@ -358,14 +363,14 @@ QDateTime PeriodicHouseKeeperTask::UpdateLastRun(QDateTime last,
     return res;
 }
 
-void PeriodicHouseKeeperTask::SetLastRun(QDateTime last, bool successful)
+void PeriodicHouseKeeperTask::SetLastRun(const QDateTime& last, bool successful)
 {
     HouseKeeperTask::SetLastRun(last, successful);
     CalculateWindow();
     m_currentProb = 1.0;
 }
 
-bool PeriodicHouseKeeperTask::DoCheckRun(QDateTime now)
+bool PeriodicHouseKeeperTask::DoCheckRun(const QDateTime& now)
 {
     int elapsed = GetLastRun().secsTo(now);
 
@@ -395,7 +400,10 @@ bool PeriodicHouseKeeperTask::DoCheckRun(QDateTime now)
     // remember, this is computing the probability that up to this point, one
     //      of these tests has returned positive, so each individual test has
     //      a necessarily low probability
-    bool res = (rand() > (int)(prob2 * RAND_MAX));
+    //
+    // Pseudo-random is good enough. Don't need a true random.
+    // NOLINTNEXTLINE(cert-msc30-c,cert-msc50-cpp)
+    bool res = (rand() > (int)(prob2 * static_cast<float>(RAND_MAX)));
     m_currentProb = prob;
 //  if (res)
 //      LOG(VB_GENERAL, LOG_DEBUG, QString("%1 will run: this=%2; total=%3")
@@ -406,7 +414,7 @@ bool PeriodicHouseKeeperTask::DoCheckRun(QDateTime now)
     return res;
 }
 
-bool PeriodicHouseKeeperTask::InWindow(QDateTime now)
+bool PeriodicHouseKeeperTask::InWindow(const QDateTime& now)
 {
     int elapsed = GetLastRun().secsTo(now);
 
@@ -418,7 +426,7 @@ bool PeriodicHouseKeeperTask::InWindow(QDateTime now)
            (elapsed < m_windowElapsed.second);
 }
 
-bool PeriodicHouseKeeperTask::PastWindow(QDateTime now)
+bool PeriodicHouseKeeperTask::PastWindow(const QDateTime &now)
 {
     return GetLastRun().secsTo(now) > m_windowElapsed.second;
 }
@@ -478,7 +486,7 @@ void DailyHouseKeeperTask::SetHourWindow(int min, int max)
     CalculateWindow();
 }
 
-bool DailyHouseKeeperTask::InWindow(QDateTime now)
+bool DailyHouseKeeperTask::InWindow(const QDateTime& now)
 {
     if (PeriodicHouseKeeperTask::InWindow(now))
         // parent says we're in the window
@@ -562,7 +570,7 @@ void HouseKeepingThread::run(void)
  *  Tasks cannot be removed from the housekeeper once added.
  *
  */
-HouseKeeper::HouseKeeper(void) : m_timer(nullptr)
+HouseKeeper::HouseKeeper(void)
 {
     m_timer = new QTimer(this);
     connect(m_timer, SIGNAL(timeout()), this, SLOT(Run()));
@@ -593,9 +601,8 @@ HouseKeeper::~HouseKeeper(void)
         // issue a terminate call to any long-running tasks
         // this is just a noop unless overwritten by a subclass
         QMutexLocker mapLock(&m_mapLock);
-        QMap<QString,HouseKeeperTask*>::iterator it = m_taskMap.begin();
-        for (; it != m_taskMap.end(); ++it)
-            (*it)->Terminate();
+        for (auto *it : qAsConst(m_taskMap))
+            it->Terminate();
     }
 
     if (!m_threadList.isEmpty())
@@ -762,10 +769,12 @@ void HouseKeeper::Run(void)
 
         int count2 = m_threadList.size();
         if (count1 > count2)
+        {
             LOG(VB_GENERAL, LOG_DEBUG,
                 QString("Discarded HouseKeepingThreads have completed and "
                         "been deleted. Current count %1 -> %2.")
                             .arg(count1).arg(count2));
+        }
     }
 }
 
@@ -791,7 +800,7 @@ void HouseKeeper::StartThread(void)
         // we're running for the first time
         // start up a new thread
         LOG(VB_GENERAL, LOG_DEBUG, "Running initial HouseKeepingThread.");
-        HouseKeepingThread *thread = new HouseKeepingThread(this);
+        auto *thread = new HouseKeepingThread(this);
         m_threadList.append(thread);
         thread->start();
     }
@@ -806,7 +815,7 @@ void HouseKeeper::StartThread(void)
                     "spawning replacement. Current count %1.")
                             .arg(m_threadList.size()));
         m_threadList.first()->Discard();
-        HouseKeepingThread *thread = new HouseKeepingThread(this);
+        auto *thread = new HouseKeepingThread(this);
         m_threadList.prepend(thread);
         thread->start();
     }
@@ -823,12 +832,19 @@ void HouseKeeper::customEvent(QEvent *e)
 {
     if (e->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = static_cast<MythEvent*>(e);
+        auto *me = dynamic_cast<MythEvent*>(e);
+        if (me == nullptr)
+            return;
         if ((me->Message().left(20) == "HOUSE_KEEPER_RUNNING") ||
             (me->Message().left(23) == "HOUSE_KEEPER_SUCCESSFUL"))
         {
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
             QStringList tokens = me->Message()
                                     .split(" ", QString::SkipEmptyParts);
+#else
+            QStringList tokens = me->Message()
+                                    .split(" ", Qt::SkipEmptyParts);
+#endif
             if (tokens.size() != 4)
                 return;
 
@@ -843,10 +859,12 @@ void HouseKeeper::customEvent(QEvent *e)
                 if ((m_taskMap[tag]->GetScope() == kHKGlobal) ||
                         ((m_taskMap[tag]->GetScope() == kHKLocal) &&
                          (gCoreContext->GetHostName() == hostname)))
+                {
                     // task being run in the same scope as us.
                     // update the run time so we don't attempt to run
                     //      it ourselves
                     m_taskMap[tag]->SetLastRun(last, successful);
+                }
             }
         }
     }

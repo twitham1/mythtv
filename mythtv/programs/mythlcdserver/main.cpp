@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythLCDServerCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
 
@@ -130,8 +130,7 @@ int main(int argc, char **argv)
         assigned_port = special_port;
     }
 
-    LCDServer *server =
-        new LCDServer(assigned_port, startup_message, message_time);
+    auto *server = new LCDServer(assigned_port, startup_message, message_time);
 
     QCoreApplication::exec();
 

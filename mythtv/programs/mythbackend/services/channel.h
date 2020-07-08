@@ -49,7 +49,8 @@ class Channel : public ChannelServices
                                                      bool      OnlyVisible,
                                                      bool      Details,
                                                      bool      OrderByName,
-                                                     bool      GroupByCallsign) override; // ChannelServices
+                                                     bool      GroupByCallsign,
+                                                     bool      OnlyTunable ) override; // ChannelServices
 
         DTC::ChannelInfo*      GetChannelInfo      ( uint     ChanID     ) override; // ChannelServices
 
@@ -63,12 +64,14 @@ class Channel : public ChannelServices
                                                      uint          ATSCMajorChannel,
                                                      uint          ATSCMinorChannel,
                                                      bool          UseEIT,
-                                                     bool          visible,
+                                                     bool          Visible,
+                                                     const QString &ExtendedVisible,
                                                      const QString &FrequencyID,
                                                      const QString &Icon,
                                                      const QString &Format,
                                                      const QString &XMLTVID,
-                                                     const QString &DefaultAuthority ) override; // ChannelServices
+                                                     const QString &DefaultAuthority,
+                                                     uint          ServiceType ) override; // ChannelServices
 
         bool                   AddDBChannel        ( uint          MplexID,
                                                      uint          SourceID,
@@ -80,12 +83,14 @@ class Channel : public ChannelServices
                                                      uint          ATSCMajorChannel,
                                                      uint          ATSCMinorChannel,
                                                      bool          UseEIT,
-                                                     bool          visible,
+                                                     bool          Visible,
+                                                     const QString &ExtendedVisible,
                                                      const QString &FrequencyID,
                                                      const QString &Icon,
                                                      const QString &Format,
                                                      const QString &XMLTVID,
-                                                     const QString &DefaultAuthority ) override; // ChannelServices
+                                                     const QString &DefaultAuthority,
+                                                     uint          ServiceType ) override; // ChannelServices
 
         bool                   RemoveDBChannel     ( uint          ChannelID ) override; // ChannelServices
 
@@ -104,7 +109,10 @@ class Channel : public ChannelServices
                                                            const QString &Password,
                                                            bool          UseEIT,
                                                            const QString &ConfigPath,
-                                                           int           NITId ) override; // ChannelServices
+                                                           int           NITId,
+                                                           uint          BouquetId,
+                                                           uint          RegionId,
+                                                           uint          ScanFrequency ) override; // ChannelServices
 
         int                       AddVideoSource         ( const QString &SourceName,
                                                            const QString &Grabber,
@@ -114,7 +122,10 @@ class Channel : public ChannelServices
                                                            const QString &Password,
                                                            bool          UseEIT,
                                                            const QString &ConfigPath,
-                                                           int           NITId ) override; // ChannelServices
+                                                           int           NITId,
+                                                           uint          BouquetId,
+                                                           uint          RegionId,
+                                                           uint          ScanFrequency ) override; // ChannelServices
 
         bool                      RemoveVideoSource      ( uint SourceID ) override; // ChannelServices
 
@@ -164,7 +175,7 @@ class ScriptableChannel : public QObject
 
     public:
 
-        Q_INVOKABLE ScriptableChannel( QScriptEngine *pEngine, QObject *parent = nullptr ) : QObject( parent )
+        Q_INVOKABLE explicit ScriptableChannel( QScriptEngine *pEngine, QObject *parent = nullptr ) : QObject( parent )
         {
             m_pEngine = pEngine;
         }
@@ -178,11 +189,12 @@ class ScriptableChannel : public QObject
                                        bool     OnlyVisible = false,
                                        bool     Details = false,
                                        bool     OrderByName = false,
-                                       bool     GroupByCallsign = false
+                                       bool     GroupByCallsign = false,
+                                       bool     OnlyTunable = false
                                      )
         {
             SCRIPT_CATCH_EXCEPTION( nullptr,
-                return m_obj.GetChannelInfoList( SourceID, ChannelGroupID, StartIndex, Count, OnlyVisible, Details, OrderByName, GroupByCallsign );
+                return m_obj.GetChannelInfoList( SourceID, ChannelGroupID, StartIndex, Count, OnlyVisible, Details, OrderByName, GroupByCallsign, OnlyTunable );
             )
         }
 
@@ -203,19 +215,21 @@ class ScriptableChannel : public QObject
                                    uint          ATSCMajorChannel,
                                    uint          ATSCMinorChannel,
                                    bool          UseEIT,
-                                   bool          visible,
+                                   bool          Visible,
+                                   const QString &ExtendedVisible,
                                    const QString &FrequencyID,
                                    const QString &Icon,
                                    const QString &Format,
                                    const QString &XMLTVID,
-                                   const QString &DefaultAuthority )
+                                   const QString &DefaultAuthority,
+                                   uint          ServiceType )
         {
             SCRIPT_CATCH_EXCEPTION( false,
                 return m_obj.UpdateDBChannel(MplexID, SourceID, ChannelID,
                                          CallSign, ChannelName, ChannelNumber,
                                          ServiceID, ATSCMajorChannel, ATSCMinorChannel,
-                                         UseEIT, visible, FrequencyID, Icon, Format,
-                                         XMLTVID, DefaultAuthority);
+                                         UseEIT, Visible, ExtendedVisible, FrequencyID, Icon, Format,
+                                         XMLTVID, DefaultAuthority, ServiceType);
             )
         }
 
@@ -230,18 +244,20 @@ class ScriptableChannel : public QObject
                                    uint          ATSCMinorChannel,
                                    bool          UseEIT,
                                    bool          Visible,
+                                   const QString &ExtendedVisible,
                                    const QString &FrequencyID,
                                    const QString &Icon,
                                    const QString &Format,
                                    const QString &XMLTVID,
-                                   const QString &DefaultAuthority )
+                                   const QString &DefaultAuthority,
+                                   uint          ServiceType )
         {
             SCRIPT_CATCH_EXCEPTION( false,
                 return m_obj.AddDBChannel(MplexID, SourceID, ChannelID,
                                       CallSign, ChannelName, ChannelNumber,
                                       ServiceID, ATSCMajorChannel, ATSCMinorChannel,
-                                      UseEIT, Visible, FrequencyID, Icon, Format,
-                                      XMLTVID, DefaultAuthority);
+                                      UseEIT, Visible, ExtendedVisible, FrequencyID, Icon, Format,
+                                      XMLTVID, DefaultAuthority, ServiceType);
             )
         }
 
@@ -275,12 +291,16 @@ class ScriptableChannel : public QObject
                                  const QString &Password,
                                  bool          UseEIT,
                                  const QString &ConfigPath,
-                                 int           NITId )
+                                 int           NITId,
+                                 uint          BouquetId,
+                                 uint          RegionId,
+                                 uint          ScanFrequency )
         {
             SCRIPT_CATCH_EXCEPTION( false,
                 return m_obj.UpdateVideoSource( SourceID, SourceName, Grabber,
                                             UserId, FreqTable, LineupId, Password,
-                                            UseEIT, ConfigPath, NITId );
+                                            UseEIT, ConfigPath, NITId, BouquetId, RegionId,
+                                            ScanFrequency );
             )
         }
 
@@ -292,12 +312,16 @@ class ScriptableChannel : public QObject
                                  const QString &Password,
                                  bool          UseEIT,
                                  const QString &ConfigPath,
-                                 int           NITId )
+                                 int           NITId,
+                                 uint          BouquetId,
+                                 uint          RegionId,
+                                 uint          ScanFrequency )
         {
             SCRIPT_CATCH_EXCEPTION( false,
                 return m_obj.AddVideoSource( SourceName, Grabber, UserId,
                                          FreqTable, LineupId, Password,
-                                         UseEIT, ConfigPath, NITId );
+                                         UseEIT, ConfigPath, NITId, BouquetId, RegionId,
+                                         ScanFrequency );
             )
         }
 
@@ -333,6 +357,7 @@ class ScriptableChannel : public QObject
 };
 
 
+// NOLINTNEXTLINE(modernize-use-auto)
 Q_SCRIPT_DECLARE_QMETAOBJECT_MYTHTV( ScriptableChannel, QObject*);
 
 #endif

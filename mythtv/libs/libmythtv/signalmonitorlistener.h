@@ -1,13 +1,13 @@
 // -*- Mode: c++ -*-
 // Copyright (c) 2008, Daniel Thor Kristjansson
 
-#ifndef _SIGNALMONITORLISTENER_H_
-#define _SIGNALMONITORLISTENER_H_
+#ifndef SIGNALMONITORLISTENER_H
+#define SIGNALMONITORLISTENER_H
 
 #include "mythtvexp.h"
 #include "signalmonitorvalue.h"
 
-typedef enum {
+enum SignalMonitorMessageType {
     kAllGood,
     kStatusChannelTuned,
     kStatusSignalLock,
@@ -16,7 +16,7 @@ typedef enum {
     kStatusBitErrorRate,
     kStatusUncorrectedBlocks,
     kStatusRotorPosition,
-} SignalMonitorMessageType;
+};
 
 class MTV_PUBLIC SignalMonitorListener
 {
@@ -57,7 +57,7 @@ class MTV_PUBLIC SignalMonitorListener
 class MTV_PUBLIC DVBSignalMonitorListener : public SignalMonitorListener
 {
   protected:
-    virtual ~DVBSignalMonitorListener() = default;
+    ~DVBSignalMonitorListener() override = default;
 
   public:
     virtual void StatusSignalToNoise(    const SignalMonitorValue&) = 0;
@@ -67,4 +67,4 @@ class MTV_PUBLIC DVBSignalMonitorListener : public SignalMonitorListener
 };
 
 
-#endif // _SIGNALMONITORLISTENER_H_
+#endif // SIGNALMONITORLISTENER_H

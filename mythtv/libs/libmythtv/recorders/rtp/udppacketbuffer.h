@@ -4,8 +4,8 @@
  * Distributed as part of MythTV under GPL v2 and later.
  */
 
-#ifndef _UDP_PACKET_BUFFER_H_
-#define _UDP_PACKET_BUFFER_H_
+#ifndef UDP_PACKET_BUFFER_H
+#define UDP_PACKET_BUFFER_H
 
 #include "packetbuffer.h"
 
@@ -21,10 +21,10 @@ class UDPPacketBuffer : public PacketBuffer
     }
 
     /// Frees the packet, there is no FEC used by Raw UDP
-    void PushFECPacket(const UDPPacket &packet, unsigned int) override // PacketBuffer
+    void PushFECPacket(const UDPPacket &packet, unsigned int /*fec_stream_num*/) override // PacketBuffer
     {
         FreePacket(packet);
     }
 };
 
-#endif // _UDP_PACKET_BUFFER_H_
+#endif // UDP_PACKET_BUFFER_H

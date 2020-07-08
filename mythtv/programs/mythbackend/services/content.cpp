@@ -70,7 +70,7 @@ QFileInfo Content::GetFile( const QString &sStorageGroup,
 
         //LOG(VB_UPNP, LOG_ERR, sMsg);
 
-        throw sMsg;
+        throw QString(sMsg);
     }
 
     // ------------------------------------------------------------------
@@ -127,7 +127,7 @@ QFileInfo Content::GetImageFile( const QString &sStorageGroup,
 
         //LOG(VB_UPNP, LOG_WARNING, sMsg);
 
-        throw sMsg;
+        throw QString(sMsg);
     }
 
     // ------------------------------------------------------------------
@@ -181,7 +181,7 @@ QFileInfo Content::GetImageFile( const QString &sStorageGroup,
     // Must generate Generate Image and save.
     // ----------------------------------------------------------------------
 
-    QImage *pImage = new QImage( sFullFileName );
+    auto *pImage = new QImage( sFullFileName );
 
     if (!pImage || pImage->isNull())
         return QFileInfo();
@@ -217,7 +217,7 @@ QStringList Content::GetDirList( const QString &sStorageGroup )
         QString sMsg( "GetDirList - StorageGroup missing.");
         LOG(VB_UPNP, LOG_ERR, sMsg);
 
-        throw sMsg;
+        throw QString(sMsg);
     }
 
     StorageGroup sgroup(sStorageGroup);
@@ -237,7 +237,7 @@ QStringList Content::GetFileList( const QString &sStorageGroup )
         QString sMsg( "GetFileList - StorageGroup missing.");
         LOG(VB_UPNP, LOG_ERR, sMsg);
 
-        throw sMsg;
+        throw QString(sMsg);
     }
 
     StorageGroup sgroup(sStorageGroup);
@@ -316,7 +316,7 @@ DTC::ArtworkInfoList* Content::GetRecordingArtworkList( int        RecordedId,
 DTC::ArtworkInfoList* Content::GetProgramArtworkList( const QString &sInetref,
                                                       int            nSeason  )
 {
-    DTC::ArtworkInfoList *pArtwork = new DTC::ArtworkInfoList();
+    auto *pArtwork = new DTC::ArtworkInfoList();
 
     FillArtworkInfoList (pArtwork, sInetref, nSeason);
 
@@ -565,9 +565,8 @@ QFileInfo Content::GetPreviewImage(        int        nRecordedId,
         if (!pginfo.IsLocal())
             return QFileInfo();
 
-        PreviewGenerator *previewgen = new PreviewGenerator( &pginfo,
-                                                             QString(),
-                                                             PreviewGenerator::kLocal);
+        auto *previewgen = new PreviewGenerator( &pginfo, QString(),
+                                                 PreviewGenerator::kLocal);
         previewgen->SetPreviewTimeAsSeconds( nSecsIn          );
         previewgen->SetOutputFilename      ( sPreviewFileName );
 
@@ -636,9 +635,8 @@ QFileInfo Content::GetPreviewImage(        int        nRecordedId,
     if (QFile::exists( sNewFileName ))
         return QFileInfo( sNewFileName );
 
-    PreviewGenerator *previewgen = new PreviewGenerator( &pginfo,
-                                                         QString(),
-                                                         PreviewGenerator::kLocal);
+    auto *previewgen = new PreviewGenerator( &pginfo, QString(),
+                                             PreviewGenerator::kLocal);
     previewgen->SetPreviewTimeAsSeconds( nSecsIn             );
     previewgen->SetOutputFilename      ( sNewFileName        );
     previewgen->SetOutputSize          (QSize(nWidth,nHeight));
@@ -887,7 +885,7 @@ DTC::LiveStreamInfo *Content::AddLiveStream( const QString   &sStorageGroup,
 
         LOG(VB_UPNP, LOG_ERR, sMsg);
 
-        throw sMsg;
+        throw QString(sMsg);
     }
 
     // ------------------------------------------------------------------
@@ -911,12 +909,11 @@ DTC::LiveStreamInfo *Content::AddLiveStream( const QString   &sStorageGroup,
     else
     {
         sFullFileName =
-            gCoreContext->GenMythURL(sHostName, 0, sFileName, sStorageGroup);
+            MythCoreContext::GenMythURL(sHostName, 0, sFileName, sStorageGroup);
     }
 
-    HTTPLiveStream *hls = new
-        HTTPLiveStream(sFullFileName, nWidth, nHeight, nBitrate, nAudioBitrate,
-                       nMaxSegments, 0, 0, nSampleRate);
+    auto *hls = new HTTPLiveStream(sFullFileName, nWidth, nHeight, nBitrate,
+                               nAudioBitrate, nMaxSegments, 0, 0, nSampleRate);
 
     if (!hls)
     {
@@ -956,7 +953,7 @@ DTC::LiveStreamInfo *Content::StopLiveStream( int nId )
 
 DTC::LiveStreamInfo *Content::GetLiveStream( int nId )
 {
-    HTTPLiveStream *hls = new HTTPLiveStream(nId);
+    auto *hls = new HTTPLiveStream(nId);
 
     if (!hls)
     {

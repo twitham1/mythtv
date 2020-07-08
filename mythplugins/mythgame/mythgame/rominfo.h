@@ -1,9 +1,11 @@
 #ifndef ROMINFO_H_
 #define ROMINFO_H_
 
+#include <utility>
+
+#include <QList>
 #include <QMetaType>
 #include <QString>
-#include <QList>
 
 int romInDB(const QString& rom, const QString& gametype);
 
@@ -13,7 +15,7 @@ class RomInfo
     static QList<RomInfo*> GetAllRomInfo();
     static RomInfo *GetRomInfoById(int id);
 
-    RomInfo(int lid = 0, QString lromname = "", QString lsystem = "", QString lgamename ="",
+    explicit RomInfo(int lid = 0, QString lromname = "", QString lsystem = "", QString lgamename ="",
             QString lgenre = "", QString lyear = "", bool lfavorite = false,
             QString lrompath = "", QString lcountry ="", QString lcrc_value = "",
             int ldiskcount = 0, QString lgametype = "", int lromcount = 0,
@@ -22,26 +24,26 @@ class RomInfo
             QString lboxart = "", QString linetref = "")
             {
                 m_id = lid;
-                m_romname = lromname;
-                m_system = lsystem;
-                m_gamename = lgamename;
-                m_genre = lgenre;
-                m_year = lyear;
+                m_romname = std::move(lromname);
+                m_system = std::move(lsystem);
+                m_gamename = std::move(lgamename);
+                m_genre = std::move(lgenre);
+                m_year = std::move(lyear);
                 m_favorite = lfavorite;
-                m_rompath = lrompath;
-                m_screenshot = lscreenshot;
-                m_fanart = lfanart;
-                m_boxart = lboxart;
-                m_country = lcountry;
-                m_crc_value = lcrc_value;
+                m_rompath = std::move(lrompath);
+                m_screenshot = std::move(lscreenshot);
+                m_fanart = std::move(lfanart);
+                m_boxart = std::move(lboxart);
+                m_country = std::move(lcountry);
+                m_crc_value = std::move(lcrc_value);
                 m_diskcount = ldiskcount;
-                m_gametype = lgametype;
+                m_gametype = std::move(lgametype);
                 m_romcount = lromcount;
-                m_allsystems = lallsystems;
-                m_plot = lplot;
-                m_publisher = lpublisher;
-                m_version = lversion;
-                m_inetref = linetref;
+                m_allsystems = std::move(lallsystems);
+                m_plot = std::move(lplot);
+                m_publisher = std::move(lpublisher);
+                m_version = std::move(lversion);
+                m_inetref = std::move(linetref);
             }
 
     RomInfo(const RomInfo &lhs)
@@ -71,7 +73,7 @@ class RomInfo
 
     ~RomInfo() = default;
 
-    bool FindImage(QString BaseFileName, QString *result);
+    static bool FindImage(QString BaseFileName, QString *result);
 
     int Id() const { return m_id; }
     void setId(const int &lid) { m_id = lid; }
@@ -133,17 +135,17 @@ class RomInfo
     QString Inetref() const { return m_inetref; }
     void setInetref(const QString &linetref) { m_inetref = linetref; }
 
-    int Favorite() const { return m_favorite; }
+    bool Favorite() const { return m_favorite; }
     void setFavorite(bool updateDatabase = false);
 
-    QString getExtension();
-    QString toString();
+    QString getExtension() const;
+    QString toString() const;
 
     void setField(const QString& field, const QString& data);
     void fillData();
 
-    void SaveToDatabase();
-    void DeleteFromDatabase();
+    void SaveToDatabase() const;
+    void DeleteFromDatabase() const;
 
   protected:
     int     m_id;

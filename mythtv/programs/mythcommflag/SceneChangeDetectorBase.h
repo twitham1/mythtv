@@ -1,9 +1,8 @@
-#ifndef _SCENECHANGEDETECTORBASE_H_
-#define _SCENECHANGEDETECTORBASE_H_
+#ifndef SCENECHANGEDETECTORBASE_H
+#define SCENECHANGEDETECTORBASE_H
 
 #include <QObject>
-
-typedef struct VideoFrame_ VideoFrame;
+#include "mythframe.h"
 
 class SceneChangeDetectorBase : public QObject
 {
@@ -20,13 +19,12 @@ class SceneChangeDetectorBase : public QObject
                             float debugValue = 0.0);
 
   protected:
-    virtual ~SceneChangeDetectorBase() = default;
+    ~SceneChangeDetectorBase() override = default;
 
   protected:
     unsigned int m_width, m_height;
 };
 
-#endif
+#endif // SCENECHANGEDETECTORBASE_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */
-

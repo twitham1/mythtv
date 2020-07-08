@@ -33,6 +33,7 @@
 #include "mythcorecontext.h"
 #include "mythlocale.h"
 
+// Frequency tables for USA/ATSC broadcast and cable networks
 ScanFrequencyTable::ScanFrequencyTable()
 {
     addSelection(QObject::tr("Broadcast"),        "us",          true);
@@ -54,6 +55,7 @@ ScanFrequencyTable::ScanFrequencyTable()
                     "digital channels are on the higher frequencies."));
 }
 
+// Frequency tables for DVB-T/T2 terrestrial broadcast per country
 ScanCountry::ScanCountry()
 {
     // Default to saved country
@@ -77,7 +79,7 @@ ScanCountry::ScanCountry()
     addSelection(QObject::tr("United Kingdom"), "gb", country == "gb");
 }
 
-
+// Frequency tables for DVB-C cable networks per country
 ScanNetwork::ScanNetwork()
 {
     // Default to saved country
@@ -85,5 +87,6 @@ ScanNetwork::ScanNetwork()
 
     setLabel(QObject::tr("Country"));
     addSelection(QObject::tr("Germany"),        "de", country == "de");
+    addSelection(QObject::tr("Netherlands"),    "nl", country == "nl");
     addSelection(QObject::tr("United Kingdom"), "gb", country == "gb");
 }

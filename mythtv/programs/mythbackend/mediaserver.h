@@ -8,8 +8,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __MEDIASERVER_H__
-#define __MEDIASERVER_H__
+#ifndef MEDIASERVER_H
+#define MEDIASERVER_H
 
 #include <QString>
 
@@ -49,11 +49,11 @@ class MediaServer : public UPnp
         explicit MediaServer();
         void Init(bool bIsMaster, bool bDisableUPnp = false);
 
-        virtual ~MediaServer();
+        ~MediaServer() override;
 
         void     RegisterExtension  ( UPnpCDSExtension    *pExtension );
         void     UnregisterExtension( UPnpCDSExtension    *pExtension );
 
 };
 
-#endif
+#endif // MEDIASERVER_H

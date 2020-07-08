@@ -2,8 +2,8 @@
 // Simple header which encapsulates platform incompatibilities, so we
 // do not need to litter the codebase with ifdefs.
 
-#ifndef __COMPAT_H__
-#define __COMPAT_H__
+#ifndef COMPAT_H
+#define COMPAT_H
 
 #ifdef __cplusplus
 #    include <cstdio>         // for snprintf(), used by inline dlerror()
@@ -73,9 +73,9 @@
     #define snprintf            _snprintf
 
     #ifdef  _WIN64
-        typedef __int64    ssize_t;
+        using ssize_t = __int64;
     #else
-        typedef int   ssize_t;
+        using ssize_t = int;
     #endif
 
     // Check for execute, only checking existance in MSVC
@@ -120,7 +120,7 @@
     #   endif
     #endif
 
-    typedef uint32_t   mode_t;
+    using mode_t = uint32_t;
 
     #if !defined(__cplusplus) && !defined( inline )
     #   define inline __inline
@@ -137,7 +137,7 @@
 //used in videodevice only - that code is not windows-compatible anyway
 #    define minor(X) 0
 
-    typedef unsigned int uint;
+    using uint = unsigned int;
 #endif
 
 #if defined(__cplusplus) && defined(_WIN32)
@@ -328,7 +328,7 @@ static __inline struct tm *localtime_r(const time_t *timep, struct tm *result)
 #    define WEXITSTATUS(w) (((w) >> 8) & 0xff)
 #    define WTERMSIG(w)    ((w) & 0x7f)
 
-    typedef long suseconds_t;
+    using suseconds_t = long;
 
 #endif // _WIN32
 
@@ -337,13 +337,13 @@ static __inline struct tm *localtime_r(const time_t *timep, struct tm *result)
 #include "mythconfig.h"
 
 #if CONFIG_DARWIN && ! defined (_SUSECONDS_T)
-    typedef int32_t suseconds_t;   // 10.3 or earlier don't have this
+    using suseconds_t = int32_t;   // 10.3 or earlier don't have this
 #endif
 
 // Libdvdnav now uses off64_t lseek64(), which BSD/Darwin doesn't have.
 // Luckily, its lseek() is already 64bit compatible
 #ifdef BSD
-    typedef off_t off64_t;
+    typedef off_t off64_t; //NOLINT(modernize-use-using) included from dvdnav C code
     #define lseek64(f,o,w) lseek(f,o,w)
 #endif
 
@@ -389,12 +389,6 @@ static __inline struct tm *localtime_r(const time_t *timep, struct tm *result)
     }
 #endif
 
-#ifdef _WIN32
-#    define PREFIX64 "I64"
-#else
-#    define PREFIX64 "ll"
-#endif
-
 #ifdef ANDROID
 #ifndef S_IREAD
 #define S_IREAD S_IRUSR
@@ -418,4 +412,4 @@ static __inline struct tm *localtime_r(const time_t *timep, struct tm *result)
 #   define LZO_COMPILE_TIME_ASSERT( a )
 #endif
 
-#endif // __COMPAT_H__
+#endif // COMPAT_H

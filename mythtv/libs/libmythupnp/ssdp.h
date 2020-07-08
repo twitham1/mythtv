@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __SSDP_H__
-#define __SSDP_H__
+#ifndef SSDP_H
+#define SSDP_H
 
 #include <QFile>
 
@@ -27,22 +27,20 @@
 #define SSDP_PORT       1900
 #define SSDP_SEARCHPORT 6549
 
-typedef enum
+enum SSDPMethod
 {
     SSDPM_Unknown         = 0,
     SSDPM_GetDeviceDesc   = 1,
     SSDPM_GetDeviceList   = 2
+};
 
-} SSDPMethod;
-
-typedef enum
+enum SSDPRequestType
 {
     SSDP_Unknown        = 0,
     SSDP_MSearch        = 1,
     SSDP_MSearchResp    = 2,
     SSDP_Notify         = 3
-
-} SSDPRequestType;
+};
 
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
@@ -56,8 +54,6 @@ typedef enum
 #define SocketIdx_Multicast  1
 #define SocketIdx_Broadcast  2
 
-#define NumberOfSockets     (sizeof( m_Sockets ) / sizeof( MSocketDevice * ))
-
 class UPNP_PUBLIC SSDP : public MThread
 {
     private:
@@ -65,7 +61,8 @@ class UPNP_PUBLIC SSDP : public MThread
         static SSDP*        g_pSSDP;  
 
         QRegExp             m_procReqLineExp        {"[ \r\n][ \r\n]*"};
-        MSocketDevice      *m_Sockets[3];
+        constexpr static int kNumberOfSockets = 3;
+        MSocketDevice      *m_sockets[kNumberOfSockets] {nullptr,nullptr,nullptr};
 
         int                 m_nPort                 {SSDP_PORT};
         int                 m_nSearchPort           {SSDP_SEARCHPORT};
@@ -89,13 +86,13 @@ class UPNP_PUBLIC SSDP : public MThread
 
         bool    ProcessSearchRequest ( const QStringMap &sHeaders,
                                        const QHostAddress&  peerAddress,
-                                       quint16       peerPort );
-        bool    ProcessSearchResponse( const QStringMap &sHeaders );
-        bool    ProcessNotify        ( const QStringMap &sHeaders );
+                                       quint16       peerPort ) const;
+        static bool    ProcessSearchResponse( const QStringMap &sHeaders );
+        static bool    ProcessNotify        ( const QStringMap &sHeaders );
 
         bool    IsTermRequested      ();
 
-        QString GetHeaderValue    ( const QStringMap &headers,
+        static QString GetHeaderValue    ( const QStringMap &headers,
                                     const QString    &sKey,
                                     const QString    &sDefault );
 
@@ -110,7 +107,7 @@ class UPNP_PUBLIC SSDP : public MThread
         static SSDP* Instance();
         static void Shutdown();
 
-            ~SSDP();
+            ~SSDP() override;
 
         void RequestTerminate(void);
 
@@ -150,19 +147,19 @@ class SSDPExtension : public HttpServerExtension
 
     private:
 
-        SSDPMethod GetMethod( const QString &sURI );
+        static SSDPMethod GetMethod( const QString &sURI );
 
-        void       GetDeviceDesc( HTTPRequest *pRequest );
+        void       GetDeviceDesc( HTTPRequest *pRequest ) const;
         void       GetFile      ( HTTPRequest *pRequest, const QString& sFileName );
-        void       GetDeviceList( HTTPRequest *pRequest );
+        static void       GetDeviceList( HTTPRequest *pRequest );
 
     public:
                  SSDPExtension( int nServicePort, const QString &sSharePath);
-        virtual ~SSDPExtension( ) = default;
+        ~SSDPExtension( ) override = default;
 
         QStringList GetBasePaths() override; // HttpServerExtension
         
         bool     ProcessRequest( HTTPRequest *pRequest ) override; // HttpServerExtension
 };
 
-#endif
+#endif // SSDP_H

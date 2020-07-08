@@ -27,15 +27,14 @@ class ProgramRecPriorityInfo : public RecordingInfo
     friend class ProgramRecPriority;
 
   public:
-    ProgramRecPriorityInfo():
-        RecordingInfo() {}
+    ProgramRecPriorityInfo() = default;
     ProgramRecPriorityInfo(const ProgramRecPriorityInfo &/*other*/) = default;
     ProgramRecPriorityInfo &operator=(const ProgramRecPriorityInfo &other)
-        { clone(other); return *this; }
+        { if (this != &other) clone(other); return *this; }
     ProgramRecPriorityInfo &operator=(const RecordingInfo &other)
-        { clone(other); return *this; }
+        { if (this != &other) clone(other); return *this; }
     ProgramRecPriorityInfo &operator=(const ProgramInfo &other)
-        { clone(other); return *this; }
+        { if (this != &other) clone(other); return *this; }
     virtual void clone(const ProgramRecPriorityInfo &other,
                        bool ignore_non_serialized_data = false);
     void clone(const RecordingInfo &other,
@@ -62,10 +61,10 @@ class ProgramRecPriority : public ScheduleCommon
     Q_OBJECT
   public:
     ProgramRecPriority(MythScreenStack *parent, const QString &name);
-   ~ProgramRecPriority() = default;
+   ~ProgramRecPriority() override = default;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
     void customEvent(QEvent *event) override; // ScheduleCommon
 
     enum SortType
@@ -123,9 +122,9 @@ class ProgramRecPriority : public ScheduleCommon
     MythUIText *m_lastRecordedText        {nullptr};
     MythUIText *m_lastRecordedDateText    {nullptr};
     MythUIText *m_lastRecordedTimeText    {nullptr};
-    MythUIText *m_channameText            {nullptr};
-    MythUIText *m_channumText             {nullptr};
-    MythUIText *m_callsignText            {nullptr};
+    MythUIText *m_chanNameText            {nullptr};
+    MythUIText *m_chanNumText             {nullptr};
+    MythUIText *m_callSignText            {nullptr};
     MythUIText *m_recProfileText          {nullptr};
 
     ProgramRecPriorityInfo *m_currentItem {nullptr};

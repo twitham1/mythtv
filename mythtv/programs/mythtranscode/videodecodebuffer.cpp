@@ -1,7 +1,6 @@
 #include "videodecodebuffer.h"
 
 #include "mythplayer.h"
-#include "videooutbase.h"
 
 #include <chrono> // for milliseconds
 #include <thread> // for sleep_for
@@ -35,7 +34,7 @@ void VideoDecodeBuffer::run()
         {
             locker.unlock();
 
-            DecodedFrameInfo tfInfo;
+            DecodedFrameInfo tfInfo {};
             tfInfo.frame = nullptr;
             tfInfo.didFF = 0;
             tfInfo.isKey = false;

@@ -3,12 +3,16 @@
 #ifndef CHANNEL_H
 #define CHANNEL_H
 
+#include <utility>
+
+// MythTV headers
 #include "dtvchannel.h"
+#include "frequencies.h"
 
 #ifdef USING_V4L2
 #include "videodev2.h" // needed for v4l2_std_id type
 #else
-typedef uint64_t v4l2_std_id;
+using v4l2_std_id = uint64_t;
 #endif
 
 using namespace std;
@@ -17,7 +21,7 @@ using namespace std;
 
 class TVRec;
 
-typedef QMap<int,v4l2_std_id> VidModV4L2;
+using VidModV4L2 = QMap<int,v4l2_std_id>;
 
 /** \class V4LChannel
  *  \brief Implements tuning for TV cards using the V4L driver API,
@@ -32,10 +36,11 @@ typedef QMap<int,v4l2_std_id> VidModV4L2;
 class V4LChannel : public DTVChannel
 {
  public:
-    V4LChannel(TVRec *parent, const QString &videodevice,
-               const QString &audiodevice = "")
-        : DTVChannel(parent), m_device(videodevice), m_audio_device(audiodevice) {}
-    virtual ~V4LChannel(void);
+    V4LChannel(TVRec *parent, QString videodevice,
+               QString audiodevice = "")
+        : DTVChannel(parent), m_device(std::move(videodevice)),
+          m_audioDevice(std::move(audiodevice)) {}
+    ~V4LChannel(void) override;
 
     bool Init(QString &startchannel, bool setchan) override; // ChannelBase
 
@@ -57,17 +62,17 @@ class V4LChannel : public DTVChannel
     bool IsOpen(void)       const override // ChannelBase
         { return GetFd() >= 0; }
     int  GetFd(void)        const override // ChannelBase
-        { return m_videofd; }
+        { return m_videoFd; }
     QString GetDevice(void) const override // ChannelBase
         { return m_device; }
-    QString GetAudioDevice(void) const { return m_audio_device; }
-    QString GetSIStandard(void) const { return "atsc"; }
+    QString GetAudioDevice(void) const { return m_audioDevice; }
+    static QString GetSIStandard(void) { return "atsc"; }
 
     // Picture attributes.
     bool InitPictureAttributes(void) override; // ChannelBase
-    int  GetPictureAttribute(PictureAttribute) const override; // ChannelBase
-    int  ChangePictureAttribute(PictureAdjustType,
-                                PictureAttribute, bool up) override; // ChannelBase
+    int  GetPictureAttribute(PictureAttribute attr) const override; // ChannelBase
+    int  ChangePictureAttribute(PictureAdjustType type,
+                                PictureAttribute attr, bool up) override; // ChannelBase
 
   protected:
     bool IsExternalChannelChangeSupported(void) override // ChannelBase
@@ -75,7 +80,7 @@ class V4LChannel : public DTVChannel
 
   private:
     // Helper Sets
-    void SetFreqTable(const int index);
+    void SetFreqTable(int index);
     int  SetFreqTable(const QString &name) override; // ChannelBase
     bool SetInputAndFormat(int inputNum, const QString& newFmt);
 
@@ -91,20 +96,19 @@ class V4LChannel : public DTVChannel
   private:
     // Data
     QString           m_device;
-    QString           m_audio_device;
-    int               m_videofd           {-1};
-    QString           m_device_name;
-    QString           m_driver_name;
-    QMap<QString,int> m_pict_attr_default;
+    QString           m_audioDevice;
+    int               m_videoFd           {-1};
+    QString           m_deviceName;
+    QString           m_driverName;
+    QMap<QString,int> m_pictAttrDefault;
 
-    struct CHANLIST *m_curList            {nullptr};
-    int              m_totalChannels      {0};
+    CHANLIST_vec     m_curList            {};
 
-    bool             m_has_stream_io      {false};
-    bool             m_has_std_io         {false};
-    bool             m_has_async_io       {false};
-    bool             m_has_tuner          {false};
-    bool             m_has_sliced_vbi     {false};
+    bool             m_hasStreamIO        {false};
+    bool             m_hasStdIO           {false};
+    bool             m_hasAsyncIO         {false};
+    bool             m_hasTuner           {false};
+    bool             m_hasSlicedVbi       {false};
 
     int              m_defaultFreqTable   {1};
     int              m_inputNumV4L        {0};

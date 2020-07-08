@@ -115,7 +115,7 @@ QString  HttpServer::s_platform;
 
 HttpServer::HttpServer() :
     m_sSharePath(GetShareDir()),
-    m_threadPool("HttpServerPool"), m_running(true),
+    m_threadPool("HttpServerPool"),
     m_privateToken(QUuid::createUuid().toString()) // Cryptographically random and sufficiently long enough to act as a secure token
 {
     // Number of connections processed concurrently
@@ -138,7 +138,7 @@ HttpServer::HttpServer() :
             .arg(LOBYTE(LOWORD(GetVersion())))
             .arg(HIBYTE(LOWORD(GetVersion())));
 #else
-        struct utsname uname_info;
+        struct utsname uname_info {};
         uname( &uname_info );
         s_platform = QString("%1/%2")
             .arg(uname_info.sysname).arg(uname_info.release);
@@ -190,11 +190,7 @@ void HttpServer::LoadSSLConfig()
     m_sslConfig.setSslOption(QSsl::SslOptionDisableLegacyRenegotiation, true); // Potential DoS multiplier
     m_sslConfig.setSslOption(QSsl::SslOptionDisableCompression, true); // CRIME attack
 
-#if QT_VERSION < QT_VERSION_CHECK(5,5,0)
-    QList<QSslCipher> availableCiphers = QSslSocket::supportedCiphers();
-#else
     QList<QSslCipher> availableCiphers = QSslConfiguration::supportedCiphers();
-#endif
     QList<QSslCipher> secureCiphers;
     QList<QSslCipher>::iterator it;
     for (it = availableCiphers.begin(); it != availableCiphers.end(); ++it)
@@ -305,7 +301,7 @@ QString HttpServer::GetServerVersion(void)
 void HttpServer::newTcpConnection(qt_socket_fd_t socket)
 {
     PoolServerType type = kTCPServer;
-    PrivTcpServer *server = dynamic_cast<PrivTcpServer *>(QObject::sender());
+    auto *server = dynamic_cast<PrivTcpServer *>(QObject::sender());
     if (server)
         type = server->GetServerType();
 
@@ -479,14 +475,14 @@ void HttpWorker::run(void)
     bool                    bTimeout   = false;
     bool                    bKeepAlive = true;
     HTTPRequest            *pRequest   = nullptr;
-    QTcpSocket             *pSocket;
+    QTcpSocket             *pSocket    = nullptr;
     bool                    bEncrypted = false;
 
     if (m_connectionType == kSSLServer)
     {
 
 #ifndef QT_NO_OPENSSL
-        QSslSocket *pSslSocket = new QSslSocket();
+        auto *pSslSocket = new QSslSocket();
         if (pSslSocket->setSocketDescriptor(m_socket)
            && gCoreContext->CheckSubnet(pSslSocket))
         {

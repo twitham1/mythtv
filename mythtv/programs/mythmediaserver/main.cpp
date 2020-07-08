@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythMediaServerCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
 
@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
     }
 
     ms_sd_notify("STATUS=Creating socket manager");
-    MythSocketManager *sockmanager = new MythSocketManager();
+    auto *sockmanager = new MythSocketManager();
     if (!sockmanager->Listen(port))
     {
         LOG(VB_GENERAL, LOG_ERR,
@@ -153,11 +153,11 @@ int main(int argc, char *argv[])
     sockmanager->RegisterHandler(new FileServerHandler());
     sockmanager->RegisterHandler(new MessageHandler());
 
-    ControlRequestHandler *controlRequestHandler = new ControlRequestHandler();
+    auto *controlRequestHandler = new ControlRequestHandler();
     sockmanager->RegisterHandler(controlRequestHandler);
     controlRequestHandler->ConnectToMaster();
 
-    MythSystemEventHandler *sysEventHandler = new MythSystemEventHandler();
+    auto *sysEventHandler = new MythSystemEventHandler();
 
     // Provide systemd ready notification (for type=notify units)
     ms_sd_notify("STATUS=");

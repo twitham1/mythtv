@@ -1,5 +1,5 @@
-#ifndef _COMMDETECTOR_FACTORY_H_
-#define _COMMDETECTOR_FACTORY_H_
+#ifndef COMMDETECTOR_FACTORY_H
+#define COMMDETECTOR_FACTORY_H
 
 #include "programinfo.h"
 
@@ -14,7 +14,7 @@ class CommDetectorFactory
     CommDetectorFactory() = default;
     ~CommDetectorFactory() = default;
 
-    CommDetectorBase* makeCommDetector(
+    static CommDetectorBase* makeCommDetector(
         SkipType commDetectMethod,
         bool showProgress,
         bool fullSpeed, MythPlayer* player,
@@ -26,7 +26,6 @@ class CommDetectorFactory
         bool useDB);
 };
 
-#endif
-
+#endif // COMMDETECTOR_FACTORY_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

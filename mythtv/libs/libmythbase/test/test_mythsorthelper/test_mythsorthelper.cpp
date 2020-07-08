@@ -21,12 +21,11 @@
 
 void TestSortHelper::Singleton(void)
 {
-    std::shared_ptr<MythSortHelper>sh1, sh2, sh3;
-    sh1 = getMythSortHelper();
+    auto sh1 = getMythSortHelper();
     QVERIFY(sh1.use_count() == 2);
-    sh2 = getMythSortHelper();
+    auto sh2 = getMythSortHelper();
     QVERIFY(sh2.use_count() == 3);
-    sh3 = getMythSortHelper();
+    auto sh3 = getMythSortHelper();
     QVERIFY(sh3.use_count() == 4);
     sh2 = nullptr;
     QVERIFY(sh3.use_count() == 3);
@@ -56,10 +55,8 @@ void TestSortHelper::titles_timing(void)
     QFETCH(int, sensitive);
     QFETCH(int, disposition);
     QFETCH(QString, exclusions);
-    MythSortHelper *sh =
-        new MythSortHelper(static_cast<Qt::CaseSensitivity>(sensitive),
-                           static_cast<SortPrefixMode>(disposition),
-                           "");
+    auto *sh = new MythSortHelper(static_cast<Qt::CaseSensitivity>(sensitive),
+                                  static_cast<SortPrefixMode>(disposition), "");
     QBENCHMARK {
         QString title = sh->doTitle("The Flash");
     }
@@ -77,10 +74,8 @@ void TestSortHelper::pathnames_timing(void)
     QFETCH(int, disposition);
     QFETCH(QString, exclusions);
 
-    MythSortHelper *sh =
-        new MythSortHelper(static_cast<Qt::CaseSensitivity>(sensitive),
-                           static_cast<SortPrefixMode>(disposition),
-                           "");
+    auto *sh = new MythSortHelper(static_cast<Qt::CaseSensitivity>(sensitive),
+                                  static_cast<SortPrefixMode>(disposition), "");
     QBENCHMARK {
         QString title = sh->doPathname("dvds/The Flash/Season 2/The Flash - S02E01.ts");
     }
@@ -90,13 +85,14 @@ void TestSortHelper::pathnames_timing(void)
 void TestSortHelper::Variations_test(void)
 {
     // Case sensitive, keep prefixes (aka no-op)
-    auto sh = new MythSortHelper(Qt::CaseSensitive, SortPrefixKeep, "");
+    auto *sh = new MythSortHelper(Qt::CaseSensitive, SortPrefixKeep, "");
     QVERIFY(sh->doTitle("The Blob") == "The Blob");
     QVERIFY(sh->doTitle("The Blob") != "the blob");
     QVERIFY(sh->doTitle("The Blob") != "Blob");
     QVERIFY(sh->doTitle("The Blob") != "blob");
     QVERIFY(sh->doTitle("The Blob") != "Blob, The");
     QVERIFY(sh->doTitle("The Blob") != "blob, the");
+    QVERIFY(sh->doTitle("Any Given Sunday") == "Any Given Sunday");
     QVERIFY(sh->doPathname("/video/recordings/The Flash/Season 1/The Flash - S01E01.ts")
             == "/video/recordings/The Flash/Season 1/The Flash - S01E01.ts");
     delete sh;
@@ -109,6 +105,7 @@ void TestSortHelper::Variations_test(void)
     QVERIFY(sh->doTitle("The Blob") != "blob");
     QVERIFY(sh->doTitle("The Blob") != "Blob, The");
     QVERIFY(sh->doTitle("The Blob") != "blob, the");
+    QVERIFY(sh->doTitle("Any Given Sunday") == "any given sunday");
     QVERIFY(sh->doPathname("/video/recordings/The Flash/Season 1/The Flash - S01E01.ts")
             == "/video/recordings/the flash/season 1/the flash - s01e01.ts");
     delete sh;
@@ -121,6 +118,7 @@ void TestSortHelper::Variations_test(void)
     QVERIFY(sh->doTitle("The Sting") != "sting");
     QVERIFY(sh->doTitle("The Sting") != "Sting, The");
     QVERIFY(sh->doTitle("The Sting") != "sting, the");
+    QVERIFY(sh->doTitle("Any Given Sunday") == "Any Given Sunday");
     QVERIFY(sh->doPathname("/video/recordings/The Flash/Season 1/The Flash - S01E01.ts")
             == "/video/recordings/Flash/Season 1/Flash - S01E01.ts");
     delete sh;
@@ -133,6 +131,7 @@ void TestSortHelper::Variations_test(void)
     QVERIFY(sh->doTitle("The Thing") == "thing");
     QVERIFY(sh->doTitle("The Thing") != "Thing, The");
     QVERIFY(sh->doTitle("The Thing") != "thing, the");
+    QVERIFY(sh->doTitle("Any Given Sunday") == "any given sunday");
     QVERIFY(sh->doPathname("/video/recordings/The Flash/Season 1/The Flash - S01E01.ts")
             == "/video/recordings/flash/season 1/flash - s01e01.ts");
     delete sh;
@@ -143,6 +142,7 @@ void TestSortHelper::Variations_test(void)
     QVERIFY(sh->doTitle("The Flash") == "flash, the");
     QVERIFY(sh->doTitle("The Flash") != "Flash");
     QVERIFY(sh->doTitle("The Flash") != "flash");
+    QVERIFY(sh->doTitle("Any Given Sunday") == "any given sunday");
     QVERIFY(sh->doPathname("/video/recordings/The Flash/Season 1/The Flash - S01E01.ts")
             == "/video/recordings/flash, the/season 1/flash - s01e01.ts, the");
     delete sh;

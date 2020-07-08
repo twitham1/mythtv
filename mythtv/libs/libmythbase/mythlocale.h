@@ -27,7 +27,7 @@ class MBASE_PUBLIC MythLocale
 
     QString GetLocaleCode() const { return m_localeCode; }
 
-    const QLocale ToQLocale() const { return m_qtLocale; }
+    QLocale ToQLocale() const { return m_qtLocale; }
 
     bool LoadDefaultsFromXML(void);
     void SaveLocaleDefaults(bool overwrite = false);
@@ -43,7 +43,7 @@ class MBASE_PUBLIC MythLocale
     bool    m_defaultsLoaded {false};
     QLocale m_qtLocale;
 
-    typedef QMap<QString, QString> SettingsMap;
+    using SettingsMap = QMap<QString, QString>;
     SettingsMap m_globalSettings;
     SettingsMap m_hostSettings;
 };

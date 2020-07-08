@@ -18,12 +18,12 @@ class MythSocket;
 class MainServer;
 class ProgramInfo;
 
-typedef enum {
+enum PlaybackSockEventsMode {
     kPBSEvents_None       = 0,
     kPBSEvents_Normal     = 1,
     kPBSEvents_NonSystem  = 2,
     kPBSEvents_SystemOnly = 3
-} PlaybackSockEventsMode;
+};
 
 class PlaybackSock : public ReferenceCounter
 {
@@ -102,7 +102,7 @@ class PlaybackSock : public ReferenceCounter
     void SetNextLiveTVDir(int capturecardnum, const QString& dir);
     void CancelNextRecording(int capturecardnum, bool cancel);
 
-    QStringList ForwardRequest(const QStringList&);
+    QStringList ForwardRequest(const QStringList &slist);
 
     bool ReadStringList(QStringList &list);
 
@@ -110,7 +110,7 @@ class PlaybackSock : public ReferenceCounter
 
     // Enforce reference counting
   protected:
-    virtual ~PlaybackSock();
+    ~PlaybackSock() override;
 
   private:
     bool SendReceiveStringList(QStringList &strlist, uint min_reply_length = 0);

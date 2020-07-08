@@ -46,15 +46,16 @@ class MTV_PUBLIC ScanWizard : public GroupSetting
     Q_OBJECT
 
   public:
-    ScanWizard(uint    default_sourceid  = 0,
-               uint    default_cardid    = 0,
-               QString default_inputname = QString());
+    explicit ScanWizard(uint  default_sourceid  = 0,
+               uint           default_cardid    = 0,
+               const QString& default_inputname = QString());
 
-    ~ScanWizard() = default;
+    ~ScanWizard() override = default;
 
   protected slots:
     void Scan();
     void SetInput(const QString &cardid_inputname);
+    void SetPaneDefaults(const QString &cardid_inputname);
 
   protected:
     uint               m_lastHWCardID   {0};
@@ -90,21 +91,26 @@ class MTV_PUBLIC ScanWizard : public GroupSetting
     bool    DoFreeToAirOnly(void)        const;
     bool    DoChannelNumbersOnly(void)   const;
     bool    DoCompleteChannelsOnly(void) const;
+    bool    DoFullChannelSearch(void)    const;
+    bool    DoRemoveDuplicates(void)     const;
     bool    DoAddFullTS(void)            const;
     bool    DoTestDecryption(void)       const;
+    bool    DoScanOpenTV(void)           const;
 
   protected:
-    VideoSourceSelector  *m_videoSource {nullptr};
-    InputSelector        *m_input       {nullptr};
-    ScanTypeSetting      *m_scanType    {nullptr};
-    ScanOptionalConfig   *m_scanConfig  {nullptr};
-    DesiredServices      *m_services    {nullptr};
-    FreeToAirOnly        *m_ftaOnly     {nullptr};
-    ChannelNumbersOnly   *m_lcnOnly     {nullptr};
-    CompleteChannelsOnly *m_completeOnly{nullptr};
-    AddFullTS            *m_addFullTS   {nullptr};
-    TrustEncSISetting    *m_trustEncSI  {nullptr};
-// End of members moved from ScanWizardConfig
+    VideoSourceSelector  *m_videoSource   {nullptr};
+    InputSelector        *m_input         {nullptr};
+    ScanTypeSetting      *m_scanType      {nullptr};
+    ScanOptionalConfig   *m_scanConfig    {nullptr};
+    DesiredServices      *m_services      {nullptr};
+    FreeToAirOnly        *m_ftaOnly       {nullptr};
+    ChannelNumbersOnly   *m_lcnOnly       {nullptr};
+    CompleteChannelsOnly *m_completeOnly  {nullptr};
+    FullChannelSearch    *m_fullSearch    {nullptr};
+    RemoveDuplicates     *m_removeDuplicates {nullptr};
+    AddFullTS            *m_addFullTS     {nullptr};
+    TrustEncSISetting    *m_trustEncSI    {nullptr};
+  // End of members moved from ScanWizardConfig
 };
 
 #endif // SCANWIZARD_H

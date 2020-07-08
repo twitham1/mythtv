@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef _WSDL_H_
-#define _WSDL_H_
+#ifndef WSDL_H
+#define WSDL_H
 
 #include <QMetaObject>
 #include <QMetaMethod>
@@ -59,9 +59,9 @@ class UPNP_PUBLIC Wsdl : public QDomDocument
                                             QString       sTypeName,
                                             bool          bReturnType = false );
 
-        bool        IsCustomType          ( QString &sTypeName );
+        static bool        IsCustomType          ( QString &sTypeName );
 
-        QString     ReadClassInfo         ( const QMetaObject *pMeta, 
+        static QString     ReadClassInfo         ( const QMetaObject *pMeta, 
                                             const QString     &sKey );
 
         QString     AddTypeInfo           ( QString            sType );
@@ -75,4 +75,4 @@ class UPNP_PUBLIC Wsdl : public QDomDocument
         bool GetWSDL( HTTPRequest *pRequest );
 };
 
-#endif
+#endif // WSDL_H

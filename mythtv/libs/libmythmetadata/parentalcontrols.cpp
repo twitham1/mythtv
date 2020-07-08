@@ -26,12 +26,14 @@ namespace
         switch (cpl)
         {
             case ParentalLevel::plNone:
-            { rpl = ParentalLevel::plLowest; break; }
-            case ParentalLevel::plLowest: { rpl = ParentalLevel::plLow; break; }
-            case ParentalLevel::plLow: { rpl = ParentalLevel::plMedium; break; }
+                rpl = ParentalLevel::plLowest; break;
+            case ParentalLevel::plLowest:
+                rpl = ParentalLevel::plLow; break;
+            case ParentalLevel::plLow:
+                rpl = ParentalLevel::plMedium; break;
             case ParentalLevel::plMedium:
-            { rpl = ParentalLevel::plHigh; break; }
-            case ParentalLevel::plHigh: { rpl = ParentalLevel::plHigh; break; }
+            case ParentalLevel::plHigh:
+                rpl = ParentalLevel::plHigh; break;
         }
 
         return boundedParentalLevel(rpl);
@@ -42,13 +44,15 @@ namespace
         ParentalLevel::Level rpl(cpl);
         switch (cpl)
         {
-            case ParentalLevel::plNone: { rpl = ParentalLevel::plNone; break; }
+            case ParentalLevel::plNone:
+                rpl = ParentalLevel::plNone; break;
             case ParentalLevel::plLowest:
-            { rpl = ParentalLevel::plLowest; break; }
-            case ParentalLevel::plLow: { rpl = ParentalLevel::plLowest; break; }
-            case ParentalLevel::plMedium: { rpl = ParentalLevel::plLow; break; }
+            case ParentalLevel::plLow:
+                rpl = ParentalLevel::plLowest; break;
+            case ParentalLevel::plMedium:
+                rpl = ParentalLevel::plLow; break;
             case ParentalLevel::plHigh:
-            { rpl = ParentalLevel::plMedium; break; }
+                rpl = ParentalLevel::plMedium; break;
         }
 
         return boundedParentalLevel(rpl);
@@ -161,7 +165,7 @@ namespace
     class PasswordManager
     {
       private:
-        typedef std::map<ParentalLevel::Level, QString> pws;
+        using pws = std::map<ParentalLevel::Level, QString>;
 
       public:
         void Add(ParentalLevel::Level level, const QString &password)
@@ -175,7 +179,7 @@ namespace
             for (ParentalLevel i = level;
                     i <= ParentalLevel::plHigh && i.good(); ++i)
             {
-                pws::const_iterator p = m_passwords.find(i.GetLevel());
+                auto p = m_passwords.find(i.GetLevel());
                 if (p != m_passwords.end() && !p->second.isEmpty())
                     ret.push_back(p->second);
             }
@@ -189,7 +193,7 @@ namespace
             for (ParentalLevel i = level;
                     i >= ParentalLevel::plLow && i.good(); --i)
             {
-                pws::const_iterator p = m_passwords.find(i.GetLevel());
+                auto p = m_passwords.find(i.GetLevel());
                 if (p != m_passwords.end() && !p->second.isEmpty())
                 {
                     ret = p->second;
@@ -235,6 +239,7 @@ class ParentalLevelChangeCheckerPrivate : public QObject
     }
 
   signals:
+    // NOLINTNEXTLINE(readability-inconsistent-declaration-parameter-name)
     void SigDone(bool passwordValid, ParentalLevel::Level toLevel);
 
   private:
@@ -305,8 +310,7 @@ class ParentalLevelChangeCheckerPrivate : public QObject
         MythScreenStack *popupStack =
                 GetMythMainWindow()->GetStack("popup stack");
 
-        MythTextInputDialog *pwd =
-                new MythTextInputDialog(popupStack,
+        auto *pwd = new MythTextInputDialog(popupStack,
                         tr("Parental PIN:"), FilterNone, true);
 
         connect(pwd, SIGNAL(haveResult(QString)),
@@ -324,19 +328,18 @@ class ParentalLevelChangeCheckerPrivate : public QObject
     {
         m_passwordOK = false;
 
-        for (QStringList::iterator p = m_validPasswords.begin();
-                p != m_validPasswords.end(); ++p)
+        for (const auto& valid_pwd : qAsConst(m_validPasswords))
         {
-            if (password == *p)
-            {
-                m_passwordOK = true;
-                QString time_stamp = MythDate::current_iso_string();
+            if (password != valid_pwd)
+                continue;
 
-                gCoreContext->SaveSetting("VideoPasswordTime", time_stamp);
-                gCoreContext->SaveSetting("VideoPasswordLevel", m_toLevel);
+            m_passwordOK = true;
+            QString time_stamp = MythDate::current_iso_string();
 
-                break;
-            }
+            gCoreContext->SaveSetting("VideoPasswordTime", time_stamp);
+            gCoreContext->SaveSetting("VideoPasswordLevel", m_toLevel);
+
+            return;
         }
     }
 

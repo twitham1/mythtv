@@ -1,5 +1,5 @@
-#ifndef _MYTHSESSION_H_
-#define _MYTHSESSION_H_
+#ifndef MYTHSESSION_H
+#define MYTHSESSION_H
 
 #include "mythbaseexp.h"
 
@@ -32,15 +32,15 @@ class MBASE_PUBLIC MythUserSession
      */
     bool IsValid(void) const;
 
-    const QString GetUserName(void) const { return m_name; }
+    QString GetUserName(void) const { return m_name; }
     uint  GetUserId(void) const { return m_userId; }
 
-    const QString GetSessionToken(void) const { return m_sessionToken; }
-    const QString GetSessionClient(void) const { return m_sessionClient; }
+    QString GetSessionToken(void) const { return m_sessionToken; }
+    QString GetSessionClient(void) const { return m_sessionClient; }
 
-    const QDateTime GetSessionCreated() const { return m_sessionCreated; }
-    const QDateTime GetSessionLastActive() const { return m_sessionLastActive; }
-    const QDateTime GetSessionExpires() const { return m_sessionExpires; }
+    QDateTime GetSessionCreated() const { return m_sessionCreated; }
+    QDateTime GetSessionLastActive() const { return m_sessionLastActive; }
+    QDateTime GetSessionExpires() const { return m_sessionExpires; }
 
     /**
      * \brief Check if the user has the given permission in a context
@@ -106,7 +106,7 @@ class MBASE_PUBLIC MythSessionManager
      *        session open for them!
      * \param username
      */
-    bool IsValidUser(const QString &username);
+    static bool IsValidUser(const QString &username);
 
     /**
      * \brief Check if the session token is valid
@@ -128,7 +128,7 @@ class MBASE_PUBLIC MythSessionManager
      *
      * The username should be checked for validity first
      */
-    QString GetPasswordDigest(const QString &username);
+    static QString GetPasswordDigest(const QString &username);
 
     /**
      * \brief Login user by digest
@@ -170,11 +170,11 @@ class MBASE_PUBLIC MythSessionManager
      * \param newPassword if action=DIGEST_USER_CHANGE_PW
      * \param adminPassword if action=DIGEST_USER_ADD
      */
-    bool ManageDigestUser(DigestUserActions action,
-                          const QString    &username,
-                          const QString    &password,
-                          const QString    &newPassword,
-                          const QString    &adminPassword);
+    static bool ManageDigestUser(DigestUserActions action,
+                                 const QString    &username,
+                                 const QString    &password,
+                                 const QString    &newPassword,
+                                 const QString    &adminPassword);
 
   private:
     /**
@@ -207,18 +207,18 @@ class MBASE_PUBLIC MythSessionManager
      */
     void DestroyUserSession(const QString &sessionToken);
 
-    bool AddDigestUser(const QString &username,
-                       const QString &password,
-                       const QString &adminPassword);
+    static bool AddDigestUser(const QString &username,
+                              const QString &password,
+                              const QString &adminPassword);
 
-    bool RemoveDigestUser(const QString &username,
-                          const QString &password);
+    static bool RemoveDigestUser(const QString &username,
+                                 const QString &password);
 
-    bool ChangeDigestUserPassword(const QString &username,
-                                  const QString &oldPassword,
-                                  const QString &newPassword);
+    static bool ChangeDigestUserPassword(const QString &username,
+                                         const QString &oldPassword,
+                                         const QString &newPassword);
 
     QMap<QString, MythUserSession> m_sessionList;
 };
 
-#endif
+#endif // MYTHSESSION_H

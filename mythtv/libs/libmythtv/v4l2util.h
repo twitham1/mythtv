@@ -1,5 +1,5 @@
-#ifndef _V4L2_util_h_
-#define _V4L2_util_h_
+#ifndef V4L2_UTIL_H
+#define V4L2_UTIL_H
 
 #ifdef USING_V4L2
 #include "videodev2.h" // our copy
@@ -34,6 +34,9 @@ class MTV_PUBLIC V4L2util
     bool GetVideoStandard(QString& name) const;
     int  GetSignalStrength(void) const;
     bool GetResolution(int& width, int& height) const;
+    uint32_t GetCapabilities(void) const;
+    QString  GetDeviceName(void) const;
+    QString  GetDriverName(void) const;
 
     bool HasTuner(void) const;
     bool HasAudioSupport(void) const;
@@ -72,7 +75,7 @@ class MTV_PUBLIC V4L2util
 
   protected:
     // VBI
-    bool OpenVBI(const QString& vbi_dev_name);
+    static bool OpenVBI(const QString& vbi_dev_name);
     bool SetSlicedVBI(const VBIMode::vbimode_t& vbimode);
 
     int  GetExtControl(int request, const QString& ctrl_desc = "") const;
@@ -104,4 +107,4 @@ class MTV_PUBLIC V4L2util
     bool     m_haveQueryExtCtrl     {false};
 };
 
-#endif
+#endif // V4L2_UTIL_H

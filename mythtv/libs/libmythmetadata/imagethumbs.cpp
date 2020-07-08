@@ -167,7 +167,7 @@ void ThumbThread<DBFS>::run()
         }
         else if (task->m_action == "DELETE")
         {
-            foreach(ImagePtrK im, task->m_images)
+            for (const auto& im : qAsConst(task->m_images))
             {
                 QString thumbnail = im->m_thumbPath;
                 if (!QDir::root().remove(thumbnail))
@@ -188,7 +188,7 @@ void ThumbThread<DBFS>::run()
         }
         else if (task->m_action == "MOVE")
         {
-            foreach(ImagePtrK im, task->m_images)
+            for (const auto& im : qAsConst(task->m_images))
             {
                 // Build new thumb path
                 QString newThumbPath =
@@ -372,7 +372,7 @@ void ImageThumb<DBFS>::ClearThumbs(int devId, const QString &action)
 
     // Generate file & thumbnail urls (as per image cache) of mountpoints
     QStringList mesg;
-    foreach (const QString &mount, mountPaths)
+    for (const auto& mount : qAsConst(mountPaths))
         mesg << m_dbfs.MakeFileUrl(mount)
              << m_dbfs.MakeThumbUrl(mount);
 
@@ -393,8 +393,9 @@ QString ImageThumb<DBFS>::DeleteThumbs(const ImageList &images)
     QStringList ids;
 
     // Pictures & videos are deleted by their own threads
-    ImageListK pics, videos;
-    foreach (ImagePtrK im, images)
+    ImageListK pics;
+    ImageListK videos;
+    for (const auto& im : qAsConst(images))
     {
         if (im->m_type == kVideoFile)
             videos.append(im);
@@ -432,16 +433,18 @@ void ImageThumb<DBFS>::CreateThumbnail(const ImagePtrK &im, int priority,
     TaskPtr task(new ThumbTask("CREATE", im, priority, notify));
 
     if (im->m_type == kImageFile && m_imageThread)
-
+    {
         m_imageThread->Enqueue(task);
-
+    }
     else if (im->m_type == kVideoFile && m_videoThread)
-
+    {
         m_videoThread->Enqueue(task);
-
+    }
     else
+    {
         LOG(VB_FILE, LOG_INFO, QString("Ignoring create thumbnail %1, type %2")
             .arg(im->m_id).arg(im->m_type));
+    }
 }
 
 
@@ -458,16 +461,18 @@ void ImageThumb<DBFS>::MoveThumbnail(const ImagePtrK &im)
     TaskPtr task(new ThumbTask("MOVE", im));
 
     if (im->m_type == kImageFile && m_imageThread)
-
+    {
         m_imageThread->Enqueue(task);
-
+    }
     else if (im->m_type == kVideoFile && m_videoThread)
-
+    {
         m_videoThread->Enqueue(task);
-
+    }
     else
+    {
         LOG(VB_FILE, LOG_INFO, QString("Ignoring move thumbnail %1, type %2")
             .arg(im->m_id).arg(im->m_type));
+    }
 }
 
 

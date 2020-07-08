@@ -25,10 +25,14 @@ ThemeInfo::ThemeInfo(const QString& theme)
     m_theme = QFileInfo(themeNoTrailingSlash);
 
     if (m_theme.exists())
+    {
         // since all the usages have a / inserted, remove the one in the url
         m_themeurl = m_theme.absoluteFilePath();
+    }
     else
+    {
         m_themeurl = theme;
+    }
 
     // since all the usages have a / insterted, remove the one in the url
     if (m_themeurl.endsWith('/'))
@@ -208,12 +212,12 @@ bool ThemeInfo::parseThemeInfo()
                         }
                         else if (ce.tagName() == "description")
                         {
-                            m_description = qApp->translate("ThemeUI",
+                            m_description = QCoreApplication::translate("ThemeUI",
                                                  parseText(ce).toUtf8());
                         }
                         else if (ce.tagName() == "errata")
                         {
-                            m_errata = qApp->translate("ThemeUI",
+                            m_errata = QCoreApplication::translate("ThemeUI",
                                                 parseText(ce).toUtf8());
                         }
                     }

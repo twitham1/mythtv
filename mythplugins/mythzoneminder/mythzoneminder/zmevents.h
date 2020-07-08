@@ -35,10 +35,10 @@ public:
     explicit ZMEvents(MythScreenStack *parent)
         : MythScreenType(parent, "zmevents"),
           m_eventList(new std::vector<Event*>) {}
-    ~ZMEvents();
+    ~ZMEvents() override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
   private slots:
     void getEventList(void);
@@ -49,7 +49,7 @@ public:
     void changeView(void);
     void toggleShowContinuous(void);
     void eventChanged(MythUIButtonListItem *item);
-    void eventVisible(MythUIButtonListItem *item);
+    static void eventVisible(MythUIButtonListItem *item);
     void cameraChanged(void);
     void dateChanged(void);
     void playerExited(void);
@@ -67,7 +67,7 @@ public:
 
     std::vector<Event *>     *m_eventList {nullptr};
     QStringList          m_dateList;
-    int                  m_savedPosition  {0};
+    size_t               m_savedPosition  {0};
     int                  m_currentCamera  {-1};
     int                  m_currentDate    {-1};
 

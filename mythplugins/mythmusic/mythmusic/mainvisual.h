@@ -4,8 +4,8 @@
 // warranty, or liability of any kind.
 //
 
-#ifndef __mainvisual_h
-#define __mainvisual_h
+#ifndef MAINVISUAL_H
+#define MAINVISUAL_H
 
 #include <vector>
 using namespace std;
@@ -36,7 +36,7 @@ class MainVisual :  public QObject, public MythTV::Visual
 
   public:
     explicit MainVisual(MythUIVideo *visualizer);
-    virtual ~MainVisual();
+    ~MainVisual() override;
 
     VisualBase *visual(void) const { return m_vis; }
     void setVisual(const QString &name);
@@ -45,17 +45,18 @@ class MainVisual :  public QObject, public MythTV::Visual
 
     void resize(const QSize &size);
 
-    void add(const void *, unsigned long, unsigned long, int, int) override; // Visual
+    void add(const void *buffer, unsigned long b_len, unsigned long timecode,
+             int source_channel, int bits_per_sample) override; // Visual
     void prepare(void) override; // Visual
 
-    void customEvent(QEvent *) override; // QObject
+    void customEvent(QEvent *event) override; // QObject
 
     void setFrameRate(int newfps);
     int frameRate(void) const { return m_fps; }
 
     QStringList getVisualizations(void) { return m_visualizers; }
 
-    int getCurrentVisual(void) { return m_currentVisualizer; }
+    int getCurrentVisual(void) const { return m_currentVisualizer; }
 
   public slots:
     void timeout();
@@ -73,5 +74,4 @@ class MainVisual :  public QObject, public MythTV::Visual
     QTimer *m_updateTimer          {nullptr};
 };
 
-#endif // __mainvisual_h
-
+#endif // MAINVISUAL_H

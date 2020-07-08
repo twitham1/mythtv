@@ -39,7 +39,9 @@ using namespace std;
 #include "hdhrchannel.h"
 #include "scanmonitor.h"
 #include "asichannel.h"
+#ifdef USING_DVB        // for bug in gcc 8.3
 #include "dvbchannel.h"
+#endif
 #include "v4lchannel.h"
 #include "iptvchannel.h"
 #include "ExternalChannel.h"
@@ -117,6 +119,8 @@ void ChannelScanner::Scan(
     bool           do_fta_only,
     bool           do_lcn_only,
     bool           do_complete_only,
+    bool           do_full_channel_search,
+    bool           do_remove_duplicates,
     bool           do_add_full_ts,
     ServiceRequirements service_requirements,
     // stuff needed for particular scans
@@ -131,6 +135,8 @@ void ChannelScanner::Scan(
     m_freeToAirOnly = do_fta_only;
     m_channelNumbersOnly = do_lcn_only;
     m_completeOnly = do_complete_only;
+    m_fullSearch = do_full_channel_search;
+    m_removeDuplicates = do_remove_duplicates;
     m_addFullTS = do_add_full_ts;
     m_serviceRequirements = service_requirements;
     m_sourceid = sourceid;
@@ -444,7 +450,7 @@ void ChannelScanner::PreScanCommon(
         // Make sure that channel_timeout is at least 7 seconds to catch
         // at least one SDT section. kDVBTableTimeout in ChannelScanSM
         // ensures that we catch the NIT then.
-        channel_timeout = max(channel_timeout, need_nit * 7 * 1000U);
+        channel_timeout = max(channel_timeout, static_cast<int>(need_nit) * 7 * 1000U);
     }
 
 #ifdef USING_DVB
@@ -516,7 +522,7 @@ void ChannelScanner::PreScanCommon(
                                       sourceid, signal_timeout, channel_timeout,
                                       inputname, do_test_decryption);
 
-    // If we know the channel types we can give the signal montior a hint.
+    // If we know the channel types we can give the signal monitor a hint.
     // Since we unfortunately do not record this info in the DB, we cannot
     // do this for the other scan types and have to guess later on...
     switch (scantype)

@@ -1,3 +1,5 @@
+#include <utility>
+
 #include <QMutex>
 
 #include "frequencies.h"
@@ -15,22 +17,18 @@ static freq_table_list_t get_matching_freq_tables_internal(
 
 TransportScanItem::TransportScanItem()
 {
-    memset(m_freqOffsets, 0, sizeof(int)*3);
-
     m_tuning.Clear();
 }
 
 TransportScanItem::TransportScanItem(uint           sourceid,
                                      const QString &_si_std,
-                                     const QString &_name,
+                                     QString        _name,
                                      uint           _mplexid,
                                      uint           _timeoutTune)
-    : m_mplexid(_mplexid),  m_friendlyName(_name),
+    : m_mplexid(_mplexid),  m_friendlyName(std::move(_name)),
       m_sourceID(sourceid),
       m_timeoutTune(_timeoutTune)
 {
-    memset(m_freqOffsets, 0, sizeof(int)*3);
-
     m_tuning.Clear();
     m_tuning.m_sistandard = _si_std;
 
@@ -42,29 +40,27 @@ TransportScanItem::TransportScanItem(uint           sourceid,
 }
 
 TransportScanItem::TransportScanItem(uint           _sourceid,
-                                     const QString &_name,
+                                     QString        _name,
                                      DTVMultiplex  &_tuning,
                                      uint           _timeoutTune)
     : m_mplexid(0),
-      m_friendlyName(_name),
+      m_friendlyName(std::move(_name)),
       m_sourceID(_sourceid),
       m_timeoutTune(_timeoutTune)
 {
-    memset(m_freqOffsets, 0, sizeof(int)*3);
     m_tuning = _tuning;
 }
 
 TransportScanItem::TransportScanItem(uint                _sourceid,
-                                     const QString      &_name,
+                                     QString             _name,
                                      DTVTunerType        _tuner_type,
                                      const DTVTransport &_tuning,
                                      uint                _timeoutTune)
     : m_mplexid(0),
-      m_friendlyName(_name),
+      m_friendlyName(std::move(_name)),
       m_sourceID(_sourceid),
       m_timeoutTune(_timeoutTune)
 {
-    memset(m_freqOffsets, 0, sizeof(int)*3);
     m_expectedChannels = _tuning.channels;
 
     m_tuning.Clear();
@@ -72,28 +68,26 @@ TransportScanItem::TransportScanItem(uint                _sourceid,
     m_tuning.ParseTuningParams(
         _tuner_type,
         QString::number(_tuning.m_frequency),  _tuning.m_inversion.toString(),
-        QString::number(_tuning.m_symbolrate), _tuning.m_fec.toString(),
-        _tuning.m_polarity.toString(),         _tuning.m_hp_code_rate.toString(),
-        _tuning.m_lp_code_rate.toString(),     _tuning.m_modulation.toString(),
-        _tuning.m_trans_mode.toString(),       _tuning.m_guard_interval.toString(),
+        QString::number(_tuning.m_symbolRate), _tuning.m_fec.toString(),
+        _tuning.m_polarity.toString(),         _tuning.m_hpCodeRate.toString(),
+        _tuning.m_lpCodeRate.toString(),       _tuning.m_modulation.toString(),
+        _tuning.m_transMode.toString(),        _tuning.m_guardInterval.toString(),
         _tuning.m_hierarchy.toString(),        _tuning.m_modulation.toString(),
-        _tuning.m_bandwidth.toString(),        _tuning.m_mod_sys.toString(),
+        _tuning.m_bandwidth.toString(),        _tuning.m_modSys.toString(),
         _tuning.m_rolloff.toString());
 }
 
 TransportScanItem::TransportScanItem(uint sourceid,
                                      const QString &std,
-                                     const QString &strFmt,
+                                     QString strFmt,
                                      uint freqNum,
                                      uint freq,
                                      const FrequencyTable &ft,
                                      uint timeoutTune)
-    : m_mplexid(0),           m_friendlyName(strFmt),
+    : m_mplexid(0),           m_friendlyName(std::move(strFmt)),
       m_friendlyNum(freqNum), m_sourceID(sourceid),
       m_timeoutTune(timeoutTune)
 {
-    memset(m_freqOffsets, 0, sizeof(int)*3);
-
     m_tuning.Clear();
 
     // setup tuning params
@@ -116,33 +110,33 @@ TransportScanItem::TransportScanItem(uint sourceid,
     {
         m_tuning.m_inversion      = ft.m_inversion;
         m_tuning.m_bandwidth      = ft.m_bandwidth;
-        m_tuning.m_hp_code_rate   = ft.m_coderateHp;
-        m_tuning.m_lp_code_rate   = ft.m_coderateLp;
-        m_tuning.m_trans_mode     = ft.m_transMode;
-        m_tuning.m_guard_interval = ft.m_guardInterval;
+        m_tuning.m_hpCodeRate     = ft.m_coderateHp;
+        m_tuning.m_lpCodeRate     = ft.m_coderateLp;
+        m_tuning.m_transMode      = ft.m_transMode;
+        m_tuning.m_guardInterval  = ft.m_guardInterval;
         m_tuning.m_hierarchy      = ft.m_hierarchy;
     }
     else if (std == "dvbc" || std == "dvbs")
     {
-        m_tuning.m_symbolrate     = ft.m_symbolRate;
+        m_tuning.m_symbolRate     = ft.m_symbolRate;
         m_tuning.m_fec            = ft.m_fecInner;
     }
 
-    m_mplexid = GetMultiplexIdFromDB();
+    // Do not use tuning information from database for the "Full Scan"
+    // m_mplexid = GetMultiplexIdFromDB();
 }
 
 TransportScanItem::TransportScanItem(uint _sourceid,
-                                     const QString &_name,
-                                     const IPTVTuningData &_tuning,
-                                     const QString &_channel,
+                                     QString _name,
+                                     IPTVTuningData _tuning,
+                                     QString _channel,
                                      uint _timeoutTune) :
     m_mplexid(0),
-    m_friendlyName(_name),
+    m_friendlyName(std::move(_name)),
     m_sourceID(_sourceid),
     m_timeoutTune(_timeoutTune),
-    m_iptvTuning(_tuning), m_iptvChannel(_channel)
+    m_iptvTuning(std::move(_tuning)), m_iptvChannel(std::move(_channel))
 {
-    memset(m_freqOffsets, 0, sizeof(int)*3);
     m_tuning.Clear();
     m_tuning.m_sistandard = "MPEG";
 }
@@ -162,7 +156,7 @@ uint TransportScanItem::GetMultiplexIdFromDB(void) const
 
 uint64_t TransportScanItem::freq_offset(uint i) const
 {
-    int64_t freq = (int64_t) m_tuning.m_frequency;
+    auto freq = (int64_t) m_tuning.m_frequency;
 
     return (uint64_t) (freq + m_freqOffsets[i]);
 }
@@ -174,36 +168,36 @@ QString TransportScanItem::toString() const
         return m_iptvChannel + ": " + m_iptvTuning.GetDeviceKey();
     }
 
-    QString str = QString("Transport Scan Item '%1' #%2\n")
-        .arg(m_friendlyName).arg(m_friendlyNum);
-    str += QString("\tmplexid(%1) standard(%2) sourceid(%3)\n")
-        .arg(m_mplexid).arg(m_tuning.m_sistandard).arg(m_sourceID);
-    str += QString("\tuseTimer(%1) scanning(%2)\n")
-        .arg(m_useTimer).arg(m_scanning);
-    str += QString("\ttimeoutTune(%3 msec)\n").arg(m_timeoutTune);
+    QString str = QString("Transport Scan Item '%1' #%2").arg(m_friendlyName).arg(m_friendlyNum);
+    str += "\n\t";
+    str += QString("mplexid(%1) "           ).arg(m_mplexid);
+    str += QString("standard(%1) "          ).arg(m_tuning.m_sistandard);
+    str += QString("sourceid(%1) "          ).arg(m_sourceID);
+    str += QString("useTimer(%1) "          ).arg(static_cast<int>(m_useTimer));
+    str += QString("scanning(%1) "          ).arg(static_cast<int>(m_scanning));
+    str += QString("timeoutTune(%3 msec)  " ).arg(m_timeoutTune);
+    str += "\n\t";
+    str += QString("frequency(%1) "         ).arg(m_tuning.m_frequency);
+    str += QString("offset[0..2]: %1 %2 %3 ").arg(m_freqOffsets[0]).arg(m_freqOffsets[1]).arg(m_freqOffsets[2]);
+
     if (m_tuning.m_sistandard == "atsc" || m_tuning.m_sistandard == "analog")
     {
-        str += QString("\tfrequency(%1) modulation(%2)\n")
-            .arg(m_tuning.m_frequency)
-            .arg(m_tuning.m_modulation.toString());
+        str += QString("modulation(%1) "    ).arg(m_tuning.m_modulation.toString());
     }
     else
     {
-        str += QString("\tfrequency(%1) constellation(%2)\n")
-            .arg(m_tuning.m_frequency)
-            .arg(m_tuning.m_modulation.toString());
-        str += QString("\t  inv(%1) bandwidth(%2) hp(%3) lp(%4)\n")
-            .arg(m_tuning.m_inversion)
-            .arg(m_tuning.m_bandwidth)
-            .arg(m_tuning.m_hp_code_rate)
-            .arg(m_tuning.m_lp_code_rate);
-        str += QString("\t  trans_mode(%1) guard_int(%2) hierarchy(%3)\n")
-            .arg(m_tuning.m_trans_mode)
-            .arg(m_tuning.m_guard_interval)
-            .arg(m_tuning.m_hierarchy);
+        str += QString("constellation(%1) " ).arg(m_tuning.m_modulation.toString());
+        str += QString("inv(%1) "           ).arg(m_tuning.m_inversion);
+        str += QString("bandwidth(%1) "     ).arg(m_tuning.m_bandwidth);
+        str += QString("hp(%1) "            ).arg(m_tuning.m_hpCodeRate);
+        str += QString("lp(%1) "            ).arg(m_tuning.m_lpCodeRate);
+        str += "\n\t";
+        str += QString("trans_mode(%1) "    ).arg(m_tuning.m_transMode);
+        str += QString("guard_int(%1) "     ).arg(m_tuning.m_guardInterval);
+        str += QString("hierarchy(%1) "     ).arg(m_tuning.m_hierarchy);
+        str += QString("symbol_rate(%1) "   ).arg(m_tuning.m_symbolRate);
+        str += QString("fec(%1) "           ).arg(m_tuning.m_fec);
     }
-    str += QString("\t offset[0..2]: %1 %2 %3")
-        .arg(m_freqOffsets[0]).arg(m_freqOffsets[1]).arg(m_freqOffsets[2]);
     return str;
 }
 
@@ -259,8 +253,8 @@ freq_table_list_t get_matching_freq_tables(
         get_matching_freq_tables_internal(format, modulation, country);
 
     freq_table_list_t new_list;
-    for (size_t i = 0; i < list.size(); i++)
-        new_list.push_back(new FrequencyTable(*list[i]));
+    for (auto & ft : list)
+        new_list.push_back(new FrequencyTable(*ft));
 
     return new_list;
 }
@@ -274,16 +268,16 @@ long long get_center_frequency(
     freq_table_list_t list =
         get_matching_freq_tables_internal(format, modulation, country);
 
-    for (size_t i = 0; i < list.size(); ++i)
+    for (auto & ft : list)
     {
-        int min_freqid = list[i]->m_nameOffset;
+        int min_freqid = ft->m_nameOffset;
         int max_freqid = min_freqid +
-            ((list[i]->m_frequencyEnd - list[i]->m_frequencyStart) /
-             list[i]->m_frequencyStep);
+            ((ft->m_frequencyEnd - ft->m_frequencyStart) /
+             ft->m_frequencyStep);
 
         if ((min_freqid <= freqid) && (freqid <= max_freqid))
-            return list[i]->m_frequencyStart +
-                list[i]->m_frequencyStep * (freqid - min_freqid);
+            return ft->m_frequencyStart +
+                ft->m_frequencyStep * (freqid - min_freqid);
     }
     return -1;
 }
@@ -296,15 +290,15 @@ int get_closest_freqid(
     freq_table_list_t list =
         get_matching_freq_tables_internal(format, modulation, country);
 
-    for (size_t i = 0; i < list.size(); ++i)
+    for (auto & ft : list)
     {
-        int min_freqid = list[i]->m_nameOffset;
+        int min_freqid = ft->m_nameOffset;
         int max_freqid = min_freqid +
-            ((list[i]->m_frequencyEnd - list[i]->m_frequencyStart) /
-             list[i]->m_frequencyStep);
+            ((ft->m_frequencyEnd - ft->m_frequencyStart) /
+             ft->m_frequencyStep);
         int freqid =
-            ((centerfreq - list[i]->m_frequencyStart) /
-             list[i]->m_frequencyStep) + min_freqid;
+            ((centerfreq - ft->m_frequencyStart) /
+             ft->m_frequencyStep) + min_freqid;
 
         if ((min_freqid <= freqid) && (freqid <= max_freqid))
             return freqid;
@@ -463,13 +457,13 @@ static void init_freq_tables(freq_table_map_t &fmap)
 
     // New Zealand
     fmap["dvbt_ofdm_nz0"] = new FrequencyTable(
-        474000000, 858000000, 8000000, "Channel %1", 21,
+        474000000, 690000000, 8000000, "Channel %1", 21,
         DTVInversion::kInversionOff,
         DTVBandwidth::kBandwidth8MHz, DTVCodeRate::kFEC_3_4,
         DTVCodeRate::kFEC_3_4, DTVModulation::kModulationQAM64,
         DTVTransmitMode::kTransmissionMode8K,
         DTVGuardInterval::kGuardInterval_1_16, DTVHierarchy::kHierarchyNone,
-        DTVModulation::kModulationQAM64, 0 , 0); // UHF 21-69
+        DTVModulation::kModulationQAM64, 0 , 0); // UHF 21-48
 
     // France
     fmap["dvbt_ofdm_fr0"] = new FrequencyTable(
@@ -493,13 +487,13 @@ static void init_freq_tables(freq_table_map_t &fmap)
 
     // Netherlands
     fmap["dvbt_ofdm_nl0"] = new FrequencyTable(
-        474000000, 786000000, 8000000, "Channel %1", 21,
+        474000000, 690000000, 8000000, "Channel %1", 21,
         DTVInversion::kInversionOff,
         DTVBandwidth::kBandwidth8MHz, DTVCodeRate::kFECAuto,
         DTVCodeRate::kFECAuto, DTVModulation::kModulationQAMAuto,
         DTVTransmitMode::kTransmissionModeAuto,
         DTVGuardInterval::kGuardIntervalAuto, DTVHierarchy::kHierarchyNone,
-        DTVModulation::kModulationQAMAuto, 0, 0); // UHF 21-60
+        DTVModulation::kModulationQAMAuto, 0, 0); // UHF 21-48
 
     // Chile (ISDB-Tb)
     fmap["dvbt_ofdm_cl0"] = new FrequencyTable(
@@ -533,6 +527,13 @@ static void init_freq_tables(freq_table_map_t &fmap)
         DTVCodeRate::kFECAuto, DTVModulation::kModulationQAMAuto,
         6900000, 0, 0);
 
+    // DVB-C Netherlands
+    fmap["dvbc_qam_nl0"] = new FrequencyTable(
+         474000000,  474000000, 8000000, "Channel %1", 21,
+        DTVCodeRate::kFECAuto, DTVModulation::kModulationQAM64,
+        6875000, 0, 0);
+
+    // DVB-C United Kingdom
     fmap["dvbc_qam_gb0"] = new FrequencyTable(
         12324000, 12324000+1, 10, "Channel %1", 1,
         DTVCodeRate::kFEC_3_4, DTVModulation::kModulationQAMAuto,
@@ -542,6 +543,7 @@ static void init_freq_tables(freq_table_map_t &fmap)
         DTVCodeRate::kFEC_3_4, DTVModulation::kModulationQAM64,
         6952000, 0, 0);
 
+    // DVB-C Unknown (British Forces ?)
     fmap["dvbc_qam_bf0"] = new FrequencyTable(
         203000000, 795000000, 100000, "BF Channel %1", 1,
         DTVCodeRate::kFECAuto, DTVModulation::kModulationQAMAuto,
@@ -582,12 +584,15 @@ static void init_freq_tables(freq_table_map_t &fmap)
         DTVModulation::kModulation8VSB);
 #endif // !DEBUG_DVB_OFFSETS
 
-    QString modStr[] = { "vsb8",  "qam256",   "qam128",   "qam64",   };
-    DTVModulation::Types mod[] = { DTVModulation::kModulation8VSB,
+    const std::array<const QString,4> modStr {
+        "vsb8", "qam256", "qam128", "qam64" };
+    const std::array<const DTVModulation::Types,4> mod {
+                         DTVModulation::kModulation8VSB,
                          DTVModulation::kModulationQAM256,
                          DTVModulation::kModulationQAM128,
                          DTVModulation::kModulationQAM64, };
-    QString desc[]   = { "ATSC ", "QAM-256 ", "QAM-128 ", "QAM-64 ", };
+    const std::array<const QString,4> desc {
+        "ATSC ", "QAM-256 ", "QAM-128 ", "QAM-64 ", };
 
 #define FREQ(A,B, C,D, E,F,G, H, I) \
     fmap[QString("atsc_%1_us%2").arg(A).arg(B)] = \
@@ -701,18 +706,16 @@ static void init_freq_tables(freq_table_map_t &fmap)
     }
 
     // create old school frequency tables...
-    for (struct CHANLISTS *ptr = chanlists; ptr->name ; ptr++)
+    for (const auto & [name, list] : gChanLists)
     {
-        QString tbl_name = ptr->name;
-        for (uint i = 0; i < (uint)ptr->count; i++)
+        for (uint i = 0; i < (uint)list.size(); i++)
         {
-            uint64_t freq = (ptr->list[i].freq * 1000LL) + 1750000;
-            fmap[QString("analog_analog_%1%2").arg(tbl_name).arg(i)] =
+            uint64_t freq = (list[i].freq * 1000LL) + 1750000;
+            fmap[QString("analog_analog_%1%2").arg(name).arg(i)] =
                 new FrequencyTable(
-                    QString("%1 %2").arg(tbl_name).arg(ptr->list[i].name), i+2,
+                    QString("%1 %2").arg(name).arg(list[i].name), i+2,
                     freq, freq + 3000000,
                     6000000, DTVModulation::kModulationAnalog);
         }
     }
-
 }

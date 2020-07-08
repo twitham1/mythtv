@@ -100,10 +100,8 @@ static QObject *qChildHelper(const char *objName, const char *inheritsClass,
                         && qstrcmp(inheritsClass, "QWidget") == 0);
     const QLatin1String oName(objName);
 
-    for (int i = 0; i < children.size(); ++i)
+    for (auto *obj : qAsConst(children))
     {
-        QObject *obj = children.at(i);
-
         if (onlyWidgets)
         {
             if (obj->isWidgetType() && (!objName || obj->objectName() == oName))
@@ -269,11 +267,11 @@ MythUIType *MythUIType::GetChildAt(const QPoint &p, bool recursive,
 
 void MythUIType::ActivateAnimations(MythUIAnimation::Trigger trigger)
 {
-    foreach (MythUIAnimation* animation, m_animations)
+    for (MythUIAnimation* animation : qAsConst(m_animations))
         if (animation->GetTrigger() == trigger)
             animation->Activate();
 
-    foreach (MythUIType* uiType, m_ChildrenList)
+    for (MythUIType* uiType : qAsConst(m_ChildrenList))
         uiType->ActivateAnimations(trigger);
 }
 
@@ -457,7 +455,7 @@ void MythUIType::Pulse(void)
         (*it)->Pulse();
 }
 
-int MythUIType::CalcAlpha(int alphamod)
+int MythUIType::CalcAlpha(int alphamod) const
 {
     return (int)(m_Effects.m_alpha * (alphamod / 255.0));
 }
@@ -498,10 +496,10 @@ void MythUIType::Draw(MythPainter *p, int xoffset, int yoffset, int alphaMod,
 
     if (p->ShowBorders())
     {
-        static const QBrush nullbrush(Qt::NoBrush);
+        static const QBrush kNullBrush(Qt::NoBrush);
         QPen pen(m_BorderColor);
         pen.setWidth(1);
-        p->DrawRect(realArea, nullbrush, pen, 255);
+        p->DrawRect(realArea, kNullBrush, pen, 255);
 
         if (p->ShowTypeNames())
         {
@@ -688,7 +686,10 @@ void MythUIType::VanishSibling(void)
 void MythUIType::SetMinAreaParent(MythRect actual_area, MythRect allowed_area,
                                   MythUIType *calling_child)
 {
-    int delta_x = 0, delta_y = 0, delta_w = 0, delta_h = 0;
+    int delta_x = 0;
+    int delta_y = 0;
+    int delta_w = 0;
+    int delta_h = 0;
     MythRect area;
 
     // If a minsize is not set, don't use MinArea
@@ -974,8 +975,9 @@ bool MythUIType::keyPressEvent(QKeyEvent * /*event*/)
 }
 
 
-void MythUIType::customEvent(QEvent * /*event*/)
+void MythUIType::customEvent(QEvent *event)
 {
+    QObject::customEvent(event);
 }
 
 /** \brief Mouse click/movement handler, receives mouse gesture events from the
@@ -1034,6 +1036,7 @@ void MythUIType::UpdateDependState(MythUIType *dependee, bool isDefault)
     {
         bool reverse = m_ReverseDepend[dependee];
         visible = reverse ? !isDefault : isDefault;
+        // NOLINTNEXTLINE(modernize-loop-convert)
         for (int i = 0; i < m_dependsValue.size(); i++)
         {
             if (m_dependsValue[i].first != dependee)
@@ -1069,7 +1072,7 @@ void MythUIType::UpdateDependState(MythUIType *dependee, bool isDefault)
 
 void MythUIType::UpdateDependState(bool isDefault)
 {
-    MythUIType *dependee = static_cast<MythUIType*>(sender());
+    auto *dependee = dynamic_cast<MythUIType*>(sender());
 
     UpdateDependState(dependee, isDefault);
 }
@@ -1171,7 +1174,7 @@ void MythUIType::CopyFrom(MythUIType *base)
     QList<MythUIAnimation*>::Iterator i;
     for (i = base->m_animations.begin(); i != base->m_animations.end(); ++i)
     {
-        MythUIAnimation* animation = new MythUIAnimation(this);
+        auto* animation = new MythUIAnimation(this);
         animation->CopyFrom(*i);
         m_animations.push_back(animation);
     }
@@ -1438,7 +1441,7 @@ void MythUIType::ConnectDependants(bool recurse)
         if (dependant)
         {
             dependant->m_dependOperator = operators;
-            foreach (QString dependeeName, dependees)
+            for (QString dependeeName : qAsConst(dependees))
             {
                 bool reverse = false;
                 if (dependeeName.startsWith('!'))

@@ -170,8 +170,8 @@ void NetSearch::ShowMenu(void)
 {
     QString label = tr("Search Options");
 
-    MythDialogBox *menuPopup = new MythDialogBox(label, m_popupStack,
-                                                 "mythnetvisionmenupopup");
+    auto *menuPopup = new MythDialogBox(label, m_popupStack,
+                                        "mythnetvisionmenupopup");
 
     if (menuPopup->Create())
     {
@@ -202,11 +202,15 @@ void NetSearch::ShowMenu(void)
                     GetFocusWidget() == m_searchResultList)
                 {
                     if (exists)
+                    {
                         menuPopup->AddButton(tr("Play"),
                                              SLOT(DoPlayVideo(filename)));
+                    }
                     else
+                    {
                         menuPopup->AddButton(tr("Save This Video"),
                                              SLOT(DoDownloadAndPlay()));
+                    }
                 }
 
                 if (item->GetDownloadable() &&
@@ -241,15 +245,13 @@ void NetSearch::FillGrabberButtonList()
 {
     m_siteList->Reset();
 
-    for (GrabberScript::scriptList::iterator i = m_grabberList.begin();
-            i != m_grabberList.end(); ++i)
+    for (const auto & g : qAsConst(m_grabberList))
     {
-        MythUIButtonListItem *item =
-                    new MythUIButtonListItem(m_siteList, (*i)->GetTitle());
-        item->SetText((*i)->GetTitle(), "title");
-        item->SetData((*i)->GetCommandline());
+        auto *item = new MythUIButtonListItem(m_siteList, g->GetTitle());
+        item->SetText(g->GetTitle(), "title");
+        item->SetData(g->GetCommandline());
         QString thumb = QString("%1mythnetvision/icons/%2").arg(GetShareDir())
-                            .arg((*i)->GetImage());
+                            .arg(g->GetImage());
         item->SetImage(thumb);
     }
 }
@@ -357,7 +359,7 @@ void NetSearch::SearchFinished(void)
 {
     CloseBusyPopup();
 
-    Search *item = new Search();
+    auto *item = new Search();
     QByteArray data = m_reply->readAll();
     item->SetData(data);
 
@@ -370,11 +372,11 @@ void NetSearch::SearchFinished(void)
     m_nextPageToken = item->nextPageToken();
     m_prevPageToken = item->prevPageToken();
 
-    if (returned > 0)
-        m_siteList->GetItemAt(m_currentGrabber)->
-                  SetText(QString::number(searchresults), "count");
-    else
+    if (returned <= 0)
         return;
+
+    m_siteList->GetItemAt(m_currentGrabber)->
+        SetText(QString::number(searchresults), "count");
 
     if (firstitem + returned == searchresults)
         m_maxpage = m_pagenum;
@@ -385,9 +387,11 @@ void NetSearch::SearchFinished(void)
             m_maxpage++;
     }
     if (m_pageText && m_maxpage > 0 && m_pagenum > 0 && returned > 0)
+    {
         m_pageText->SetText(QString("%1 / %2")
                         .arg(QString::number(m_pagenum))
                         .arg(QString::number(m_maxpage)));
+    }
 
     ResultItem::resultList list = item->GetVideoList();
     PopulateResultList(list);
@@ -415,22 +419,20 @@ void NetSearch::SearchTimeout(Search * /*item*/)
     }
 }
 
-void NetSearch::PopulateResultList(ResultItem::resultList list)
+void NetSearch::PopulateResultList(const ResultItem::resultList& list)
 {
-    for (ResultItem::resultList::iterator i = list.begin();
-            i != list.end(); ++i)
+    for (const auto & result : qAsConst(list))
     {
-        QString title = (*i)->GetTitle();
-        MythUIButtonListItem *item =
-            new MythUIButtonListItem(m_searchResultList, title,
-                                     qVariantFromValue(*i));
+        QString title = result->GetTitle();
+        auto *item = new MythUIButtonListItem(m_searchResultList, title,
+                                              QVariant::fromValue(result));
         InfoMap metadataMap;
-        (*i)->toMap(metadataMap);
+        result->toMap(metadataMap);
         item->SetTextFromMap(metadataMap);
 
-        if (!(*i)->GetThumbnail().isEmpty())
+        if (!result->GetThumbnail().isEmpty())
         {
-            QString dlfile = (*i)->GetThumbnail();
+            QString dlfile = result->GetThumbnail();
 
             if (dlfile.contains("%SHAREDIR%"))
             {
@@ -441,9 +443,9 @@ void NetSearch::PopulateResultList(ResultItem::resultList list)
             {
                 uint pos = m_searchResultList->GetItemPos(item);
 
-                m_imageDownload->addThumb((*i)->GetTitle(),
-                                          (*i)->GetThumbnail(),
-                                          qVariantFromValue<uint>(pos));
+                m_imageDownload->addThumb(result->GetTitle(),
+                                          result->GetThumbnail(),
+                                          QVariant::fromValue<uint>(pos));
             }
         }
     }
@@ -458,7 +460,7 @@ void NetSearch::RunSearchEditor()
 {
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    SearchEditor *searchedit = new SearchEditor(mainStack, "mythnetsearchedit");
+    auto *searchedit = new SearchEditor(mainStack, "mythnetsearchedit");
 
     if (searchedit->Create())
     {
@@ -482,7 +484,7 @@ void NetSearch::DoListRefresh()
 
 void NetSearch::SlotItemChanged()
 {
-    ResultItem *item = m_searchResultList->GetDataValue().value<ResultItem*>();
+    auto *item = m_searchResultList->GetDataValue().value<ResultItem*>();
 
     if (item && GetFocusWidget() == m_searchResultList)
     {
@@ -545,9 +547,11 @@ void NetSearch::customEvent(QEvent *event)
 {
     if (event->type() == ThumbnailDLEvent::kEventType)
     {
-        ThumbnailDLEvent *tde = (ThumbnailDLEvent *)event;
-        ThumbnailData *data = tde->m_thumb;
+        auto *tde = dynamic_cast<ThumbnailDLEvent *>(event);
+        if (tde == nullptr)
+            return;
 
+        ThumbnailData *data = tde->m_thumb;
         if (!data)
             return;
 

@@ -30,10 +30,10 @@ class MHGroup;
 class MHParseText: public MHParseBase
 {
   public:
-    MHParseText(QByteArray &program)
-        : m_String((unsigned char *)malloc(100)),
+    explicit MHParseText(QByteArray &program)
+        : m_string((unsigned char *)malloc(100)),
           m_data(program) {}
-    virtual ~MHParseText();
+    ~MHParseText() override;
 
     // Parse the text and return a pointer to the parse tree
     MHParseNode *Parse() override; // MHParseBase
@@ -42,7 +42,7 @@ class MHParseText: public MHParseBase
     void GetNextChar();
     void NextSym();
     MHParseNode *DoParse();
-    void Error(const char *str);
+    void Error(const char *str) const;
 
     int            m_lineCount     {1};
 
@@ -55,7 +55,7 @@ class MHParseText: public MHParseBase
     int            m_nTag          {0};
     int            m_nInt          {0};
     bool           m_fBool         {false};
-    unsigned char *m_String        {nullptr};
+    unsigned char *m_string        {nullptr};
     int            m_nStringLength {0};
 
     unsigned int   m_p             {0}; // Count of bytes read

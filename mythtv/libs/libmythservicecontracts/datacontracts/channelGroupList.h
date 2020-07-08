@@ -23,7 +23,7 @@ class SERVICE_PUBLIC ChannelGroupList : public QObject
 
     Q_CLASSINFO( "ChannelGroups", "type=DTC::ChannelGroup");
 
-    Q_PROPERTY( QVariantList ChannelGroups READ ChannelGroups DESIGNABLE true )
+    Q_PROPERTY( QVariantList ChannelGroups READ ChannelGroups )
 
     PROPERTYIMP_RO_REF( QVariantList, ChannelGroups );
 
@@ -46,7 +46,7 @@ class SERVICE_PUBLIC ChannelGroupList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            ChannelGroup *pObject = new ChannelGroup( this );
+            auto *pObject = new ChannelGroup( this );
             m_ChannelGroups.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

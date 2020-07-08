@@ -5,8 +5,8 @@
  *  Distributed as part of MythTV under GPL v2 and later.
  */
 
-#ifndef _HLSSTREAMHANDLER_H_
-#define _HLSSTREAMHANDLER_H_
+#ifndef HLSSTREAMHANDLER_H
+#define HLSSTREAMHANDLER_H
 
 #include <vector>
 using namespace std;
@@ -27,15 +27,15 @@ class HLSStreamHandler : public IPTVStreamHandler
     static HLSStreamHandler* Get(const IPTVTuningData& tuning, int inputid);
     static void Return(HLSStreamHandler* & ref, int inputid);
 
-  protected:
-    explicit HLSStreamHandler(const IPTVTuningData &tuning, int inputid);
-    virtual ~HLSStreamHandler(void);
-
-    void run(void) override; // MThread
-
-  private:
+    // Deleted functions should be public.
     HLSStreamHandler(const HLSStreamHandler &) = delete;            // not copyable
     HLSStreamHandler &operator=(const HLSStreamHandler &) = delete; // not copyable
+
+  protected:
+    explicit HLSStreamHandler(const IPTVTuningData &tuning, int inputid);
+    ~HLSStreamHandler(void) override;
+
+    void run(void) override; // MThread
 
   protected:
     HLSReader*     m_hls        {nullptr};
@@ -48,4 +48,4 @@ class HLSStreamHandler : public IPTVStreamHandler
     static QMap<QString, uint>               s_hlshandlers_refcnt;
 };
 
-#endif // _HLSSTREAMHANDLER_H_
+#endif // HLSSTREAMHANDLER_H

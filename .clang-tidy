@@ -1,8 +1,78 @@
 # Crappy parser.  Only uses a comma to delineate the end of a line, so
 # all comments must end with a comma. A single quote inside a comment
 # also screws up the parsing.
+#
+# The goal is to pass all of the following:
+#
+#     bugprone-*
+#     cert-*
+#     clang-analyzer-*
+#     cppcoreguidelines-*
+#     misc-*
+#     modernize-*
+#     performance-*
+#     readability-*
+#
+# Some specific checks may never be enabled, like
+# clang-analyzer-security.insecureAPI.strcpy which requires a missing
+# library to fix problems.  Others like modernize-redundant-void-arg
+# seem unnecessary.  Some others may never be enabled by default, like
+# clang-analyzer-core.CallAndMessage which doesn't understand
+# dynamic_cast and gives lots of false positives.
+#,
+
+# Skip warnings that are in files in an "external" directory.  Also
+# ignore warnings from a file in an "include" directory to ignore
+# files that are "installed" from mythtv for mythplugins.  These will
+# be caught when processing files in the mythtv directory.
+#
+# Possible matches in order:
+#
+# file.h or ./file.h or dir/file.h or ./dir/file.h
+# ../dir/file.h
+# ../../libmyth<blah>/dir/format.h
+#,
+HeaderFilterRegex: '^((\./)?([[:alnum:]]+/)?[[:alnum:]]+\.h|\.\./[[:alnum:]]+/[[:alnum:]]+\.h|\.\./\.\./libmyth[[:alnum:]]+/[[:alnum:]]+\.h|\.\./\.\./external/libmythsoundtouch/[[:alnum:]]+\.h)$'
 
 Checks: '-*,
+
+    bugprone-*,
+
+       -bugprone-misplaced-widening-cast,
+
+        # Renamed/replaced by cppcoreguidelines-narrowing-conversions. ,
+       -bugprone-narrowing-conversions,
+
+        # Doesn''t distinguish between identifiers in the code and
+        # those supplied on the command line with "-X_FOO=BAR". The
+        # only remaining positives are those passed on the command
+        # line. New in clang11. ,
+       -bugprone-reserved-identifier,
+
+    cert-*,
+
+	# Aliases for bugprone-reserved-identifier,
+       -cert-dcl37-c,
+       -cert-dcl51-cpp,
+
+        # Dont declare c-style varardic functions. ,
+       -cert-dcl50-cpp,
+
+        # Using function invokes a command interpreter. Should fix. ,
+       -cert-env33-c,
+
+        # string-to-number conversion functions that do not verify the
+        # validity of the conversion. Needs work. ,
+       -cert-err34-c,
+
+        # Lots of complaints about constructors of static objects
+        # possibly throwing exceptions that cant be caught.  These
+        # all appear to be within Qt code that cant be fixed by us. ,
+       -cert-err58-cpp,
+
+        # Alias for bugprone-signed-char-misuse,
+       -cert-str34-c,
+
     clang-analyzer-*,
         # Not tested. ,
        -clang-analyzer-apiModeling.*,
@@ -12,10 +82,13 @@ Checks: '-*,
         # wrong, but a valid pointer if the inheritance is right. ,
         #
         # One valid error in m_groupName in globalsettings.cpp??? ,
-       -clang-analyzer-core.CallAndMessage,
+        clang-analyzer-core.CallAndMessage,
 
-        # mytharchivehelper/external/pxsup2dast.c has try/catch code. ,
-       -clang-analyzer-core.StackAddrEscapeBase,
+        # 2 instances in FFmpeg, 2 in dvbdescriptors.h, 1 progdetails.cpp. ,
+       -clang-analyzer-core.NullDereference,
+
+        # One instance in cc708window.h. ,
+       -clang-analyzer-cplusplus.NewDelete,
 
         # Doesnt recognize cases where the constructor adds the new
         # object to a list (either static or in the parent.)
@@ -24,165 +97,168 @@ Checks: '-*,
         # need to be chased down. ,
        -clang-analyzer-cplusplus.NewDeleteLeaks,
 
-        # Tested on x86-64. ,
+        # All testing on x86-64. ,
        -clang-analyzer-osx.*,
 
         # Cant fix due to missing LIB_EXT1 extensions. ,
        -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
-        # Cant fix due to missing LIB_EXT1 extensions. ,
        -clang-analyzer-security.insecureAPI.strcpy,
 
-    clang-diagnostic-error,
+    # Explicitly list the tests that arent aliases. ,
+   -cppcoreguidelines-*,
 
-    bugprone-*,
-        # Not investigated yet. ,
-        bugprone-argument-comment,
+        # Needs work. ,
+       -cppcoreguidelines-avoid-goto,
 
-        # A handful of warnings
-       -bugprone-integer-division,
+        # Good. ,
+        cppcoreguidelines-init-variables,
+        cppcoreguidelines-interfaces-global-init,
+
+        # Tons of warnings.  Most complaining that #define should
+        # become a constexpr. ,
+       -cppcoreguidelines-macro-usage,
 
         # Bunch of warnings.... ,
-       -bugprone-narrowing-conversions,
+       -cppcoreguidelines-narrowing-conversions,
+       -cppcoreguidelines-no-malloc,
 
-        # Errors in code?  GroupAnimation overrides several parent
-        # functions with an explicit nullptr.  Shouldnt it just call
-        # up? ,
-       -bugprone-parent-virtual-call,
+        # No gsl. ,
+       -cppcoreguidelines-owning-memory,
 
-        # Half dozen errors, all in SQL statements. ,
-       -bugprone-suspicious-missing-comma,
+        # No gsl. Warning on every log message.
+        # "do not implicitly decay an array into a pointer; consider
+        #  using gsl::array_view or an explicit cast instead" ,
+       -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+
+        # No gsl. Recommends gsl::at be used in 1611 places. ,
+       -cppcoreguidelines-pro-bounds-constant-array-index,
+
+        # Bunch of warnings.... ,
+       -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+       -cppcoreguidelines-pro-type-const-cast,
+        # Bunch of warnings.... ,
+       -cppcoreguidelines-pro-type-cstyle-cast,
+
+        # Good. ,
+        cppcoreguidelines-pro-type-member-init,
+
+        # Haven''t checked recently. ,
+       -cppcoreguidelines-pro-type-reinterpret-cast,
+
+        # Good. ,
+        cppcoreguidelines-pro-type-static-cast-downcast,
+
+        # Recommends using boost:: to access unions. ,
+       -cppcoreguidelines-pro-type-union-access,
+
+        # Warns on every (*)printf, sscanf,open, ioctl, etc. ,
+       -cppcoreguidelines-pro-type-vararg,
+
+       -cppcoreguidelines-slicing,
+       -cppcoreguidelines-special-member-functions,
+
+   -google-explicit-constructor,
+   -google-runtime-int,
 
     misc-*,
 
         # Cases exist. Need to add getters/setters to classes. ,
        -misc-non-private-member-variables-in-classes,
 
-        # Complains about code like "RAND () % 3 - RAND () % 3", not
-        # understanding that RAND() doesnt always return the same
-        # value. ,
-        #
-        # Two spots that check (id == -1) || (id < x) which is
-        # redundant. ,
-       -misc-redundant-expression,
-
-        # Cases exist. Need evaluation. ,
-       -misc-throw-by-value-catch-by-reference,
+        # The Q_DECLARE_METATYPE_IMPL macro triggers a warning from
+        # this checker. There are also a handful of places where
+        # MythTV uses recursion on purpose. These should be checked to
+        # ensure there are no problems. ,
+       -misc-no-recursion,
 
     modernize-*,
 
         # Lots of changes to be done. ,
-        modernize-avoid-c-arrays,
-
-        # Not investigated yet. ,
-       -modernize-loop-convert,
-
-        # Lots of changes to be done. ,
-        modernize-pass-by-value,
-
-        # Run again.  Seems like should do more.  Supposedly presence
-        # of *any* of \\, \<squote>, \<dquote>, \?, octal, hex. ,
-       -modernize-raw-string-literal,
+       -modernize-avoid-c-arrays,
 
         # Noisy!!!  foo(void) => foo()  ,
        -modernize-redundant-void-arg,
 
-        # Not investigated yet. ,
-       -modernize-use-auto,
-
-        # One weirdness in videooutput_xv.cpp.  Making the proposed
-        # change causes one of the programs to fail in the link stage. ,
-       -modernize-use-emplace,
-
-        # Noisy. Needs work.,
+        # A couple of instances in libsoundtouch. Convert that to c++
+        # then fix. ,
+       -modernize-use-override,
        -modernize-use-using,
 
-        ## C++14 modernize-make-unique,
-        ## C++14 modernize-use-transparent-functors,
-        ## C++17 modernize-concat-nested-namespaces,
-        ## C++17 modernize-unary-static-assert,
-        ## C++17 modernize-use-nodiscard,
+        # Why would anyone want this? ,
+       -modernize-use-trailing-return-type,
+
+        # Disable newer C++14/17 tests for now. ,
+       -modernize-make-unique,
+       -modernize-use-transparent-functors,
+       -modernize-concat-nested-namespaces,
+       -modernize-unary-static-assert,
+       -modernize-use-nodiscard,
 
     performance-*,
+
+        # There are 250 or so of these in the datacontracts directory.
+        # They are all genreated by the Qt PROPERTYIMP macro, so
+        # cannot be fixed by us. ,
+       -performance-unnecessary-value-param,
 
     readability-*,
 
         # Not investigated yet. ,
-       -readability-braces-around-statements,
-        # Not investigated yet. ,
        -readability-function-size,
-        # Not investigated yet. ,
+
+        # A couple of instances in libsoundtouch. Convert that to c++
+        # then fix. ,
        -readability-identifier-naming,
 
-        # Wants to convert all "if (x)" pointer validity checks to be
-        # "if (x != nullptr)"
+        # Wants to rewrite lots of implicit nullptr tests. ,
        -readability-implicit-bool-conversion,
-
-        # Has two issues:
-        #
-        #    function template specialization
-        #    CheckedSet<MythUIStateType> has a primary template
-        #    declaration with different parameter names
-        #
-        #    function ParentalLevelChangeCheckerPrivate::SigDone has a
-        #    definition with different parameter names
-        #    [readability-inconsistent-declaration-parameter-name]
-        #    void SigDone(bool passwordValid => _t1,
-        #    ParentalLevel::Level toLevel => _t2);       ,
-       -readability-inconsistent-declaration-parameter-name,
-
-        # Produces lots of changes.  Is this necessary? ,
-       -readability-isolate-declaration,
 
         # Lots of noise. Needs work. ,
        -readability-magic-numbers,
 
-        # Has problems with a couple of emit calls. ,
-       -readability-misleading-indentation,
+        # Doesn''t understand Qt signals/slots. ,
+       -readability-redundant-access-specifiers,
 
-        # Doesnt understand MMX assembly code. ,
-       -readability-non-const-parameter,
-
-        # Has two false positives that look like they could be
-        # simplified, only because of conditionally compiled code that
-        # isnt compiled in. ,
-       -readability-simplify-boolean-expr,
 '
 
 CheckOptions:
-  - key:      bugprone-suspicious-string-compare.WarnOnLogicalNotComparison
-    value:    '1'
+  - { key: bugprone-suspicious-string-compare.WarnOnLogicalNotComparison, value: 1 }
 
-  - key:      modernize-make-shared.IgnoreMacros
-    value:    '0'
-  - key:      modernize-make-unique.IgnoreMacros
-    value:    '0'
-  - key:      modernize-use-bool-literals.IgnoreMacros
-    value:    '1'
-  - key:      modernize-use-default-member-init.IgnoreMacros
-    value:    '0'
-  - key:      modernize-use-equals-default.IgnoreMacros
-    value:    '0'
-  - key:      modernize-use-using.IgnoreMacros
-    value:    '0'
+  - { key: cppcoreguidelines-pro-type-member-init.IgnoreArrays, value: 1 }
+  - { key: cppcoreguidelines-narrowing-conversions.PedanticMode, value: 0 } # test 1 at some point
 
-  - key:      performance-inefficient-vector-operation.VectorLikeClasses
-    value:    ::std::vector,QList,QByteArrayList,QItemSelection,QQueue,QStringList
+  - { key: modernize-make-shared.IgnoreMacros,             value: 0 }
+  - { key: modernize-make-unique.IgnoreMacros,             value: 0 }
+  - { key: modernize-use-bool-literals.IgnoreMacros,       value: 1 }
+  - { key: modernize-use-default-member-init.IgnoreMacros, value: 1 }
+  - { key: modernize-use-equals-default.IgnoreMacros,      value: 0 }
+  - { key: modernize-use-nullptr.NullMacros,               value: 'Z_NULL' }
+  - { key: modernize-use-using.IgnoreMacros,               value: 1 }
 
-  - key:      readability-braces-around-statements.ShortStatementLines
-    value:    '2'
-  - key:      readability-implicit-bool-conversion.AllowPointerConditions
-    value:    '1'
-  - key:      readability-implicit-bool-conversion.AllowIntegerConditions
-    value:    '1'
-  - key:      readability-inconsistent-declaration-parameter-name.strict
-    value:    '1'
-  - key:      readability-redundant-declaration.IgnoreMacros
-    value:    '0'
-  - key:      readability-simplify-boolean-expr.chainedconditionalreturn
-    value:    '1'
-  - key:      readability-simplify-boolean-expr.chainedconditionalassignment
-    value:    '1'
-  - key:      readability-simplify-subscript-expr.Types
-    value:    '::std::basic_string;::std::basic_string_view;::std::vector;::std::array;QByteArray;QString'
-  - key:      readability-uppercase-literal-suffix.IgnoreMacros
-    value:    '0'
+  - { key: performance-inefficient-vector-operation.VectorLikeClasses,
+    value: '::std::vector,QList,QByteArrayList,QItemSelection,QQueue,QStringList' }
+
+  - { key: readability-braces-around-statements.ShortStatementLines,       value: 3 }
+  - { key: readability-implicit-bool-conversion.AllowPointerConditions,    value: 1 }
+  - { key: readability-implicit-bool-conversion.AllowIntegerConditions,    value: 1 }
+  - { key: readability-inconsistent-declaration-parameter-name.strict,     value: 1 }
+  - { key: readability-redundant-declaration.IgnoreMacros,                 value: 0 }
+  - { key: readability-simplify-boolean-expr.chainedconditionalreturn,     value: 1 }
+  - { key: readability-simplify-boolean-expr.chainedconditionalassignment, value: 1 }
+  - { key: readability-uppercase-literal-suffix.IgnoreMacros,              value: 0 }
+  - { key: readability-simplify-subscript-expr.Types,
+    value: '::std::basic_string;::std::basic_string_view;::std::vector;::std::array;QByteArray;QString' }
+
+  - { key: readability-identifier-naming.PrivateMethodCase,     value: 'aNy_CasE' }
+  - { key: readability-identifier-naming.PrivateMemberCase,     value: 'camelBack' }
+  - { key: readability-identifier-naming.PrivateMemberPrefix,   value: 'm_'}
+  - { key: readability-identifier-naming.ProtectedMethodCase,   value: 'aNy_CasE' }
+  - { key: readability-identifier-naming.ProtectedMemberCase,   value: 'camelBack_CasE' }
+  - { key: readability-identifier-naming.ProtectedMemberPrefix, value: 'm_'}
+  - { key: readability-identifier-naming.PuplicMethodCase,      value: 'aNy_CasE' }
+  - { key: readability-identifier-naming.PuplicMemberCase,      value: 'camelBack' }
+  - { key: readability-identifier-naming.PuplicMemberPrefix,    value: 'm_'}
+  - { key: readability-identifier-naming.ClassConstantCase,     value: 'Any_Case' }
+  - { key: readability-identifier-naming.ClassConstantPrefix,   value: 'k' }
+
+  - { key: google-runtime-int.TypeSuffix,   value: '_t' }

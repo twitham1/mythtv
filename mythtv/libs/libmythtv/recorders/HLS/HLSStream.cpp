@@ -1,21 +1,21 @@
 #include <unistd.h>
 
+#include <utility>
+
 #include "mythlogging.h"
 
 #include "HLSReader.h"
 #include "HLSStream.h"
 
-#define LOC QString("%1 stream: ").arg(m_url)
+#define LOC QString("%1 stream: ").arg(m_m3u8Url)
 
-HLSRecStream::HLSRecStream(int seq, uint64_t bitrate, const QString& url)
+HLSRecStream::HLSRecStream(int seq, uint64_t bitrate, QString  m3u8_url, QString segment_base_url)
     : m_id(seq),
       m_bitrate(bitrate),
-      m_url(url)
+      m_m3u8Url(std::move(m3u8_url)),
+      m_segmentBaseUrl(std::move(segment_base_url))
 {
     LOG(VB_RECORD, LOG_DEBUG, LOC + "ctor");
-#ifdef USING_LIBCRYPTO
-    memset(m_AESIV, 0, sizeof(m_AESIV));
-#endif
 }
 
 HLSRecStream::~HLSRecStream(void)
@@ -25,7 +25,7 @@ HLSRecStream::~HLSRecStream(void)
 #ifdef USING_LIBCRYPTO
     AESKeyMap::iterator Iaes;
 
-    for (Iaes = m_aeskeys.begin(); Iaes != m_aeskeys.end(); ++Iaes)
+    for (Iaes = m_aesKeys.begin(); Iaes != m_aesKeys.end(); ++Iaes)
         delete *Iaes;
 #endif
 }
@@ -73,12 +73,12 @@ bool HLSRecStream::DecodeData(MythSingleDownload& downloader,
 {
     AESKeyMap::iterator Ikey;
 
-    if ((Ikey = m_aeskeys.find(keypath)) == m_aeskeys.end())
+    if ((Ikey = m_aesKeys.find(keypath)) == m_aesKeys.end())
     {
-        AES_KEY* key = new AES_KEY;
+        auto* key = new AES_KEY;
         DownloadKey(downloader, keypath, key);
-        Ikey = m_aeskeys.insert(keypath, key);
-        if (Ikey == m_aeskeys.end())
+        Ikey = m_aesKeys.insert(keypath, key);
+        if (Ikey == m_aesKeys.end())
         {
             LOG(VB_RECORD, LOG_ERR, LOC +
                 "DecodeData: Unable to add AES key to map");
@@ -117,6 +117,7 @@ bool HLSRecStream::DecodeData(MythSingleDownload& downloader,
            data.size() - aeslen);
 
     // remove the PKCS#7 padding from the buffer
+    // NOLINTNEXTLINE(bugprone-signed-char-misuse)
     int pad = decrypted_data[data.size()-1];
     if (pad <= 0 || pad > AES_BLOCK_SIZE)
     {
@@ -137,11 +138,11 @@ bool HLSRecStream::DecodeData(MythSingleDownload& downloader,
 void HLSRecStream::AverageBandwidth(int64_t bandwidth)
 {
     // Average the last 20 segments
-    if (m_bandwidth_segs.size() > 19)
-        m_sumbandwidth -= m_bandwidth_segs.dequeue();
-    m_bandwidth_segs.enqueue(bandwidth);
-    m_sumbandwidth += bandwidth;
-    m_bandwidth = m_sumbandwidth / m_bandwidth_segs.size();
+    if (m_bandwidthSegs.size() > 19)
+        m_sumBandwidth -= m_bandwidthSegs.dequeue();
+    m_bandwidthSegs.enqueue(bandwidth);
+    m_sumBandwidth += bandwidth;
+    m_bandwidth = m_sumBandwidth / m_bandwidthSegs.size();
 }
 
 uint HLSRecStream::Duration(void) const
@@ -179,8 +180,8 @@ bool HLSRecStream::SetAESIV(QString line)
     int padding = std::max(0, AES_BLOCK_SIZE - (line.size() - 2));
     QByteArray ba = QByteArray(padding, 0x0);
     ba.append(QByteArray::fromHex(QByteArray(line.toLatin1().constData() + 2)));
-    memcpy(m_AESIV, ba.constData(), ba.size());
-    m_ivloaded = true;
+    memcpy(m_aesIV, ba.constData(), ba.size());
+    m_ivLoaded = true;
     return true;
 }
 #endif // USING_LIBCRYPTO

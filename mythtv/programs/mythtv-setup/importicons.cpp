@@ -23,15 +23,19 @@
 #include "mythprogressdialog.h"
 
 ImportIconsWizard::ImportIconsWizard(MythScreenStack *parent, bool fRefresh,
-                                     const QString &channelname)
+                                     QString channelname)
                   :MythScreenType(parent, "ChannelIconImporter"),
-    m_strChannelname(channelname), m_fRefresh(fRefresh)
+    m_strChannelname(std::move(channelname)), m_fRefresh(fRefresh)
 {
     if (!m_strChannelname.isEmpty())
+    {
         LOG(VB_GENERAL, LOG_INFO,
             QString("Fetching icon for channel %1").arg(m_strChannelname));
+    }
     else
+    {
         LOG(VB_GENERAL, LOG_INFO, "Fetching icons for multiple channels");
+    }
 
     m_popupStack = GetMythMainWindow()->GetStack("popup stack");
 
@@ -183,7 +187,7 @@ void ImportIconsWizard::menuSelection(MythUIButtonListItem *item)
     if (!item)
         return;
 
-    SearchEntry entry = item->GetData().value<SearchEntry>();
+    auto entry = item->GetData().value<SearchEntry>();
 
     LOG(VB_GENERAL, LOG_INFO, QString("Menu Selection: %1 %2 %3")
             .arg(entry.strID) .arg(entry.strName) .arg(entry.strLogo));
@@ -287,11 +291,11 @@ bool ImportIconsWizard::initialLoad(const QString& name)
                         "dtv_multiplex.mplexid, channel.icon, channel.visible "
                         "FROM channel LEFT JOIN dtv_multiplex "
                         "ON channel.mplexid = dtv_multiplex.mplexid "
-                        "WHERE ");
+                        "WHERE deleted IS NULL AND ");
     if (!name.isEmpty())
         querystring.append("name=\"" + name + "\"");
     else
-        querystring.append("channel.visible");
+        querystring.append("channel.visible > 0");
     querystring.append(" ORDER BY name");
 
     MSqlQuery query(MSqlQuery::InitCon());
@@ -469,10 +473,14 @@ bool ImportIconsWizard::doLoad()
                         .arg((*m_missingIter).strName));
     m_manualEdit->SetText((*m_missingIter).strName);
     if (!search((*m_missingIter).strName))
+    {
         m_statusText->SetText(tr("No matches found for %1")
                               .arg((*m_missingIter).strName));
+    }
     else
+    {
         m_statusText->Reset();
+    }
 
     return true;
 }
@@ -492,9 +500,8 @@ QStringList ImportIconsWizard::extract_csv(const QString &line)
     bool in_comment = false;
     bool in_escape = false;
     int comma_count = 0;
-    for (int i = 0; i < line.length(); i++)
+    for (auto cur : qAsConst(line))
     {
-        QChar cur = line[i];
         if (in_escape)
         {
             str += cur;
@@ -533,7 +540,7 @@ QString ImportIconsWizard::wget(QUrl& url, const QString& strParam )
 {
     QByteArray data(strParam.toLatin1());
 
-    QNetworkRequest *req = new QNetworkRequest(url);
+    auto *req = new QNetworkRequest(url);
     req->setHeader(QNetworkRequest::ContentTypeHeader, QString("application/x-www-form-urlencoded"));
     req->setHeader(QNetworkRequest::ContentLengthHeader, data.size());
 
@@ -697,19 +704,19 @@ bool ImportIconsWizard::search(const QString& strParam)
                 entry.strLogo = ret[2];
                 m_listSearch.append(entry);
 
-                MythUIButtonListItem *item;
+                MythUIButtonListItem *item = nullptr;
                 if (prevIconName == entry.strName)
                 {
                     QString newname = QString("%1 (%2)").arg(entry.strName)
                                                         .arg(namei);
                     item = new MythUIButtonListItem(m_iconsList, newname,
-                                             qVariantFromValue(entry));
+                                             QVariant::fromValue(entry));
                     namei++;
                 }
                 else
                 {
                     item = new MythUIButtonListItem(m_iconsList, entry.strName,
-                                             qVariantFromValue(entry));
+                                             QVariant::fromValue(entry));
                     namei=1;
                 }
 
@@ -751,7 +758,11 @@ bool ImportIconsWizard::findmissing(const QString& strParam)
 
     LOG(VB_CHANNEL, LOG_INFO,
         QString("Icon Import: Working findmissing : %1") .arg(str));
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList strSplit = str.split("\n", QString::SkipEmptyParts);
+#else
+    QStringList strSplit = str.split("\n", Qt::SkipEmptyParts);
+#endif
     for (QStringList::const_iterator it = strSplit.begin();
          it != strSplit.end(); ++it)
     {
@@ -775,8 +786,7 @@ void ImportIconsWizard::askSubmit(const QString& strParam)
                          "choices back to mythtv.org so that others can "
                          "benefit from your selections.");
 
-    MythConfirmationDialog *confirmPopup =
-            new MythConfirmationDialog(m_popupStack, message);
+    auto *confirmPopup = new MythConfirmationDialog(m_popupStack, message);
 
     confirmPopup->SetReturnEvent(this, "submitresults");
 
@@ -800,15 +810,27 @@ bool ImportIconsWizard::submit()
 
     LOG(VB_CHANNEL, LOG_INFO, QString("Icon Import: Working submit : %1")
         .arg(str));
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList strSplit = str.split("\n", QString::SkipEmptyParts);
-    unsigned atsc = 0, dvb = 0, callsign = 0, tv = 0, xmltvid = 0;
+#else
+    QStringList strSplit = str.split("\n", Qt::SkipEmptyParts);
+#endif
+    unsigned atsc = 0;
+    unsigned dvb = 0;
+    unsigned callsign = 0;
+    unsigned tv = 0;
+    unsigned xmltvid = 0;
     for (QStringList::const_iterator it = strSplit.begin();
          it != strSplit.end(); ++it)
     {
         if (*it == "#")
             continue;
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList strSplit2=(*it).split(":", QString::SkipEmptyParts);
+#else
+        QStringList strSplit2=(*it).split(":", Qt::SkipEmptyParts);
+#endif
         if (strSplit2.size() < 2)
             continue;
 
@@ -836,7 +858,7 @@ void ImportIconsWizard::customEvent(QEvent *event)
 {
     if (event->type() == DialogCompletionEvent::kEventType)
     {
-        DialogCompletionEvent *dce = (DialogCompletionEvent*)(event);
+        auto *dce = (DialogCompletionEvent*)(event);
 
         QString resultid  = dce->GetId();
         int     buttonnum = dce->GetResult();

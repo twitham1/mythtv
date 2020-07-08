@@ -96,10 +96,8 @@ SignalHandler::SignalHandler(QList<int> &signallist, QObject *parent) :
     m_notifier = new QSocketNotifier(s_sigFd[1], QSocketNotifier::Read, this);
     connect(m_notifier, SIGNAL(activated(int)), this, SLOT(handleSignal()));
 
-    QList<int>::iterator it = signallist.begin();
-    for( ; it != signallist.end(); ++it )
+    for (int signum : qAsConst(signallist))
     {
-        int signum = *it;
         if (!s_defaultHandlerList.contains(signum))
         {
             cerr << "No default handler for signal " << signum << endl;
@@ -124,8 +122,8 @@ SignalHandler::~SignalHandler()
     }
 
     QMutexLocker locker(&m_sigMapLock);
-    QMap<int, SigHandlerFunc>::iterator it = m_sigMap.begin();
-    for ( ; it != m_sigMap.end(); ++it)
+    // NOLINTNEXTLINE(modernize-loop-convert)
+    for (auto it = m_sigMap.begin(); it != m_sigMap.end(); ++it)
     {
         int signum = it.key();
         signal(signum, SIG_DFL);
@@ -178,7 +176,7 @@ void SignalHandler::SetHandlerPrivate(int signum, SigHandlerFunc handler)
 
     if (!sa_handler_already_set)
     {
-        struct sigaction sa;
+        struct sigaction sa {};
         sa.sa_sigaction = SignalHandler::signalHandler;
         sigemptyset(&sa.sa_mask);
         sa.sa_flags = SA_RESTART | SA_SIGINFO;
@@ -194,31 +192,31 @@ void SignalHandler::SetHandlerPrivate(int signum, SigHandlerFunc handler)
 #endif
 }
 
-typedef struct {
-    int signum;
-    int code;
-    int pid;
-    int uid;
-    uint64_t value;
-} SignalInfo;
+struct SignalInfo {
+    int      m_signum;
+    int      m_code;
+    int      m_pid;
+    int      m_uid;
+    uint64_t m_value;
+};
 
 void SignalHandler::signalHandler(int signum, siginfo_t *info, void *context)
 {
-    SignalInfo signalInfo;
+    SignalInfo signalInfo {};
 
     (void)context;
-    signalInfo.signum = signum;
+    signalInfo.m_signum = signum;
 #ifdef _WIN32
     (void)info;
-    signalInfo.code   = 0;
-    signalInfo.pid    = 0;
-    signalInfo.uid    = 0;
-    signalInfo.value  = 0;
+    signalInfo.m_code   = 0;
+    signalInfo.m_pid    = 0;
+    signalInfo.m_uid    = 0;
+    signalInfo.m_value  = 0;
 #else
-    signalInfo.code   = (info ? info->si_code : 0);
-    signalInfo.pid    = (info ? (int)info->si_pid : 0);
-    signalInfo.uid    = (info ? (int)info->si_uid : 0);
-    signalInfo.value  = (info ? *(uint64_t *)&info->si_value : 0);
+    signalInfo.m_code   = (info ? info->si_code : 0);
+    signalInfo.m_pid    = (info ? (int)info->si_pid : 0);
+    signalInfo.m_uid    = (info ? (int)info->si_uid : 0);
+    signalInfo.m_value  = (info ? *(uint64_t *)&info->si_value : 0);
 #endif
 
     // Keep trying if there's no room to write, but stop on error (-1)
@@ -289,10 +287,10 @@ void SignalHandler::handleSignal(void)
 #ifndef _WIN32
     m_notifier->setEnabled(false);
 
-    SignalInfo signalInfo;
+    SignalInfo signalInfo {};
     int ret = ::read(s_sigFd[1], &signalInfo, sizeof(SignalInfo));
     bool infoComplete = (ret == sizeof(SignalInfo));
-    int signum = (infoComplete ? signalInfo.signum : 0);
+    int signum = (infoComplete ? signalInfo.m_signum : 0);
 
     if (infoComplete)
     {
@@ -300,8 +298,8 @@ void SignalHandler::handleSignal(void)
         signame = strdup(signame ? signame : "Unknown Signal");
         LOG(VB_GENERAL, LOG_CRIT,
             QString("Received %1: Code %2, PID %3, UID %4, Value 0x%5")
-            .arg(signame) .arg(signalInfo.code) .arg(signalInfo.pid)
-            .arg(signalInfo.uid) .arg(signalInfo.value,8,16,QChar('0')));
+            .arg(signame) .arg(signalInfo.m_code) .arg(signalInfo.m_pid)
+            .arg(signalInfo.m_uid) .arg(signalInfo.m_value,8,16,QChar('0')));
         free(signame);
     }
 

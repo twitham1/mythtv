@@ -11,8 +11,7 @@
 
 #define LOC QString("UDPListener: ")
 
-MythUDPListener::MythUDPListener() :
-    m_socketPool(nullptr)
+MythUDPListener::MythUDPListener()
 {
     Enable();
 }
@@ -145,7 +144,7 @@ void MythUDPListener::Process(const QByteArray &buf, const QHostAddress& /*sende
                 type = e.text();
             else if (notification && e.tagName() == "progress")
             {
-                bool ok;
+                bool ok = false;
                 progress = e.text().toFloat(&ok);
                 if (!ok)
                     progress = -1.0F;
@@ -180,7 +179,7 @@ void MythUDPListener::Process(const QByteArray &buf, const QHostAddress& /*sende
             QStringList args;
             args << QString::number(timeout);
             MythMainWindow *window = GetMythMainWindow();
-            MythEvent* me = new MythEvent(MythEvent::MythUserMessage, msg, args);
+            auto* me = new MythEvent(MythEvent::MythUserMessage, msg, args);
             qApp->postEvent(window, me);
         }
     }

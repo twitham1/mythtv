@@ -1,5 +1,5 @@
-#ifndef _HTTPTSSTREAMHANDLER_H_
-#define _HTTPTSSTREAMHANDLER_H_
+#ifndef HTTPTSSTREAMHANDLER_H
+#define HTTPTSSTREAMHANDLER_H
 
 #include <vector>
 using namespace std;
@@ -25,7 +25,7 @@ class HTTPTSStreamHandler : public IPTVStreamHandler
 
 protected:
     explicit HTTPTSStreamHandler(const IPTVTuningData &tuning, int inputid);
-    virtual ~HTTPTSStreamHandler(void);
+    ~HTTPTSStreamHandler(void) override;
     void run(void) override; // MThread
 
   protected:
@@ -68,4 +68,4 @@ class MTV_PUBLIC HTTPReader : public QObject
     int                     m_size       {0};
 };
 
-#endif // _HTTPTSSTREAMHANDLER_H_
+#endif // HTTPTSSTREAMHANDLER_H

@@ -13,6 +13,10 @@
 #include "mythmedia.h"
 
 /// Stores details of media handlers
+
+// Adding member initializers caused compilation to fail with an error
+// that it cannot convert a brace-enclosed initializer list to MHData.
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 struct MHData
 {
     void   (*callback)(MythMediaDevice *mediadevice);
@@ -26,7 +30,7 @@ class MonitorThread : public MThread
 {
   public:
     MonitorThread(MediaMonitor* pMon,  unsigned long interval);
-    ~MonitorThread() { wait(); m_Monitor = nullptr; }
+    ~MonitorThread() override { wait(); m_Monitor = nullptr; }
     void setMonitor(MediaMonitor* pMon) { m_Monitor = pMon; }
     void run(void) override; // MThread
 
@@ -85,13 +89,13 @@ class MPUBLIC MediaMonitor : public QObject
     virtual QStringList GetCDROMBlockDevices(void) = 0;
 
   public slots:
-    void mediaStatusChanged(MythMediaStatus oldStatus, MythMediaDevice* pMedia);
+    void mediaStatusChanged(MythMediaStatus oldStatus, MythMediaDevice* pMedia) const;
 
   protected:
     MediaMonitor(QObject *par, unsigned long interval, bool allowEject);
-    virtual ~MediaMonitor() = default;
+    ~MediaMonitor() override = default;
 
-    void AttemptEject(MythMediaDevice *device);
+    static void AttemptEject(MythMediaDevice *device);
     void CheckDevices(void);
     virtual void CheckDeviceNotifications(void) {};
     virtual bool AddDevice(MythMediaDevice* pDevice) = 0;

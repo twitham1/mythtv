@@ -1,7 +1,7 @@
 // -*- Mode: c++ -*-
 
-#ifndef _IMPORT_RECORDER_H_
-#define _IMPORT_RECORDER_H_
+#ifndef IMPORT_RECORDER_H
+#define IMPORT_RECORDER_H
 
 #include <QMutex>
 
@@ -24,7 +24,7 @@ class ImportRecorder : public DTVRecorder
 {
   public:
     explicit ImportRecorder(TVRec*rec) : DTVRecorder(rec) {}
-    ~ImportRecorder() = default;
+    ~ImportRecorder() override = default;
 
     // RecorderBase
     void SetOptionsFromProfile(RecordingProfile *profile,
@@ -40,14 +40,14 @@ class ImportRecorder : public DTVRecorder
     void InitStreamData(void) override {} // DTVRecorder
 
     long long GetFramesWritten(void) override; // DTVRecorder
-    RecordingQuality *GetRecordingQuality(const RecordingInfo*) const override // DTVRecorder
+    RecordingQuality *GetRecordingQuality(const RecordingInfo */*r*/) const override // DTVRecorder
         {return nullptr;}
     void UpdateRecSize();
 
   private:
-    int                 m_import_fd {-1};
+    int                 m_importFd  {-1};
     MythCommFlagPlayer *m_cfp       {nullptr};
     long long           m_nfc       {0};
 };
 
-#endif // _IMPORT_RECORDER_H_
+#endif // IMPORT_RECORDER_H

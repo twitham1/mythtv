@@ -445,10 +445,12 @@ RecStatus::Type EncoderLink::StartRecording(ProgramInfo *rec)
         retval = m_sock->StartRecording(m_inputid, rec);
     }
     else
+    {
         LOG(VB_GENERAL, LOG_ERR,
             QString("Wanted to start recording on recorder %1,\n\t\t\t"
                     "but the backend is not there anymore\n")
                 .arg(m_inputid));
+    }
 
     if (retval != RecStatus::Recording &&
         retval != RecStatus::Tuning &&
@@ -474,10 +476,12 @@ RecStatus::Type EncoderLink::GetRecordingStatus(void)
         retval = m_sock->GetRecordingStatus(m_inputid);
     }
     else
+    {
         LOG(VB_GENERAL, LOG_ERR,
             QString("Wanted to get status on recorder %1,\n\t\t\t"
                     "but the backend is not there anymore\n")
                 .arg(m_inputid));
+    }
 
     if (retval != RecStatus::Recording &&
         retval != RecStatus::Tuning &&
@@ -804,10 +808,10 @@ QString EncoderLink::SetInput(QString input)
  *         <b>This only works on local recorders.</b>
  *  \return -1 if query does not succeed, otherwise.
  */
-void EncoderLink::ToggleChannelFavorite(QString changroup)
+void EncoderLink::ToggleChannelFavorite(const QString& changroup)
 {
     if (m_local)
-        m_tv->ToggleChannelFavorite(std::move(changroup));
+        m_tv->ToggleChannelFavorite(changroup);
     else
         LOG(VB_GENERAL, LOG_ERR,
             "Should be local only query: ToggleChannelFavorite");
@@ -987,9 +991,9 @@ bool EncoderLink::GetChannelInfo(uint &chanid, uint &sourceid,
 }
 
 bool EncoderLink::SetChannelInfo(uint chanid, uint sourceid,
-                                 QString oldchannum,
-                                 QString callsign, QString channum,
-                                 QString channame, QString xmltv)
+                                 const QString& oldchannum,
+                                 const QString& callsign, const QString& channum,
+                                 const QString& channame, const QString& xmltv)
 {
     if (!m_local)
     {
@@ -997,9 +1001,9 @@ bool EncoderLink::SetChannelInfo(uint chanid, uint sourceid,
         return false;
     }
 
-    return m_tv->SetChannelInfo(chanid, sourceid, std::move(oldchannum),
-                                std::move(callsign), std::move(channum),
-                                std::move(channame), std::move(xmltv));
+    return m_tv->SetChannelInfo(chanid, sourceid, oldchannum,
+                                callsign, channum,
+                                channame, xmltv);
 }
 
 bool EncoderLink::AddChildInput(uint childid)

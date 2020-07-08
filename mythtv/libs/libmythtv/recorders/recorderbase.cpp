@@ -25,7 +25,7 @@ using namespace std;
 #include "dtvchannel.h"
 #include "dvbchannel.h"
 #include "ExternalChannel.h"
-#include "ringbuffer.h"
+#include "io/mythmediabuffer.h"
 #include "cardutil.h"
 #include "tv_rec.h"
 #include "mythdate.h"
@@ -49,10 +49,6 @@ RecorderBase::RecorderBase(TVRec *rec)
     : m_tvrec(rec)
 {
     RecorderBase::ClearStatistics();
-    QMutexLocker locker(avcodeclock);
-#if 0
-    avcodec_init(); // init CRC's
-#endif
 }
 
 RecorderBase::~RecorderBase(void)
@@ -76,27 +72,31 @@ RecorderBase::~RecorderBase(void)
     }
 }
 
-void RecorderBase::SetRingBuffer(RingBuffer *rbuf)
+void RecorderBase::SetRingBuffer(MythMediaBuffer *Buffer)
 {
     if (VERBOSE_LEVEL_CHECK(VB_RECORD, LOG_INFO))
     {
         QString msg("");
-        if (rbuf)
-            msg = " '" + rbuf->GetFilename() + "'";
+        if (Buffer)
+            msg = " '" + Buffer->GetFilename() + "'";
         LOG(VB_RECORD, LOG_INFO, LOC + QString("SetRingBuffer(0x%1)")
-                .arg((uint64_t)rbuf,0,16) + msg);
+                .arg((uint64_t)Buffer,0,16) + msg);
     }
-    m_ringBuffer = rbuf;
+    m_ringBuffer = Buffer;
     m_weMadeBuffer = false;
 }
 
 void RecorderBase::SetRecording(const RecordingInfo *pginfo)
 {
     if (pginfo)
+    {
         LOG(VB_RECORD, LOG_INFO, LOC + QString("SetRecording(0x%1) title(%2)")
                 .arg((uint64_t)pginfo,0,16).arg(pginfo->GetTitle()));
+    }
     else
+    {
         LOG(VB_RECORD, LOG_INFO, LOC + "SetRecording(0x0)");
+    }
 
     ProgramInfo *oldrec = m_curRecording;
     if (pginfo)
@@ -121,11 +121,11 @@ void RecorderBase::SetRecording(const RecordingInfo *pginfo)
     delete oldrec;
 }
 
-void RecorderBase::SetNextRecording(const RecordingInfo *ri, RingBuffer *rb)
+void RecorderBase::SetNextRecording(const RecordingInfo *ri, MythMediaBuffer *Buffer)
 {
     LOG(VB_RECORD, LOG_INFO, LOC + QString("SetNextRecording(0x%1, 0x%2)")
         .arg(reinterpret_cast<intptr_t>(ri),0,16)
-        .arg(reinterpret_cast<intptr_t>(rb),0,16));
+        .arg(reinterpret_cast<intptr_t>(Buffer),0,16));
 
     // First we do some of the time consuming stuff we can do now
     SavePositionMap(true);
@@ -147,7 +147,7 @@ void RecorderBase::SetNextRecording(const RecordingInfo *ri, RingBuffer *rb)
         m_nextRecording = new RecordingInfo(*ri);
 
     delete m_nextRingBuffer;
-    m_nextRingBuffer = rb;
+    m_nextRingBuffer = Buffer;
 }
 
 void RecorderBase::SetOption(const QString &name, const QString &value)
@@ -160,7 +160,7 @@ void RecorderBase::SetOption(const QString &name, const QString &value)
     {
         m_ntsc = false;
         if (value.toLower() == "ntsc" || value.toLower() == "ntsc-jp")
-        {
+        {    // NOLINT(bugprone-branch-clone)
             m_ntsc = true;
             SetFrameRate(29.97);
         }
@@ -173,7 +173,7 @@ void RecorderBase::SetOption(const QString &name, const QString &value)
             // are far more likely to be using a mix of ATSC and NTSC than
             // a mix of ATSC and PAL or SECAM. The atsc recorder itself
             // does not care about these values, except in so much as tv_rec
-            // cares about m_video_frame_rate which should be neither 29.97
+            // cares about m_videoFrameRate which should be neither 29.97
             // nor 25.0, but based on the actual video.
             m_ntsc = true;
             SetFrameRate(29.97);
@@ -224,17 +224,17 @@ void RecorderBase::SetStrOption(RecordingProfile *profile, const QString &name)
 void RecorderBase::StopRecording(void)
 {
     QMutexLocker locker(&m_pauseLock);
-    m_request_recording = false;
+    m_requestRecording = false;
     m_unpauseWait.wakeAll();
     while (m_recording)
     {
         m_recordingWait.wait(&m_pauseLock, 100);
-        if (m_request_recording)
+        if (m_requestRecording)
         {
             LOG(VB_GENERAL, LOG_ERR, LOC +
                 "Programmer Error: Recorder started while we were in "
                 "StopRecording");
-            m_request_recording = false;
+            m_requestRecording = false;
         }
     }
 }
@@ -250,7 +250,7 @@ bool RecorderBase::IsRecording(void)
 bool RecorderBase::IsRecordingRequested(void)
 {
     QMutexLocker locker(&m_pauseLock);
-    return m_request_recording;
+    return m_requestRecording;
 }
 
 /** \brief Pause tells recorder to pause, it should not block.
@@ -264,7 +264,7 @@ void RecorderBase::Pause(bool clear)
 {
     (void) clear;
     QMutexLocker locker(&m_pauseLock);
-    m_request_pause = true;
+    m_requestPause = true;
 }
 
 /** \brief Unpause tells recorder to unpause.
@@ -274,7 +274,7 @@ void RecorderBase::Pause(bool clear)
 void RecorderBase::Unpause(void)
 {
     QMutexLocker locker(&m_pauseLock);
-    m_request_pause = false;
+    m_requestPause = false;
     m_unpauseWait.wakeAll();
 }
 
@@ -301,7 +301,7 @@ bool RecorderBase::WaitForPause(int timeout)
     t.start();
 
     QMutexLocker locker(&m_pauseLock);
-    while (!IsPaused(true) && m_request_pause)
+    while (!IsPaused(true) && m_requestPause)
     {
         int wait = timeout - t.elapsed();
         if (wait <= 0)
@@ -312,7 +312,7 @@ bool RecorderBase::WaitForPause(int timeout)
 }
 
 /** \fn RecorderBase::PauseAndWait(int)
- *  \brief If m_request_pause is true, sets pause and blocks up to
+ *  \brief If m_requestPause is true, sets pause and blocks up to
  *         timeout milliseconds or until unpaused, whichever is
  *         sooner.
  *
@@ -326,7 +326,7 @@ bool RecorderBase::WaitForPause(int timeout)
 bool RecorderBase::PauseAndWait(int timeout)
 {
     QMutexLocker locker(&m_pauseLock);
-    if (m_request_pause)
+    if (m_requestPause)
     {
         if (!IsPaused(true))
         {
@@ -339,7 +339,7 @@ bool RecorderBase::PauseAndWait(int timeout)
         m_unpauseWait.wait(&m_pauseLock, timeout);
     }
 
-    if (!m_request_pause && IsPaused(true))
+    if (!m_requestPause && IsPaused(true))
     {
         m_paused = false;
         m_unpauseWait.wakeAll();
@@ -437,6 +437,10 @@ void RecorderBase::FinishRecording(void)
     {
         if (m_primaryVideoCodec == AV_CODEC_ID_H264)
             m_curRecording->SaveVideoProperties(VID_AVC, VID_AVC);
+        else if (m_primaryVideoCodec == AV_CODEC_ID_H265)
+            m_curRecording->SaveVideoProperties(VID_HEVC, VID_HEVC);
+        else if (m_primaryVideoCodec == AV_CODEC_ID_MPEG2VIDEO)
+            m_curRecording->SaveVideoProperties(VID_MPEG2, VID_MPEG2);
 
         RecordingFile *recFile = m_curRecording->GetRecordingFile();
         if (recFile)
@@ -523,9 +527,8 @@ long long RecorderBase::GetKeyframePosition(long long desired) const
     frm_pos_map_t::const_iterator it = m_positionMap.lowerBound(desired);
     if (it == m_positionMap.end())
         ret = *m_positionMap.begin();
-    else if (it.key() == desired)
-        ret = *it;
-    else if (--it != m_positionMap.end())
+    else if ((it.key() == desired) ||
+             (--it != m_positionMap.end()))
         ret = *it;
 
     return ret;
@@ -791,19 +794,25 @@ void RecorderBase::ResolutionChange(uint width, uint height, long long frame)
     }
 }
 
-void RecorderBase::FrameRateChange(uint framerate, long long frame)
+void RecorderBase::FrameRateChange(uint framerate, uint64_t frame)
 {
     if (m_curRecording)
     {
         // Populate the recordfile table as early as possible, the average
         // value will be determined when the recording completes.
-        if (!m_curRecording->GetRecordingFile()->m_videoFrameRate)
+        if (m_curRecording->GetRecordingFile()->m_videoFrameRate == 0.0)
         {
             m_curRecording->GetRecordingFile()->m_videoFrameRate = (double)framerate / 1000.0;
             m_curRecording->GetRecordingFile()->Save();
         }
         m_curRecording->SaveFrameRate(frame, framerate);
     }
+}
+
+void RecorderBase::VideoScanChange(SCAN_t scan, uint64_t frame)
+{
+    if (m_curRecording)
+        m_curRecording->SaveVideoScanType(frame, scan != SCAN_t::INTERLACED);
 }
 
 void RecorderBase::VideoCodecChange(AVCodecID vCodec)
@@ -840,101 +849,101 @@ void RecorderBase::SetTotalFrames(uint64_t total_frames)
 RecorderBase *RecorderBase::CreateRecorder(
     TVRec                  *tvrec,
     ChannelBase            *channel,
-    const RecordingProfile &profile,
+    RecordingProfile       &profile,
     const GeneralDBOptions &genOpt)
 {
     if (!channel)
         return nullptr;
 
     RecorderBase *recorder = nullptr;
-    if (genOpt.inputtype == "MPEG")
-    {
+    if (genOpt.m_inputType == "MPEG")
+    { // NOLINTNEXTLINE(bugprone-branch-clone)
 #ifdef USING_IVTV
         recorder = new MpegRecorder(tvrec);
 #endif // USING_IVTV
     }
-    else if (genOpt.inputtype == "HDPVR")
-    {
 #ifdef USING_HDPVR
-        recorder = new MpegRecorder(tvrec);
-#endif // USING_HDPVR
-    }
-    else if (genOpt.inputtype == "V4L2ENC")
+    else if (genOpt.m_inputType == "HDPVR")
     {
+        recorder = new MpegRecorder(tvrec);
+    }
+#endif // USING_HDPVR
 #ifdef USING_V4L2
+    else if (genOpt.m_inputType == "V4L2ENC")
+    {
         if (dynamic_cast<V4LChannel*>(channel))
             recorder = new V4L2encRecorder(tvrec, dynamic_cast<V4LChannel*>(channel));
-#endif
     }
-    else if (genOpt.inputtype == "FIREWIRE")
-    {
+#endif
 #ifdef USING_FIREWIRE
+    else if (genOpt.m_inputType == "FIREWIRE")
+    {
         if (dynamic_cast<FirewireChannel*>(channel))
             recorder = new FirewireRecorder(tvrec, dynamic_cast<FirewireChannel*>(channel));
-#endif // USING_FIREWIRE
     }
-    else if (genOpt.inputtype == "HDHOMERUN")
-    {
+#endif // USING_FIREWIRE
 #ifdef USING_HDHOMERUN
+    else if (genOpt.m_inputType == "HDHOMERUN")
+    {
         if (dynamic_cast<HDHRChannel*>(channel))
         {
             recorder = new HDHRRecorder(tvrec, dynamic_cast<HDHRChannel*>(channel));
-            recorder->SetBoolOption("wait_for_seqstart", genOpt.wait_for_seqstart);
+            recorder->SetBoolOption("wait_for_seqstart", genOpt.m_waitForSeqstart);
         }
-#endif // USING_HDHOMERUN
     }
-    else if (genOpt.inputtype == "CETON")
-    {
+#endif // USING_HDHOMERUN
 #ifdef USING_CETON
+    else if (genOpt.m_inputType == "CETON")
+    {
         if (dynamic_cast<CetonChannel*>(channel))
         {
             recorder = new CetonRecorder(tvrec, dynamic_cast<CetonChannel*>(channel));
-            recorder->SetBoolOption("wait_for_seqstart", genOpt.wait_for_seqstart);
+            recorder->SetBoolOption("wait_for_seqstart", genOpt.m_waitForSeqstart);
         }
-#endif // USING_CETON
     }
-    else if (genOpt.inputtype == "DVB")
-    {
+#endif // USING_CETON
 #ifdef USING_DVB
+    else if (genOpt.m_inputType == "DVB")
+    {
         if (dynamic_cast<DVBChannel*>(channel))
         {
             recorder = new DVBRecorder(tvrec, dynamic_cast<DVBChannel*>(channel));
-            recorder->SetBoolOption("wait_for_seqstart", genOpt.wait_for_seqstart);
+            recorder->SetBoolOption("wait_for_seqstart", genOpt.m_waitForSeqstart);
         }
-#endif // USING_DVB
     }
-    else if (genOpt.inputtype == "FREEBOX")
-    {
+#endif // USING_DVB
 #ifdef USING_IPTV
+    else if (genOpt.m_inputType == "FREEBOX")
+    {
         if (dynamic_cast<IPTVChannel*>(channel))
         {
             recorder = new IPTVRecorder(tvrec, dynamic_cast<IPTVChannel*>(channel));
-            recorder->SetOption("mrl", genOpt.videodev);
+            recorder->SetOption("mrl", genOpt.m_videoDev);
         }
-#endif // USING_IPTV
     }
-    else if (genOpt.inputtype == "VBOX")
-    {
+#endif // USING_IPTV
 #ifdef USING_VBOX
+    else if (genOpt.m_inputType == "VBOX")
+    {
         if (dynamic_cast<IPTVChannel*>(channel))
             recorder = new IPTVRecorder(tvrec, dynamic_cast<IPTVChannel*>(channel));
-#endif // USING_VBOX
     }
-    else if (genOpt.inputtype == "ASI")
-    {
+#endif // USING_VBOX
 #ifdef USING_ASI
+    else if (genOpt.m_inputType == "ASI")
+    {
         if (dynamic_cast<ASIChannel*>(channel))
         {
             recorder = new ASIRecorder(tvrec, dynamic_cast<ASIChannel*>(channel));
-            recorder->SetBoolOption("wait_for_seqstart", genOpt.wait_for_seqstart);
+            recorder->SetBoolOption("wait_for_seqstart", genOpt.m_waitForSeqstart);
         }
-#endif // USING_ASI
     }
-    else if (genOpt.inputtype == "IMPORT")
+#endif // USING_ASI
+    else if (genOpt.m_inputType == "IMPORT")
     {
         recorder = new ImportRecorder(tvrec);
     }
-    else if (genOpt.inputtype == "DEMO")
+    else if (genOpt.m_inputType == "DEMO")
     {
 #ifdef USING_IVTV
         recorder = new MpegRecorder(tvrec);
@@ -942,15 +951,15 @@ RecorderBase *RecorderBase::CreateRecorder(
         recorder = new ImportRecorder(tvrec);
 #endif
     }
-    else if (CardUtil::IsV4L(genOpt.inputtype))
-    {
 #if CONFIG_LIBMP3LAME && defined(USING_V4L2)
+    else if (CardUtil::IsV4L(genOpt.m_inputType))
+    {
         // V4L/MJPEG/GO7007 from here on
         recorder = new NuppelVideoRecorder(tvrec, channel);
-        recorder->SetBoolOption("skipbtaudio", genOpt.skip_btaudio);
-#endif // USING_V4L2
+        recorder->SetBoolOption("skipbtaudio", genOpt.m_skipBtAudio);
     }
-    else if (genOpt.inputtype == "EXTERNAL")
+#endif // USING_V4L2
+    else if (genOpt.m_inputType == "EXTERNAL")
     {
         if (dynamic_cast<ExternalChannel*>(channel))
             recorder = new ExternalRecorder(tvrec, dynamic_cast<ExternalChannel*>(channel));
@@ -958,18 +967,17 @@ RecorderBase *RecorderBase::CreateRecorder(
 
     if (recorder)
     {
-        recorder->SetOptionsFromProfile(
-            const_cast<RecordingProfile*>(&profile),
-            genOpt.videodev, genOpt.audiodev, genOpt.vbidev);
+        recorder->SetOptionsFromProfile(&profile,
+            genOpt.m_videoDev, genOpt.m_audioDev, genOpt.m_vbiDev);
         // Override the samplerate defined in the profile if this card
         // was configured with a fixed rate.
-        if (genOpt.audiosamplerate)
-            recorder->SetOption("samplerate", genOpt.audiosamplerate);
+        if (genOpt.m_audioSampleRate)
+            recorder->SetOption("samplerate", genOpt.m_audioSampleRate);
     }
     else
     {
         QString msg = "Need %1 recorder, but compiled without %2 support!";
-        msg = msg.arg(genOpt.inputtype).arg(genOpt.inputtype);
+        msg = msg.arg(genOpt.m_inputType).arg(genOpt.m_inputType);
         LOG(VB_GENERAL, LOG_ERR,
             "RecorderBase::CreateRecorder() Error, " + msg);
     }

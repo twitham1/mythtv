@@ -241,12 +241,8 @@ void MythUITextEdit::InsertText(const QString &text)
     if (!m_Text)
         return;
 
-    int i = 0;
-
-    for (; i < text.size(); ++i)
-    {
-        InsertCharacter(text[i]);
-    }
+    for (auto c : qAsConst(text))
+        InsertCharacter(c);
 
     emit valueChanged();
 }
@@ -382,7 +378,7 @@ void MythUITextEdit::PasteTextFromClipboard(QClipboard::Mode mode)
     InsertText(clipboard->text(mode));
 }
 
-typedef QPair<int, int> keyCombo;
+using keyCombo = QPair<int, int>;
 static QMap<keyCombo, int> gDeadKeyMap;
 
 static void LoadDeadKeys(QMap<QPair<int, int>, int> &map)
@@ -527,7 +523,7 @@ bool MythUITextEdit::keyPressEvent(QKeyEvent *event)
                  && GetMythDB()->GetNumSetting("UseVirtualKeyboard", 1) == 1)
         {
             MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
-            MythUIVirtualKeyboard *kb =  new MythUIVirtualKeyboard(popupStack, this);
+            auto *kb = new MythUIVirtualKeyboard(popupStack, this);
 
             if (kb->Create())
             {
@@ -576,7 +572,7 @@ bool MythUITextEdit::gestureEvent(MythGestureEvent *event)
 
 void MythUITextEdit::CopyFrom(MythUIType *base)
 {
-    MythUITextEdit *textedit = dynamic_cast<MythUITextEdit *>(base);
+    auto *textedit = dynamic_cast<MythUITextEdit *>(base);
 
     if (!textedit)
     {
@@ -600,6 +596,6 @@ void MythUITextEdit::CopyFrom(MythUIType *base)
 
 void MythUITextEdit::CreateCopy(MythUIType *parent)
 {
-    MythUITextEdit *textedit = new MythUITextEdit(parent, objectName());
+    auto *textedit = new MythUITextEdit(parent, objectName());
     textedit->CopyFrom(this);
 }

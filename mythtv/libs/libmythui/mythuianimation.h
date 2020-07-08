@@ -15,22 +15,22 @@ class UIEffects
 
     UIEffects() = default;
 
-    QPointF GetCentre(const QRect &rect, int xoff, int yoff)
+    QPointF GetCentre(const QRect &rect, int xoff, int yoff) const
     {
-        float x = xoff + rect.left();
-        float y = yoff + rect.top();
+        float x = static_cast<float>(xoff) + static_cast<float>(rect.left());
+        float y = static_cast<float>(yoff) + static_cast<float>(rect.top());
         if (Middle == m_centre || Top == m_centre || Bottom == m_centre)
-            x += rect.width() / 2.0F;
+            x += static_cast<float>(rect.width()) / 2.0F;
         if (Middle == m_centre || Left == m_centre || Right == m_centre)
-            y += rect.height() / 2.0F;
+            y += static_cast<float>(rect.height()) / 2.0F;
         if (Right == m_centre || TopRight == m_centre || BottomRight == m_centre)
-            x += rect.width();
+            x += static_cast<float>(rect.width());
         if (Bottom == m_centre || BottomLeft == m_centre || BottomRight == m_centre)
-            y += rect.height();
-        return QPointF(x, y);
+            y += static_cast<float>(rect.height());
+        return {x, y};
     }
 
-    QRect GetExtent(const QSize &size);
+    QRect GetExtent(const QSize &size) const;
 
     int    m_alpha  {255};
     float  m_hzoom  {1.0F};
@@ -45,7 +45,7 @@ class MythUIAnimation : public QVariantAnimation, XMLParseBase
     enum Type    { Alpha, Position, Zoom, HorizontalZoom, VerticalZoom, Angle };
     enum Trigger { AboutToHide, AboutToShow };
 
-    MythUIAnimation(MythUIType* parent = nullptr,
+    explicit MythUIAnimation(MythUIType* parent = nullptr,
                     Trigger trigger = AboutToShow, Type type = Alpha)
         : m_parent(parent), m_type(type), m_trigger(trigger) {}
     void Activate(void);

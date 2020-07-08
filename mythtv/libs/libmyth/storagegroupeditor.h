@@ -1,5 +1,5 @@
-#ifndef _STORAGEGROUPEDITOR_H
-#define _STORAGEGROUPEDITOR_H
+#ifndef STORAGEGROUPEDITOR_H
+#define STORAGEGROUPEDITOR_H
 
 #include "storagegroup.h"
 #include "standardsettings.h"
@@ -44,7 +44,7 @@ class StorageGroupDirStorage : public SimpleDBStorage
 {
   public:
     StorageGroupDirStorage(StorageUser *_user, int id,
-                           const QString &group);
+                           QString group);
 
   protected:
     QString GetSetClause(MSqlBindings &bindings) const override; // SimpleDBStorage
@@ -73,6 +73,6 @@ class StorageGroupDirSetting : public MythUIFileBrowserSetting
     QString m_group;
 };
 
-#endif
+#endif // STORAGEGROUPEDITOR_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

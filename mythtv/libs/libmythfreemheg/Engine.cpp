@@ -20,7 +20,7 @@
 */
 
 #include <QStringList>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QThread>
 
 #include "Engine.h"
@@ -48,7 +48,7 @@ MHEG *MHCreateEngine(MHContext *context)
 MHEngine::MHEngine(MHContext *context): m_Context(context)
 {
     // Required for BBC Freeview iPlayer
-    MHPSEntry *pEntry = new MHPSEntry;
+    auto *pEntry = new MHPSEntry;
     pEntry->m_FileName.Copy("ram://bbcipstr");
     pEntry->m_Data.Append(new MHUnion(true)); // Default true
     // The next value must be true to enable Freeview interaction channel
@@ -231,7 +231,7 @@ MHGroup *MHEngine::ParseProgram(QByteArray &text)
                 pRes = new MHScene;
                 break;
             default:
-                pTree->Failure("Expected Application or Scene"); // throws exception.
+                MHParseNode::Failure("Expected Application or Scene"); // throws exception.
         }
 
         pRes->Initialise(pTree, this); // Convert the parse tree.
@@ -262,7 +262,8 @@ static EProtocol PathProtocol(const QString& csPath)
     if (csPath.startsWith("CI:"))
         return kProtoCI;
 
-    int firstColon = csPath.indexOf(':'), firstSlash = csPath.indexOf('/');
+    int firstColon = csPath.indexOf(':');
+    int firstSlash = csPath.indexOf('/');
     if (firstColon > 0 && firstSlash > 0 && firstColon < firstSlash)
         return kProtoUnknown;
 
@@ -293,7 +294,7 @@ bool MHEngine::Launch(const MHObjectRef &target, bool fIsSpawn)
         return false;
     }
 
-    MHApplication *pProgram = dynamic_cast<MHApplication*>(ParseProgram(text));
+    auto *pProgram = dynamic_cast<MHApplication*>(ParseProgram(text));
     if (! pProgram)
     {
         MHLOG(MHLogWarning, "Empty application");
@@ -305,9 +306,9 @@ bool MHEngine::Launch(const MHObjectRef &target, bool fIsSpawn)
         delete pProgram;
         return false;
     }
-    if ((__mhlogoptions & MHLogScenes) && __mhlogStream != nullptr)   // Print it so we know what's going on.
+    if ((gMHLogoptions & MHLogScenes) && gMHLogStream != nullptr)   // Print it so we know what's going on.
     {
-        pProgram->PrintMe(__mhlogStream, 0);
+        pProgram->PrintMe(gMHLogStream, 0);
     }
 
     // Clear the action queue of anything pending.
@@ -417,8 +418,6 @@ void MHEngine::Quit()
 
 void MHEngine::TransitionToScene(const MHObjectRef &target)
 {
-    int i;
-
     if (m_fInTransition)
     {
         // TransitionTo is not allowed in OnStartUp or OnCloseDown actions.
@@ -460,7 +459,7 @@ void MHEngine::TransitionToScene(const MHObjectRef &target)
     // Deactivate any non-shared ingredients in the application.
     MHApplication *pApp = CurrentApp();
 
-    for (i = pApp->m_Items.Size(); i > 0; i--)
+    for (int i = pApp->m_Items.Size(); i > 0; i--)
     {
         MHIngredient *pItem = pApp->m_Items.GetAt(i - 1);
 
@@ -502,13 +501,13 @@ void MHEngine::TransitionToScene(const MHObjectRef &target)
     m_Interacting = nullptr;
 
     // Switch to the new scene.
-    CurrentApp()->m_pCurrentScene = static_cast< MHScene* >(pProgram);
+    CurrentApp()->m_pCurrentScene = dynamic_cast< MHScene* >(pProgram);
     SetInputRegister(CurrentScene()->m_nEventReg);
     m_redrawRegion = QRegion(0, 0, CurrentScene()->m_nSceneCoordX, CurrentScene()->m_nSceneCoordY); // Redraw the whole screen
 
-    if ((__mhlogoptions & MHLogScenes) && __mhlogStream != nullptr)   // Print it so we know what's going on.
+    if ((gMHLogoptions & MHLogScenes) && gMHLogStream != nullptr)   // Print it so we know what's going on.
     {
-        pProgram->PrintMe(__mhlogStream, 0);
+        pProgram->PrintMe(gMHLogStream, 0);
     }
 
     pProgram->Preparation(this);
@@ -554,7 +553,7 @@ QString MHEngine::GetPathName(const MHOctetString &str)
     }
 
     // Remove any occurrences of x/../
-    int nPos;
+    int nPos = -1;
 
     while ((nPos = csPath.indexOf("/../")) >= 0)
     {
@@ -576,7 +575,8 @@ MHRoot *MHEngine::FindObject(const MHObjectRef &oRef, bool failOnNotFound)
 {
     // It should match either the application or the scene.
     MHGroup *pSearch = nullptr;
-    MHGroup *pScene = CurrentScene(), *pApp = CurrentApp();
+    MHGroup *pScene = CurrentScene();
+    MHGroup *pApp = CurrentApp();
 
     if (pScene && GetPathName(pScene->m_ObjectReference.m_GroupId) == GetPathName(oRef.m_GroupId))
     {
@@ -621,16 +621,16 @@ void MHEngine::RunActions()
         // Run it.  If it fails and throws an exception catch it and continue with the next.
         try
         {
-            if ((__mhlogoptions & MHLogActions) && __mhlogStream != nullptr)   // Debugging
+            if ((gMHLogoptions & MHLogActions) && gMHLogStream != nullptr)   // Debugging
             {
-                fprintf(__mhlogStream, "[freemheg] Action - ");
-                pAction->PrintMe(__mhlogStream, 0);
-                fflush(__mhlogStream);
+                fprintf(gMHLogStream, "[freemheg] Action - ");
+                pAction->PrintMe(gMHLogStream, 0);
+                fflush(gMHLogStream);
             }
 
             pAction->Perform(this);
         }
-        catch (char const *)
+        catch (...)
         {
         }
     }
@@ -687,7 +687,7 @@ void MHEngine::EventTriggered(MHRoot *pSource, enum EventType ev, const MHUnion 
         default:
         {
             // Asynchronous events.  Add to the event queue.
-            MHAsynchEvent *pEvent = new MHAsynchEvent;
+            auto *pEvent = new MHAsynchEvent;
             pEvent->m_pEventSource = pSource;
             pEvent->m_eventType = ev;
             pEvent->m_eventData = evData;
@@ -705,10 +705,8 @@ void MHEngine::EventTriggered(MHRoot *pSource, enum EventType ev, const MHUnion 
 // Check all the links in the application and scene and fire any that match this event.
 void MHEngine::CheckLinks(const MHObjectRef &sourceRef, enum EventType ev, const MHUnion &un)
 {
-    for (int i = 0; i < m_LinkTable.size(); i++)
-    {
-        m_LinkTable.at(i)->MatchEvent(sourceRef, ev, un, this);
-    }
+    for (auto *link : qAsConst(m_LinkTable))
+        link->MatchEvent(sourceRef, ev, un, this);
 }
 
 // Add and remove links to and from the active link table.
@@ -768,7 +766,7 @@ void MHEngine::BringToFront(const MHRoot *p)
         return;    // If it's not there do nothing
     }
 
-    MHVisible *pVis = (MHVisible *)p; // Can now safely cast it.
+    auto *pVis = (MHVisible *)p; // Can now safely cast it.
     CurrentApp()->m_DisplayStack.RemoveAt(nPos); // Remove it from its present posn
     CurrentApp()->m_DisplayStack.Append(pVis); // Push it on the top.
     Redraw(pVis->GetVisibleArea()); // Request a redraw
@@ -783,7 +781,7 @@ void MHEngine::SendToBack(const MHRoot *p)
         return;    // If it's not there do nothing
     }
 
-    MHVisible *pVis = (MHVisible *)p; // Can now safely cast it.
+    auto *pVis = (MHVisible *)p; // Can now safely cast it.
     CurrentApp()->m_DisplayStack.RemoveAt(nPos); // Remove it from its present posn
     CurrentApp()->m_DisplayStack.InsertAt(pVis, 0); // Put it on the bottom.
     Redraw(pVis->GetVisibleArea()); // Request a redraw
@@ -798,7 +796,7 @@ void MHEngine::PutBefore(const MHRoot *p, const MHRoot *pRef)
         return;    // If it's not there do nothing
     }
 
-    MHVisible *pVis = (MHVisible *)p; // Can now safely cast it.
+    auto *pVis = (MHVisible *)p; // Can now safely cast it.
     int nRef = CurrentApp()->FindOnStack(pRef);
 
     if (nRef == -1)
@@ -836,7 +834,7 @@ void MHEngine::PutBehind(const MHRoot *p, const MHRoot *pRef)
         return;    // If the reference visible isn't there do nothing.
     }
 
-    MHVisible *pVis = (MHVisible *)p; // Can now safely cast it.
+    auto *pVis = (MHVisible *)p; // Can now safely cast it.
     CurrentApp()->m_DisplayStack.RemoveAt(nPos);
 
     if (nRef >= nPos)
@@ -1001,7 +999,7 @@ void MHEngine::RequestExternalContent(MHIngredient *pRequester)
                     reinterpret_cast< const unsigned char * >(text.constData()),
                     text.size(), this);
             }
-            catch (char const *)
+            catch (...)
             {}
         }
         else
@@ -1018,7 +1016,7 @@ void MHEngine::RequestExternalContent(MHIngredient *pRequester)
         // Need to record this and check later.
         MHLOG(MHLogNotifications, QString("Waiting for %1 <= %2")
             .arg(pRequester->m_ObjectReference.Printable()).arg(csPath.left(128)) );
-        MHExternContent *pContent = new MHExternContent;
+        auto *pContent = new MHExternContent;
         pContent->m_FileName = csPath;
         pContent->m_pRequester = pRequester;
         pContent->m_time.start();
@@ -1030,11 +1028,10 @@ void MHEngine::RequestExternalContent(MHIngredient *pRequester)
 void MHEngine::CancelExternalContentRequest(MHIngredient *pRequester)
 {
     QList<MHExternContent *>::iterator it = m_ExternContentTable.begin();
-    MHExternContent *pContent;
 
     while (it != m_ExternContentTable.end())
     {
-        pContent = *it;
+        MHExternContent *pContent = *it;
 
         if (pContent->m_pRequester == pRequester)
         {
@@ -1073,7 +1070,7 @@ void MHEngine::CheckContentRequests()
                         reinterpret_cast< const unsigned char * >(text.constData()),
                         text.size(), this);
                 }
-                catch (char const *)
+                catch (...)
                 {}
             }
             else
@@ -1117,7 +1114,7 @@ bool MHEngine::LoadStorePersistent(bool fIsLoad, const MHOctetString &fileName, 
 
     // See if there is an entry there already.
     MHPSEntry *pEntry = nullptr;
-    int i;
+    int i = 0;
 
     for (i = 0; i < m_PersistentStore.Size(); i++)
     {
@@ -1145,6 +1142,10 @@ bool MHEngine::LoadStorePersistent(bool fIsLoad, const MHOctetString &fileName, 
         pEntry->m_FileName.Copy(fileName);
         m_PersistentStore.Append(pEntry);
     }
+
+    // This should never happen
+    if (pEntry == nullptr)
+        return false;
 
     if (fIsLoad)   // Copy the data into the variables.
     {
@@ -1176,7 +1177,7 @@ bool MHEngine::LoadStorePersistent(bool fIsLoad, const MHOctetString &fileName, 
         // Set the store to the values.
         for (i = 0; i < variables.Size(); i++)
         {
-            MHUnion *pValue = new MHUnion;
+            auto *pValue = new MHUnion;
             pEntry->m_Data.Append(pValue);
             FindObject(*(variables.GetAt(i)))->GetVariableValue(*pValue, this);
             MHLOG(MHLogNotifications, QString("Store Persistent(%1) %2=>#%3")
@@ -1191,7 +1192,7 @@ bool MHEngine::LoadStorePersistent(bool fIsLoad, const MHOctetString &fileName, 
 bool MHEngine::GetEngineSupport(const MHOctetString &feature)
 {
     QString csFeat = QString::fromUtf8((const char *)feature.Bytes(), feature.Size());
-    QStringList strings = csFeat.split(QRegExp("[\\(\\,\\)]"));
+    QStringList strings = csFeat.split(QRegularExpression(R"([\(\,\)])"));
 
     MHLOG(MHLogNotifications, "NOTE GetEngineSupport " + csFeat);
 
@@ -1476,20 +1477,20 @@ void MHEngine::GetDefaultFontAttrs(MHOctetString &str)
 const char *MHEngine::MHEGEngineProviderIdString = "MHGGNU001";
 
 // Define the logging function and settings
-int __mhlogoptions = MHLogError;
+int gMHLogoptions = MHLogError;
 
-FILE *__mhlogStream = nullptr;
+FILE *gMHLogStream = nullptr;
 
 // The MHEG engine calls this when it needs to log something.
-void __mhlog(const QString& logtext)
+void mhlog_fn(const QString& logtext)
 {
     QByteArray tmp = logtext.toLatin1();
-    fprintf(__mhlogStream, "[freemheg] %s\n", tmp.constData());
+    fprintf(gMHLogStream, "[freemheg] %s\n", tmp.constData());
 }
 
 // Called from the user of the library to set the logging.
 void MHSetLogging(FILE *logStream, unsigned int logLevel)
 {
-    __mhlogStream = logStream;
-    __mhlogoptions = logLevel;
+    gMHLogStream = logStream;
+    gMHLogoptions = logLevel;
 }

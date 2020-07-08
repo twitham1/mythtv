@@ -31,7 +31,7 @@ class SERVICE_PUBLIC FrontendList : public QObject
 
     Q_CLASSINFO( "Frontends", "type=DTC::Frontend");
 
-    Q_PROPERTY( QVariantList Frontends READ Frontends DESIGNABLE true )
+    Q_PROPERTY( QVariantList Frontends READ Frontends )
 
     PROPERTYIMP_RO_REF( QVariantList, Frontends );
 
@@ -54,7 +54,7 @@ class SERVICE_PUBLIC FrontendList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            Frontend *pObject = new Frontend( this );
+            auto *pObject = new Frontend( this );
             m_Frontends.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

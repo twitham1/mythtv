@@ -1,15 +1,18 @@
 #ifndef VIDEO_SCANNER_H
 #define VIDEO_SCANNER_H
 
-#include <set>
 #include <map>
+#include <set>
+#include <utility>
 #include <vector>
 
+// Qt headers
 #include <QObject> // for moc
 #include <QStringList>
 #include <QEvent>
 #include <QCoreApplication>
 
+// MythTV headers
 #include "mythmetaexp.h"
 #include "mthread.h"
 #include "mythprogressdialog.h"
@@ -22,7 +25,7 @@ class META_PUBLIC VideoScanner : public QObject
 
   public:
     VideoScanner();
-    ~VideoScanner();
+    ~VideoScanner() override;
 
     void doScan(const QStringList &dirs);
     void doScanAll(void);
@@ -43,9 +46,9 @@ class META_PUBLIC VideoScanChanges : public QEvent
   public:
     VideoScanChanges(QList<int> adds, QList<int> movs,
                      QList<int>dels) : QEvent(kEventType),
-                     m_additions(adds), m_moved(movs),
-                     m_deleted(dels) {}
-    ~VideoScanChanges() = default;
+                     m_additions(std::move(adds)), m_moved(std::move(movs)),
+                     m_deleted(std::move(dels)) {}
+    ~VideoScanChanges() override = default;
 
     QList<int> m_additions; // newly added intids
     QList<int> m_moved; // intids moved to new filename
@@ -60,14 +63,14 @@ class META_PUBLIC VideoScannerThread : public MThread
 
   public:
     explicit VideoScannerThread(QObject *parent);
-    ~VideoScannerThread();
+    ~VideoScannerThread() override;
 
     void run() override; // MThread
     void SetDirs(QStringList dirs);
     void SetHosts(const QStringList &hosts);
     void SetProgressDialog(MythUIProgressDialog *dialog) { m_dialog = dialog; };
     QStringList GetOfflineSGHosts(void) { return m_offlineSGHosts; };
-    bool getDataChanged() { return m_DBDataChanged; };
+    bool getDataChanged() const { return m_dbDataChanged; };
 
     void ResetCounts() { m_addList.clear(); m_movList.clear(); m_delList.clear(); };
 
@@ -75,12 +78,12 @@ class META_PUBLIC VideoScannerThread : public MThread
 
     struct CheckStruct
     {
-        bool check;
+        bool check {false};
         QString host;
     };
 
-    typedef std::vector<std::pair<unsigned int, QString> > PurgeList;
-    typedef std::map<QString, CheckStruct> FileCheckList;
+    using PurgeList = std::vector<std::pair<unsigned int, QString> >;
+    using FileCheckList = std::map<QString, CheckStruct>;
 
     void removeOrphans(unsigned int id, const QString &filename);
 
@@ -88,28 +91,28 @@ class META_PUBLIC VideoScannerThread : public MThread
     bool updateDB(const FileCheckList &add, const PurgeList &remove);
     bool buildFileList(const QString &directory,
                                         const QStringList &imageExtensions,
-                                        FileCheckList &filelist);
+                                        FileCheckList &filelist) const;
 
     void SendProgressEvent(uint progress, uint total = 0,
             QString messsage = QString());
 
     QObject *m_parent    {nullptr};
 
-    bool m_ListUnknown   {false};
-    bool m_RemoveAll     {false};
-    bool m_KeepAll       {false};
-    bool m_HasGUI        {false};
+    bool m_listUnknown   {false};
+    bool m_removeAll     {false};
+    bool m_keepAll       {false};
+    bool m_hasGUI        {false};
     QStringList m_directories;
     QStringList m_liveSGHosts;
     QStringList m_offlineSGHosts;
 
-    VideoMetadataListManager *m_dbmetadata {nullptr};
+    VideoMetadataListManager *m_dbMetadata {nullptr};
     MythUIProgressDialog     *m_dialog     {nullptr};
 
     QList<int> m_addList; // newly added intids
     QList<int> m_movList; // intids moved to new filename
     QList<int> m_delList; // orphaned/deleted intids
-    bool m_DBDataChanged {false};
+    bool m_dbDataChanged {false};
 };
 
 #endif

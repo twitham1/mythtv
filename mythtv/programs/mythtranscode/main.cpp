@@ -108,7 +108,7 @@ static int CheckJobQueue()
 }
 
 static int QueueTranscodeJob(ProgramInfo *pginfo, const QString& profile,
-                            QString hostname, bool usecutlist)
+                            const QString& hostname, bool usecutlist)
 {
     RecordingInfo recinfo(*pginfo);
     if (!profile.isEmpty())
@@ -116,7 +116,7 @@ static int QueueTranscodeJob(ProgramInfo *pginfo, const QString& profile,
 
     if (JobQueue::QueueJob(JOB_TRANSCODE, pginfo->GetChanID(),
                            pginfo->GetRecordingStartTime(),
-                           std::move(hostname), "", "",
+                           hostname, "", "",
                            usecutlist ? JOB_USE_CUTLIST : 0))
     {
         LOG(VB_GENERAL, LOG_NOTICE,
@@ -146,14 +146,17 @@ int main(int argc, char *argv[])
 {
     uint chanid = 0;
     QDateTime starttime;
-    QString infile, outfile;
+    QString infile;
+    QString outfile;
     QString profilename = QString("autodetect");
     QString fifodir = nullptr;
     int jobID = -1;
     int jobType = JOB_NONE;
     int otype = REPLEX_MPEG2;
-    bool useCutlist = false, keyframesonly = false;
-    bool build_index = false, fifosync = false;
+    bool useCutlist = false;
+    bool keyframesonly = false;
+    bool build_index = false;
+    bool fifosync = false;
     bool mpeg2 = false;
     bool fifo_info = false;
     bool cleanCut = false;
@@ -185,7 +188,7 @@ int main(int argc, char *argv[])
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythTranscodeCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
 
@@ -200,10 +203,10 @@ int main(int argc, char *argv[])
 
     bool showprogress = cmdline.toBool("showprogress");
 
-    int retval;
     QString mask("general");
     bool quiet = (outfile == "-") || showprogress;
-    if ((retval = cmdline.ConfigureLogging(mask, quiet)) != GENERIC_EXIT_OK)
+    int retval = cmdline.ConfigureLogging(mask, quiet);
+    if (retval != GENERIC_EXIT_OK)
         return retval;
 
     if (cmdline.toBool("starttime"))
@@ -240,17 +243,20 @@ int main(int argc, char *argv[])
                 return GENERIC_EXIT_INVALID_CMDLINE;
             }
 
-            uint64_t last = 0, start, end;
+            uint64_t last = 0;
             QStringList cutlist = cmdline.toStringList("usecutlist", " ");
-            QStringList::iterator it;
-            for (it = cutlist.begin(); it != cutlist.end(); ++it)
+            for (const auto & cut : qAsConst(cutlist))
             {
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
                 QStringList startend =
-                    (*it).split("-", QString::SkipEmptyParts);
+                    cut.split("-", QString::SkipEmptyParts);
+#else
+                QStringList startend = cut.split("-", Qt::SkipEmptyParts);
+#endif
                 if (startend.size() == 2)
                 {
-                    start = startend.first().toULongLong();
-                    end = startend.last().toULongLong();
+                    uint64_t start = startend.first().toULongLong();
+                    uint64_t end = startend.last().toULongLong();
 
                     if (cmdline.toBool("inversecut"))
                     {
@@ -287,7 +293,8 @@ int main(int argc, char *argv[])
             // sanitize cutlist
             if (deleteMap.count() >= 2)
             {
-                frm_dir_map_t::iterator cur = deleteMap.begin(), prev;
+                frm_dir_map_t::iterator cur = deleteMap.begin();
+                frm_dir_map_t::iterator prev;
                 prev = cur++;
                 while (cur != deleteMap.end())
                 {
@@ -545,20 +552,26 @@ int main(int argc, char *argv[])
     if (jobID >= 0)
         JobQueue::ChangeJobStatus(jobID, JOB_RUNNING);
 
-    Transcode *transcode = new Transcode(pginfo);
+    auto *transcode = new Transcode(pginfo);
 
     if (!build_index)
     {
         if (cmdline.toBool("hlsstreamid"))
+        {
             LOG(VB_GENERAL, LOG_NOTICE,
                 QString("Transcoding HTTP Live Stream ID %1")
                         .arg(cmdline.toInt("hlsstreamid")));
+        }
         else if (fifodir.isEmpty())
+        {
             LOG(VB_GENERAL, LOG_NOTICE, QString("Transcoding from %1 to %2")
                     .arg(infile).arg(outfile));
+        }
         else
+        {
             LOG(VB_GENERAL, LOG_NOTICE, QString("Transcoding from %1 to FIFO")
                     .arg(infile));
+        }
     }
 
     if (cmdline.toBool("avf"))
@@ -643,7 +656,7 @@ int main(int argc, char *argv[])
            check_func = &CheckJobQueue;
         }
 
-        MPEG2fixup *m2f = new MPEG2fixup(infile, outfile,
+        auto *m2f = new MPEG2fixup(infile, outfile,
                                          &deleteMap, nullptr, false, false, 20,
                                          showprogress, otype, update_func,
                                          check_func);
@@ -751,8 +764,8 @@ static int transUnlink(const QString& filename, ProgramInfo *pginfo)
     {
         int port = gCoreContext->GetBackendServerPort(hostname);
         QString basename = filename.section('/', -1);
-        QString uri = gCoreContext->GenMythURL(hostname, port, basename,
-                                               pginfo->GetStorageGroup());
+        QString uri = MythCoreContext::GenMythURL(hostname, port, basename,
+                                                  pginfo->GetStorageGroup());
 
         LOG(VB_GENERAL, LOG_NOTICE, QString("Requesting delete for file '%1'.")
                 .arg(uri));
@@ -944,7 +957,6 @@ static void CompleteJob(int jobID, ProgramInfo *pginfo, bool useCutlist,
 
         if (!gCoreContext->GetBoolSetting("SaveTranscoding", false) || forceDelete)
         {
-            int err;
             bool followLinks =
                 gCoreContext->GetBoolSetting("DeletesFollowLinks", false);
 
@@ -957,7 +969,7 @@ static void CompleteJob(int jobID, ProgramInfo *pginfo, bool useCutlist,
             {
                 QString link = getSymlinkTarget(oldfile);
                 QByteArray alink = link.toLocal8Bit();
-                err = transUnlink(alink.constData(), pginfo);
+                int err = transUnlink(alink.constData(), pginfo);
                 if (err)
                 {
                     LOG(VB_GENERAL, LOG_ERR,
@@ -979,11 +991,13 @@ static void CompleteJob(int jobID, ProgramInfo *pginfo, bool useCutlist,
             }
             else
             {
-                err = transUnlink(aoldfile.constData(), pginfo);
+                int err = transUnlink(aoldfile.constData(), pginfo);
                 if (err)
+                {
                     LOG(VB_GENERAL, LOG_ERR,
                         QString("mythtranscode: Error deleting '%1': ")
                             .arg(oldfile) + ENO);
+                }
             }
         }
 
@@ -999,9 +1013,8 @@ static void CompleteJob(int jobID, ProgramInfo *pginfo, bool useCutlist,
         QDir dir (fInfo.path());
         QFileInfoList previewFiles = dir.entryInfoList(nameFilters);
 
-        for (int nIdx = 0; nIdx < previewFiles.size(); nIdx++)
+        for (const auto & previewFile : qAsConst(previewFiles))
         {
-            const QFileInfo& previewFile = previewFiles.at(nIdx);
             QString oldFileName = previewFile.absoluteFilePath();
 
             // Delete previews if cutlist was applied.  They will be re-created as
@@ -1113,13 +1126,19 @@ static void CompleteJob(int jobID, ProgramInfo *pginfo, bool useCutlist,
         if (jobID >= 0)
         {
             if (status == JOB_ABORTING)                     // Stop command was sent
+            {
                 JobQueue::ChangeJobStatus(jobID, JOB_ABORTED,
                                         QObject::tr("Job Aborted"));
+            }
             else if (status != JOB_ERRORING)                // Recoverable error
+            {
                 exitCode = GENERIC_EXIT_RESTART;
+            }
             else                                            // Unrecoverable error
+            {
                 JobQueue::ChangeJobStatus(jobID, JOB_ERRORED,
                                         QObject::tr("Unrecoverable error"));
+            }
         }
     }
 }

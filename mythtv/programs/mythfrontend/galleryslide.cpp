@@ -163,9 +163,7 @@ void SequentialAnimation::Start(bool forwards, float speed)
     m_current = forwards ? 0 : m_group.size() - 1;
 
     // Start group, then first child
-    // Parent function explicitly set to zero. Have to call
-    // grandparent directly to get work done.
-    AbstractAnimation::Start(forwards, speed);
+    GroupAnimation::Start(forwards, speed);
     m_group.at(m_current)->Start(m_forwards, m_speed);
 }
 
@@ -177,9 +175,7 @@ void SequentialAnimation::Start(bool forwards, float speed)
 void SequentialAnimation::SetSpeed(float speed)
 {
     // Set group speed for subsequent children
-    // Parent function explicitly set to zero. Have to call
-    // grandparent directly to get work done.
-    AbstractAnimation::SetSpeed(speed);
+    GroupAnimation::SetSpeed(speed);
 
     // Set active child
     if (!m_running || m_current < 0 || m_current >= m_group.size())
@@ -211,9 +207,11 @@ void SequentialAnimation::Finished()
 void ParallelAnimation::Pulse(int interval)
 {
     if (m_running)
+    {
         // Pulse all children
-        foreach(AbstractAnimation *animation, m_group)
+        for (AbstractAnimation *animation : qAsConst(m_group))
             animation->Pulse(interval);
+    }
 }
 
 
@@ -230,10 +228,8 @@ void ParallelAnimation::Start(bool forwards, float speed)
     m_finished = m_group.size();
 
     // Start group, then all children
-    // Parent function explicitly set to zero. Have to call
-    // grandparent directly to get work done.
-    AbstractAnimation::Start(forwards, speed);
-    foreach(AbstractAnimation *animation, m_group)
+    GroupAnimation::Start(forwards, speed);
+    for (AbstractAnimation *animation : qAsConst(m_group))
         animation->Start(m_forwards, m_speed);
 }
 
@@ -245,10 +241,8 @@ void ParallelAnimation::Start(bool forwards, float speed)
 void ParallelAnimation::SetSpeed(float speed)
 {
     // Set group speed, then all children
-    // Parent function explicitly set to zero. Have to call
-    // grandparent directly to get work done.
-    AbstractAnimation::SetSpeed(speed);
-    foreach(AbstractAnimation *animation, m_group)
+    GroupAnimation::SetSpeed(speed);
+    for (AbstractAnimation *animation : qAsConst(m_group))
         animation->SetSpeed(m_speed);
 }
 
@@ -585,7 +579,7 @@ SlideBuffer::~SlideBuffer()
 void SlideBuffer::Teardown()
 {
     QMutexLocker lock(&m_mutexQ);
-    foreach (Slide *s, m_queue)
+    for (Slide *s : qAsConst(m_queue))
         s->Clear();
     LOG(VB_GUI, LOG_DEBUG, "Aborted Slidebuffer");
 }
@@ -605,7 +599,7 @@ void SlideBuffer::Initialise(MythUIImage &image)
     // Fill buffer with slides cloned from the XML image widget
 
     // Create first as a child of the XML image.
-    Slide *slide = new Slide(nullptr, "slide0", &image);
+    auto *slide = new Slide(nullptr, "slide0", &image);
 
     // Buffer is notified when it has loaded image
     connect(slide, SIGNAL(ImageLoaded(Slide *)),

@@ -11,7 +11,7 @@
 #include "mythdirs.h"
 #include "mythcorecontext.h"
 
-typedef QMap<QString, QTranslator*> TransMap;
+using TransMap = QMap<QString, QTranslator*>;
 
 class MythTranslationPrivate
 {
@@ -55,14 +55,14 @@ void MythTranslation::load(const QString &module_name)
         lang = "en_us";
     }
 
-    QTranslator *trans = new QTranslator(nullptr);
+    auto *trans = new QTranslator(nullptr);
     if (trans->load(GetTranslationsDir() + module_name
                     + "_" + lang + ".qm", "."))
     {
         LOG(VB_GENERAL, LOG_INFO,
             QString("Loading %1 translation for module %2")
                 .arg(lang).arg(module_name));
-        qApp->installTranslator(trans);
+        QCoreApplication::installTranslator(trans);
         d.m_translators[module_name] = trans;
     }
     else
@@ -79,7 +79,7 @@ void MythTranslation::unload(const QString &module_name)
     if (it != d.m_translators.end())
     {
         // found translator, remove it from qApp and our map
-        qApp->removeTranslator(*it);
+        QCoreApplication::removeTranslator(*it);
         delete *it;
         d.m_translators.erase(it);
     }
@@ -111,10 +111,8 @@ void MythTranslation::reload()
              ++it)
             keys.append(it.key());
 
-        for (QStringList::Iterator it = keys.begin();
-             it != keys.end();
-             ++it)
-            load(*it);
+        for (const auto& key : qAsConst(keys))
+            load(key);
     }
 }
 

@@ -81,14 +81,22 @@ static int SetMarkupList(const MythUtilCommandLineParser &cmdline,
 
     newList.replace(QRegExp(" "), "");
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList tokens = newList.split(",", QString::SkipEmptyParts);
+#else
+    QStringList tokens = newList.split(",", Qt::SkipEmptyParts);
+#endif
 
     if (newList.isEmpty())
         newList = "(EMPTY)";
 
     for (int i = 0; i < tokens.size(); i++)
     {
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList cutpair = tokens[i].split("-", QString::SkipEmptyParts);
+#else
+        QStringList cutpair = tokens[i].split("-", Qt::SkipEmptyParts);
+#endif
         if (isCutlist)
         {
             markuplist[cutpair[0].toInt()] = MARK_CUT_START;
@@ -146,10 +154,12 @@ static int CopySkipListToCutList(const MythUtilCommandLineParser &cmdline)
 
     pginfo.QueryCommBreakList(cutlist);
     for (it = cutlist.begin(); it != cutlist.end(); ++it)
+    {
         if (*it == MARK_COMM_START)
             cutlist[it.key()] = MARK_CUT_START;
         else
             cutlist[it.key()] = MARK_CUT_END;
+    }
     pginfo.SaveCutList(cutlist);
 
     cout << "Commercial Skip List copied to Cutlist\n";
@@ -227,7 +237,8 @@ static int GetMarkup(const MythUtilCommandLineParser &cmdline)
         LOG(VB_STDIO|VB_FLUSH, LOG_ERR, "Missing --getmarkup filename\n");
         return GENERIC_EXIT_INVALID_CMDLINE;
     }
-    QVector<ProgramInfo::MarkupEntry> mapMark, mapSeek;
+    QVector<ProgramInfo::MarkupEntry> mapMark;
+    QVector<ProgramInfo::MarkupEntry> mapSeek;
     pginfo.QueryMarkup(mapMark, mapSeek);
     QFile outfile(filename);
     if (!outfile.open(QIODevice::WriteOnly))
@@ -248,9 +259,8 @@ static int GetMarkup(const MythUtilCommandLineParser &cmdline)
     root.appendChild(item);
     QDomElement markup = xml.createElement("markup");
     item.appendChild(markup);
-    for (int i = 0; i < mapMark.size(); ++i)
+    for (const auto & entry : qAsConst(mapMark))
     {
-        ProgramInfo::MarkupEntry &entry = mapMark[i];
         QDomElement child = xml.createElement("mark");
         child.setAttribute("type", entry.type);
         child.setAttribute("frame", (qulonglong)entry.frame);
@@ -258,9 +268,8 @@ static int GetMarkup(const MythUtilCommandLineParser &cmdline)
             child.setAttribute("data", (qulonglong)entry.data);
         markup.appendChild(child);
     }
-    for (int i = 0; i < mapSeek.size(); ++i)
+    for (const auto & entry : qAsConst(mapSeek))
     {
-        ProgramInfo::MarkupEntry &entry = mapSeek[i];
         QDomElement child = xml.createElement("seek");
         child.setAttribute("type", entry.type);
         child.setAttribute("frame", (qulonglong)entry.frame);
@@ -286,7 +295,8 @@ static int SetMarkup(const MythUtilCommandLineParser &cmdline)
         LOG(VB_STDIO|VB_FLUSH, LOG_ERR, "Missing --setmarkup filename\n");
         return GENERIC_EXIT_INVALID_CMDLINE;
     }
-    QVector<ProgramInfo::MarkupEntry> mapMark, mapSeek;
+    QVector<ProgramInfo::MarkupEntry> mapMark;
+    QVector<ProgramInfo::MarkupEntry> mapSeek;
     QFile infile(filename);
     if (!infile.open(QIODevice::ReadOnly))
     {
@@ -331,7 +341,7 @@ static int SetMarkup(const MythUtilCommandLineParser &cmdline)
         {
             QDomElement e = n.toElement();
             QString tagName = e.tagName();
-            bool isMark;
+            bool isMark = false;
             if (tagName == "mark")
                 isMark = true;
             else if (tagName == "seek")

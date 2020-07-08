@@ -211,7 +211,7 @@ void MetadataDownload::run()
 
 unsigned int MetadataDownload::findExactMatchCount(MetadataLookupList list,
                                                    const QString &originaltitle,
-                                                   bool withArt) const
+                                                   bool withArt)
 {
     unsigned int exactMatches = 0;
     unsigned int exactMatchesWithArt = 0;
@@ -240,12 +240,12 @@ unsigned int MetadataDownload::findExactMatchCount(MetadataLookupList list,
 }
 
 MetadataLookup* MetadataDownload::findBestMatch(MetadataLookupList list,
-                                            const QString &originaltitle) const
+                                            const QString &originaltitle)
 {
     QStringList titles;
     MetadataLookup *ret = nullptr;
     QDate exactTitleDate;
-    float exactTitlePopularity;
+    float exactTitlePopularity = 0.0F;
     int exactMatches = 0;
     int exactMatchesWithArt = 0;
     bool foundMatchWithArt = false;
@@ -339,12 +339,11 @@ MetadataLookup* MetadataDownload::findBestMatch(MetadataLookupList list,
                     .arg(originaltitle).arg(bestTitle));
 
     // Grab the one item that matches the besttitle (IMPERFECT)
-    MetadataLookupList::const_iterator i = list.begin();
-    for (; i != list.end(); ++i)
+    for (auto item : qAsConst(list))
     {
-        if ((*i)->GetTitle() == bestTitle)
+        if (item->GetTitle() == bestTitle)
         {
-            ret = (*i);
+            ret = item;
             break;
         }
     }
@@ -442,7 +441,7 @@ MetadataLookupList MetadataDownload::readMXML(const QString& MXMLpath,
     {
         QByteArray mxmlraw;
         QDomElement item;
-        RemoteFile *rf = new RemoteFile(MXMLpath);
+        auto *rf = new RemoteFile(MXMLpath);
 
         if (rf->isOpen())
         {
@@ -491,7 +490,7 @@ MetadataLookupList MetadataDownload::readNFO(const QString& NFOpath,
     {
         QByteArray nforaw;
         QDomElement item;
-        RemoteFile *rf = new RemoteFile(NFOpath);
+        auto *rf = new RemoteFile(NFOpath);
 
         if (rf->isOpen())
         {
@@ -668,7 +667,7 @@ MetadataLookupList MetadataDownload::handleTelevision(MetadataLookup *lookup)
                                           lookup->GetSubtitle(), lookup, false);
         }
 
-        if (list.isEmpty() && lookup->GetSeason() && lookup->GetEpisode())
+        if (list.isEmpty() && (lookup->GetSeason() || lookup->GetEpisode()))
         {
             list = grabber.LookupData(lookup->GetInetref(), lookup->GetSeason(),
                                       lookup->GetEpisode(), lookup);
@@ -725,8 +724,8 @@ MetadataLookupList MetadataDownload::handleTelevision(MetadataLookup *lookup)
     {
         // mark all results so that search collection is properly handled later
         lookup->SetIsCollection(searchcollection);
-        for (MetadataLookupList::iterator it = list.begin();
-             it != list.end(); ++it)
+        // NOLINTNEXTLINE(modernize-loop-convert)
+        for (auto it = list.begin(); it != list.end(); ++it)
         {
             (*it)->SetIsCollection(searchcollection);
         }

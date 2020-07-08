@@ -75,11 +75,15 @@ bool MetaIOID3::OpenFile(const QString &filename, bool forWriting)
     if (!m_file->isOpen() || (forWriting && m_file->readOnly()))
     {
         if (m_file->isOpen())
+        {
             LOG(VB_FILE, LOG_NOTICE,
                 QString("Could not open file for writing: %1").arg(m_filename));
+        }
         else
+        {
             LOG(VB_FILE, LOG_ERR,
                 QString("Could not open file: %1").arg(m_filename));
+        }
 
         CloseFile();
         return false;
@@ -114,18 +118,19 @@ TagLib::ID3v2::Tag* MetaIOID3::GetID3v2Tag(bool create)
     if (!m_file)
         return nullptr;
 
-    TagLib::ID3v2::Tag *tag = nullptr;
-    switch (m_fileType)
+    if (m_fileType == kMPEG)
     {
-        case kMPEG :
-            tag = (static_cast<TagLib::MPEG::File*>(m_file))->ID3v2Tag(create);
-            break;
-        case kFLAC :
-            tag = (static_cast<TagLib::FLAC::File*>(m_file))->ID3v2Tag(create);
-            break;
+        auto *file = dynamic_cast<TagLib::MPEG::File*>(m_file);
+        return (file != nullptr) ? file->ID3v2Tag(create) : nullptr;
     }
 
-    return tag;
+    if (m_fileType == kFLAC)
+    {
+        auto *file = dynamic_cast<TagLib::FLAC::File*>(m_file);
+        return (file != nullptr) ? file->ID3v2Tag(create) : nullptr;
+    }
+
+    return nullptr;
 }
 
 TagLib::ID3v1::Tag* MetaIOID3::GetID3v1Tag(bool create)
@@ -133,18 +138,13 @@ TagLib::ID3v1::Tag* MetaIOID3::GetID3v1Tag(bool create)
     if (!m_file)
         return nullptr;
 
-    TagLib::ID3v1::Tag *tag = nullptr;
-    switch (m_fileType)
+    if (m_fileType == kMPEG)
     {
-        case kMPEG :
-            tag = (static_cast<TagLib::MPEG::File*>(m_file))->ID3v1Tag(create);
-            break;
-        case kFLAC :
-            // Flac doesn't support ID3v1
-            break;
+        auto *file = dynamic_cast<TagLib::MPEG::File*>(m_file);
+        return (file != nullptr) ? file->ID3v1Tag(create) : nullptr;
     }
 
-    return tag;
+    return nullptr;
 }
 
 /*!
@@ -195,7 +195,7 @@ bool MetaIOID3::write(const QString &filename, MusicMetadata* mdata)
         TextIdentificationFrame *tpe4frame = nullptr;
         TagLib::ID3v2::FrameList tpelist = tag->frameListMap()["TPE4"];
         if (!tpelist.isEmpty())
-            tpe4frame = (TextIdentificationFrame *)tpelist.front();
+            tpe4frame = dynamic_cast<TextIdentificationFrame *>(tpelist.front());
 
         if (!tpe4frame)
         {
@@ -209,7 +209,7 @@ bool MetaIOID3::write(const QString &filename, MusicMetadata* mdata)
         TextIdentificationFrame *tpe2frame = nullptr;
         tpelist = tag->frameListMap()["TPE2"];
         if (!tpelist.isEmpty())
-            tpe2frame = (TextIdentificationFrame *)tpelist.front();
+            tpe2frame = dynamic_cast<TextIdentificationFrame *>(tpelist.front());
 
         if (!tpe2frame)
         {
@@ -253,7 +253,7 @@ MusicMetadata *MetaIOID3::read(const QString &filename)
         }
     }
 
-    MusicMetadata *metadata = new MusicMetadata(filename);
+    auto *metadata = new MusicMetadata(filename);
 
     ReadGenericMetadata(tag, metadata);
 
@@ -268,7 +268,7 @@ MusicMetadata *MetaIOID3::read(const QString &filename)
     if (tpelist.isEmpty() || tpelist.front()->toString().isEmpty())
         tpelist = tag->frameListMap()["TPE2"];
     if (!tpelist.isEmpty())
-        tpeframe = (TextIdentificationFrame *)tpelist.front();
+        tpeframe = dynamic_cast<TextIdentificationFrame *>(tpelist.front());
 
     if (tpeframe && !tpeframe->toString().isEmpty())
     {
@@ -312,10 +312,9 @@ MusicMetadata *MetaIOID3::read(const QString &filename)
         // then compilation is TRUE
         if (!compilation && !musicbrainz->fieldList().isEmpty())
         {
-            TagLib::StringList l = musicbrainz->fieldList();
-            for (TagLib::StringList::ConstIterator it = l.begin(); it != l.end(); it++)
+            for (auto & field : musicbrainz->fieldList())
             {
-                QString ID = TStringToQString((*it));
+                QString ID = TStringToQString(field);
 
                 if (ID == MYTH_MUSICBRAINZ_ALBUMARTIST_UUID)
                 {
@@ -391,7 +390,7 @@ MusicMetadata *MetaIOID3::read(const QString &filename)
  */
 QImage* MetaIOID3::getAlbumArt(const QString &filename, ImageType type)
 {
-    QImage *picture = new QImage();
+    auto *picture = new QImage();
 
     AttachedPictureFrame::Type apicType
         = AttachedPictureFrame::FrontCover;
@@ -427,11 +426,9 @@ QImage* MetaIOID3::getAlbumArt(const QString &filename, ImageType type)
         {
             TagLib::ID3v2::FrameList apicframes = tag->frameListMap()["APIC"];
 
-            for(TagLib::ID3v2::FrameList::Iterator it = apicframes.begin();
-                it != apicframes.end(); ++it)
+            for (auto & apicframe : apicframes)
             {
-                AttachedPictureFrame *frame =
-                                    static_cast<AttachedPictureFrame *>(*it);
+                auto *frame = dynamic_cast<AttachedPictureFrame *>(apicframe);
                 if (frame && frame->type() == apicType)
                 {
                     picture->loadFromData((const uchar *)frame->picture().data(),
@@ -484,12 +481,15 @@ AlbumArtList MetaIOID3::readAlbumArt(TagLib::ID3v2::Tag *tag)
     {
         TagLib::ID3v2::FrameList apicframes = tag->frameListMap()["APIC"];
 
-        for(TagLib::ID3v2::FrameList::Iterator it = apicframes.begin();
-            it != apicframes.end(); ++it)
+        for (auto & apicframe : apicframes)
         {
-
-            AttachedPictureFrame *frame =
-                static_cast<AttachedPictureFrame *>(*it);
+            auto *frame = dynamic_cast<AttachedPictureFrame *>(apicframe);
+            if (frame == nullptr)
+            {
+                LOG(VB_GENERAL, LOG_DEBUG,
+                    "Music Scanner - Cannot convert APIC frame");
+                continue;
+            }
 
             // Assume a valid image would have at least
             // 100 bytes of data (1x1 indexed gif is 35 bytes)
@@ -501,7 +501,7 @@ AlbumArtList MetaIOID3::readAlbumArt(TagLib::ID3v2::Tag *tag)
                 continue;
             }
 
-            AlbumArtImage *art = new AlbumArtImage();
+            auto *art = new AlbumArtImage();
 
             if (frame->description().isEmpty())
                 art->m_description.clear();
@@ -584,9 +584,9 @@ AttachedPictureFrame* MetaIOID3::findAPIC(TagLib::ID3v2::Tag *tag,
                                         const String &description)
 {
   TagLib::ID3v2::FrameList l = tag->frameList("APIC");
-  for(TagLib::ID3v2::FrameList::Iterator it = l.begin(); it != l.end(); ++it)
+  for (auto & frame : l)
   {
-    AttachedPictureFrame *f = static_cast<AttachedPictureFrame *>(*it);
+    auto *f = dynamic_cast<AttachedPictureFrame *>(frame);
     if (f && f->type() == type &&
         (description.isNull() || f->description() == description))
       return f;
@@ -809,10 +809,9 @@ UserTextIdentificationFrame* MetaIOID3::find(TagLib::ID3v2::Tag *tag,
                                                 const String &description)
 {
   TagLib::ID3v2::FrameList l = tag->frameList("TXXX");
-  for(TagLib::ID3v2::FrameList::Iterator it = l.begin(); it != l.end(); ++it)
+  for (auto & frame : l)
   {
-    UserTextIdentificationFrame *f =
-                                static_cast<UserTextIdentificationFrame *>(*it);
+    auto *f = dynamic_cast<UserTextIdentificationFrame *>(frame);
     if (f && f->description() == description)
       return f;
   }
@@ -830,9 +829,9 @@ PopularimeterFrame* MetaIOID3::findPOPM(TagLib::ID3v2::Tag *tag,
                                         const String &_email)
 {
   TagLib::ID3v2::FrameList l = tag->frameList("POPM");
-  for(TagLib::ID3v2::FrameList::Iterator it = l.begin(); it != l.end(); ++it)
+  for (auto & frame : l)
   {
-    PopularimeterFrame *f = static_cast<PopularimeterFrame *>(*it);
+    auto *f = dynamic_cast<PopularimeterFrame *>(frame);
     if (f && f->email() == _email)
       return f;
   }

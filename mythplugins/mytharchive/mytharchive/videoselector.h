@@ -23,17 +23,17 @@ class MythUIButton;
 class MythUIButtonList;
 class MythUIButtonListItem;
 
-typedef struct
+struct VideoInfo
 {
-    int     id;
+    int     id            { 0 };
     QString title;
     QString plot;
     QString category;
     QString filename;
     QString coverfile;
-    int     parentalLevel;
-    uint64_t size;
-} VideoInfo;
+    int     parentalLevel { ParentalLevel::plNone };
+    uint64_t size         { 0 };
+};
 
 class VideoSelector : public MythScreenType
 {
@@ -42,7 +42,7 @@ class VideoSelector : public MythScreenType
   public:
     VideoSelector(MythScreenStack *parent, QList<ArchiveItem *> *archiveList);
 
-    ~VideoSelector(void);
+    ~VideoSelector(void) override;
 
     bool Create() override; // MythScreenType
     bool keyPressEvent(QKeyEvent *e) override; // MythScreenType
@@ -69,7 +69,7 @@ class VideoSelector : public MythScreenType
     void updateSelectedList(void);
     void getVideoList(void);
     void wireUpTheme(void);
-    std::vector<VideoInfo *> *getVideoListFromDB(void);
+    static std::vector<VideoInfo *> *getVideoListFromDB(void);
     void setParentalLevel(ParentalLevel::Level level);
 
     ParentalLevelChangeChecker *m_parentalLevelChecker {nullptr};

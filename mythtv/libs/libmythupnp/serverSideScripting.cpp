@@ -87,13 +87,8 @@ ServerSideScripting::~ServerSideScripting()
 {
     Lock();
 
-    QMap<QString, ScriptInfo*>::iterator it = m_mapScripts.begin();
-
-    for (; it != m_mapScripts.end(); ++it)
-    {
-        if (*it)
-            delete (*it);
-    }
+    for (const auto *script : qAsConst(m_mapScripts))
+        delete script;
 
     m_mapScripts.clear();
     Unlock();
@@ -214,13 +209,12 @@ bool ServerSideScripting::EvaluatePage( QTextStream *pOutStream, const QString &
         // word characters and numbers, _ and $
         // They must not start with a number - to simplify the regexp, we
         // restrict the first character to the English alphabet
-        QRegExp validChars = QRegExp("^([a-zA-Z]|_|\\$)(\\w|\\$)+$");
+        QRegExp validChars = QRegExp(R"(^([a-zA-Z]|_|\$)(\w|\$)+$)");
 
         QVariantMap params;
-        QMap<QString, QString>::const_iterator it = mapParams.begin();
         QString prevArrayName = "";
         QVariantMap array;
-        for (; it != mapParams.end(); ++it)
+        for (auto it = mapParams.cbegin(); it != mapParams.cend(); ++it)
         {
             const QString& key = it.key();
             QVariant value = QVariant(it.value());
@@ -271,7 +265,7 @@ bool ServerSideScripting::EvaluatePage( QTextStream *pOutStream, const QString &
         QStringMap mapHeaders = pRequest->m_mapHeaders;
 
         QVariantMap requestHeaders;
-        for (it = mapHeaders.begin(); it != mapHeaders.end(); ++it)
+        for (auto it = mapHeaders.begin(); it != mapHeaders.end(); ++it)
         {
             QString key = it.key();
             key = key.replace('-', '_'); // May be other valid chars in a request header that we need to replace
@@ -290,7 +284,7 @@ bool ServerSideScripting::EvaluatePage( QTextStream *pOutStream, const QString &
         QStringMap mapCookies = pRequest->m_mapCookies;
 
         QVariantMap requestCookies;
-        for (it = mapCookies.begin(); it != mapCookies.end(); ++it)
+        for (auto it = mapCookies.begin(); it != mapCookies.end(); ++it)
         {
             QString key = it.key();
             key = key.replace('-', '_'); // May be other valid chars in a request header that we need to replace
@@ -489,7 +483,7 @@ QString ServerSideScripting::CreateMethodFromFile( const QString &sFileName ) co
 //
 //////////////////////////////////////////////////////////////////////////////
 
-QString ServerSideScripting::ReadFileContents( const QString &sFileName ) const
+QString ServerSideScripting::ReadFileContents( const QString &sFileName )
 {
     QString  sCode;
     QFile    scriptFile( sFileName );
@@ -626,7 +620,11 @@ bool ServerSideScripting::ProcessLine( QTextStream &sCode,
 
                     // Extract filename (remove quotes)
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
                     QStringList sParts = sSegment.split( ' ', QString::SkipEmptyParts );
+#else
+                    QStringList sParts = sSegment.split( ' ', Qt::SkipEmptyParts );
+#endif
 
                     if (sParts.length() > 1 )
                     {
@@ -640,10 +638,12 @@ bool ServerSideScripting::ProcessLine( QTextStream &sCode,
                                   << "\n";
                         }
                         else
+                        {
                             LOG(VB_GENERAL, LOG_ERR,
                                 QString("ServerSideScripting::ProcessLine 'import' - File not found: %1%2")
                                    .arg(m_sResRootPath)
                                    .arg(sFileName));
+                        }
                     }
                     else
                     {

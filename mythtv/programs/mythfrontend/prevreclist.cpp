@@ -26,8 +26,8 @@
 using namespace std;
 
 // QT
-#include <QString>
 #include <QDateTime>
+#include <QString>
 
 //MythTV
 #include "mythcorecontext.h"
@@ -55,10 +55,10 @@ static const int fReverseSort = 2;
 static const int fDefault = fReverseSort;
 
 PrevRecordedList::PrevRecordedList(MythScreenStack *parent, uint recid,
-    const QString &title) :
+    QString title) :
     ScheduleCommon(parent,"PrevRecordedList"),
     m_recid(recid),
-    m_title(title)
+    m_title(std::move(title))
 {
 
     if (m_recid && !m_title.isEmpty())
@@ -164,8 +164,7 @@ void PrevRecordedList::Load(void)
         else
             LoadDates();
     }
-    ScreenLoadCompletionEvent *slce =
-        new ScreenLoadCompletionEvent(objectName());
+    auto *slce = new ScreenLoadCompletionEvent(objectName());
     QCoreApplication::postEvent(this, slce);
 }
 
@@ -221,16 +220,20 @@ bool PrevRecordedList::LoadTitles(void)
     while (query.next())
     {
         QString title(query.value(0).toString());
-        ProgramInfo *program = new ProgramInfo();
+        auto *program = new ProgramInfo();
         program->SetTitle(title);
         m_titleData.push_back(program);
     }
     if (m_reverseSort)
+    {
         std::stable_sort(m_titleData.begin(), m_titleData.end(),
             comp_sorttitle_lt_rev);
+    }
     else
+    {
         std::stable_sort(m_titleData.begin(), m_titleData.end(),
             comp_sorttitle_lt);
+    }
     return true;
 }
 
@@ -259,7 +262,7 @@ bool PrevRecordedList::LoadDates(void)
     // Create "Last two weeks" entry
     // It is identified by bogus date of 0000/00
 
-    ProgramInfo *program = new ProgramInfo();
+    auto *program = new ProgramInfo();
     program->SetRecordingStartTime(QDateTime::currentDateTime());
     program->SetTitle(tr("Last two weeks"), "0000/00");
     m_titleData.push_back(program);
@@ -270,7 +273,11 @@ bool PrevRecordedList::LoadDates(void)
         int month(query.value(1).toInt());
         program = new ProgramInfo();
         QDate startdate(year,month,1);
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QDateTime starttime(startdate);
+#else
+        QDateTime starttime = startdate.startOfDay();
+#endif
         program->SetRecordingStartTime(starttime);
         QString date = QString("%1/%2")
             .arg(year,4,10,QChar('0')).arg(month,2,10,QChar('0'));
@@ -281,11 +288,15 @@ bool PrevRecordedList::LoadDates(void)
         m_titleData.push_back(program);
     }
     if (m_reverseSort)
+    {
         std::stable_sort(m_titleData.begin(), m_titleData.end(),
             comp_sortdate_lt_rev);
+    }
     else
+    {
         std::stable_sort(m_titleData.begin(), m_titleData.end(),
             comp_sortdate_lt);
+    }
     return true;
 }
 
@@ -300,15 +311,15 @@ void PrevRecordedList::UpdateShowList(void)
 }
 
 void PrevRecordedList::UpdateList(MythUIButtonList *bnList,
-    ProgramList *progData, bool isShows)
+    ProgramList *progData, bool isShows) const
 {
     bnList->Reset();
-    for (size_t i = 0; i < progData->size(); ++i)
+    for (auto *pg : *progData)
     {
-        MythUIButtonListItem *item =
-            new MythUIButtonListItem(bnList, "", QVariant::fromValue((*progData)[i]));
+        auto *item = new MythUIButtonListItem(bnList, "",
+                                          QVariant::fromValue(pg));
         InfoMap infoMap;
-        (*progData)[i]->ToMap(infoMap,true);
+        pg->ToMap(infoMap,true);
         QString state;
         if (isShows)
         {
@@ -318,7 +329,7 @@ void PrevRecordedList::UpdateList(MythUIButtonList *bnList,
             else
                 partTitle = infoMap["titlesubtitle"];
             infoMap["parttitle"] = partTitle;
-            state = RecStatus::toUIState((*progData)[i]->GetRecordingStatus());
+            state = RecStatus::toUIState(pg->GetRecordingStatus());
             if ((state == "warning"))
                 state = "disabled";
         }
@@ -354,10 +365,12 @@ void PrevRecordedList::updateInfo(void)
             if (m_help1Text)
                 m_help1Text->SetText(tr("Select a program..."));
             if (m_help2Text)
+            {
                 m_help2Text->SetText(tr(
                 "Select the title of the program you wish to find. "
                 "When finished return with the left arrow key. "
                 "To search by date press 1."));
+            }
             if (m_curviewText)
             {
                 if (m_reverseSort)
@@ -373,10 +386,12 @@ void PrevRecordedList::updateInfo(void)
             if (m_help1Text)
                 m_help1Text->SetText(tr("Select a month ..."));
             if (m_help2Text)
+            {
                 m_help2Text->SetText(tr(
                 "Select a month to search. "
                 "When finished return with the left arrow key. "
                 "To search by title press 2."));
+            }
             if (m_curviewText)
             {
                 if (m_reverseSort)
@@ -532,12 +547,12 @@ bool PrevRecordedList::keyPressEvent(QKeyEvent *e)
 
 void PrevRecordedList::ShowMenu(void)
 {
-    MythMenu *sortMenu = new MythMenu(tr("Sort Options"), this, "sortmenu");
+    auto *sortMenu = new MythMenu(tr("Sort Options"), this, "sortmenu");
     sortMenu->AddItem(tr("Reverse Sort Order"));
     sortMenu->AddItem(tr("Sort By Title"));
     sortMenu->AddItem(tr("Sort By Time"));
 
-    MythMenu *menu = new MythMenu(tr("List Options"), this, "menu");
+    auto *menu = new MythMenu(tr("List Options"), this, "menu");
 
     menu->AddItem(tr("Sort"), nullptr, sortMenu);
 
@@ -552,7 +567,7 @@ void PrevRecordedList::ShowMenu(void)
     }
     menu->AddItem(tr("Program Guide"),   SLOT(ShowGuide()));
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
-    MythDialogBox *menuPopup = new MythDialogBox(menu, popupStack, "menuPopup");
+    auto *menuPopup = new MythDialogBox(menu, popupStack, "menuPopup");
 
     if (!menuPopup->Create())
     {
@@ -565,7 +580,7 @@ void PrevRecordedList::ShowMenu(void)
 
 void PrevRecordedList::ShowItemMenu(void)
 {
-    MythMenu *menu = new MythMenu(tr("Recording Options"), this, "menu");
+    auto *menu = new MythMenu(tr("Recording Options"), this, "menu");
 
     ProgramInfo *pi = GetCurrentProgram();
     if (pi)
@@ -580,7 +595,7 @@ void PrevRecordedList::ShowItemMenu(void)
             SLOT(ShowDeleteOldSeriesMenu()));
     }
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
-    MythDialogBox *menuPopup = new MythDialogBox(menu, popupStack, "menuPopup");
+    auto *menuPopup = new MythDialogBox(menu, popupStack, "menuPopup");
 
     if (!menuPopup->Create())
     {
@@ -597,7 +612,7 @@ void PrevRecordedList::customEvent(QEvent *event)
 
     if (event->type() == DialogCompletionEvent::kEventType)
     {
-        DialogCompletionEvent *dce = (DialogCompletionEvent*)(event);
+        auto *dce = (DialogCompletionEvent*)(event);
 
         QString resultid   = dce->GetId();
         QString resulttext = dce->GetResultText();
@@ -625,8 +640,7 @@ void PrevRecordedList::customEvent(QEvent *event)
         }
         else if (resultid == "deleterule")
         {
-            RecordingRule *record =
-                dce->GetData().value<RecordingRule *>();
+            auto *record = dce->GetData().value<RecordingRule *>();
             if (record && buttonnum > 0 && !record->Delete())
             {
                 LOG(VB_GENERAL, LOG_ERR, LOC +
@@ -641,7 +655,7 @@ void PrevRecordedList::customEvent(QEvent *event)
     }
     else if (event->type() == ScreenLoadCompletionEvent::kEventType)
     {
-        ScreenLoadCompletionEvent *slce = (ScreenLoadCompletionEvent*)(event);
+        auto *slce = (ScreenLoadCompletionEvent*)(event);
         QString id = slce->GetId();
 
         if (id == objectName())
@@ -740,8 +754,7 @@ void PrevRecordedList::DeleteOldEpisode(bool ok)
     ScheduledRecording::RescheduleCheck(*pi, "DeleteOldEpisode");
 
     // Delete the current item from both m_showData and m_showList.
-    ProgramList::iterator it =
-        m_showData.begin() + m_showList->GetCurrentPos();
+    auto it = m_showData.begin() + m_showList->GetCurrentPos();
     m_showData.erase(it);
     MythUIButtonListItem *item = m_showList->GetItemCurrent();
     m_showList->RemoveItem(item);
@@ -768,8 +781,17 @@ void PrevRecordedList::DeleteOldSeries(bool ok)
 
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare("DELETE FROM oldrecorded "
-                  "WHERE title = :TITLE AND future = 0");
+                  "WHERE title = :TITLE "
+                  "      AND recstatus <> :PENDING "
+                  "      AND recstatus <> :TUNING "
+                  "      AND recstatus <> :RECORDING "
+                  "      AND recstatus <> :FAILING "
+                  "      AND future = 0");
     query.bindValue(":TITLE", title);
+    query.bindValue(":PENDING", RecStatus::Pending);
+    query.bindValue(":TUNING", RecStatus::Tuning);
+    query.bindValue(":RECORDING", RecStatus::Recording);
+    query.bindValue(":FAILING", RecStatus::Failing);
     if (!query.exec())
         MythDB::DBError("ProgLister::DeleteOldSeries -- delete", query);
 
@@ -781,10 +803,14 @@ void PrevRecordedList::DeleteOldSeries(bool ok)
 
     // Delete the matching items from both m_showData and m_showList.
     int pos = 0;
-    ProgramList::iterator it = m_showData.begin();
+    auto it = m_showData.begin();
     while (pos < (int)m_showData.size())
     {
-        if ((*it)->GetTitle() == title)
+        if ((*it)->GetTitle() == title
+            && (*it)->GetRecordingStatus() != RecStatus::Pending
+            && (*it)->GetRecordingStatus() != RecStatus::Tuning
+            && (*it)->GetRecordingStatus() != RecStatus::Recording
+            && (*it)->GetRecordingStatus() != RecStatus::Failing)
         {
             LOG(VB_GENERAL, LOG_INFO, QString("Deleting %1 at pos %2")
                 .arg(title).arg(pos));

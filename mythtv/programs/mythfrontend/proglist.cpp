@@ -35,16 +35,16 @@ using namespace std;
 #define LOC_ERR  QString("ProgLister, Error: ")
 
 ProgLister::ProgLister(MythScreenStack *parent, ProgListType pltype,
-                       const QString &view, const QString &extraArg,
-                       const QDateTime &selectedTime) :
+                       QString view, QString extraArg,
+                       QDateTime selectedTime) :
     ScheduleCommon(parent, "ProgLister"),
     m_type(pltype),
-    m_extraArg(extraArg),
+    m_extraArg(std::move(extraArg)),
     m_startTime(MythDate::current()),
     m_searchTime(m_startTime),
-    m_selectedTime(selectedTime),
+    m_selectedTime(std::move(selectedTime)),
     m_channelOrdering(gCoreContext->GetSetting("ChannelOrdering", "channum")),
-    m_view(view)
+    m_view(std::move(view))
 {
     if (pltype == plMovies)
     {
@@ -66,8 +66,8 @@ ProgLister::ProgLister(MythScreenStack *parent, ProgListType pltype,
         case plTitleSearch:   m_searchType = kTitleSearch;   break;
         case plKeywordSearch: m_searchType = kKeywordSearch; break;
         case plPeopleSearch:  m_searchType = kPeopleSearch;  break;
-        case plPowerSearch:   m_searchType = kPowerSearch;   break;
-        case plSQLSearch:     m_searchType = kPowerSearch;   break;
+        case plPowerSearch:
+        case plSQLSearch:
         case plStoredSearch:  m_searchType = kPowerSearch;   break;
         default:              m_searchType = kNoSearch;      break;
     }
@@ -75,11 +75,11 @@ ProgLister::ProgLister(MythScreenStack *parent, ProgListType pltype,
 
 // previously recorded ctor
 ProgLister::ProgLister(
-    MythScreenStack *parent, uint recid, const QString &title) :
+    MythScreenStack *parent, uint recid, QString title) :
     ScheduleCommon(parent, "PreviousList"),
     m_type(plPreviouslyRecorded),
     m_recid(recid),
-    m_title(title),
+    m_title(std::move(title)),
     m_startTime(MythDate::current()),
     m_searchTime(m_startTime),
     m_channelOrdering(gCoreContext->GetSetting("ChannelOrdering", "channum")),
@@ -123,11 +123,15 @@ bool ProgLister::Create()
             this,       SLOT(  HandleVisible(  MythUIButtonListItem*)));
 
     if (m_type == plPreviouslyRecorded)
+    {
         connect(m_progList, SIGNAL(itemClicked(MythUIButtonListItem*)),
                 this,       SLOT(  ShowOldRecordedMenu()));
+    }
     else
+    {
         connect(m_progList, SIGNAL(itemClicked(MythUIButtonListItem*)),
                 this,       SLOT(  EditRecording()));
+    }
 
     m_progList->SetLCDTitles(tr("Program List"), "title|channel|shortstarttimedate");
     m_progList->SetSearchFields("titlesubtitle");
@@ -143,7 +147,7 @@ bool ProgLister::Create()
         case plKeywordSearch:      value = tr("Keyword Search");   break;
         case plPeopleSearch:       value = tr("People Search");    break;
         case plStoredSearch:       value = tr("Stored Search");    break;
-        case plPowerSearch:        value = tr("Power Search");     break;
+        case plPowerSearch:
         case plSQLSearch:          value = tr("Power Search");     break;
         case plRecordid:           value = tr("Rule Search");      break;
         case plCategory:           value = tr("Category Search");  break;
@@ -171,8 +175,7 @@ void ProgLister::Load(void)
 
     FillItemList(false, false);
 
-    ScreenLoadCompletionEvent *slce =
-        new ScreenLoadCompletionEvent(objectName());
+    auto *slce = new ScreenLoadCompletionEvent(objectName());
     QCoreApplication::postEvent(this, slce);
 }
 
@@ -266,12 +269,12 @@ bool ProgLister::keyPressEvent(QKeyEvent *e)
 
 void ProgLister::ShowMenu(void)
 {
-    MythMenu *sortMenu = new MythMenu(tr("Sort Options"), this, "sortmenu");
+    auto *sortMenu = new MythMenu(tr("Sort Options"), this, "sortmenu");
     sortMenu->AddItem(tr("Reverse Sort Order"));
     sortMenu->AddItem(tr("Sort By Title"));
     sortMenu->AddItem(tr("Sort By Time"));
 
-    MythMenu *menu = new MythMenu(tr("Options"), this, "menu");
+    auto *menu = new MythMenu(tr("Options"), this, "menu");
 
     if (m_allowViewDialog && m_type != plPreviouslyRecorded)
     {
@@ -307,7 +310,7 @@ void ProgLister::ShowMenu(void)
     }
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
-    MythDialogBox *menuPopup = new MythDialogBox(menu, popupStack, "menuPopup");
+    auto *menuPopup = new MythDialogBox(menu, popupStack, "menuPopup");
 
     if (!menuPopup->Create())
     {
@@ -522,7 +525,7 @@ void ProgLister::SetViewFromList(const QString& item)
 }
 
 bool ProgLister::PowerStringToSQL(
-    const QString &qphrase, QString &output, MSqlBindings &bindings) const
+    const QString &qphrase, QString &output, MSqlBindings &bindings)
 {
     output.clear();
 
@@ -534,7 +537,7 @@ bool ProgLister::PowerStringToSQL(
         return false;
     };
 
-    static const QString bindinglist[6] =
+    static const QString kBindingList[6] =
     {
         ":POWERTITLE",
         ":POWERSUB",
@@ -544,7 +547,7 @@ bool ProgLister::PowerStringToSQL(
         ":POWERCALLSIGN",
     };
 
-    static const QString outputlist[6] =
+    static const QString kOutputList[6] =
     {
         "program.title LIKE :POWERTITLE ",
         "program.subtitle LIKE :POWERSUB ",
@@ -562,9 +565,9 @@ bool ProgLister::PowerStringToSQL(
         if (!output.isEmpty())
             output += "\nAND ";
 
-        output += outputlist[i];
-        bindings[bindinglist[i]] =
-            (!outputlist[i].contains("=")) ?
+        output += kOutputList[i];
+        bindings[kBindingList[i]] =
+            (!kOutputList[i].contains("=")) ?
             QString('%') + field[i] + QString('%') : field[i];
     }
 
@@ -594,7 +597,7 @@ void ProgLister::ShowDeleteRuleMenu(void)
     if (!pi || !pi->GetRecordingRuleID())
         return;
 
-    RecordingRule *record = new RecordingRule();
+    auto *record = new RecordingRule();
     if (!record->LoadByProgram(pi))
     {
         delete record;
@@ -606,11 +609,11 @@ void ProgLister::ShowDeleteRuleMenu(void)
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    MythConfirmationDialog *okPopup = new MythConfirmationDialog(
+    auto *okPopup = new MythConfirmationDialog(
         popupStack, message, true);
 
     okPopup->SetReturnEvent(this, "deleterule");
-    okPopup->SetData(qVariantFromValue(record));
+    okPopup->SetData(QVariant::fromValue(record));
 
     if (okPopup->Create())
         popupStack->AddScreen(okPopup);
@@ -701,7 +704,7 @@ void ProgLister::ShowOldRecordedMenu(void)
 
     QString title = tr("Previously Recorded");
 
-    MythMenu *menu = new MythMenu(title, message, this, "deletemenu");
+    auto *menu = new MythMenu(title, message, this, "deletemenu");
     if (pi->IsDuplicate())
         menu->AddItem(tr("Allow this episode to re-record"));
     else
@@ -711,7 +714,7 @@ void ProgLister::ShowOldRecordedMenu(void)
     menu->AddItem(tr("Cancel"));
 
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-    MythDialogBox *menuPopup = new MythDialogBox(menu, mainStack, "deletepopup", true);
+    auto *menuPopup = new MythDialogBox(menu, mainStack, "deletepopup", true);
 
     if (menuPopup->Create())
         mainStack->AddScreen(menuPopup);
@@ -730,11 +733,11 @@ void ProgLister::FillViewList(const QString &view)
             0, true, "channum, chanid");
         ChannelUtil::SortChannels(channels, m_channelOrdering, true);
 
-        for (size_t i = 0; i < channels.size(); ++i)
+        for (auto & channel : channels)
         {
-            QString chantext = channels[i].GetFormatted(ChannelInfo::kChannelShort);
+            QString chantext = channel.GetFormatted(ChannelInfo::kChannelShort);
 
-            m_viewList.push_back(QString::number(channels[i].m_chanid));
+            m_viewList.push_back(QString::number(channel.m_chanId));
             m_viewTextList.push_back(chantext);
         }
 
@@ -1096,7 +1099,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
 
     if (m_type == plTitle) // per title listings
     {
-        where = "WHERE channel.visible = 1 "
+        where = "WHERE channel.deleted IS NULL "
+            "  AND channel.visible > 0 "
             "  AND program.endtime > :PGILSTART "
             "  AND (program.title = :PGILPHRASE0 OR "
             "       (program.seriesid <> '' AND "
@@ -1108,7 +1112,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
     {
         where = "LEFT JOIN oldprogram ON "
             "  oldprogram.oldtitle = program.title "
-            "WHERE channel.visible = 1 "
+            "WHERE channel.deleted IS NULL "
+            "  AND channel.visible > 0 "
             "  AND program.endtime > :PGILSTART "
             "  AND oldprogram.oldtitle IS NULL "
             "  AND program.manualid = 0 ";
@@ -1145,14 +1150,16 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
     }
     else if (m_type == plTitleSearch) // keyword search
     {
-        where = "WHERE channel.visible = 1 "
+        where = "WHERE channel.deleted IS NULL "
+            "  AND channel.visible > 0 "
             "  AND program.endtime > :PGILSTART "
             "  AND program.title LIKE :PGILLIKEPHRASE0 ";
         bindings[":PGILLIKEPHRASE0"] = QString("%") + qphrase + '%';
     }
     else if (m_type == plKeywordSearch) // keyword search
     {
-        where = "WHERE channel.visible = 1 "
+        where = "WHERE channel.deleted IS NULL "
+            "  AND channel.visible > 0 "
             "  AND program.endtime > :PGILSTART "
             "  AND (program.title LIKE :PGILLIKEPHRASE1 "
             "    OR program.subtitle LIKE :PGILLIKEPHRASE2 "
@@ -1163,7 +1170,9 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
     }
     else if (m_type == plPeopleSearch) // people search
     {
-        where = ", people, credits WHERE channel.visible = 1 "
+        where = ", people, credits "
+            "WHERE channel.deleted IS NULL "
+            "  AND channel.visible > 0 "
             "  AND program.endtime > :PGILSTART "
             "  AND people.name LIKE :PGILPHRASE1 "
             "  AND credits.person = people.person "
@@ -1181,11 +1190,14 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
         if (!powerWhere.isEmpty())
         {
             if (genreflag)
+            {
                 where = QString("LEFT JOIN programgenres ON "
                                 "program.chanid = programgenres.chanid AND "
                                 "program.starttime = programgenres.starttime ");
+            }
 
-            where += QString("WHERE channel.visible = 1 "
+            where += QString("WHERE channel.deleted IS NULL "
+                             "  AND channel.visible > 0 "
                              "  AND program.endtime > :PGILSTART "
                              "  AND ( ") + powerWhere + " ) ";
             MSqlAddMoreBindings(bindings, powerBindings);
@@ -1194,7 +1206,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
     else if (m_type == plSQLSearch) // complex search
     {
         qphrase.remove(QRegExp("^\\s*AND\\s+", Qt::CaseInsensitive));
-        where = QString("WHERE channel.visible = 1 "
+        where = QString("WHERE channel.deleted iS NULL "
+                        "  AND channel.visible > 0 "
                         "  AND program.endtime > :PGILSTART "
                         "  AND ( %1 ) ").arg(qphrase);
         if (!m_extraArg.isEmpty())
@@ -1202,7 +1215,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
     }
     else if (m_type == plChannel) // list by channel
     {
-        where = "WHERE channel.visible = 1 "
+        where = "WHERE channel.deleted IS NULL "
+            "  AND channel.visible > 0 "
             "  AND program.endtime > :PGILSTART "
             "  AND channel.chanid = :PGILPHRASE2 ";
         bindings[":PGILPHRASE2"] = qphrase;
@@ -1211,7 +1225,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
     {
         if (!m_useGenres)
         {
-            where = "WHERE channel.visible = 1 "
+            where = "WHERE channel.deleted IS NULL "
+                "  AND channel.visible > 0 "
                 "  AND program.endtime > :PGILSTART "
                 "  AND program.category = :PGILPHRASE3 ";
             bindings[":PGILPHRASE3"] = qphrase;
@@ -1222,7 +1237,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
                 "  program.chanid = g.chanid AND "
                 "  program.starttime = g.starttime AND "
                 "  genre = :PGILPHRASE4 "
-                "WHERE channel.visible = 1 "
+                "WHERE channel.deleted IS NULL "
+                "  AND channel.visible > 0 "
                 "  AND program.endtime > :PGILSTART ";
             bindings[":PGILPHRASE4"] = qphrase;
         }
@@ -1236,7 +1252,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
                 "  program.chanid = g2.chanid AND "
                 "  program.starttime = g2.starttime AND "
                 "  g2.genre = :GENRE2 "
-                "WHERE channel.visible = 1 "
+                "WHERE channel.deleted IS NULL "
+                "  AND channel.visible > 0 "
                 "  AND program.endtime > :PGILSTART ";
             bindings[":GENRE1"] = m_viewList[m_curView].section(":/:", 0, 0);
             bindings[":GENRE2"] = m_viewList[m_curView].section(":/:", 1, 1);
@@ -1244,7 +1261,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
     }
     else if (m_type == plMovies) // list movies
     {
-        where = "WHERE channel.visible = 1 "
+        where = "WHERE channel.deleted IS NULL "
+            "  AND channel.visible > 0 "
             "  AND program.endtime > :PGILSTART "
             "  AND program.category_type = 'movie' "
             "  AND program.stars " + qphrase + ' ';
@@ -1254,7 +1272,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
         QDateTime searchTime(m_searchTime);
         searchTime.setTime(QTime(searchTime.time().hour(), 0, 0));
         bindings[":PGILSEARCHTIME1"] = searchTime;
-        where = "WHERE channel.visible = 1 "
+        where = "WHERE channel.deleted IS NULL "
+            "  AND channel.visible > 0 "
             "  AND program.starttime >= :PGILSEARCHTIME1 ";
         if (m_titleSort)
         {
@@ -1268,7 +1287,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
         where = "JOIN recordmatch ON "
             " (program.starttime = recordmatch.starttime "
             "  AND program.chanid = recordmatch.chanid) "
-            "WHERE channel.visible = 1 "
+            "WHERE channel.deleted IS NULL "
+            "  AND channel.visible > 0 "
             "  AND program.endtime > :PGILSTART "
             "  AND recordmatch.recordid = :PGILPHRASE5 ";
         bindings[":PGILPHRASE5"] = qphrase;
@@ -1285,7 +1305,8 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
             QString fromc = query.value(0).toString();
             QString wherec = query.value(1).toString();
 
-            where = QString("WHERE channel.visible = 1 "
+            where = QString("WHERE channel.deleted IS NULL "
+                            "  AND channel.visible > 0 "
                             "  AND program.endtime > :PGILSTART "
                             "  AND ( %1 ) ").arg(wherec);
             if (!fromc.isEmpty())
@@ -1345,7 +1366,7 @@ void ProgLister::FillItemList(bool restorePosition, bool updateDisp)
         {
             // Prune to one per title
             QString curtitle;
-            ProgramList::iterator it = m_itemList.begin();
+            auto it = m_itemList.begin();
             while (it != m_itemList.end())
             {
                 if ((*it)->GetSortTitle() != curtitle)
@@ -1382,22 +1403,33 @@ void ProgLister::SortList(SortBy sortby, bool reverseSort)
     if (reverseSort)
     {
         if (kTimeSort == sortby)
+        {
             stable_sort(m_itemList.rbegin(), m_itemList.rend(), plTimeSort());
+        }
         else if (kPrevTitleSort == sortby)
+        {
             stable_sort(m_itemList.rbegin(), m_itemList.rend(),
                         plPrevTitleSort());
+        }
         else
+        {
             stable_sort(m_itemList.rbegin(), m_itemList.rend(), plTitleSort());
+        }
     }
     else
     {
         if (kTimeSort == sortby)
+        {
             stable_sort(m_itemList.begin(), m_itemList.end(), plTimeSort());
+        }
         else if (kPrevTitleSort == sortby)
-            stable_sort(m_itemList.begin(), m_itemList.end(),
-                        plPrevTitleSort());
+        {
+            stable_sort(m_itemList.begin(), m_itemList.end(),plPrevTitleSort());
+        }
         else
+        {
             stable_sort(m_itemList.begin(), m_itemList.end(), plTitleSort());
+        }
     }
 }
 
@@ -1435,7 +1467,7 @@ void ProgLister::UpdateDisplay(const ProgramInfo *selected)
         RestoreSelection(selected, offset);
     else if (m_selectedTime.isValid())
     {
-        size_t i;
+        size_t i = 0;
         for (i = 0; i < m_itemList.size(); ++i)
         {
             if (m_selectedTime <= m_itemList[i]->GetScheduledStartTime())
@@ -1449,7 +1481,7 @@ void ProgLister::UpdateDisplay(const ProgramInfo *selected)
 void ProgLister::RestoreSelection(const ProgramInfo *selected,
                                   int selectedOffset)
 {
-    plCompare *comp;
+    plCompare *comp = nullptr;
     if (!m_titleSort)
         comp = new plTimeSort();
     else if (m_type == plPreviouslyRecorded)
@@ -1457,10 +1489,10 @@ void ProgLister::RestoreSelection(const ProgramInfo *selected,
     else
         comp = new plTitleSort();
 
-    int i;
+    int i = 0;
     for (i = m_itemList.size() - 2; i >= 0; i--)
     {
-        bool dobreak;
+        bool dobreak = false;
         if (m_reverseSort)
             dobreak = comp->operator()(selected, m_itemList[i]);
         else
@@ -1476,7 +1508,7 @@ void ProgLister::RestoreSelection(const ProgramInfo *selected,
 
 void ProgLister::HandleVisible(MythUIButtonListItem *item)
 {
-    ProgramInfo *pginfo = item->GetData().value<ProgramInfo*>();
+    auto *pginfo = item->GetData().value<ProgramInfo*>();
 
     if (item->GetText("is_item_initialized").isNull())
     {
@@ -1509,9 +1541,8 @@ void ProgLister::HandleVisible(MythUIButtonListItem *item)
 
 void ProgLister::UpdateButtonList(void)
 {
-    ProgramList::const_iterator it = m_itemList.begin();
-    for (; it != m_itemList.end(); ++it)
-        new MythUIButtonListItem(m_progList, "", qVariantFromValue(*it));
+    for (auto *it : m_itemList)
+        new MythUIButtonListItem(m_progList, "", QVariant::fromValue(it));
     m_progList->LoadInBackground();
 
     if (m_positionText)
@@ -1532,7 +1563,7 @@ void ProgLister::HandleSelected(MythUIButtonListItem *item)
         return;
     }
 
-    ProgramInfo *pginfo = item->GetData().value<ProgramInfo*> ();
+    auto *pginfo = item->GetData().value<ProgramInfo*> ();
     if (!pginfo)
     {
         ClearCurrentProgramInfo();
@@ -1568,7 +1599,7 @@ void ProgLister::customEvent(QEvent *event)
 
     if (event->type() == DialogCompletionEvent::kEventType)
     {
-        DialogCompletionEvent *dce = (DialogCompletionEvent*)(event);
+        auto *dce = (DialogCompletionEvent*)(event);
 
         QString resultid   = dce->GetId();
         QString resulttext = dce->GetResultText();
@@ -1622,8 +1653,7 @@ void ProgLister::customEvent(QEvent *event)
         }
         else if (resultid == "deleterule")
         {
-            RecordingRule *record =
-                dce->GetData().value<RecordingRule *>();
+            auto *record = dce->GetData().value<RecordingRule *>();
             if (record && buttonnum > 0 && !record->Delete())
             {
                 LOG(VB_GENERAL, LOG_ERR, LOC +
@@ -1638,7 +1668,7 @@ void ProgLister::customEvent(QEvent *event)
     }
     else if (event->type() == ScreenLoadCompletionEvent::kEventType)
     {
-        ScreenLoadCompletionEvent *slce = (ScreenLoadCompletionEvent*)(event);
+        auto *slce = (ScreenLoadCompletionEvent*)(event);
         QString id = slce->GetId();
 
         if (id == objectName())
@@ -1652,7 +1682,10 @@ void ProgLister::customEvent(QEvent *event)
     }
     else if (event->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = static_cast<MythEvent *>(event);
+        auto *me = dynamic_cast<MythEvent *>(event);
+        if (me == nullptr)
+            return;
+
         const QString& message = me->Message();
 
         if (m_allowViewDialog && message == "CHOOSE_VIEW")

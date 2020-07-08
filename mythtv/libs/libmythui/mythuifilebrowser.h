@@ -2,6 +2,10 @@
 #ifndef MYTHUIFILEBROWSER_H_
 #define MYTHUIFILEBROWSER_H_
 
+// C++ headers
+#include <utility>
+
+// QT headers
 #include <QDir>
 #include <QEvent>
 #include <QFileInfo>
@@ -23,10 +27,11 @@ class MythUIStateType;
 class MUI_PUBLIC MFileInfo : public QFileInfo
 {
   public:
-    MFileInfo(QString fileName = "", QString sgDir = "", bool isDir = false,
+    explicit MFileInfo(const QString& fileName = "", QString sgDir = "", bool isDir = false,
               qint64 size = 0);
    ~MFileInfo() = default;
 
+    MFileInfo(const MFileInfo &other);
     MFileInfo &operator=(const MFileInfo &other);
 
     void init(const QString& fileName = "", QString sgDir = "", bool isDir = false,
@@ -34,7 +39,7 @@ class MUI_PUBLIC MFileInfo : public QFileInfo
 
     QString fileName(void) const;
     QString filePath(void) const;
-    bool isRemote(void) { return m_isRemote; }
+    bool isRemote(void) const { return m_isRemote; }
     bool isDir(void) const;
     bool isFile(void) const;
     bool isParentDir(void) const;
@@ -47,7 +52,7 @@ class MUI_PUBLIC MFileInfo : public QFileInfo
     void setIsDir(bool isDir) { m_isDir = isDir; m_isFile = !isDir; }
     void setIsFile(bool isFile) { m_isFile = isFile; m_isDir = !isFile; }
     void setIsParentDir(bool isParentDir) { m_isParentDir = isParentDir; }
-    void setSGDir(QString sgDir) { m_storageGroupDir = sgDir; }
+    void setSGDir(QString sgDir) { m_storageGroupDir = std::move(sgDir); }
 
     QString hostName(void) const { return m_hostName; }
     QString storageGroup(void) const { return m_storageGroup; }
@@ -78,14 +83,14 @@ class MUI_PUBLIC MythUIFileBrowser : public MythScreenType
 
   public:
     MythUIFileBrowser(MythScreenStack *parent, const QString &startPath);
-   ~MythUIFileBrowser() = default;
+   ~MythUIFileBrowser() override = default;
 
     bool Create(void) override; // MythScreenType
 
     void SetReturnEvent(QObject *retobject, const QString &resultid);
 
     void SetTypeFilter(QDir::Filters filter) { m_typeFilter = filter; }
-    void SetNameFilter(QStringList filter) { m_nameFilter = filter; }
+    void SetNameFilter(QStringList filter) { m_nameFilter = std::move(filter); }
 
   private slots:
     void OKPressed(void);
@@ -99,7 +104,7 @@ class MUI_PUBLIC MythUIFileBrowser : public MythScreenType
 
   private:
     void SetPath(const QString &startPath);
-    bool GetRemoteFileList(const QString &url, const QString &sgDir,
+    static bool GetRemoteFileList(const QString &url, const QString &sgDir,
                            QStringList &list);
     void updateFileList(void);
     void updateRemoteFileList(void);
@@ -107,8 +112,8 @@ class MUI_PUBLIC MythUIFileBrowser : public MythScreenType
     void updateSelectedList(void);
     void updateWidgets(void);
 
-    bool IsImage(QString extension);
-    QString FormatSize(int size);
+    static bool IsImage(QString extension);
+    static QString FormatSize(int64_t size);
 
     bool               m_isRemote        {false};
 

@@ -1,5 +1,5 @@
-#ifndef _RECORDING_FILE_H_
-#define _RECORDING_FILE_H_
+#ifndef RECORDING_FILE_H
+#define RECORDING_FILE_H
 
 #include <QString>
 #include <QSize>
@@ -9,13 +9,13 @@
 
 class RecordingRule;
 
-typedef enum AVContainerFormats
+enum AVContainer
 {
     formatUnknown  = 0,
     formatNUV      = 1,
     formatMPEG2_TS = 2,
     formatMPEG2_PS = 3
-} AVContainer;
+};
 
 /** \class RecordingFile
  *  \brief Holds information on a recording file and it's video and audio streams
@@ -60,4 +60,4 @@ class MTV_PUBLIC RecordingFile
     static AVContainer AVContainerFromString(const QString &formatStr);
 };
 
-#endif
+#endif // RECORDING_FILE_H

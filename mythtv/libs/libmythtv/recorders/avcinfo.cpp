@@ -6,17 +6,6 @@
 #include "firewiredevice.h"
 #endif
 
-QString guid_to_string(uint64_t guid)
-{
-    return QString("%1").arg(guid, 16, 16, QLatin1Char('0')).toUpper();
-}
-
-uint64_t string_to_guid(const QString &guid)
-{
-    return guid.toULongLong(nullptr, 16);
-}
-
-#ifndef GUID_ONLY
 AVCInfo::AVCInfo()
 {
     memset(m_unit_table, 0xff, sizeof(m_unit_table));
@@ -34,6 +23,9 @@ AVCInfo::AVCInfo(const AVCInfo &o) :
 
 AVCInfo &AVCInfo::operator=(const AVCInfo &o)
 {
+    if (this == &o)
+        return *this;
+
     m_port     = o.m_port;
     m_node     = o.m_node;
     m_guid     = o.m_guid;
@@ -83,9 +75,8 @@ bool AVCInfo::GetSubunitInfo(void)
 
 bool AVCInfo::IsSubunitType(int subunit_type) const
 {
-    for (uint i = 0; i < 32; i++)
+    for (int subunit : m_unit_table)
     {
-        int subunit = m_unit_table[i];
         if ((subunit != 0xff) &&
             (subunit & FirewireDevice::kAVCSubunitTypeUnit) == subunit_type)
         {
@@ -129,4 +120,3 @@ QString AVCInfo::GetSubunitInfoString(void) const
 
     return str;
 }
-#endif

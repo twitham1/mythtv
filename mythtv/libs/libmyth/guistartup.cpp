@@ -145,7 +145,7 @@ bool GUIStartup::updateProgress(bool finished)
 {
     if (m_progressTimer)
     {
-        int elapsed;
+        int elapsed = 0;
         if (finished)
             elapsed = m_total;
         else
@@ -176,9 +176,7 @@ void GUIStartup::Close(void)
     QString message = tr("Do you really want to exit MythTV?");
     MythScreenStack *popupStack
       = GetMythMainWindow()->GetStack("popup stack");
-    MythConfirmationDialog *confirmdialog
-      = new MythConfirmationDialog(
-         popupStack, message);
+    auto *confirmdialog = new MythConfirmationDialog(popupStack, message);
 
     if (confirmdialog->Create())
         popupStack->AddScreen(confirmdialog);

@@ -31,7 +31,7 @@ class SERVICE_PUBLIC InputList : public QObject
 
     Q_CLASSINFO( "Inputs", "type=DTC::Input");
 
-    Q_PROPERTY( QVariantList Inputs READ Inputs DESIGNABLE true )
+    Q_PROPERTY( QVariantList Inputs READ Inputs )
 
     PROPERTYIMP_RO_REF( QVariantList, Inputs );
 
@@ -54,7 +54,7 @@ class SERVICE_PUBLIC InputList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            Input *pObject = new Input( this );
+            auto *pObject = new Input( this );
             m_Inputs.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

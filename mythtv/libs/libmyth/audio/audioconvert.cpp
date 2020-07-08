@@ -27,6 +27,7 @@
 
 #include "mythconfig.h"
 #include "mythlogging.h"
+#include "mythaverror.h"
 #include "audioconvert.h"
 
 extern "C" {
@@ -388,7 +389,8 @@ static int fromFloat32(AudioFormat format, int* out, const float* in, int len)
 #if ARCH_X86
     if (sse_check() && len >= 16)
     {
-        float o = 0.99999995, mo = -1;
+        float o = 0.99999995;
+        float mo = -1;
         int loops = len >> 4;
         i = loops << 4;
 
@@ -469,7 +471,8 @@ static int fromFloatFLT(float* out, const float* in, int len)
     if (sse_check() && len >= 16)
     {
         int loops = len >> 4;
-        float o = 1, mo = -1;
+        float o = 1;
+        float mo = -1;
         i = loops << 4;
 
         __asm__ volatile (
@@ -594,15 +597,15 @@ public:
         int ret = swr_init(m_swr);
         if (ret < 0)
         {
-            char error[AV_ERROR_MAX_STRING_SIZE];
+            std::string error;
             LOG(VB_AUDIO, LOG_ERR, LOC +
                 QString("error initializing resampler context (%1)")
-                .arg(av_make_error_string(error, sizeof(error), ret)));
+                .arg(av_make_error_stdstring(error, ret)));
             swr_free(&m_swr);
             return;
         }
     }
-    int Process(void* out, const void* in, int bytes)
+    int Process(void* out, const void* in, int bytes) const
     {
         if (!m_swr)
             return -1;
@@ -679,27 +682,24 @@ int AudioConvert::Process(void* out, const void* in, int bytes, bool noclip)
         }
         // this leave S24 -> U8/S16.
         // TODO: native handling of those ; use internal temp buffer in the mean time
-
-        // cppcheck-suppress unassignedVariable
-        uint8_t     buffer[65536+15];
-        uint8_t*    tmp = (uint8_t*)(((long)buffer + 15) & ~0xf);
+        alignas(16) uint8_t buffer[65536] {0};
         int left        = bytes;
 
         while (left > 0)
         {
-            int s;
+            int s = 0;
 
             if (left >= 65536)
             {
-                s       = toFloat(m_in, tmp, in, 65536);
+                s       = toFloat(m_in, buffer, in, 65536);
                 in      = (void*)((long)in + s);
-                out     = (void*)((long)out + fromFloat(m_out, out, tmp, s));
+                out     = (void*)((long)out + fromFloat(m_out, out, buffer, s));
                 left   -= 65536;
                 continue;
             }
-            s       = toFloat(m_in, tmp, in, left);
+            s       = toFloat(m_in, buffer, in, left);
             in      = (void*)((long)in + s);
-            out     = (void*)((long)out + fromFloat(m_out, out, tmp, s));
+            out     = (void*)((long)out + fromFloat(m_out, out, buffer, s));
             left    = 0;
         }
         return bytes * AudioOutputSettings::SampleSize(m_out) / AudioOutputSettings::SampleSize(m_in);
@@ -720,8 +720,8 @@ int AudioConvert::Process(void* out, const void* in, int bytes, bool noclip)
  */
 void AudioConvert::MonoToStereo(void* dst, const void* src, int samples)
 {
-    float* d = (float*)dst;
-    float* s = (float*)src;
+    auto* d = (float*)dst;
+    auto* s = (float*)src;
     for (int i = 0; i < samples; i++)
     {
         *d++ = *s;
@@ -730,9 +730,9 @@ void AudioConvert::MonoToStereo(void* dst, const void* src, int samples)
 }
 
 template <class AudioDataType>
-void _DeinterleaveSample(AudioDataType* out, const AudioDataType* in, int channels, int frames)
+void tDeinterleaveSample(AudioDataType* out, const AudioDataType* in, int channels, int frames)
 {
-    AudioDataType* outp[8];
+    std::array<AudioDataType*,8> outp {};
 
     for (int i = 0; i < channels; i++)
     {
@@ -766,23 +766,23 @@ void AudioConvert::DeinterleaveSamples(AudioFormat format, int channels,
     int bits = AudioOutputSettings::FormatToBits(format);
     if (bits == 8)
     {
-        _DeinterleaveSample((char*)output, (const char*)input, channels, data_size/sizeof(char)/channels);
+        tDeinterleaveSample((char*)output, (const char*)input, channels, data_size/sizeof(char)/channels);
     }
     else if (bits == 16)
     {
-        _DeinterleaveSample((short*)output, (const short*)input, channels, data_size/sizeof(short)/channels);
+        tDeinterleaveSample((short*)output, (const short*)input, channels, data_size/sizeof(short)/channels);
     }
     else
     {
-        _DeinterleaveSample((int*)output, (const int*)input, channels, data_size/sizeof(int)/channels);
+        tDeinterleaveSample((int*)output, (const int*)input, channels, data_size/sizeof(int)/channels);
     }
 }
 
 template <class AudioDataType>
-void _InterleaveSample(AudioDataType* out, const AudioDataType* in, int channels, int frames,
+void tInterleaveSample(AudioDataType* out, const AudioDataType* in, int channels, int frames,
                        const AudioDataType*  const* inp = nullptr)
 {
-    const AudioDataType* my_inp[8];
+    std::array<const AudioDataType*,8> my_inp {};
 
     if (channels == 1)
     {
@@ -828,17 +828,17 @@ void AudioConvert::InterleaveSamples(AudioFormat format, int channels,
     int bits = AudioOutputSettings::FormatToBits(format);
     if (bits == 8)
     {
-        _InterleaveSample((char*)output, (const char*)nullptr, channels, data_size/sizeof(char)/channels,
+        tInterleaveSample((char*)output, (const char*)nullptr, channels, data_size/sizeof(char)/channels,
                           (const char*  const*)input);
     }
     else if (bits == 16)
     {
-        _InterleaveSample((short*)output, (const short*)nullptr, channels, data_size/sizeof(short)/channels,
+        tInterleaveSample((short*)output, (const short*)nullptr, channels, data_size/sizeof(short)/channels,
                           (const short*  const*)input);
     }
     else
     {
-        _InterleaveSample((int*)output, (const int*)nullptr, channels, data_size/sizeof(int)/channels,
+        tInterleaveSample((int*)output, (const int*)nullptr, channels, data_size/sizeof(int)/channels,
                           (const int*  const*)input);
     }
 }
@@ -854,15 +854,15 @@ void AudioConvert::InterleaveSamples(AudioFormat format, int channels,
     int bits = AudioOutputSettings::FormatToBits(format);
     if (bits == 8)
     {
-        _InterleaveSample((char*)output, (const char*)input, channels, data_size/sizeof(char)/channels);
+        tInterleaveSample((char*)output, (const char*)input, channels, data_size/sizeof(char)/channels);
     }
     else if (bits == 16)
     {
-        _InterleaveSample((short*)output, (const short*)input, channels, data_size/sizeof(short)/channels);
+        tInterleaveSample((short*)output, (const short*)input, channels, data_size/sizeof(short)/channels);
     }
     else
     {
-        _InterleaveSample((int*)output, (const int*)input, channels, data_size/sizeof(int)/channels);
+        tInterleaveSample((int*)output, (const int*)input, channels, data_size/sizeof(int)/channels);
     }
 }
 

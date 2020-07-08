@@ -178,10 +178,12 @@ void PhrasePopup::recordClicked(void)
             return;
 
         MSqlBindings bindings;
-        if (m_parent->PowerStringToSQL(text, what, bindings))
+        if (ProgLister::PowerStringToSQL(text, what, bindings))
+        {
             fromgenre = QString("LEFT JOIN programgenres ON "
                                 "program.chanid = programgenres.chanid AND "
                                 "program.starttime = programgenres.starttime ");
+        }
 
         if (what.isEmpty())
             return;
@@ -189,12 +191,12 @@ void PhrasePopup::recordClicked(void)
         MSqlEscapeAsAQuery(what, bindings);
     }
 
-    RecordingRule *record = new RecordingRule();
+    auto *record = new RecordingRule();
 
     record->LoadBySearch(m_searchType, text, what, fromgenre);
 
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-    ScheduleEditor *schededit = new ScheduleEditor(mainStack, record);
+    auto *schededit = new ScheduleEditor(mainStack, record);
     if (schededit->Create())
     {
         mainStack->AddScreen(schededit);
@@ -290,8 +292,7 @@ void PowerSearchPopup::editClicked(void)
     if (m_phraseList->GetCurrentPos() != 0)
         currentItem = m_phraseList->GetValue();
 
-    EditPowerSearchPopup *popup = new EditPowerSearchPopup(
-        popupStack, m_parent, currentItem);
+    auto *popup = new EditPowerSearchPopup(popupStack, m_parent, currentItem);
 
     if (!popup->Create())
     {
@@ -359,11 +360,13 @@ void PowerSearchPopup::recordClicked(void)
             return;
 
         MSqlBindings bindings;
-        if (m_parent->PowerStringToSQL(text, what, bindings))
+        if (ProgLister::PowerStringToSQL(text, what, bindings))
+        {
             fromgenre = QString(
                 "LEFT JOIN programgenres ON "
                 "program.chanid = programgenres.chanid AND "
                 "program.starttime = programgenres.starttime ");
+        }
 
         if (what.isEmpty())
             return;
@@ -371,12 +374,12 @@ void PowerSearchPopup::recordClicked(void)
         MSqlEscapeAsAQuery(what, bindings);
     }
 
-    RecordingRule *record = new RecordingRule();
+    auto *record = new RecordingRule();
 
     record->LoadBySearch(m_searchType, text, what, fromgenre);
 
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-    ScheduleEditor *schededit = new ScheduleEditor(mainStack, record);
+    auto *schededit = new ScheduleEditor(mainStack, record);
     if (schededit->Create())
     {
         mainStack->AddScreen(schededit);
@@ -524,22 +527,22 @@ void EditPowerSearchPopup::initLists(void)
     ChannelInfoList channels = ChannelUtil::GetChannels(0, true, "callsign");
     ChannelUtil::SortChannels(channels, channelOrdering, true);
 
-    for (size_t i = 0; i < channels.size(); ++i)
+    for (auto & channel : channels)
     {
-        QString chantext = channels[i].GetFormatted(ChannelInfo::kChannelShort);
+        QString chantext = channel.GetFormatted(ChannelInfo::kChannelShort);
 
-        m_parent->m_viewList << QString::number(channels[i].m_chanid);
+        m_parent->m_viewList << QString::number(channel.m_chanId);
         m_parent->m_viewTextList << chantext;
 
-        MythUIButtonListItem *item =
-               new MythUIButtonListItem(m_channelList, chantext, nullptr, false);
+        auto *item = new MythUIButtonListItem(m_channelList, chantext,
+                                              nullptr, false);
 
         InfoMap chanmap;
-        channels[i].ToMap(chanmap);
+        channel.ToMap(chanmap);
         item->SetTextFromMap(chanmap);
 
-        m_channels << channels[i].m_callsign;
-        if (channels[i].m_callsign == field[5])
+        m_channels << channel.m_callSign;
+        if (channel.m_callSign == field[5])
             m_channelList->SetItemCurrent(m_channelList->GetCount() - 1);
     }
 }

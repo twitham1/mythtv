@@ -36,8 +36,8 @@
  *  \brief Create a new KeyBindings instance.
  *  \param hostname The host for which to create the key bindings.
  */
-KeyBindings::KeyBindings(const QString &hostname)
-    : m_hostname(hostname)
+KeyBindings::KeyBindings(QString hostname)
+    : m_hostname(std::move(hostname))
 {
     LoadMandatoryBindings();
     LoadContexts();
@@ -116,9 +116,9 @@ QStringList KeyBindings::GetKeyContexts(const QString &key) const
     ActionList actions = m_actionSet.GetActions(key);
     QStringList contexts;
 
-    for (int i = 0; i < actions.size(); i++)
+    for (const auto & action : qAsConst(actions))
     {
-        QString context = actions[i].GetContext();
+        QString context = action.GetContext();
         if (!contexts.contains(context))
             contexts.push_back(context);
     }

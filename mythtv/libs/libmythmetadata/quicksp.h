@@ -43,8 +43,16 @@ class simple_ref_ptr
         unref();
     }
 
+    // The first two lines of this function are the clang-tidy
+    // recommended solution to make a function properly handle
+    // self-assignment.  No idea why clang-tidy doesn't recognize
+    // this, unless it has something to do with templates?
+    //
+    // NOLINTNEXTLINE(bugprone-unhandled-self-assignment,cert-oop54-cpp)
     simple_ref_ptr &operator=(const simple_ref_ptr &rhs)
     {
+        if (this == &rhs)
+            return *this;
         rhs.m_ref->inc();
         unref();
         m_ref = rhs.m_ref;
@@ -75,7 +83,7 @@ class simple_ref_ptr
         m_ref = new ref(ptr);
     }
 
-    typedef T *(simple_ref_ptr<T>::*fake_bool)() const;
+    using fake_bool = T *(simple_ref_ptr<T>::*)() const;
 
     operator fake_bool() const
     {

@@ -66,7 +66,7 @@ class ImageProperties
     bool     m_isMasked       {false};
     bool     m_isOriented     {false};
 
-    ReflectAxis m_reflectAxis {ReflectVertical};
+    ReflectAxis m_reflectAxis {ReflectAxis::Vertical};
     int m_reflectScale        {100};
     int m_reflectLength       {100};
     int m_reflectShear        {0};
@@ -84,8 +84,8 @@ class ImageProperties
     QString m_maskImageFilename;
 };
 
-typedef QPair<MythImage *, int> AnimationFrame;
-typedef QVector<AnimationFrame> AnimationFrames;
+using AnimationFrame = QPair<MythImage *, int>;
+using AnimationFrames = QVector<AnimationFrame>;
 
 /**
  * \class MythUIImage
@@ -103,7 +103,7 @@ class MUI_PUBLIC MythUIImage : public MythUIType
                 MythUIType *parent, const QString &name);
     MythUIImage(const QString &filename, MythUIType *parent, const QString &name);
     MythUIImage(MythUIType *parent, const QString &name);
-   ~MythUIImage();
+   ~MythUIImage() override;
 
     QString GetFilename(void) { return m_Filename; }
 
@@ -126,7 +126,7 @@ class MUI_PUBLIC MythUIImage : public MythUIType
     void SetImages(QVector<MythImage *> *images);
 
     void SetDelay(int delayms);
-    void SetDelays(QVector<int> delays);
+    void SetDelays(const QVector<int>& delays);
 
     void Reset(void) override; // MythUIType
     bool Load(bool allowLoadInBackground = true, bool forceStat = false);
@@ -146,7 +146,7 @@ class MUI_PUBLIC MythUIImage : public MythUIType
 
     void Clear(void);
 
-    void SetAnimationFrames(AnimationFrames frames);
+    void SetAnimationFrames(const AnimationFrames& frames);
     void customEvent(QEvent *event) override; // MythUIType
 
     bool ParseElement(const QString &filename, QDomElement &element,
@@ -187,7 +187,7 @@ class MUI_PUBLIC MythUIImage : public MythUIType
     bool            m_showingRandomImage {false};
     QString         m_imageDirectory;
 
-    MythUIImagePrivate *d                {nullptr};
+    MythUIImagePrivate *d                {nullptr}; // NOLINT(readability-identifier-naming)
 
     enum AnimationCycle {kCycleStart, kCycleReverse};
     AnimationCycle  m_animationCycle     {kCycleStart};

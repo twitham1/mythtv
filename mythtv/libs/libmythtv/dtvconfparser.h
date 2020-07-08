@@ -29,12 +29,13 @@
  *
  */
 
-#ifndef _DTVCONFPARSER_H_
-#define _DTVCONFPARSER_H_
+#ifndef DTVCONFPARSER_H
+#define DTVCONFPARSER_H
 
 // C++ headers
 #include <cstdint>
 #include <unistd.h>
+#include <utility>
 #include <vector>
 using namespace std;
 
@@ -57,7 +58,7 @@ class DTVChannelInfo
     uint    m_serviceid {0};
     int     m_lcn       {-1};
 };
-typedef vector<DTVChannelInfo> DTVChannelInfoList;
+using DTVChannelInfoList = vector<DTVChannelInfo>;
 
 class DTVTransport : public DTVMultiplex
 {
@@ -67,7 +68,7 @@ class DTVTransport : public DTVMultiplex
   public:
     DTVChannelInfoList channels;
 };
-typedef vector<DTVTransport> DTVChannelList;
+using DTVChannelList = vector<DTVTransport>;
 
 /** \class DTVConfParser
  *  \brief Parses dvb-utils channel scanner output files.
@@ -78,8 +79,8 @@ class DTVConfParser
     enum return_t   { ERROR_CARDTYPE, ERROR_OPEN, ERROR_PARSE, OK };
     enum cardtype_t { ATSC, OFDM, QPSK, QAM, DVBS2, UNKNOWN };
 
-    DTVConfParser(enum cardtype_t type, uint sourceid, const QString &file)
-        : m_type(type), m_sourceid(sourceid), m_filename(file) {}
+    DTVConfParser(enum cardtype_t type, uint sourceid, QString file)
+        : m_type(type), m_sourceid(sourceid), m_filename(std::move(file)) {}
     virtual ~DTVConfParser() = default;
 
     return_t Parse(void);
@@ -104,4 +105,4 @@ class DTVConfParser
     DTVChannelList m_channels;
 };
 
-#endif // _DTVCONFPARSER_H_
+#endif // DTVCONFPARSER_H

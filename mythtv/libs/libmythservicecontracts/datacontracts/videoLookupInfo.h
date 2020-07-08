@@ -94,7 +94,7 @@ class SERVICE_PUBLIC VideoLookup : public QObject
     Q_PROPERTY( QString         IMDB            READ IMDB             WRITE setIMDB           )
     Q_PROPERTY( QString         TMSRef          READ TMSRef           WRITE setTMSRef         )
 
-    Q_PROPERTY( QVariantList Artwork    READ Artwork DESIGNABLE true )
+    Q_PROPERTY( QVariantList Artwork    READ Artwork )
 
     PROPERTYIMP    ( QString    , Title          )
     PROPERTYIMP    ( QString    , SubTitle       )
@@ -164,7 +164,7 @@ class SERVICE_PUBLIC VideoLookup : public QObject
 
         ArtworkItem *AddNewArtwork()
         {
-            ArtworkItem *pObject = new ArtworkItem( this );
+            auto *pObject = new ArtworkItem( this );
             Artwork().append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

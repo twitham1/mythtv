@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __HTMLSERVER_H__
-#define __HTMLSERVER_H__
+#ifndef HTMLSERVER_H
+#define HTMLSERVER_H
 
 #include "httpserver.h"
 #include "serverSideScripting.h"
@@ -28,13 +28,13 @@ class UPNP_PUBLIC HtmlServerExtension : public HttpServerExtension
 {
     private:
 
-        ServerSideScripting m_Scripting;
-        QString             m_IndexFilename;
+        ServerSideScripting m_scripting;
+        QString             m_indexFilename;
 
     public:
                  HtmlServerExtension( const QString &sSharePath,
                                       const QString &sApplicationPrefix);
-        virtual ~HtmlServerExtension( ) = default;
+        ~HtmlServerExtension( ) override = default;
 
         // Special case, this extension is called if no other extension
         // processes the request.  
@@ -46,9 +46,9 @@ class UPNP_PUBLIC HtmlServerExtension : public HttpServerExtension
 
         QScriptEngine* ScriptEngine()
         {
-            return &(m_Scripting.m_engine);
+            return &(m_scripting.m_engine);
         }
 
 };
 
-#endif
+#endif // HTMLSERVER_H

@@ -7,7 +7,6 @@
 #include "mythdate.h"
 #include "mythcorecontext.h"
 #include "signalmonitor.h"
-#include "videooutbase.h"
 #include "mythdb.h"
 #include "mythsocket.h"
 #include "mythlogging.h"
@@ -34,7 +33,7 @@ bool RemoteEncoder::Setup(void)
         LOG(VB_NETWORK, LOG_DEBUG, "RemoteEncoder::Setup(): Connecting...");
 
         QString ann = QString("ANN Playback %1 %2")
-            .arg(gCoreContext->GetHostName()).arg(false);
+            .arg(gCoreContext->GetHostName()).arg(static_cast<int>(false));
 
         m_controlSock = gCoreContext->ConnectCommandSocket(
             m_remotehost, m_remoteport, ann);
@@ -143,7 +142,7 @@ ProgramInfo *RemoteEncoder::GetRecording(void)
 
     if (SendReceiveStringList(strlist))
     {
-        ProgramInfo *proginfo = new ProgramInfo(strlist);
+        auto *proginfo = new ProgramInfo(strlist);
         if (proginfo->GetChanID())
             return proginfo;
         delete proginfo;
@@ -278,10 +277,9 @@ void RemoteEncoder::FillPositionMap(int64_t start, int64_t end,
     if (!SendReceiveStringList(strlist))
         return;
 
-    QStringList::const_iterator it = strlist.begin();
-    for (; it != strlist.end(); ++it)
+    for (auto it = strlist.cbegin(); it != strlist.cend(); ++it)
     {
-        bool ok;
+        bool ok = false;
         uint64_t index = (*it).toLongLong(&ok);
         if (++it == strlist.end() || !ok)
             break;
@@ -305,10 +303,9 @@ void RemoteEncoder::FillDurationMap(int64_t start, int64_t end,
     if (!SendReceiveStringList(strlist))
         return;
 
-    QStringList::const_iterator it = strlist.begin();
-    for (; it != strlist.end(); ++it)
+    for (auto it = strlist.cbegin(); it != strlist.cend(); ++it)
     {
-        bool ok;
+        bool ok = false;
         uint64_t index = (*it).toLongLong(&ok);
         if (++it == strlist.end() || !ok)
             break;
@@ -405,7 +402,7 @@ void RemoteEncoder::SetLiveRecording(bool recording)
 {
     QStringList strlist( QString("QUERY_RECORDER %1").arg(m_recordernum) );
     strlist << "SET_LIVE_RECORDING";
-    strlist << QString::number(recording);
+    strlist << QString::number(static_cast<int>(recording));
 
     SendReceiveStringList(strlist);
 }

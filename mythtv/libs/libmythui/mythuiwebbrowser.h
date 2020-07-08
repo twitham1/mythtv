@@ -7,7 +7,7 @@
 #include "mythuiexp.h"
 
 #include <QString>
-#include <QTime>
+#include <QElapsedTimer>
 #include <QColor>
 #include <QIcon>
 
@@ -25,21 +25,21 @@ class BrowserApi : public QObject
     Q_OBJECT
   public:
     explicit BrowserApi(QObject *parent);
-    ~BrowserApi(void);
+    ~BrowserApi(void) override;
 
     void setWebView(QWebView *view);
 
   public slots:
-    void Play(void);
-    void Stop(void);
-    void Pause(void);
+    static void Play(void);
+    static void Stop(void);
+    static void Pause(void);
 
-    void SetVolume(int volumn);
+    static void SetVolume(int volumn);
     int GetVolume(void);
 
-    void PlayFile(const QString& filename);
-    void PlayTrack(int trackID);
-    void PlayURL(const QString& url);
+    static void PlayFile(const QString& filename);
+    static void PlayTrack(int trackID);
+    static void PlayURL(const QString& url);
 
     QString GetMetadata(void);
 
@@ -72,7 +72,7 @@ class MythWebPage : public QWebPage
 
   public:
     explicit MythWebPage(QObject *parent = nullptr);
-    ~MythWebPage();
+    ~MythWebPage() override;
 
     bool extension (Extension extension, const ExtensionOption *option = nullptr,
                     ExtensionReturn *output = nullptr) override; // QWebPage
@@ -91,7 +91,7 @@ class MythWebView : public QWebView
 
   public:
     MythWebView(QWidget *parent, MythUIWebBrowser *parentBrowser);
-    ~MythWebView(void);
+    ~MythWebView(void) override;
 
     void keyPressEvent(QKeyEvent *event) override; // QWidget
     void customEvent(QEvent *e) override; // QWidget
@@ -108,11 +108,11 @@ class MythWebView : public QWebView
     void openBusyPopup(const QString &message);
     void closeBusyPopup(void);
 
-    bool isMusicFile(const QString &extension, const QString &mimetype);
-    bool isVideoFile(const QString &extension, const QString &mimetype);
+    static bool isMusicFile(const QString &extension, const QString &mimetype);
+    static bool isVideoFile(const QString &extension, const QString &mimetype);
 
     QString getReplyMimetype(void);
-    QString getExtensionForMimetype(const QString &mimetype);
+    static QString getExtensionForMimetype(const QString &mimetype);
 
     MythWebPage      *m_webpage         {nullptr};
     MythUIWebBrowser *m_parentBrowser   {nullptr};
@@ -135,7 +135,7 @@ class MUI_PUBLIC MythUIWebBrowser : public MythUIType
 
   public:
     MythUIWebBrowser(MythUIType *parent, const QString &name);
-    ~MythUIWebBrowser();
+    ~MythUIWebBrowser() override;
 
     void Init(void);
 
@@ -153,14 +153,14 @@ class MUI_PUBLIC MythUIWebBrowser : public MythUIType
     QString GetTitle(void);
 
     void SetActive(bool active);
-    bool IsActive(void) { return m_active; }
+    bool IsActive(void) const { return m_active; }
 
     /// returns true if all keypresses are to be passed to the web page
-    bool IsInputToggled(void) { return m_inputToggled; }
+    bool IsInputToggled(void) const { return m_inputToggled; }
     void SetInputToggled(bool inputToggled) { m_inputToggled = inputToggled; }
 
     void  SetZoom(float zoom);
-    float GetZoom(void);
+    float GetZoom(void) const;
 
     bool CanGoForward(void);
     bool CanGoBack(void);
@@ -228,7 +228,7 @@ class MUI_PUBLIC MythUIWebBrowser : public MythUIType
     bool         m_active;
     bool         m_wasActive;
     bool         m_initialized;
-    QTime        m_lastUpdateTime;
+    QElapsedTimer m_lastUpdateTime;
     int          m_updateInterval;
 
     float        m_zoom;
@@ -241,7 +241,7 @@ class MUI_PUBLIC MythUIWebBrowser : public MythUIType
     bool         m_inputToggled;
     QString      m_lastMouseAction;
     int          m_mouseKeyCount;
-    QTime        m_lastMouseActionTime;
+    QElapsedTimer m_lastMouseActionTime;
 
     MythUIScrollBar *m_horizontalScrollbar;
     MythUIScrollBar *m_verticalScrollbar;

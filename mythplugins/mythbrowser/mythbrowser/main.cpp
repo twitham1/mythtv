@@ -31,13 +31,17 @@ static int handleMedia(const QString &url, const QString &directory, const QStri
         return 1;
     }
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList urls = url.split(" ", QString::SkipEmptyParts);
+#else
+    QStringList urls = url.split(" ", Qt::SkipEmptyParts);
+#endif
 
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
     if (urls[0].startsWith("mythflash://"))
     {
-        MythFlashPlayer *flashplayer = new MythFlashPlayer(mainStack, urls);
+        auto *flashplayer = new MythFlashPlayer(mainStack, urls);
         if (flashplayer->Create())
             mainStack->AddScreen(flashplayer);
         else
@@ -45,7 +49,7 @@ static int handleMedia(const QString &url, const QString &directory, const QStri
     }
     else
     {
-        MythBrowser *mythbrowser = new MythBrowser(mainStack, urls);
+        auto *mythbrowser = new MythBrowser(mainStack, urls);
 
         if (!directory.isEmpty())
             mythbrowser->setDefaultSaveDirectory(directory);
@@ -95,8 +99,7 @@ static void runHomepage()
         MythScreenStack *m_popupStack =
                 GetMythMainWindow()->GetStack("popup stack");
 
-        MythConfirmationDialog *okPopup =
-                new MythConfirmationDialog(m_popupStack, message, false);
+        auto *okPopup = new MythConfirmationDialog(m_popupStack, message, false);
 
         if (okPopup->Create())
             m_popupStack->AddScreen(okPopup);
@@ -121,7 +124,8 @@ static void setupKeys(void)
 
 int mythplugin_init(const char *libversion)
 {
-    if (!gCoreContext->TestPluginVersion("mythbrowser", libversion, MYTH_BINARY_VERSION))
+    if (!MythCoreContext::TestPluginVersion("mythbrowser", libversion,
+                                            MYTH_BINARY_VERSION))
         return -1;
 
     UpgradeBrowserDatabaseSchema();
@@ -145,7 +149,7 @@ int mythplugin_run(void)
 {
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    BookmarkManager *manager = new BookmarkManager(mainStack, "bookmarkmanager");
+    auto *manager = new BookmarkManager(mainStack, "bookmarkmanager");
 
     if (manager->Create())
     {
@@ -160,7 +164,7 @@ int mythplugin_config(void)
 {
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    BrowserConfig *config = new BrowserConfig(mainStack, "browserconfig");
+    auto *config = new BrowserConfig(mainStack, "browserconfig");
 
     if (config->Create())
     {

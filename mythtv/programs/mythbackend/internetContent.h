@@ -31,13 +31,13 @@ class InternetContent : public HttpServerExtension
 {
     private:
 
-        void    GetInternetSearch( HTTPRequest *pRequest );
-        void    GetInternetSources( HTTPRequest *pRequest );
-        void    GetInternetContent( HTTPRequest *pRequest );
+        static void    GetInternetSearch( HTTPRequest *pRequest );
+        static void    GetInternetSources( HTTPRequest *pRequest );
+        static void    GetInternetContent( HTTPRequest *pRequest );
 
     public:
                  explicit InternetContent( const QString &sSharePath);
-        virtual ~InternetContent() = default;
+        ~InternetContent() override = default;
 
         QStringList GetBasePaths() override; // HttpServerExtension
 

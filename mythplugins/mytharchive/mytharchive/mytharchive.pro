@@ -2,9 +2,6 @@ include ( ../../mythconfig.mak )
 include ( ../../settings.pro )
 include ( ../../programs-libs.pro )
 
-QMAKE_COPY_DIR = sh ../../cpsvndir
-win32:QMAKE_COPY_DIR = sh ../../cpsimple
-
 INCLUDEPATH += $${SYSROOT}$${PREFIX}/include/mythtv/libavformat
 INCLUDEPATH += $${SYSROOT}$${PREFIX}/include/mythtv/libswscale
 DEPENDPATH *= $${INCLUDEPATH}
@@ -27,14 +24,14 @@ target.path = $${LIBDIR}/mythtv/plugins
 INSTALLS += target
 
 HEADERS += archivesettings.h logviewer.h fileselector.h
-HEADERS += recordingselector.h videoselector.h dbcheck.h
+HEADERS += recordingselector.h videoselector.h archivedbcheck.h
 HEADERS += archiveutil.h selectdestination.h
 HEADERS += mythburn.h themeselector.h editmetadata.h thumbfinder.h
 HEADERS += exportnative.h importnative.h
 
 SOURCES += main.cpp archivesettings.cpp logviewer.cpp
 SOURCES += fileselector.cpp recordingselector.cpp videoselector.cpp
-SOURCES += dbcheck.cpp archiveutil.cpp selectdestination.cpp
+SOURCES += archivedbcheck.cpp archiveutil.cpp selectdestination.cpp
 SOURCES += mythburn.cpp themeselector.cpp editmetadata.cpp thumbfinder.cpp
 SOURCES += exportnative.cpp importnative.cpp
 

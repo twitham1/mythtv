@@ -1,5 +1,5 @@
-#ifndef _METADATAIMAGEHELPER_H_
-#define _METADATAIMAGEHELPER_H_
+#ifndef METADATAIMAGEHELPER_H
+#define METADATAIMAGEHELPER_H
 
 #include <QObject>
 #include <QMultiMap>
@@ -23,13 +23,12 @@ struct ArtworkInfo
     QString label;
     QString thumbnail;
     QString url;
-    uint width;
-    uint height;
+    uint    width     {0};
+    uint    height    {0};
 };
 
-typedef QList< ArtworkInfo > ArtworkList;
-
-typedef QMultiMap< VideoArtworkType, ArtworkInfo > ArtworkMap;
+using ArtworkList = QList< ArtworkInfo >;
+using ArtworkMap  = QMultiMap< VideoArtworkType, ArtworkInfo >;
 
 MTV_PUBLIC ArtworkMap GetArtwork(const QString& inetref,
                                        uint season,
@@ -48,4 +47,4 @@ MTV_PUBLIC bool SetArtwork(const QString &inetref,
 Q_DECLARE_METATYPE(VideoArtworkType)
 Q_DECLARE_METATYPE(ArtworkInfo)
 
-#endif
+#endif // METADATAIMAGEHELPER_H

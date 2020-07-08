@@ -9,11 +9,15 @@
 #ifndef IMAGEMETADATA_H
 #define IMAGEMETADATA_H
 
+#include <utility>
+
+// Qt headers
 #include <QCoreApplication> // for tr()
+#include <QDateTime>
 #include <QStringBuilder>
 #include <QStringList>
-#include <QDateTime>
 
+// MythTV headers
 #include "mythmetaexp.h"
 
 
@@ -64,19 +68,19 @@ public:
     Orientation(int current, int file) : m_current(current), m_file(file) {}
 
     //! Encode original & current orientation to a single Db field
-    int Composite() { return m_current * 10 + m_file; }
-    int Transform(int);
+    int Composite() const { return m_current * 10 + m_file; }
+    int Transform(int transform);
     int GetCurrent(bool compensate);
-    QString Description();
+    QString Description() const;
 
     static int FromRotation(const QString &degrees);
 
 private:
     static QString AsText(int orientation);
 
-    int Apply(int);
+    int Apply(int transform) const;
 
-    typedef QHash<int, QHash<int, int> > Matrix;
+    using Matrix = QHash<int, QHash<int, int> >;
 
     //! True when using Qt 5.4.1 with its deviant orientation behaviour
     static const bool krunningQt541;
@@ -112,7 +116,7 @@ public:
     static QStringList FromString(const QString &str)
     { return str.split(kSeparator); }
 
-    typedef QMap<QString, QStringList> TagMap;
+    using TagMap = QMap<QString, QStringList>;
     static TagMap ToMap(const QStringList &tags);
 
     virtual bool        IsValid()                                = 0;
@@ -122,7 +126,8 @@ public:
     virtual QString     GetComment(bool *exists = nullptr)          = 0;
 
 protected:
-    explicit ImageMetaData(const QString &filePath) : m_filePath(filePath) {}
+    explicit ImageMetaData(QString filePath)
+        : m_filePath(std::move(filePath)) {}
 
     //! Image filepath
     QString m_filePath;

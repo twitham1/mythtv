@@ -20,17 +20,17 @@ class NetBase : public MythScreenType
   Q_OBJECT
 
   public:
-    NetBase(MythScreenStack *parent, const char *name = nullptr);
-    virtual ~NetBase();
+    explicit NetBase(MythScreenStack *parent, const char *name = nullptr);
+    ~NetBase() override;
 
   protected:
     void Init() override; // MythScreenType
     virtual ResultItem *GetStreamItem() = 0;
     virtual void LoadData(void) = 0;
     void InitProgressDialog();
-    void CleanCacheDir();
+    static void CleanCacheDir();
     void DownloadVideo(const QString &url, const QString &dest);
-    void RunCmdWithoutScreensaver(const QString &cmd);
+    static void RunCmdWithoutScreensaver(const QString &cmd);
 
   protected slots:
     void StreamWebVideo(void);

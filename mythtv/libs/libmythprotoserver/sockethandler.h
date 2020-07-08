@@ -1,7 +1,7 @@
 // -*- Mode: c++ -*-
 
-#ifndef _SOCKETHANDLER_H_
-#define _SOCKETHANDLER_H_
+#ifndef SOCKETHANDLER_H
+#define SOCKETHANDLER_H
 
 #include <QString>
 #include <QMutex>
@@ -18,11 +18,11 @@ class PROTOSERVER_PUBLIC SocketHandler : public ReferenceCounter
   public:
     SocketHandler(MythSocket *sock, MythSocketManager *parent,
                   QString hostname);
-   ~SocketHandler();
+   ~SocketHandler() override;
 
-    bool DoesBlockShutdown(void)        { return m_blockShutdown; }
-    bool GetsStandardEvents(void)       { return m_standardEvents; }
-    bool GetsSystemEvents(void)         { return m_systemEvents; }
+    bool DoesBlockShutdown(void) const  { return m_blockShutdown; }
+    bool GetsStandardEvents(void) const { return m_standardEvents; }
+    bool GetsSystemEvents(void) const   { return m_systemEvents; }
 
     QString GetHostname(void)           { return m_hostname; }
 
@@ -47,4 +47,4 @@ class PROTOSERVER_PUBLIC SocketHandler : public ReferenceCounter
     QString             m_hostname;
 };
 
-#endif
+#endif // SOCKETHANDLER_H

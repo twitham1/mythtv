@@ -123,7 +123,7 @@ void FileSelector::itemClicked(MythUIButtonListItem *item)
     if (!item)
         return;
 
-    FileData *fileData = item->GetData().value<FileData*>();
+    auto *fileData = item->GetData().value<FileData*>();
 
     if (fileData->directory)
     {
@@ -205,13 +205,11 @@ void FileSelector::OKPressed()
     {
         // loop though selected files and add them to the list
         QString f;
-        ArchiveItem *a;
 
         // remove any items that have been removed from the list
         QList<ArchiveItem *> tempAList;
-        for (int x = 0; x < m_archiveList->size(); x++)
+        for (auto *a : qAsConst(*m_archiveList))
         {
-            a = m_archiveList->at(x);
             bool found = false;
 
             for (int y = 0; y < m_selectedList.size(); y++)
@@ -228,8 +226,8 @@ void FileSelector::OKPressed()
                 tempAList.append(a);
         }
 
-        for (int x = 0; x < tempAList.size(); x++)
-            m_archiveList->removeAll(tempAList.at(x));
+        for (auto *x : qAsConst(tempAList))
+            m_archiveList->removeAll(x);
 
         // remove any items that are already in the list
         QStringList tempSList;
@@ -237,9 +235,8 @@ void FileSelector::OKPressed()
         {
             f = m_selectedList.at(x);
 
-            for (int y = 0; y < m_archiveList->size(); y++)
+            for (const auto *a : qAsConst(*m_archiveList))
             {
-                a = m_archiveList->at(y);
                 if (a->filename == f)
                 {
                     tempSList.append(f);
@@ -264,7 +261,7 @@ void FileSelector::OKPressed()
                 if (pos > 0)
                     title = f.mid(pos + 1);
 
-                a = new ArchiveItem;
+                auto *a = new ArchiveItem;
                 a->type = "File";
                 a->title = title;
                 a->subtitle = "";
@@ -290,7 +287,7 @@ void FileSelector::OKPressed()
     else
     {
         MythUIButtonListItem *item = m_fileButtonList->GetItemCurrent();
-        FileData *fileData = item->GetData().value<FileData*>();
+        auto *fileData = item->GetData().value<FileData*>();
 
         if (m_selectorType == FSTYPE_DIRECTORY)
         {
@@ -348,12 +345,10 @@ void FileSelector::updateSelectedList()
         m_selectedList.takeFirst();
     m_selectedList.clear();
 
-    for (int x = 0; x < m_archiveList->size(); x++)
+    for (const auto *a : qAsConst(*m_archiveList))
     {
-        ArchiveItem *a = m_archiveList->at(x);
-        for (int y = 0; y < m_fileData.size(); y++)
+        for (const auto *f : qAsConst(m_fileData))
         {
-            FileData *f = m_fileData.at(y);
             if (f->filename == a->filename)
             {
                 if (m_selectedList.indexOf(f->filename) == -1)
@@ -383,14 +378,12 @@ void FileSelector::updateFileList()
         QStringList filters;
         filters << "*";
         QFileInfoList list = d.entryInfoList(filters, QDir::Dirs, QDir::Name);
-        QFileInfo fi;
 
-        for (int x = 0; x < list.size(); x++)
+        for (const auto & fi : qAsConst(list))
         {
-            fi = list.at(x);
             if (fi.fileName() != ".")
             {
-                FileData  *data = new FileData;
+                auto  *data = new FileData;
                 data->selected = false;
                 data->directory = true;
                 data->filename = fi.fileName();
@@ -398,11 +391,11 @@ void FileSelector::updateFileList()
                 m_fileData.append(data);
 
                 // add a row to the MythUIButtonList
-                MythUIButtonListItem* item = new
+                auto* item = new
                         MythUIButtonListItem(m_fileButtonList, data->filename);
                 item->setCheckable(false);
                 item->SetImage("ma_folder.png");
-                item->SetData(qVariantFromValue(data));
+                item->SetData(QVariant::fromValue(data));
             }
         }
 
@@ -410,12 +403,15 @@ void FileSelector::updateFileList()
         {
             // second get a list of file's in the current directory
             filters.clear();
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
             filters = m_filemask.split(" ", QString::SkipEmptyParts);
+#else
+            filters = m_filemask.split(" ", Qt::SkipEmptyParts);
+#endif
             list = d.entryInfoList(filters, QDir::Files, QDir::Name);
-            for (int x = 0; x < list.size(); x++)
+            for (const auto & fi : qAsConst(list))
             {
-                fi = list.at(x);
-                FileData  *data = new FileData;
+                auto  *data = new FileData;
                 data->selected = false;
                 data->directory = false;
                 data->filename = fi.fileName();
@@ -423,7 +419,7 @@ void FileSelector::updateFileList()
                 m_fileData.append(data);
 
                 // add a row to the UIListBtnArea
-                MythUIButtonListItem* item = 
+                auto* item = 
                      new MythUIButtonListItem(m_fileButtonList, data->filename);
                 item->SetText(formatSize(data->size / 1024, 2), "size");
 
@@ -448,7 +444,7 @@ void FileSelector::updateFileList()
                 else
                     item->setCheckable(false);
 
-                item->SetData(qVariantFromValue(data));
+                item->SetData(QVariant::fromValue(data));
             }
         }
         m_locationEdit->SetText(m_curDirectory);

@@ -1,23 +1,26 @@
 #ifndef DELETEMAP_H
 #define DELETEMAP_H
 
+#include <utility>
+
+// Qt headers
 #include <QCoreApplication>
 
+// MythTV headers
 #include "mythtvexp.h"
 #include "programtypes.h"               // for frm_dir_map_t, MarkTypes
 
 class OSD;
 class PlayerContext;
 
-typedef struct DeleteMapUndoEntry
+struct DeleteMapUndoEntry
 {
     frm_dir_map_t m_deleteMap;
     QString       m_message; // how we got from previous map to this map
-    DeleteMapUndoEntry(const frm_dir_map_t &dm, const QString &msg)
-        : m_deleteMap(dm), m_message(msg) { }
+    DeleteMapUndoEntry(frm_dir_map_t dm, QString msg)
+        : m_deleteMap(std::move(dm)), m_message(std::move(msg)) { }
     DeleteMapUndoEntry(void) = default;
-
-} DeleteMapUndoEntry;
+};
 
 class MTV_PUBLIC DeleteMap
 {
@@ -32,7 +35,7 @@ class MTV_PUBLIC DeleteMap
     void SetSeekAmount(float amount) { m_seekamount = amount; }
 
     void UpdateOSD(uint64_t frame, double frame_rate, OSD *osd);
-    void UpdateOSD(int64_t timecode, OSD *osd);
+    static void UpdateOSD(int64_t timecode, OSD *osd);
 
     bool IsEditing(void) const { return m_editing; }
     void SetEditing(bool edit, OSD *osd = nullptr);
@@ -76,7 +79,7 @@ class MTV_PUBLIC DeleteMap
     uint64_t TranslatePositionRelToAbs(uint64_t position) const;
 
     void TrackerReset(uint64_t frame);
-    bool TrackerWantsToJump(uint64_t frame, uint64_t &to);
+    bool TrackerWantsToJump(uint64_t frame, uint64_t &to) const;
 
     bool Undo(void);
     bool Redo(void);

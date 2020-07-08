@@ -41,7 +41,7 @@ void MHTokenGroupItem::Initialise(MHParseNode *p, MHEngine *engine)
         for (int i = 0; i < pSlots->GetSeqCount(); i++)
         {
             MHParseNode *pAct = pSlots->GetSeqN(i);
-            MHActionSequence *pActions = new MHActionSequence;
+            auto *pActions = new MHActionSequence;
             m_ActionSlots.Append(pActions);
 
             // The action slot entry may be NULL.
@@ -123,7 +123,7 @@ void MHTokenGroup::Initialise(MHParseNode *p, MHEngine *engine)
     {
         for (int i = 0; i < pMovements->GetArgCount(); i++)
         {
-            MHMovement *pMove = new MHMovement;
+            auto *pMove = new MHMovement;
             m_MovementTable.Append(pMove);
             pMove->Initialise(pMovements->GetArgN(i), engine);
         }
@@ -135,7 +135,7 @@ void MHTokenGroup::Initialise(MHParseNode *p, MHEngine *engine)
     {
         for (int i = 0; i < pTokenGrp->GetArgCount(); i++)
         {
-            MHTokenGroupItem *pToken = new MHTokenGroupItem;
+            auto *pToken = new MHTokenGroupItem;
             m_TokenGrpItems.Append(pToken);
             pToken->Initialise(pTokenGrp->GetArgN(i), engine);
         }
@@ -148,7 +148,7 @@ void MHTokenGroup::Initialise(MHParseNode *p, MHEngine *engine)
         for (int i = 0; i < pNoToken->GetArgCount(); i++)
         {
             MHParseNode *pAct = pNoToken->GetArgN(i);
-            MHActionSequence *pActions = new MHActionSequence;
+            auto *pActions = new MHActionSequence;
             m_NoTokenActionSlots.Append(pActions);
 
             // The action slot entry may be NULL.
@@ -252,7 +252,9 @@ void MHTokenGroup::Activation(MHEngine *engine)
             {
                 engine->FindObject(m_TokenGrpItems.GetAt(i)->m_Object)->Activation(engine);
             }
-            catch (char const *) {}
+            catch (...)
+            {
+            }
         }
     }
 
@@ -402,11 +404,10 @@ void MHListGroup::Preparation(MHEngine *engine)
         {
             MHRoot *pItem = engine->FindObject(m_TokenGrpItems.GetAt(i)->m_Object);
             MHListItem *p = nullptr;
-            QList<MHListItem *>::iterator it = m_ItemList.begin();
 
-            for (; it != m_ItemList.end(); ++it)
+            for (auto *item : qAsConst(m_ItemList))
             {
-                p = *it;
+                p = item;
 
                 if (p->m_pVisible == pItem)
                 {
@@ -428,10 +429,8 @@ void MHListGroup::Preparation(MHEngine *engine)
 void MHListGroup::Destruction(MHEngine *engine)
 {
     // Reset the positions of the visibles.
-    for (int j = 0; j < m_ItemList.size(); j++)
-    {
-        m_ItemList.at(j)->m_pVisible->ResetPosition();
-    }
+    for (auto *item : qAsConst(m_ItemList))
+        item->m_pVisible->ResetPosition();
 
     MHTokenGroup::Destruction(engine);
 }
@@ -447,10 +446,8 @@ void MHListGroup::Activation(MHEngine *engine)
 void MHListGroup::Deactivation(MHEngine *engine)
 {
     // Deactivate the visibles.
-    for (int j = 0; j < m_ItemList.size(); j++)
-    {
-        m_ItemList.at(j)->m_pVisible->Deactivation(engine);
-    }
+    for (auto *item : qAsConst(m_ItemList))
+        item->m_pVisible->Deactivation(engine);
 
     MHTokenGroup::Deactivation(engine);
 }
@@ -548,11 +545,9 @@ void MHListGroup::Update(MHEngine *engine)
 void MHListGroup::AddItem(int nIndex, MHRoot *pItem, MHEngine *engine)
 {
     // See if the item is already there and ignore this if it is.
-    QList<MHListItem *>::iterator it = m_ItemList.begin();
-
-    for (; it != m_ItemList.end(); ++it)
+    for (auto *item : qAsConst(m_ItemList))
     {
-        if ((*it)->m_pVisible == pItem)
+        if (item->m_pVisible == pItem)
         {
             return;
         }
@@ -610,10 +605,12 @@ void MHListGroup::Select(int nIndex, MHEngine *engine)
     {
         // Deselect any existing selections.
         for (int i = 0; i < m_ItemList.size(); i++)
+        {
             if (m_ItemList.at(i)->m_fSelected)
             {
                 Deselect(i + 1, engine);
             }
+        }
     }
 
     pListItem->m_fSelected = true;

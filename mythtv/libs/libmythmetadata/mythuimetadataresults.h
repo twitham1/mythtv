@@ -15,7 +15,7 @@ class META_PUBLIC MetadataResultsDialog : public MythScreenType
   public:
     MetadataResultsDialog(MythScreenStack *lparent,
                           const MetadataLookupList &results);
-    ~MetadataResultsDialog();
+    ~MetadataResultsDialog() override;
 
     bool Create() override; // MythScreenType
 
@@ -30,7 +30,7 @@ class META_PUBLIC MetadataResultsDialog : public MythScreenType
   private slots:
     void customEvent(QEvent *event) override; // MythUIType
 
-    void cleanCacheDir();
+    static void cleanCacheDir();
     void sendResult(MythUIButtonListItem* item);
 };
 

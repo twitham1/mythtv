@@ -13,10 +13,8 @@ using namespace std;
 #include <mythcontext.h>
 #include <mythlogging.h>
 
-extern "C" {
 #include "goom_tools.h"
 #include "goom_core.h"
-}
 
 Goom::Goom()
 {
@@ -107,7 +105,7 @@ bool Goom::draw(QPainter *p, const QColor &back)
         height /= m_scaleh;
     }
 
-    QImage *image = new QImage((uchar*) m_buffer, width, height, width * 4, QImage::Format_RGB32);
+    auto *image = new QImage((uchar*) m_buffer, width, height, width * 4, QImage::Format_RGB32);
 
     p->drawImage(QRect(0, 0, m_size.width(), m_size.height()), *image);
 
@@ -121,9 +119,9 @@ static class GoomFactory : public VisFactory
   public:
     const QString &name(void) const override // VisFactory
     {
-        static QString name = QCoreApplication::translate("Visualizers",
-                                                          "Goom");
-        return name;
+        static QString s_name = QCoreApplication::translate("Visualizers",
+                                                            "Goom");
+        return s_name;
     }
 
     uint plugins(QStringList *list) const override // VisFactory

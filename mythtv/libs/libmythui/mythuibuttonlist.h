@@ -1,11 +1,15 @@
 #ifndef MYTHUIBUTTONLIST_H_
 #define MYTHUIBUTTONLIST_H_
 
-#include <QList>
+#include <utility>
+
+// Qt headers
 #include <QHash>
+#include <QList>
 #include <QString>
 #include <QVariant>
 
+// MythTV headers
 #include "mythuitype.h"
 #include "mythscreentype.h"
 #include "mythimage.h"
@@ -30,8 +34,8 @@ class MUI_PUBLIC MythUIButtonListItem
         FullChecked
     };
 
-    MythUIButtonListItem(MythUIButtonList *lbtype, const QString& text,
-                         const QString& image = "", bool checkable = false,
+    MythUIButtonListItem(MythUIButtonList *lbtype, QString text,
+                         QString image = "", bool checkable = false,
                          CheckState state = CantCheck, bool showArrow = false,
                          int listPosition = -1);
     MythUIButtonListItem(MythUIButtonList *lbtype, const QString& text,
@@ -144,11 +148,11 @@ class MUI_PUBLIC MythUIButtonList : public MythUIType
     MythUIButtonList(MythUIType *parent, const QString &name,
                    const QRect &area, bool showArrow = true,
                    bool showScrollBar = false);
-    ~MythUIButtonList();
+    ~MythUIButtonList() override;
 
     bool keyPressEvent(QKeyEvent *event) override; // MythUIType
     bool gestureEvent(MythGestureEvent *event) override; // MythUIType
-    void customEvent(QEvent *) override; // MythUIType
+    void customEvent(QEvent *event) override; // MythUIType
 
     enum MovementUnit { MoveItem, MoveColumn, MoveRow, MovePage, MoveMax,
                         MoveMid, MoveByAmount };
@@ -187,7 +191,7 @@ class MUI_PUBLIC MythUIButtonList : public MythUIType
     int GetItemPos(MythUIButtonListItem* item) const;
     int GetTopItemPos(void) const { return m_topPosition; }
     int GetCount() const;
-    uint GetVisibleCount();
+    int GetVisibleCount();
     bool IsEmpty() const;
 
     virtual bool MoveDown(MovementUnit unit = MoveItem, uint amount = 0);
@@ -300,7 +304,7 @@ class MUI_PUBLIC MythUIButtonList : public MythUIType
     int m_itemHeight                  {0};
     int m_itemHorizSpacing            {0};
     int m_itemVertSpacing             {0};
-    uint m_itemsVisible               {0};
+    int m_itemsVisible                {0};
     int m_maxVisible                  {0};
     int m_rows                        {0};
     int m_columns                     {0};
@@ -351,8 +355,8 @@ class MUI_PUBLIC SearchButtonListDialog : public MythScreenType
     SearchButtonListDialog(MythScreenStack *parent, const char *name,
                            MythUIButtonList *parentList, QString searchText)
         : MythScreenType(parent, name, false),
-          m_parentList(parentList), m_searchText(searchText) {}
-    ~SearchButtonListDialog(void) = default;
+          m_parentList(parentList), m_searchText(std::move(searchText)) {}
+    ~SearchButtonListDialog(void) override = default;
 
     bool Create(void) override; // MythScreenType
     bool keyPressEvent(QKeyEvent *event) override; // MythScreenType

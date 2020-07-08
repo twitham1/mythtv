@@ -28,7 +28,7 @@ class MSqlDatabase
   friend class MDBManager;
   friend class MSqlQuery;
   public:
-    explicit MSqlDatabase(const QString &name);
+    explicit MSqlDatabase(QString name);
    ~MSqlDatabase(void);
 
     bool OpenDatabase(bool skipdb = false);
@@ -71,11 +71,11 @@ class MBASE_PUBLIC MDBManager
     MSqlDatabase *getStaticCon(MSqlDatabase **dbcon, const QString& name);
 
     QMutex m_lock;
-    typedef QList<MSqlDatabase*> DBList;
+    using DBList = QList<MSqlDatabase*>;
     QHash<QThread*, DBList> m_pool; // protected by m_lock
 #if REUSE_CONNECTION
     QHash<QThread*, MSqlDatabase*> m_inuse; // protected by m_lock
-    QHash<QThread*, int> m_inuse_count; // protected by m_lock
+    QHash<QThread*, int> m_inuseCount; // protected by m_lock
 #endif
 
     int m_nextConnID         {0};
@@ -83,19 +83,19 @@ class MBASE_PUBLIC MDBManager
 
     MSqlDatabase *m_schedCon {nullptr};
     MSqlDatabase *m_channelCon {nullptr};
-    QHash<QThread*, DBList> m_static_pool;
+    QHash<QThread*, DBList> m_staticPool;
 };
 
 /// \brief MSqlDatabase Info, used by MSqlQuery. Do not use directly.
-typedef struct _MSqlQueryInfo
+struct MSqlQueryInfo
 {
-    MSqlDatabase *db;
+    MSqlDatabase *db      {nullptr};
     QSqlDatabase qsqldb;
-    bool returnConnection;
-} MSqlQueryInfo;
+    bool returnConnection {false};
+};
 
 /// \brief typedef for a map of string -> string bindings for generic queries.
-typedef QMap<QString, QVariant> MSqlBindings;
+using MSqlBindings = QMap<QString, QVariant>;
 
 /// \brief Add the entries in addfrom to the map in output
  MBASE_PUBLIC  void MSqlAddMoreBindings(MSqlBindings &output, MSqlBindings &addfrom);
@@ -124,7 +124,7 @@ typedef QMap<QString, QVariant> MSqlBindings;
  */
 class MBASE_PUBLIC MSqlQuery : private QSqlQuery
 {
-    MBASE_PUBLIC friend void MSqlEscapeAsAQuery(QString&, MSqlBindings&);
+    MBASE_PUBLIC friend void MSqlEscapeAsAQuery(QString& query, MSqlBindings& bindings);
   public:
     /// \brief Get DB connection from pool
     explicit MSqlQuery(const MSqlQueryInfo &qi);
@@ -132,7 +132,7 @@ class MBASE_PUBLIC MSqlQuery : private QSqlQuery
     ~MSqlQuery();
 
     /// \brief Only updated once during object creation
-    bool isConnected(void) { return m_isConnected; }
+    bool isConnected(void) const { return m_isConnected; }
 
     /// \brief Wrap QSqlQuery::exec() so we can display SQL
     bool exec(void);
@@ -151,7 +151,7 @@ class MBASE_PUBLIC MSqlQuery : private QSqlQuery
 
     /// \brief Wrap QSqlQuery::seek(int,bool)
     //         so we can display the query results
-    bool seek(int, bool relative = false);
+    bool seek(int where, bool relative = false);
 
     /// \brief Wrap QSqlQuery::exec(const QString &query) so we can display SQL
     bool exec(const QString &query);
@@ -212,13 +212,13 @@ class MBASE_PUBLIC MSqlQuery : private QSqlQuery
     /// \brief Checks DB connection + login (login info via Mythcontext)
     static bool testDBConnection();
 
-    typedef enum
+    enum ConnectionReuse
     {
         kDedicatedConnection,
         kNormalConnection,
-    } ConnectionReuse;
+    };
     /// \brief Only use this in combination with MSqlQuery constructor
-    static MSqlQueryInfo InitCon(ConnectionReuse = kNormalConnection);
+    static MSqlQueryInfo InitCon(ConnectionReuse _reuse = kNormalConnection);
 
     /// \brief Returns dedicated connection. (Required for using temporary SQL tables.)
     static MSqlQueryInfo SchedCon();
@@ -238,7 +238,7 @@ class MBASE_PUBLIC MSqlQuery : private QSqlQuery
     MSqlDatabase *m_db               {nullptr};
     bool          m_isConnected      {false};
     bool          m_returnConnection {false};
-    QString       m_last_prepared_query; // holds a copy of the last prepared query
+    QString       m_lastPreparedQuery; // holds a copy of the last prepared query
 };
 
 #endif

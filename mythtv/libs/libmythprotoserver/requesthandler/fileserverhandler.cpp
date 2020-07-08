@@ -10,7 +10,7 @@
 
 #include "mythmiscutil.h"
 #include "mythdb.h"
-#include "ringbuffer.h"
+#include "io/mythmediabuffer.h"
 #include "mythsocket.h"
 #include "mythlogging.h"
 #include "programinfo.h"
@@ -75,7 +75,8 @@ QString FileServerHandler::LocalFilePath(const QString &path,
         lpath = "";
 
         MSqlQuery query(MSqlQuery::InitCon());
-        query.prepare("SELECT icon FROM channel WHERE icon LIKE :FILENAME ;");
+        query.prepare("SELECT icon FROM channel "
+                      "WHERE icon LIKE :FILENAME ;");
         query.bindValue(":FILENAME", QString("%/") + file);
 
         if (query.exec() && query.next())
@@ -179,8 +180,7 @@ bool FileServerHandler::HandleAnnounce(MythSocket *socket,
     {
         if (slist.size() >= 3)
         {
-            SocketHandler *handler =
-                new SocketHandler(socket, m_parent, commands[2]);
+            auto *handler = new SocketHandler(socket, m_parent, commands[2]);
 
             handler->BlockShutdown(true);
             handler->AllowStandardEvents(true);
@@ -630,7 +630,7 @@ bool FileServerHandler::HandleQueryFileExists(SocketHandler *socket,
             << fullname;
 
         // TODO: convert me to QFile
-        struct stat fileinfo;
+        struct stat fileinfo {};
         if (stat(fullname.toLocal8Bit().constData(), &fileinfo) >= 0)
         {
             res << QString::number(fileinfo.st_dev)
@@ -738,9 +738,9 @@ bool FileServerHandler::HandleDeleteFile(SocketHandler *socket,
     return HandleDeleteFile(socket, slist[1], slist[2]);
 }
 
-bool FileServerHandler::DeleteFile(QString filename, QString storagegroup)
+bool FileServerHandler::DeleteFile(const QString& filename, const QString& storagegroup)
 {
-    return HandleDeleteFile(nullptr, std::move(filename), std::move(storagegroup));
+    return HandleDeleteFile(nullptr, filename, storagegroup);
 }
 
 bool FileServerHandler::HandleDeleteFile(SocketHandler *socket,
@@ -867,7 +867,7 @@ bool FileServerHandler::HandleGetFileList(SocketHandler *socket,
         {
             LOG(VB_FILE, LOG_INFO, "Getting remote info");
             res << "QUERY_SG_GETFILELIST" << wantHost << groupname << path
-                << QString::number(fileNamesOnly);
+                << QString::number(static_cast<int>(fileNamesOnly));
             remsock->SendReceiveStringList(res);
             remsock->DecrRef();
         }
@@ -954,7 +954,7 @@ bool FileServerHandler::HandleQueryFileTransfer(SocketHandler *socket,
 
     QStringList res;
     int recnum = commands[1].toInt();
-    FileTransfer *ft;
+    FileTransfer *ft = nullptr;
 
     {
         QReadLocker rlock(&m_ftLock);
@@ -1024,7 +1024,7 @@ bool FileServerHandler::HandleQueryFileTransfer(SocketHandler *socket,
     }
     else if (slist[1] == "IS_OPEN")
     {
-        res << QString::number(ft->isOpen());
+        res << QString::number(static_cast<int>(ft->isOpen()));
     }
     else if (slist[1] == "DONE")
     {
@@ -1050,7 +1050,7 @@ bool FileServerHandler::HandleQueryFileTransfer(SocketHandler *socket,
     {
         // return size and if the file is not opened for writing
         res << QString::number(ft->GetFileSize());
-        res << QString::number(!gCoreContext->IsRegisteredFileForWrite(ft->GetFileName()));
+        res << QString::number(static_cast<int>(!gCoreContext->IsRegisteredFileForWrite(ft->GetFileName())));
     }
     else
     {

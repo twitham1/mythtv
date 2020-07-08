@@ -110,8 +110,12 @@ void NetEditorBase::SlotLoadedData()
 
     while (!grabber.isNull())
     {
-        QString title, author, image, description, type, commandline;
-        double version;
+        QString title;
+        QString author;
+        QString image;
+        QString description;
+        QString type;
+        QString commandline;
         bool search = false;
         bool tree = false;
 
@@ -121,7 +125,7 @@ void NetEditorBase::SlotLoadedData()
         image = grabber.firstChildElement("thumbnail").text();
         type = grabber.firstChildElement("type").text();
         description = grabber.firstChildElement("description").text();
-        version = grabber.firstChildElement("version").text().toDouble();
+        double version = grabber.firstChildElement("version").text().toDouble();
 
         QString searchstring = grabber.firstChildElement("search").text();
 
@@ -187,26 +191,28 @@ void NetEditorBase::CreateBusyDialog(const QString& title)
 
 void NetEditorBase::FillGrabberButtonList()
 {
-    for (GrabberScript::scriptList::iterator i = m_grabberList.begin();
-            i != m_grabberList.end(); ++i)
+    for (const auto & g : qAsConst(m_grabberList))
     {
-        MythUIButtonListItem *item =
-            new MythUIButtonListItem(m_grabbers, (*i)->GetTitle());
-        item->SetText((*i)->GetTitle(), "title");
-        item->SetData(qVariantFromValue(*i));
-        QString img = (*i)->GetImage();
+        auto *item = new MythUIButtonListItem(m_grabbers, g->GetTitle());
+        item->SetText(g->GetTitle(), "title");
+        item->SetData(QVariant::fromValue(g));
+        const QString& img = g->GetImage();
         QString thumb;
 
         if (!img.startsWith("/") && !img.isEmpty())
+        {
             thumb = QString("%1mythnetvision/icons/%2").arg(GetShareDir())
-                .arg((*i)->GetImage());
+                .arg(g->GetImage());
+        }
         else
+        {
             thumb = img;
+        }
 
         item->SetImage(thumb);
         item->setCheckable(true);
         item->setChecked(MythUIButtonListItem::NotChecked);
-        QFileInfo fi((*i)->GetCommandline());
+        QFileInfo fi(g->GetCommandline());
 
         if (FindGrabberInDB(fi.fileName()))
             item->setChecked(MythUIButtonListItem::FullChecked);
@@ -218,8 +224,7 @@ void NetEditorBase::ToggleItem(MythUIButtonListItem *item)
     if (!item)
         return;
 
-    GrabberScript *script = item->GetData().value<GrabberScript*>();
-
+    auto *script = item->GetData().value<GrabberScript*>();
     if (!script)
         return;
 

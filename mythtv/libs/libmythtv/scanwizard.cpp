@@ -42,13 +42,13 @@
 
 #define LOC QString("SWiz: ")
 
-ScanWizard::ScanWizard(uint    default_sourceid,
-                       uint    default_cardid,
-                       QString default_inputname) :
+ScanWizard::ScanWizard(uint           default_sourceid,
+                       uint           default_cardid,
+                       const QString& default_inputname) :
     m_scannerPane(new ChannelScannerGUI())
 {
-    SetupConfig(default_sourceid, default_cardid, std::move(default_inputname));
-    ButtonStandardSetting *scanButton = new ButtonStandardSetting(tr("Scan"));
+    SetupConfig(default_sourceid, default_cardid, default_inputname);
+    auto *scanButton = new ButtonStandardSetting(tr("Scan"));
     connect(scanButton, SIGNAL(clicked()), SLOT(Scan()));
     addChild(scanButton);
 }
@@ -139,6 +139,8 @@ void ScanWizard::Scan()
                            DoFreeToAirOnly(),
                            DoChannelNumbersOnly(),
                            DoCompleteChannelsOnly(),
+                           DoFullChannelSearch(),
+                           DoRemoveDuplicates(),
                            GetServiceRequirements());
         ci.Process(transports, sourceid);
     }
@@ -173,7 +175,8 @@ void ScanWizard::Scan()
 
     if (do_scan)
     {
-        QString table_start, table_end;
+        QString table_start;
+        QString table_end;
         GetFrequencyTableRange(table_start, table_end);
 
         m_scannerPane->Scan(
@@ -182,7 +185,11 @@ void ScanWizard::Scan()
             DoIgnoreSignalTimeout(),  DoFollowNIT(),
             DoTestDecryption(),       DoFreeToAirOnly(),
             DoChannelNumbersOnly(),   DoCompleteChannelsOnly(),
-            DoAddFullTS(),            GetServiceRequirements(),
+            DoFullChannelSearch(),
+            DoRemoveDuplicates(),
+            DoAddFullTS(),
+            GetServiceRequirements(),
+
             // stuff needed for particular scans
             GetMultiplex(),         start_chan,
             GetFrequencyStandard(), GetModulation(),
@@ -193,7 +200,7 @@ void ScanWizard::Scan()
 
 void ScanWizard::SetInput(const QString &cardid_inputname)
 {
-    uint    cardid;
+    uint    cardid = 0;
     QString inputname;
     if (!InputSelector::Parse(cardid_inputname, cardid, inputname))
         return;

@@ -87,10 +87,8 @@ long long
 frameAnalyzerMapSum(const FrameAnalyzer::FrameMap *frameMap)
 {
     long long sum = 0;
-    for (FrameAnalyzer::FrameMap::const_iterator ii = frameMap->begin();
-            ii != frameMap->end();
-            ++ii)
-        sum += *ii;
+    for (long long ii : qAsConst(*frameMap))
+        sum += ii;
     return sum;
 }
 
@@ -104,9 +102,8 @@ removeShortBreaks(FrameAnalyzer::FrameMap *breakMap, float fps, int minbreaklen,
      * Return whether or not any breaks were actually removed.
      */
     FrameAnalyzer::FrameMap::Iterator   bb;
-    bool                                removed;
 
-    removed = false;
+    bool removed = false;
 
     /* Don't remove the initial commercial break, no matter how short. */
     bb = breakMap->begin();
@@ -151,11 +148,10 @@ removeShortSegments(FrameAnalyzer::FrameMap *breakMap, long long nframes,
      *
      * Return whether or not any segments were actually removed.
      */
-    FrameAnalyzer::FrameMap::Iterator   bb, bbnext;
-    bool                                removed;
+    FrameAnalyzer::FrameMap::Iterator   bb;
+    FrameAnalyzer::FrameMap::Iterator   bbnext;
 
-    removed = false;
-
+    bool removed = false;
 
     for (bb = breakMap->begin(); bb != breakMap->end(); bb = bbnext)
     {

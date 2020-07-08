@@ -31,10 +31,9 @@ namespace M3U
             return QString();
 
         QStringList list = line.mid(p + 1).split(',');
-        QStringList::iterator it = list.begin();
-        for (; it != list.end(); ++it)
+        for (const auto & it : qAsConst(list))
         {
-            QString arg = (*it).trimmed();
+            QString arg = it.trimmed();
             if (arg.startsWith(attr))
             {
                 int pos = arg.indexOf(QLatin1String("="));
@@ -215,10 +214,10 @@ namespace M3U
         }
 
         QString val = list[0];
-        bool ok;
 
         if (version < 3)
         {
+            bool ok = false;
             duration = val.toInt(&ok);
             if (!ok)
             {
@@ -230,6 +229,7 @@ namespace M3U
         }
         else
         {
+            bool ok = false;
             double d = val.toDouble(&ok);
             if (!ok)
             {
@@ -275,6 +275,7 @@ namespace M3U
         return true;
     }
 
+    // cppcheck-suppress constParameter
     bool ParseKey(int version, const QString& line, bool& aesmsg,
                   const QString& loc, QString &path, QString &iv)
     {

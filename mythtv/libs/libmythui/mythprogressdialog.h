@@ -1,9 +1,13 @@
 #ifndef MYTHPROGRESSBOX_H_
 #define MYTHPROGRESSBOX_H_
 
+#include <utility>
+
+// Qt headers
 #include <QEvent>
 #include <QMutex>
 
+// MythTV headers
 #include "mythscreentype.h"
 
 class MythUIText;
@@ -12,13 +16,14 @@ class MythUIProgressBar;
 class MUI_PUBLIC ProgressUpdateEvent : public QEvent
 {
   public:
-    ProgressUpdateEvent(uint count, uint total=0, QString message="") :
+    explicit ProgressUpdateEvent(uint count, uint total=0, QString message="") :
         QEvent(kEventType), m_total(total), m_count(count),
-        m_message(message) { }
+        m_message(std::move(message)) { }
+    ~ProgressUpdateEvent() override;
 
     QString GetMessage() { return m_message; }
-    uint GetTotal() { return m_total; }
-    uint GetCount() { return m_count; }
+    uint GetTotal() const { return m_total; }
+    uint GetCount() const { return m_count; }
 
     static Type kEventType;
 
@@ -55,9 +60,9 @@ class MUI_PUBLIC MythUIProgressDialog : public MythScreenType
 {
     Q_OBJECT
   public:
-    MythUIProgressDialog(const QString &message,
+    MythUIProgressDialog(QString message,
                   MythScreenStack *parent, const char *name)
-        : MythScreenType(parent, name, false), m_message(message) {}
+        : MythScreenType(parent, name, false), m_message(std::move(message)) {}
 
     bool Create(void) override; // MythScreenType
     bool keyPressEvent(QKeyEvent *event) override; // MythScreenType

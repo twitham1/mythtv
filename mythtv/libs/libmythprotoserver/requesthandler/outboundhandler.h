@@ -1,5 +1,5 @@
-#ifndef _OUTBOUNDREQUESTHANDLER_H_
-#define _OUTBOUNDREQUESTHANDLER_H_
+#ifndef OUTBOUNDREQUESTHANDLER_H
+#define OUTBOUNDREQUESTHANDLER_H
 
 #include <QTimer>
 #include <QString>
@@ -27,11 +27,11 @@ class PROTOSERVER_PUBLIC OutboundRequestHandler : public SocketRequestHandler
 
   protected:
     virtual bool AnnounceSocket(void)               { return false; }
-    MythSocket *m_socket;
+    MythSocket *m_socket { nullptr };
 
   private:
     bool DoConnectToMaster(void);
     QTimer      m_timer;
 };
 
-#endif
+#endif // OUTBOUNDREQUESTHANDLER_H

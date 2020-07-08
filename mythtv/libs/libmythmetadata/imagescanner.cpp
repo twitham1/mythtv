@@ -111,7 +111,7 @@ template <class DBFS>
 QStringList ImageScanThread<DBFS>::GetProgress()
 {
     QMutexLocker locker(&m_mutexProgress);
-    return QStringList() << QString::number(gCoreContext->IsBackend())
+    return QStringList() << QString::number(static_cast<int>(gCoreContext->IsBackend()))
                          << QString::number(m_progressCount)
                          << QString::number(m_progressTotalCount);
 }
@@ -261,8 +261,7 @@ void ImageScanThread<DBFS>::SyncSubTree(const QFileInfo &dirInfo, int parentId,
     int id = SyncDirectory(dirInfo, devId, base, parentId);
 
     // Sync its contents
-    QFileInfoList list = dir.entryInfoList();
-    foreach(const QFileInfo &fileInfo, list)
+    for (const auto& fileInfo : dir.entryInfoList())
     {
         if (!IsScanning())
         {
@@ -400,11 +399,7 @@ template <class DBFS>
 template <class DBFS>
 void ImageScanThread<DBFS>::PopulateMetadata(
     const QString &path, int type, QString &comment,
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-    uint &time,
-#else
     qint64 &time,
-#endif
     int &orientation)
 {
     // Set orientation, date, comment from file meta data
@@ -415,11 +410,7 @@ void ImageScanThread<DBFS>::PopulateMetadata(
     orientation  = metadata->GetOrientation();
     comment      = metadata->GetComment().simplified();
     QDateTime dt = metadata->GetOriginalDateTime();
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-    time         = (dt.isValid()) ? dt.toTime_t() : 0;
-#else
     time         = (dt.isValid()) ? dt.toSecsSinceEpoch() : 0;
-#endif
 
     delete metadata;
 }
@@ -480,7 +471,7 @@ void ImageScanThread<DBFS>::SyncFile(const QFileInfo &fileInfo, int devId,
         im->m_isHidden = dbIm->m_isHidden;
 
         // Set date, comment from file meta data
-        int fileOrient;
+        int fileOrient = 0;
         PopulateMetadata(absFilePath, im->m_type,
                          im->m_comment, im->m_date, fileOrient);
 
@@ -508,7 +499,7 @@ void ImageScanThread<DBFS>::SyncFile(const QFileInfo &fileInfo, int devId,
         LOG(VB_FILE, LOG_INFO,  QString("New file %1").arg(absFilePath));
 
         // Set date, comment from file meta data
-        int fileOrient;
+        int fileOrient = 0;
         PopulateMetadata(absFilePath, im->m_type,
                          im->m_comment, im->m_date, fileOrient);
 
@@ -538,16 +529,16 @@ void ImageScanThread<DBFS>::SyncFile(const QFileInfo &fileInfo, int devId,
 template <class DBFS>
 void ImageScanThread<DBFS>::CountTree(QDir &dir)
 {
-    QFileInfoList files = dir.entryInfoList();
-
-    foreach(const QFileInfo &fileInfo, files)
+    for (const auto& fileInfo : dir.entryInfoList())
     {
         // Ignore excluded dirs/files
         if (MATCHES(m_exclusions, fileInfo.fileName()))
             continue;
 
         if (fileInfo.isFile())
+        {
             ++m_progressTotalCount;
+        }
         // Ignore missing dirs
         else if (dir.cd(fileInfo.fileName()))
         {
@@ -586,7 +577,7 @@ void ImageScanThread<DBFS>::CountFiles(const QStringList &paths)
 
     // Use global image filters
     QDir dir = m_dir;
-    foreach(const QString &sgDir, paths)
+    for (const auto& sgDir : qAsConst(paths))
     {
         // Ignore missing dirs
         if (dir.cd(sgDir))
@@ -608,7 +599,7 @@ void ImageScanThread<DBFS>::Broadcast(int progress)
 {
     // Only 2 scanners are ever visible (FE & BE) so use bool as scanner id
     QStringList status;
-    status << QString::number(gCoreContext->IsBackend())
+    status << QString::number(static_cast<int>(gCoreContext->IsBackend()))
            << QString::number(progress)
            << QString::number(m_progressTotalCount);
 

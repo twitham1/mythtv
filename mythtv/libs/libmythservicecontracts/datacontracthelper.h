@@ -34,6 +34,9 @@
 //  * DESIGNABLE in Q_PROPERTY is used to indicate if it should be Serialized 
 //    (can specify a propery to support runtime logic)
 //
+//    N.B., DESIGNABLE was removed in v32-Pre to prepare for Qt 6.
+//
+//
 //  * Q_CLASSINFO( "defaultProp", "<propname>" ) is used to indicate the 
 //    default property (used for node text in XML)
 //
@@ -83,9 +86,9 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #define PROPERTYIMP_PTR( type, name )   \
-    private: type* m_##name;            \
+    private: type* m_##name;              /* NOLINT(bugprone-macro-parentheses) */ \
     public:                             \
-    type* name()                        \
+    type* name()                          /* NOLINT(bugprone-macro-parentheses) */ \
     {                                   \
         if (m_##name == nullptr)        \
             m_##name = new type( this );\
@@ -97,7 +100,7 @@
 #define PROPERTYIMP_RO_REF( type, name ) \
     private: type m_##name;              \
     public:                              \
-    type &name()                         \
+    type &name()                           /* NOLINT(bugprone-macro-parentheses) */ \
     {                                    \
         return m_##name;                 \
     }
@@ -118,8 +121,7 @@ inline void DeleteListContents( QVariantList &list )
 
         const QObject *pObject = vValue.value< QObject* >();
 
-        if (pObject != nullptr)
-            delete pObject;
+        delete pObject;
     }
 }
 
@@ -128,10 +130,8 @@ inline void DeleteListContents( QVariantList &list )
 template< class T >
 void CopyListContents( QObject *pParent, QVariantList &dst, const QVariantList &src )
 {
-    for( int nIdx = 0; nIdx < src.size(); nIdx++ )
+    for (const auto& vValue : qAsConst(src))
     {
-        QVariant vValue = src[ nIdx ];
-
         if ( vValue.canConvert< QObject* >())
         {
             const QObject *pObject = vValue.value< QObject* >();

@@ -1,5 +1,5 @@
-#ifndef _AUTO_DELETE_DEQUE_H_
-#define _AUTO_DELETE_DEQUE_H_
+#ifndef AUTO_DELETE_DEQUE_H
+#define AUTO_DELETE_DEQUE_H
 
 // C++ headers
 #include <deque>
@@ -11,11 +11,11 @@ class AutoDeleteDeque
     explicit AutoDeleteDeque(bool auto_delete = true) : m_autodelete(auto_delete) {}
     ~AutoDeleteDeque() { clear(); }
 
-    typedef typename std::deque< T > List;
-    typedef typename List::iterator iterator;
-    typedef typename List::const_iterator const_iterator;
-    typedef typename List::reverse_iterator reverse_iterator;
-    typedef typename List::const_reverse_iterator const_reverse_iterator;
+    using List = typename std::deque< T >;
+    using iterator = typename List::iterator;
+    using const_iterator = typename List::const_iterator;
+    using reverse_iterator = typename List::reverse_iterator;
+    using const_reverse_iterator = typename List::const_reverse_iterator;
 
     T operator[](uint index)
     {
@@ -23,7 +23,7 @@ class AutoDeleteDeque
             return m_list[index];
         return nullptr;
     }
-    const T operator[](uint index) const
+    T operator[](uint index) const
     {
         if (index < m_list.size())
             return m_list[index];
@@ -51,13 +51,17 @@ class AutoDeleteDeque
     iterator end(void)               { return m_list.end();   }
     const_iterator begin(void) const { return m_list.begin(); }
     const_iterator end(void)   const { return m_list.end();   }
+    const_iterator cbegin(void) const { return m_list.begin(); }
+    const_iterator cend(void)   const { return m_list.end();   }
     reverse_iterator rbegin(void)             { return m_list.rbegin(); }
     reverse_iterator rend(void)               { return m_list.rend();   }
     const_reverse_iterator rbegin(void) const { return m_list.rbegin(); }
     const_reverse_iterator rend(void)   const { return m_list.rend();   }
+    const_reverse_iterator crbegin(void) const { return m_list.rbegin(); }
+    const_reverse_iterator crend(void)   const { return m_list.rend();   }
 
     T back(void)                     { return m_list.back();  }
-    const T back(void)         const { return m_list.back();  }
+    T back(void)               const { return m_list.back();  }
 
     bool empty(void)  const { return m_list.empty(); }
     size_t size(void) const { return m_list.size(); }
@@ -86,4 +90,4 @@ T AutoDeleteDeque<T>::take(uint index)
     return info;
 }
 
-#endif // _AUTO_DELETE_DEQUE_H_
+#endif // AUTO_DELETE_DEQUE_H

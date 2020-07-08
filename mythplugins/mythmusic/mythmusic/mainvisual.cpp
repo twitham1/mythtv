@@ -94,7 +94,8 @@ void MainVisual::setVisual(const QString &name)
 
     m_pixmap.fill(m_visualizerVideo->GetBackgroundColor());
 
-    QString visName, pluginName;
+    QString visName;
+    QString pluginName;
 
     if (name.contains("-"))
     {
@@ -146,8 +147,9 @@ void MainVisual::prepare()
 // Caller holds mutex() lock
 void MainVisual::add(const void *buffer, unsigned long b_len, unsigned long timecode, int source_channels, int bits_per_sample)
 {
-    unsigned long len = b_len, cnt;
-    short *l = nullptr, *r = nullptr;
+    unsigned long len = b_len;
+    short *l = nullptr;
+    short *r = nullptr;
     bool s32le = false;
 
     // 24 bit samples are stored as s32le in the buffer.
@@ -165,7 +167,7 @@ void MainVisual::add(const void *buffer, unsigned long b_len, unsigned long time
     if (len > m_samples)
         len = m_samples;
 
-    cnt = len;
+    int cnt = len;
 
     if (source_channels == 2)
     {

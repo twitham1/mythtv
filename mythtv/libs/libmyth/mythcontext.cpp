@@ -13,10 +13,9 @@
 
 #include <cmath>
 #include <iostream>
-
 #include <queue>
-#include <algorithm>
 #include <thread>
+#include <vector>
 
 using namespace std;
 
@@ -29,10 +28,9 @@ using namespace std;
 #include "dbsettings.h"
 #include "langsettings.h"
 #include "mythtranslation.h"
-#include "mythxdisplay.h"
+#include "platforms/mythxdisplay.h"
 #include "mythevent.h"
 #include "dbutil.h"
-#include "DisplayRes.h"
 #include "mythmediamonitor.h"
 
 #include "mythdb.h"
@@ -62,14 +60,14 @@ using namespace std;
 
 MythContext *gContext = nullptr;
 
-static const QString _Location = "MythContext";
+static const QString sLocation = "MythContext";
 
 class MythContextPrivate : public QObject
 {
     friend class MythContextSlotHandler;
 
   public:
-    MythContextPrivate(MythContext *lparent);
+    explicit MythContextPrivate(MythContext *lparent);
    ~MythContextPrivate() override;
 
     bool Init        (bool gui,
@@ -87,18 +85,18 @@ class MythContextPrivate : public QObject
     QString TestDBconnection(bool prompt=true);
     void    SilenceDBerrors(void);
     void    EnableDBerrors(void);
-    void    ResetDatabase(void);
+    void    ResetDatabase(void) const;
 
     int     ChooseBackend(const QString &error);
     int     UPnPautoconf(int milliSeconds = 2000);
     bool    DefaultUPnP(QString &error);
     bool    UPnPconnect(const DeviceLocation *backend, const QString &PIN);
     void    ShowGuiStartup(void);
-    bool    checkPort(QString &host, int port, int timeLimit);
-    void    processEvents(void);
+    bool    checkPort(QString &host, int port, int timeLimit) const;
+    static void processEvents(void);
     bool    saveSettingsCache(void);
-    void    loadSettingsCacheOverride(void);
-    void    clearSettingsCacheOverride(void);
+    void    loadSettingsCacheOverride(void) const;
+    static void clearSettingsCacheOverride(void);
 
 
   protected:
@@ -120,8 +118,8 @@ class MythContextPrivate : public QObject
 
     QString                 m_masterhostname;  ///< master backend hostname
 
-    DatabaseParams          m_DBparams;  ///< Current database host & WOL details
-    QString                 m_DBhostCp;  ///< dbHostName backup
+    DatabaseParams          m_dbParams;  ///< Current database host & WOL details
+    QString                 m_dbHostCp;  ///< dbHostName backup
 
     Configuration          *m_pConfig            {nullptr};
 
@@ -135,11 +133,11 @@ class MythContextPrivate : public QObject
     bool                    m_settingsCacheDirty {false};
 
   private:
-    MythConfirmationDialog *m_MBEversionPopup    {nullptr};
+    MythConfirmationDialog *m_mbeVersionPopup    {nullptr};
     int                     m_registration       {-1};
     QDateTime               m_lastCheck;
     QTcpSocket             *m_socket             {nullptr};
-    static const QString    s_settingsToSave[];
+    static const std::vector<QString> kSettingsToSave;
 };
 
 static void exec_program_cb(const QString &cmd)
@@ -153,7 +151,7 @@ static void exec_program_tv_cb(const QString &cmd)
     QStringList tokens = cmd.simplified().split(" ");
     QStringList strlist;
 
-    bool cardidok;
+    bool cardidok = false;
     int wantcardid = tokens[0].toInt(&cardidok, 10);
 
     if (cardidok && wantcardid > 0)
@@ -169,10 +167,9 @@ static void exec_program_tv_cb(const QString &cmd)
 
     if (cardid >= 0)
     {
-        s = s.sprintf(qPrintable(s),
-                      qPrintable(strlist[1]),
-                      qPrintable(strlist[2]),
-                      qPrintable(strlist[3]));
+        s = s.arg(qPrintable(strlist[1]))
+            .arg(qPrintable(strlist[2]))
+            .arg(qPrintable(strlist[3]));
 
         myth_system(s);
 
@@ -187,11 +184,15 @@ static void exec_program_tv_cb(const QString &cmd)
         if (cardidok)
         {
             if (cardid == -1)
+            {
                 label = QObject::tr("Could not find specified tuner (%1).")
                                     .arg(wantcardid);
+            }
             else
+            {
                 label = QObject::tr("Specified tuner (%1) is already in use.")
                                     .arg(wantcardid);
+            }
         }
         else
         {
@@ -214,7 +215,7 @@ static void configplugin_cb(const QString &cmd)
 
     if (GetNotificationCenter() && pmanager->config_plugin(cmd.trimmed()))
     {
-        ShowNotificationError(cmd, _Location,
+        ShowNotificationError(cmd, sLocation,
                               QObject::tr("Failed to configure plugin"));
     }
 }
@@ -228,7 +229,7 @@ static void plugin_cb(const QString &cmd)
     if (GetNotificationCenter() && pmanager->run_plugin(cmd.trimmed()))
     {
         ShowNotificationError(QObject::tr("Plugin failure"),
-                              _Location,
+                              sLocation,
                               QObject::tr("%1 failed to run for some reason").arg(cmd));
     }
 }
@@ -322,7 +323,7 @@ void MythContextPrivate::EndTempWindow(void)
  * \param timeLimit Limit in seconds for testing.
  */
 
-bool MythContextPrivate::checkPort(QString &host, int port, int timeLimit)
+bool MythContextPrivate::checkPort(QString &host, int port, int timeLimit) const
 {
     PortChecker checker;
     if (m_guiStartup)
@@ -382,7 +383,7 @@ bool MythContextPrivate::Init(const bool gui,
 
     if (gui)
     {
-        MythUIMenuCallbacks cbs;
+        MythUIMenuCallbacks cbs {};
         cbs.exec_program = exec_program_cb;
         cbs.exec_program_tv = exec_program_tv_cb;
         cbs.configplugin = configplugin_cb;
@@ -416,7 +417,7 @@ bool MythContextPrivate::FindDatabase(bool prompt, bool noAutodetect)
 
     // 1. Either load config.xml or use sensible "localhost" defaults:
     bool loaded = LoadDatabaseSettings();
-    DatabaseParams dbParamsFromFile = m_DBparams;
+    DatabaseParams dbParamsFromFile = m_dbParams;
 
     // In addition to the UI chooser, we can also try to autoSelect later,
     // but only if we're not doing manualSelect and there was no
@@ -477,8 +478,7 @@ bool MythContextPrivate::FindDatabase(bool prompt, bool noAutodetect)
         if (manualSelect)
         {
             // Get the user to select a backend from a possible list:
-            BackendSelection::Decision d = (BackendSelection::Decision)
-                ChooseBackend(failure);
+            auto d = (BackendSelection::Decision)ChooseBackend(failure);
             switch (d)
             {
                 case BackendSelection::kAcceptConfigure:
@@ -512,14 +512,14 @@ DBfound:
     LOG(VB_GENERAL, LOG_DEBUG, "FindDatabase() - Success!");
     // If we got the database from UPNP then the wakeup settings are lost.
     // Restore them.
-    m_DBparams.wolEnabled = dbParamsFromFile.wolEnabled;
-    m_DBparams.wolReconnect = dbParamsFromFile.wolReconnect;
-    m_DBparams.wolRetry = dbParamsFromFile.wolRetry;
-    m_DBparams.wolCommand = dbParamsFromFile.wolCommand;
+    m_dbParams.m_wolEnabled = dbParamsFromFile.m_wolEnabled;
+    m_dbParams.m_wolReconnect = dbParamsFromFile.m_wolReconnect;
+    m_dbParams.m_wolRetry = dbParamsFromFile.m_wolRetry;
+    m_dbParams.m_wolCommand = dbParamsFromFile.m_wolCommand;
 
-    SaveDatabaseParams(m_DBparams,
-                       !loaded || m_DBparams.forceSave ||
-                       dbParamsFromFile != m_DBparams);
+    SaveDatabaseParams(m_dbParams,
+                       !loaded || m_dbParams.m_forceSave ||
+                       dbParamsFromFile != m_dbParams);
     EnableDBerrors();
     ResetDatabase();
     return true;
@@ -535,48 +535,48 @@ NoDBfound:
 bool MythContextPrivate::LoadDatabaseSettings(void)
 {
     // try new format first
-    m_DBparams.LoadDefaults();
+    m_dbParams.LoadDefaults();
 
-    m_DBparams.localHostName = m_pConfig->GetValue("LocalHostName", "");
-    m_DBparams.dbHostPing = m_pConfig->GetBoolValue(kDefaultDB + "PingHost", true);
-    m_DBparams.dbHostName = m_pConfig->GetValue(kDefaultDB + "Host", "");
-    m_DBparams.dbUserName = m_pConfig->GetValue(kDefaultDB + "UserName", "");
-    m_DBparams.dbPassword = m_pConfig->GetValue(kDefaultDB + "Password", "");
-    m_DBparams.dbName = m_pConfig->GetValue(kDefaultDB + "DatabaseName", "");
-    m_DBparams.dbPort = m_pConfig->GetValue(kDefaultDB + "Port", 0);
+    m_dbParams.m_localHostName = m_pConfig->GetValue("LocalHostName", "");
+    m_dbParams.m_dbHostPing = m_pConfig->GetBoolValue(kDefaultDB + "PingHost", true);
+    m_dbParams.m_dbHostName = m_pConfig->GetValue(kDefaultDB + "Host", "");
+    m_dbParams.m_dbUserName = m_pConfig->GetValue(kDefaultDB + "UserName", "");
+    m_dbParams.m_dbPassword = m_pConfig->GetValue(kDefaultDB + "Password", "");
+    m_dbParams.m_dbName = m_pConfig->GetValue(kDefaultDB + "DatabaseName", "");
+    m_dbParams.m_dbPort = m_pConfig->GetValue(kDefaultDB + "Port", 0);
 
-    m_DBparams.wolEnabled =
+    m_dbParams.m_wolEnabled =
         m_pConfig->GetBoolValue(kDefaultWOL + "Enabled", false);
-    m_DBparams.wolReconnect =
+    m_dbParams.m_wolReconnect =
         m_pConfig->GetValue(kDefaultWOL + "SQLReconnectWaitTime", 0);
-    m_DBparams.wolRetry =
+    m_dbParams.m_wolRetry =
         m_pConfig->GetValue(kDefaultWOL + "SQLConnectRetry", 5);
-    m_DBparams.wolCommand =
+    m_dbParams.m_wolCommand =
         m_pConfig->GetValue(kDefaultWOL + "Command", "");
 
-    bool ok = m_DBparams.IsValid("config.xml");
+    bool ok = m_dbParams.IsValid("config.xml");
     if (!ok) // if new format fails, try legacy format
     {
-        m_DBparams.LoadDefaults();
-        m_DBparams.dbHostName = m_pConfig->GetValue(
+        m_dbParams.LoadDefaults();
+        m_dbParams.m_dbHostName = m_pConfig->GetValue(
             kDefaultMFE + "DBHostName", "");
-        m_DBparams.dbUserName = m_pConfig->GetValue(
+        m_dbParams.m_dbUserName = m_pConfig->GetValue(
             kDefaultMFE + "DBUserName", "");
-        m_DBparams.dbPassword = m_pConfig->GetValue(
+        m_dbParams.m_dbPassword = m_pConfig->GetValue(
             kDefaultMFE + "DBPassword", "");
-        m_DBparams.dbName = m_pConfig->GetValue(
+        m_dbParams.m_dbName = m_pConfig->GetValue(
             kDefaultMFE + "DBName", "");
-        m_DBparams.dbPort = m_pConfig->GetValue(
+        m_dbParams.m_dbPort = m_pConfig->GetValue(
             kDefaultMFE + "DBPort", 0);
-        m_DBparams.forceSave = true;
-        ok = m_DBparams.IsValid("config.xml");
+        m_dbParams.m_forceSave = true;
+        ok = m_dbParams.IsValid("config.xml");
     }
     if (!ok)
-        m_DBparams.LoadDefaults();
+        m_dbParams.LoadDefaults();
 
-    gCoreContext->GetDB()->SetDatabaseParams(m_DBparams);
+    gCoreContext->GetDB()->SetDatabaseParams(m_dbParams);
 
-    QString hostname = m_DBparams.localHostName;
+    QString hostname = m_dbParams.m_localHostName;
     if (hostname.isEmpty() ||
         hostname == "my-unique-identifier-goes-here")
     {
@@ -629,7 +629,7 @@ bool MythContextPrivate::LoadDatabaseSettings(void)
     }
     else
     {
-        m_DBparams.localEnabled = true;
+        m_dbParams.m_localEnabled = true;
     }
 
     LOG(VB_GENERAL, LOG_INFO, QString("Using a profile name of: '%1' (Usually the "
@@ -646,18 +646,18 @@ bool MythContextPrivate::SaveDatabaseParams(
     bool ret = true;
 
     // only rewrite file if it has changed
-    if (params != m_DBparams || force)
+    if (params != m_dbParams || force)
     {
         m_pConfig->SetValue(
-            "LocalHostName", params.localHostName);
+            "LocalHostName", params.m_localHostName);
 
         m_pConfig->SetBoolValue(
-            kDefaultDB + "PingHost", params.dbHostPing);
+            kDefaultDB + "PingHost", params.m_dbHostPing);
 
         // If dbHostName is an IPV6 address with scope,
         // remove the scope. Unescaped % signs are an
         // xml violation
-        QString dbHostName(params.dbHostName);
+        QString dbHostName(params.m_dbHostName);
         QHostAddress addr;
         if (addr.setAddress(dbHostName))
         {
@@ -667,22 +667,22 @@ bool MythContextPrivate::SaveDatabaseParams(
         m_pConfig->SetValue(
             kDefaultDB + "Host", dbHostName);
         m_pConfig->SetValue(
-            kDefaultDB + "UserName", params.dbUserName);
+            kDefaultDB + "UserName", params.m_dbUserName);
         m_pConfig->SetValue(
-            kDefaultDB + "Password", params.dbPassword);
+            kDefaultDB + "Password", params.m_dbPassword);
         m_pConfig->SetValue(
-            kDefaultDB + "DatabaseName", params.dbName);
+            kDefaultDB + "DatabaseName", params.m_dbName);
         m_pConfig->SetValue(
-            kDefaultDB + "Port", params.dbPort);
+            kDefaultDB + "Port", params.m_dbPort);
 
         m_pConfig->SetBoolValue(
-            kDefaultWOL + "Enabled", params.wolEnabled);
+            kDefaultWOL + "Enabled", params.m_wolEnabled);
         m_pConfig->SetValue(
-            kDefaultWOL + "SQLReconnectWaitTime", params.wolReconnect);
+            kDefaultWOL + "SQLReconnectWaitTime", params.m_wolReconnect);
         m_pConfig->SetValue(
-            kDefaultWOL + "SQLConnectRetry", params.wolRetry);
+            kDefaultWOL + "SQLConnectRetry", params.m_wolRetry);
         m_pConfig->SetValue(
-            kDefaultWOL + "Command", params.wolCommand);
+            kDefaultWOL + "Command", params.m_wolCommand);
 
         // clear out any legacy nodes..
         m_pConfig->ClearValue(kDefaultMFE + "DBHostName");
@@ -696,8 +696,8 @@ bool MythContextPrivate::SaveDatabaseParams(
         m_pConfig->Save();
 
         // Save the new settings:
-        m_DBparams = params;
-        gCoreContext->GetDB()->SetDatabaseParams(m_DBparams);
+        m_dbParams = params;
+        gCoreContext->GetDB()->SetDatabaseParams(m_dbParams);
 
         // If database has changed, force its use:
         ResetDatabase();
@@ -728,10 +728,9 @@ bool MythContextPrivate::PromptForDatabaseParams(const QString &error)
 
         EnableDBerrors();
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-        DatabaseSettings *dbsetting = new DatabaseSettings();
-        StandardSettingDialog *ssd =
-            new StandardSettingDialog(mainStack, "databasesettings",
-                                      dbsetting);
+        auto *dbsetting = new DatabaseSettings();
+        auto *ssd = new StandardSettingDialog(mainStack, "databasesettings",
+                                              dbsetting);
         if (ssd->Create())
         {
             mainStack->AddScreen(ssd);
@@ -759,41 +758,41 @@ bool MythContextPrivate::PromptForDatabaseParams(const QString &error)
         if (!response.startsWith('y', Qt::CaseInsensitive))
             return false;
 
-        params.dbHostName = getResponse("Database host name:",
-                                        params.dbHostName);
+        params.m_dbHostName = getResponse("Database host name:",
+                                          params.m_dbHostName);
         response = getResponse("Should I test connectivity to this host "
                                "using the ping command?", "yes");
-        params.dbHostPing = response.startsWith('y', Qt::CaseInsensitive);
+        params.m_dbHostPing = response.startsWith('y', Qt::CaseInsensitive);
 
-        params.dbPort     = intResponse("Database non-default port:",
-                                        params.dbPort);
-        params.dbName     = getResponse("Database name:",
-                                        params.dbName);
-        params.dbUserName = getResponse("Database user name:",
-                                        params.dbUserName);
-        params.dbPassword = getResponse("Database password:",
-                                        params.dbPassword);
+        params.m_dbPort     = intResponse("Database non-default port:",
+                                          params.m_dbPort);
+        params.m_dbName     = getResponse("Database name:",
+                                          params.m_dbName);
+        params.m_dbUserName = getResponse("Database user name:",
+                                          params.m_dbUserName);
+        params.m_dbPassword = getResponse("Database password:",
+                                          params.m_dbPassword);
 
-        params.localHostName = getResponse("Unique identifier for this machine "
-                                           "(if empty, the local host name "
-                                           "will be used):",
-                                           params.localHostName);
-        params.localEnabled = !params.localHostName.isEmpty();
+        params.m_localHostName = getResponse("Unique identifier for this machine "
+                                             "(if empty, the local host name "
+                                             "will be used):",
+                                             params.m_localHostName);
+        params.m_localEnabled = !params.m_localHostName.isEmpty();
 
         response = getResponse("Would you like to use Wake-On-LAN to retry "
                                "database connections?",
-                               (params.wolEnabled ? "yes" : "no"));
-        params.wolEnabled = response.startsWith('y', Qt::CaseInsensitive);
+                               (params.m_wolEnabled ? "yes" : "no"));
+        params.m_wolEnabled = response.startsWith('y', Qt::CaseInsensitive);
 
-        if (params.wolEnabled)
+        if (params.m_wolEnabled)
         {
-            params.wolReconnect = intResponse("Seconds to wait for "
-                                              "reconnection:",
-                                              params.wolReconnect);
-            params.wolRetry     = intResponse("Number of times to retry:",
-                                              params.wolRetry);
-            params.wolCommand   = getResponse("Command to use to wake server or server MAC address:",
-                                              params.wolCommand);
+            params.m_wolReconnect = intResponse("Seconds to wait for "
+                                                "reconnection:",
+                                                params.m_wolReconnect);
+            params.m_wolRetry     = intResponse("Number of times to retry:",
+                                                params.m_wolRetry);
+            params.m_wolCommand   = getResponse("Command to use to wake server or server MAC address:",
+                                                params.m_wolCommand);
         }
 
         accepted = m_parent->SaveDatabaseParams(params);
@@ -830,7 +829,7 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
         st_success = 6
     } startupState = st_start;
 
-    static const QString guiStatuses[7] =
+    static const std::array<const QString,7> kGuiStatuses
         {"start","dbAwake","dbStarted","dbConnects","beWOL","beAwake",
             "success" };
 
@@ -841,18 +840,18 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
     {
         QElapsedTimer timer;
         timer.start();
-        if (m_DBparams.dbHostName.isNull() && m_DBhostCp.length())
-            host = m_DBhostCp;
+        if (m_dbParams.m_dbHostName.isNull() && m_dbHostCp.length())
+            host = m_dbHostCp;
         else
-            host = m_DBparams.dbHostName;
-        port = m_DBparams.dbPort;
+            host = m_dbParams.m_dbHostName;
+        port = m_dbParams.m_dbPort;
         if (port == 0)
             port = 3306;
         int wakeupTime = 3;
         int attempts = 11;
-        if (m_DBparams.wolEnabled) {
-            wakeupTime = m_DBparams.wolReconnect;
-            attempts = m_DBparams.wolRetry + 1;
+        if (m_dbParams.m_wolEnabled) {
+            wakeupTime = m_dbParams.m_wolReconnect;
+            attempts = m_dbParams.m_wolRetry + 1;
             startupState = st_start;
         }
         else
@@ -884,7 +883,7 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
 
             LOG(VB_GENERAL, LOG_INFO,
                  QString("Start up testing connections. DB %1, BE %2, attempt %3, status %4, Delay: %5")
-                      .arg(host).arg(backendIP).arg(attempt).arg(guiStatuses[startupState]).arg(msStartupScreenDelay) );
+                      .arg(host).arg(backendIP).arg(attempt).arg(kGuiStatuses[startupState]).arg(msStartupScreenDelay) );
 
             int useTimeout = wakeupTime;
             if (attempt == 0)
@@ -902,16 +901,16 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
             if (m_guiStartup && !m_guiStartup->m_Exit)
             {
                 if (attempt > 0)
-                    m_guiStartup->setStatusState(guiStatuses[startupState]);
+                    m_guiStartup->setStatusState(kGuiStatuses[startupState]);
                 m_guiStartup->setMessageState("empty");
                 processEvents();
             }
             switch (startupState) {
             case st_start:
-                if (m_DBparams.wolEnabled)
+                if (m_dbParams.m_wolEnabled)
                 {
                     if (attempt > 0)
-                        MythWakeup(m_DBparams.wolCommand);
+                        MythWakeup(m_dbParams.m_wolCommand);
                     if (!checkPort(host, port, useTimeout))
                         break;
                 }
@@ -925,10 +924,10 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
             case st_dbStarted:
                 // If the database is connecting with link-local
                 // address, it may have changed
-                if (m_DBparams.dbHostName != host)
+                if (m_dbParams.m_dbHostName != host)
                 {
-                    m_DBparams.dbHostName = host;
-                    gCoreContext->GetDB()->SetDatabaseParams(m_DBparams);
+                    m_dbParams.m_dbHostName = host;
+                    gCoreContext->GetDB()->SetDatabaseParams(m_dbParams);
                 }
                 EnableDBerrors();
                 ResetDatabase();
@@ -970,7 +969,7 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
                     ("MasterServerName");
                 backendIP = gCoreContext->GetSettingOnHost
                     ("BackendServerAddr", masterserver);
-                backendPort = gCoreContext->GetMasterServerPort();
+                backendPort = MythCoreContext::GetMasterServerPort();
                 [[clang::fallthrough]];
             case st_beWOL:
                 if (!beWOLCmd.isEmpty()) {
@@ -1003,7 +1002,7 @@ QString MythContextPrivate::TestDBconnection(bool prompt)
         if (startupState == st_success)
             break;
 
-        QString stateMsg = guiStatuses[startupState];
+        QString stateMsg = kGuiStatuses[startupState];
         stateMsg.append("Fail");
         LOG(VB_GENERAL, LOG_INFO,
              QString("Start up failure. host %1, status %2")
@@ -1099,20 +1098,20 @@ void MythContextPrivate::SilenceDBerrors(void)
 
     // Save the configured hostname, so that we can
     // still display it in the DatabaseSettings screens
-    if (m_DBparams.dbHostName.length())
-        m_DBhostCp = m_DBparams.dbHostName;
+    if (m_dbParams.m_dbHostName.length())
+        m_dbHostCp = m_dbParams.m_dbHostName;
 
-    m_DBparams.dbHostName.clear();
-    gCoreContext->GetDB()->SetDatabaseParams(m_DBparams);
+    m_dbParams.m_dbHostName.clear();
+    gCoreContext->GetDB()->SetDatabaseParams(m_dbParams);
 }
 
 void MythContextPrivate::EnableDBerrors(void)
 {
     // Restore (possibly) blanked hostname
-    if (m_DBparams.dbHostName.isNull() && m_DBhostCp.length())
+    if (m_dbParams.m_dbHostName.isNull() && m_dbHostCp.length())
     {
-        m_DBparams.dbHostName = m_DBhostCp;
-        gCoreContext->GetDB()->SetDatabaseParams(m_DBparams);
+        m_dbParams.m_dbHostName = m_dbHostCp;
+        gCoreContext->GetDB()->SetDatabaseParams(m_dbParams);
     }
 
     gCoreContext->GetDB()->SetSuppressDBMessages(false);
@@ -1130,10 +1129,10 @@ void MythContextPrivate::EnableDBerrors(void)
  * Any cached settings also need to be cleared,
  * so that they can be re-read from the new database
  */
-void MythContextPrivate::ResetDatabase(void)
+void MythContextPrivate::ResetDatabase(void) const
 {
     gCoreContext->GetDBManager()->CloseDatabases();
-    gCoreContext->GetDB()->SetDatabaseParams(m_DBparams);
+    gCoreContext->GetDB()->SetDatabaseParams(m_dbParams);
     gCoreContext->ClearSettingsCache();
 }
 
@@ -1154,7 +1153,7 @@ int MythContextPrivate::ChooseBackend(const QString &error)
     LOG(VB_GENERAL, LOG_INFO, "Putting up the UPnP backend chooser");
 
     BackendSelection::Decision ret =
-        BackendSelection::Prompt(&m_DBparams, m_pConfig);
+        BackendSelection::Prompt(&m_dbParams, m_pConfig);
 
     EndTempWindow();
 
@@ -1172,7 +1171,7 @@ int MythContextPrivate::UPnPautoconf(const int milliSeconds)
     LOG(VB_GENERAL, LOG_INFO, QString("UPNP Search %1 secs")
         .arg(milliSeconds / 1000));
 
-    SSDP::Instance()->PerformSearch(gBackendURI, milliSeconds / 1000);
+    SSDP::Instance()->PerformSearch(kBackendURI, milliSeconds / 1000);
 
     // Search for a total of 'milliSeconds' ms, sending new search packet
     // about every 250 ms until less than one second remains.
@@ -1186,12 +1185,12 @@ int MythContextPrivate::UPnPautoconf(const int milliSeconds)
         {
             LOG(VB_GENERAL, LOG_INFO, QString("UPNP Search %1 secs")
                 .arg(ttl / 1000));
-            SSDP::Instance()->PerformSearch(gBackendURI, ttl / 1000);
+            SSDP::Instance()->PerformSearch(kBackendURI, ttl / 1000);
             searchTime.start();
         }
     }
 
-    SSDPCacheEntries *backends = SSDP::Find(gBackendURI);
+    SSDPCacheEntries *backends = SSDP::Find(kBackendURI);
 
     if (!backends)
     {
@@ -1256,7 +1255,7 @@ bool MythContextPrivate::DefaultUPnP(QString &error)
     int timeout_ms = 2000;
     LOG(VB_GENERAL, LOG_INFO, QString("UPNP Search up to %1 secs")
         .arg(timeout_ms / 1000));
-    SSDP::Instance()->PerformSearch(gBackendURI, timeout_ms / 1000);
+    SSDP::Instance()->PerformSearch(kBackendURI, timeout_ms / 1000);
 
     // ----------------------------------------------------------------------
     // We need to give the server time to respond...
@@ -1267,7 +1266,7 @@ bool MythContextPrivate::DefaultUPnP(QString &error)
     MythTimer searchTime; searchTime.start();
     while (totalTime.elapsed() < timeout_ms)
     {
-        pDevLoc = SSDP::Find( gBackendURI, USN );
+        pDevLoc = SSDP::Find( kBackendURI, USN );
 
         if (pDevLoc)
             break;
@@ -1279,7 +1278,7 @@ bool MythContextPrivate::DefaultUPnP(QString &error)
         {
             LOG(VB_GENERAL, LOG_INFO, QString("UPNP Search up to %1 secs")
                 .arg(ttl / 1000));
-            SSDP::Instance()->PerformSearch(gBackendURI, ttl / 1000);
+            SSDP::Instance()->PerformSearch(kBackendURI, ttl / 1000);
             searchTime.start();
         }
     }
@@ -1316,12 +1315,12 @@ bool MythContextPrivate::UPnPconnect(const DeviceLocation *backend,
     MythXMLClient  client(URL);
 
     LOG(VB_UPNP, LOG_INFO, loc + QString("Trying host at %1").arg(URL));
-    switch (client.GetConnectionInfo(PIN, &m_DBparams, error))
+    switch (client.GetConnectionInfo(PIN, &m_dbParams, error))
     {
         case UPnPResult_Success:
-            gCoreContext->GetDB()->SetDatabaseParams(m_DBparams);
+            gCoreContext->GetDB()->SetDatabaseParams(m_dbParams);
             LOG(VB_UPNP, LOG_INFO, loc +
-                "Got database hostname: " + m_DBparams.dbHostName);
+                "Got database hostname: " + m_dbParams.m_dbHostName);
             return true;
 
         case UPnPResult_ActionNotAuthorized:
@@ -1345,7 +1344,7 @@ bool MythContextPrivate::UPnPconnect(const DeviceLocation *backend,
         return false;
 
     LOG(VB_UPNP, LOG_INFO, "Trying default DB credentials at " + URL);
-    m_DBparams.dbHostName = URL;
+    m_dbParams.m_dbHostName = URL;
 
     return true;
 }
@@ -1362,7 +1361,10 @@ bool MythContextPrivate::event(QEvent *e)
             m_registration = GetNotificationCenter()->Register(this);
         }
 
-        MythEvent *me = static_cast<MythEvent*>(e);
+        auto *me = dynamic_cast<MythEvent*>(e);
+        if (me == nullptr)
+            return true;
+
         if (me->Message() == "VERSION_MISMATCH" && (1 == me->ExtraDataCount()))
             ShowVersionMismatchPopup(me->ExtraData(0).toUInt());
         else if (me->Message() == "CONNECTION_FAILURE")
@@ -1405,7 +1407,7 @@ void MythContextPrivate::ShowConnectionFailurePopup(bool persistent)
             "mythtv-setup correct?");
 
     QString message = QObject::tr("Could not connect to master backend");
-    MythErrorNotification n(message, _Location, description);
+    MythErrorNotification n(message, sLocation, description);
     n.SetId(m_registration);
     n.SetParent(this);
     GetNotificationCenter()->Queue(n);
@@ -1419,7 +1421,7 @@ void MythContextPrivate::HideConnectionFailurePopup(void)
     if (!m_lastCheck.isValid())
         return;
 
-    MythCheckNotification n(QObject::tr("Backend is online"), _Location);
+    MythCheckNotification n(QObject::tr("Backend is online"), sLocation);
     n.SetId(m_registration);
     n.SetParent(this);
     n.SetDuration(5);
@@ -1429,7 +1431,7 @@ void MythContextPrivate::HideConnectionFailurePopup(void)
 
 void MythContextPrivate::ShowVersionMismatchPopup(uint remote_version)
 {
-    if (m_MBEversionPopup)
+    if (m_mbeVersionPopup)
         return;
 
     QString message =
@@ -1442,7 +1444,7 @@ void MythContextPrivate::ShowVersionMismatchPopup(uint remote_version)
 
     if (HasMythMainWindow() && m_ui && m_ui->IsScreenSetup())
     {
-        m_MBEversionPopup = ShowOkPopup(
+        m_mbeVersionPopup = ShowOkPopup(
             message, m_sh, SLOT(VersionMismatchPopupClosed()));
     }
     else
@@ -1467,7 +1469,7 @@ void MythContextPrivate::processEvents(void)
 // cache some settings in cache/contextcache.xml
 // only call this if the database is available.
 
-const QString MythContextPrivate::s_settingsToSave[] =
+const std::vector<QString> MythContextPrivate::kSettingsToSave
 { "Theme", "Language", "Country", "GuiHeight",
   "GuiOffsetX", "GuiOffsetY", "GuiWidth", "RunFrontendInWindow",
   "AlwaysOnTop", "HideMouseCursor", "ThemePainter", "libCECEnabled",
@@ -1482,15 +1484,14 @@ bool MythContextPrivate::saveSettingsCache(void)
     QDir dir(cacheDirName);
     dir.mkpath(cacheDirName);
     XmlConfiguration config = XmlConfiguration("cache/contextcache.xml");
-    static const int arraySize = sizeof(s_settingsToSave)/sizeof(s_settingsToSave[0]);
-    for (int ix = 0; ix < arraySize; ix++)
+    for (const auto & setting : kSettingsToSave)
     {
-        QString cacheValue = config.GetValue("Settings/"+s_settingsToSave[ix],QString());
-        gCoreContext->ClearOverrideSettingForSession(s_settingsToSave[ix]);
-        QString value = gCoreContext->GetSetting(s_settingsToSave[ix],QString());
+        QString cacheValue = config.GetValue("Settings/"+setting,QString());
+        gCoreContext->ClearOverrideSettingForSession(setting);
+        QString value = gCoreContext->GetSetting(setting,QString());
         if (value != cacheValue)
         {
-            config.SetValue("Settings/"+s_settingsToSave[ix],value);
+            config.SetValue("Settings/"+setting,value);
             m_settingsCacheDirty = true;
         }
     }
@@ -1498,19 +1499,18 @@ bool MythContextPrivate::saveSettingsCache(void)
     return config.Save();
 }
 
-void MythContextPrivate::loadSettingsCacheOverride(void)
+void MythContextPrivate::loadSettingsCacheOverride(void) const
 {
     if (!m_gui)
         return;
     XmlConfiguration config = XmlConfiguration("cache/contextcache.xml");
-    static const int arraySize = sizeof(s_settingsToSave)/sizeof(s_settingsToSave[0]);
-    for (int ix = 0; ix < arraySize; ix++)
+    for (const auto & setting : kSettingsToSave)
     {
-        if (!gCoreContext->GetSetting(s_settingsToSave[ix],QString()).isEmpty())
+        if (!gCoreContext->GetSetting(setting,QString()).isEmpty())
             continue;
-        QString value = config.GetValue("Settings/"+s_settingsToSave[ix],QString());
+        QString value = config.GetValue("Settings/"+setting,QString());
         if (!value.isEmpty())
-            gCoreContext->OverrideSettingForSession(s_settingsToSave[ix], value);
+            gCoreContext->OverrideSettingForSession(setting, value);
     }
     // Prevent power off TV after temporary window
     gCoreContext->OverrideSettingForSession("PowerOffTVAllowed", nullptr);
@@ -1522,11 +1522,8 @@ void MythContextPrivate::loadSettingsCacheOverride(void)
 void MythContextPrivate::clearSettingsCacheOverride(void)
 {
     QString language = gCoreContext->GetSetting("Language",QString());
-    static const int arraySize = sizeof(s_settingsToSave)/sizeof(s_settingsToSave[0]);
-    for (int ix = 0; ix < arraySize; ix++)
-    {
-        gCoreContext->ClearOverrideSettingForSession(s_settingsToSave[ix]);
-    }
+    for (const auto & setting : kSettingsToSave)
+        gCoreContext->ClearOverrideSettingForSession(setting);
     // Restore power off TV setting
     gCoreContext->ClearOverrideSettingForSession("PowerOffTVAllowed");
 
@@ -1537,12 +1534,12 @@ void MythContextPrivate::clearSettingsCacheOverride(void)
 
 void MythContextSlotHandler::VersionMismatchPopupClosed(void)
 {
-    d->m_MBEversionPopup = nullptr;
+    d->m_mbeVersionPopup = nullptr;
     qApp->exit(GENERIC_EXIT_SOCKET_ERROR);
 }
 
-MythContext::MythContext(const QString &binversion, bool needsBackend)
-    : m_app_binary_version(binversion)
+MythContext::MythContext(QString binversion, bool needsBackend)
+    : m_appBinaryVersion(std::move(binversion))
 {
 #ifdef _WIN32
     static bool WSAStarted = false;
@@ -1557,7 +1554,7 @@ MythContext::MythContext(const QString &binversion, bool needsBackend)
     d = new MythContextPrivate(this);
     d->m_needsBackend = needsBackend;
 
-    gCoreContext = new MythCoreContext(m_app_binary_version, d);
+    gCoreContext = new MythCoreContext(m_appBinaryVersion, d);
 
     if (!gCoreContext || !gCoreContext->Init())
     {
@@ -1579,12 +1576,12 @@ bool MythContext::Init(const bool gui,
 
     SetDisableEventPopup(true);
 
-    if (m_app_binary_version != MYTH_BINARY_VERSION)
+    if (m_appBinaryVersion != MYTH_BINARY_VERSION)
     {
         LOG(VB_GENERAL, LOG_EMERG,
                  QString("Application binary version (%1) does not "
                          "match libraries (%2)")
-                     .arg(m_app_binary_version) .arg(MYTH_BINARY_VERSION));
+                     .arg(m_appBinaryVersion) .arg(MYTH_BINARY_VERSION));
 
         QString warning = QObject::tr(
             "This application is not compatible "
@@ -1649,20 +1646,24 @@ bool MythContext::Init(const bool gui,
         d->m_settingsCacheDirty = false;
     }
     gCoreContext->ActivateSettingsCache(true);
+    gCoreContext->InitPower();
 
     return true;
 }
 
 MythContext::~MythContext()
 {
+    gCoreContext->InitPower(false /*destroy*/);
     if (MThreadPool::globalInstance()->activeThreadCount())
         LOG(VB_GENERAL, LOG_INFO, "Waiting for threads to exit.");
 
     MThreadPool::globalInstance()->waitForDone();
-    logStop();
-
     SSDP::Shutdown();
     TaskQueue::Shutdown();
+
+    LOG(VB_GENERAL, LOG_INFO, "Exiting");
+
+    logStop();
 
     delete gCoreContext;
     gCoreContext = nullptr;
@@ -1677,7 +1678,7 @@ void MythContext::SetDisableEventPopup(bool check)
 
 DatabaseParams MythContext::GetDatabaseParams(void)
 {
-    return d->m_DBparams;
+    return d->m_dbParams;
 }
 
 bool MythContext::SaveDatabaseParams(const DatabaseParams &params)

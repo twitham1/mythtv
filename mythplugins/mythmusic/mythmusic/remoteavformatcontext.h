@@ -18,9 +18,7 @@ extern "C" {
 class RemoteAVFormatContext
 {
   public:
-    explicit RemoteAVFormatContext(const QString &filename = "") :
-        m_inputFC(nullptr), m_inputIsRemote(false), m_isOpen(false),
-        m_rf(nullptr), m_byteIOContext(nullptr), m_buffer(nullptr)
+    explicit RemoteAVFormatContext(const QString &filename = "")
     { if (!filename.isEmpty()) Open(filename); }
 
     ~RemoteAVFormatContext()
@@ -42,8 +40,7 @@ class RemoteAVFormatContext
             avformat_free_context(m_inputFC);
         m_inputFC = avformat_alloc_context();
 
-        if (m_rf)
-            delete m_rf;
+        delete m_rf;
 
         m_inputIsRemote = filename.startsWith("myth://");
         if (m_inputIsRemote)
@@ -78,10 +75,7 @@ class RemoteAVFormatContext
                 LOG(VB_GENERAL, LOG_ERR,  QString("RemoteAVFormatContext::Open: Failed to probe file: %1").arg(filename));
                 return false;
             }
-            else
-            {
-                LOG(VB_PLAYBACK, LOG_INFO,  QString("RemoteAVFormatContext::Open: probed file as %1").arg(fmt->name));
-            }
+            LOG(VB_PLAYBACK, LOG_INFO,  QString("RemoteAVFormatContext::Open: probed file as %1").arg(fmt->name));
 
             m_rf->Seek(0, SEEK_SET);
 
@@ -122,11 +116,8 @@ class RemoteAVFormatContext
             m_inputFC = nullptr;
         }
 
-        if (m_rf)
-        {
-            delete m_rf;
-            m_rf = nullptr;
-        }
+        delete m_rf;
+        m_rf = nullptr;
 
         m_isOpen = false;
     }
@@ -140,15 +131,16 @@ class RemoteAVFormatContext
   private:
     static int ReadFunc(void *opaque, uint8_t *buf, int buf_size)
     {
-        RemoteFile *rf = reinterpret_cast< RemoteFile* >(opaque);
+        auto *rf = reinterpret_cast< RemoteFile* >(opaque);
         return rf->Read(buf, buf_size);
     }
 
-    static int WriteFunc(void *, uint8_t *, int) {  return -1; }
+    static int WriteFunc(void */*opaque*/, uint8_t */*buf*/, int/*buf_size*/)
+    {  return -1; }
 
     static int64_t SeekFunc(void *opaque, int64_t offset, int whence)
     {
-        RemoteFile *rf = reinterpret_cast< RemoteFile* >(opaque);
+        auto *rf = reinterpret_cast< RemoteFile* >(opaque);
         if (whence == AVSEEK_SIZE)
             return rf->GetFileSize();
 
@@ -156,11 +148,11 @@ class RemoteAVFormatContext
     }
 
   private:
-    AVFormatContext *m_inputFC;
-    bool m_inputIsRemote;
-    bool m_isOpen;
-    RemoteFile *m_rf;
-    AVIOContext *m_byteIOContext;
-    unsigned char *m_buffer;
+    AVFormatContext *m_inputFC       { nullptr };
+    bool             m_inputIsRemote {   false };
+    bool             m_isOpen        {   false };
+    RemoteFile      *m_rf            { nullptr };
+    AVIOContext     *m_byteIOContext { nullptr };
+    unsigned char   *m_buffer        { nullptr };
 };
 #endif // REMOTEAVFORMATCONTEXT_H

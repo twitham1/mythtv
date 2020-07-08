@@ -1,12 +1,14 @@
 #include <unistd.h>
 #include <iostream>
+#include <utility>
 
 using namespace std;
 
-#include <QString>
-#include <QRegExp>
-#include <QDir>
 #include <QApplication>
+#include <QDir>
+#include <QRegExp>
+#include <QString>
+#include <QSurfaceFormat>
 #include <QTime>
 
 #include "tv_play.h"
@@ -24,7 +26,7 @@ using namespace std;
 #include "mythlogging.h"
 #include "signalhandling.h"
 #include "mythmiscutil.h"
-#include "videooutbase.h"
+#include "mythvideoout.h"
 
 // libmythui
 #include "mythuihelper.h"
@@ -33,49 +35,51 @@ using namespace std;
 class VideoPerformanceTest
 {
   public:
-    VideoPerformanceTest(const QString &filename, bool novsync, bool onlydecode,
+    VideoPerformanceTest(QString filename, bool decodeno, bool onlydecode,
                          int runfor, bool deint, bool gpu)
-      : file(filename), novideosync(novsync), decodeonly(onlydecode),
-        secondstorun(runfor), deinterlace(deint), allowgpu(gpu), ctx(nullptr)
+      : m_file(std::move(filename)),
+        m_noDecode(decodeno),
+        m_decodeOnly(onlydecode),
+        m_secondsToRun(runfor),
+        m_deinterlace(deint),
+        m_allowGpu(gpu),
+        m_ctx(nullptr)
     {
-        if (secondstorun < 1)
-            secondstorun = 1;
-        if (secondstorun > 3600)
-            secondstorun = 3600;
+        if (m_secondsToRun < 1)
+            m_secondsToRun = 1;
+        if (m_secondsToRun > 3600)
+            m_secondsToRun = 3600;
     }
 
    ~VideoPerformanceTest()
     {
-        delete ctx;
+        delete m_ctx;
     }
 
     void Test(void)
     {
         PIPMap dummy;
-
-        if (novideosync) // TODO
-            LOG(VB_GENERAL, LOG_INFO, "Will attempt to disable sync-to-vblank.");
-
-        RingBuffer *rb  = RingBuffer::Create(file, false, true, 2000);
-        MythPlayer  *mp  = new MythPlayer((PlayerFlags)(kAudioMuted | (allowgpu ? kDecodeAllowGPU : kNoFlags)));
+        MythMediaBuffer *rb  = MythMediaBuffer::Create(m_file, false, true, 2000);
+        auto       *mp  = new MythPlayer(
+            (PlayerFlags)(kAudioMuted | (m_allowGpu ? (kDecodeAllowGPU | kDecodeAllowEXT): kNoFlags)));
         mp->GetAudio()->SetAudioInfo("NULL", "NULL", 0, 0);
         mp->GetAudio()->SetNoAudio();
-        ctx = new PlayerContext("VideoPerformanceTest");
-        ctx->SetRingBuffer(rb);
-        ctx->SetPlayer(mp);
-        ProgramInfo *pinfo = new ProgramInfo(file);
-        ctx->SetPlayingInfo(pinfo); // makes a copy
+        m_ctx = new PlayerContext("VideoPerformanceTest");
+        m_ctx->SetRingBuffer(rb);
+        m_ctx->SetPlayer(mp);
+        auto *pinfo = new ProgramInfo(m_file);
+        m_ctx->SetPlayingInfo(pinfo); // makes a copy
         delete pinfo;
-        mp->SetPlayerInfo(nullptr, GetMythMainWindow(), ctx);
+        mp->SetPlayerInfo(nullptr, GetMythMainWindow(), m_ctx);
 
-        FrameScanType scan = deinterlace ? kScan_Interlaced : kScan_Progressive;
+        FrameScanType scan = m_deinterlace ? kScan_Interlaced : kScan_Progressive;
         if (!mp->StartPlaying())
         {
             LOG(VB_GENERAL, LOG_ERR, "Failed to start playback.");
             return;
         }
 
-        VideoOutput *vo = mp->GetVideoOutput();
+        MythVideoOutput *vo = mp->GetVideoOutput();
         if (!vo)
         {
             LOG(VB_GENERAL, LOG_ERR, "No video output.");
@@ -87,36 +91,26 @@ class VideoPerformanceTest
         LOG(VB_GENERAL, LOG_INFO, "Otherwise rate will be limited to that of the display.");
         LOG(VB_GENERAL, LOG_INFO, "-----------------------------------");
         LOG(VB_GENERAL, LOG_INFO, QString("Starting video performance test for '%1'.")
-            .arg(file));
+            .arg(m_file));
         LOG(VB_GENERAL, LOG_INFO, QString("Test will run for %1 seconds.")
-            .arg(secondstorun));
+            .arg(m_secondsToRun));
 
-        if (decodeonly)
+        if (m_noDecode)
+            LOG(VB_GENERAL, LOG_INFO, "No decode after startup - checking display performance");
+        else if (m_decodeOnly)
             LOG(VB_GENERAL, LOG_INFO, "Decoding frames only - skipping display.");
-
-        bool doublerate = vo->NeedsDoubleFramerate();
-        if (deinterlace)
-        {
-            LOG(VB_GENERAL, LOG_INFO, QString("Deinterlacing: %1")
-                .arg(doublerate ? "doublerate" : "singlerate"));
-            if (doublerate)
-                LOG(VB_GENERAL, LOG_INFO, "Output will show fields per second");
-        }
-        else
-        {
-            LOG(VB_GENERAL, LOG_INFO, "Deinterlacing disabled");
-        }
-
         DecoderBase* dec = mp->GetDecoder();
         if (dec)
             LOG(VB_GENERAL, LOG_INFO, QString("Using decoder: %1").arg(dec->GetCodecDecoderName()));
 
-        Jitterometer *jitter = new Jitterometer("Performance: ", mp->GetFrameRate() * (doublerate ? 2 : 1));
+        auto *jitter = new Jitterometer("Performance: ", static_cast<int>(mp->GetFrameRate()));
 
-        int ms = secondstorun * 1000;
+        int ms = m_secondsToRun * 1000;
         QTime start = QTime::currentTime();
+        VideoFrame *frame = nullptr;
         while (true)
         {
+            mp->ProcessCallbacks();
             int duration = start.msecsTo(QTime::currentTime());
             if (duration < 0 || duration > ms)
             {
@@ -141,22 +135,29 @@ class VideoPerformanceTest
 
             mp->SetBuffering(false);
             vo->StartDisplayingFrame();
-            VideoFrame *frame = vo->GetLastShownFrame();
+            if ((m_noDecode && !frame) || !m_noDecode)
+                frame = vo->GetLastShownFrame();
             mp->CheckAspectRatio(frame);
 
-            if (!decodeonly)
+            if (!m_decodeOnly)
             {
-                vo->ProcessFrame(frame, nullptr, nullptr, dummy, scan);
+                MythDeintType doubledeint = GetDoubleRateOption(frame, DEINT_CPU | DEINT_SHADER | DEINT_DRIVER);
+                vo->ProcessFrame(frame, nullptr, dummy, scan);
                 vo->PrepareFrame(frame, scan, nullptr);
                 vo->Show(scan);
 
-                if (vo->NeedsDoubleFramerate() && deinterlace)
+                if (doubledeint && m_deinterlace)
                 {
+                    doubledeint = GetDoubleRateOption(frame, DEINT_CPU);
+                    MythDeintType other = GetDoubleRateOption(frame, DEINT_SHADER | DEINT_DRIVER);
+                    if (doubledeint && !other)
+                        vo->ProcessFrame(frame, nullptr, dummy, kScan_Intr2ndField);
                     vo->PrepareFrame(frame, kScan_Intr2ndField, nullptr);
                     vo->Show(scan);
                 }
             }
-            vo->DoneDisplayingFrame(frame);
+            if (!m_noDecode)
+                vo->DoneDisplayingFrame(frame);
             jitter->RecordCycleTime();
         }
         LOG(VB_GENERAL, LOG_INFO, "-----------------------------------");
@@ -164,26 +165,17 @@ class VideoPerformanceTest
     }
 
   private:
-    QString file;
-    bool    novideosync;
-    bool    decodeonly;
-    int     secondstorun;
-    bool    deinterlace;
-    bool    allowgpu;
-    PlayerContext *ctx;
+    QString m_file;
+    bool    m_noDecode;
+    bool    m_decodeOnly;
+    int     m_secondsToRun;
+    bool    m_deinterlace;
+    bool    m_allowGpu;
+    PlayerContext *m_ctx;
 };
 
 int main(int argc, char *argv[])
 {
-
-#if CONFIG_OMX_RPI
-    setenv("QT_XCB_GL_INTEGRATION","none",0);
-#endif
-
-    // try and disable sync to vblank on linux x11
-    qputenv("vblank_mode", "0"); // Intel and AMD
-    qputenv("__GL_SYNC_TO_VBLANK", "0"); // NVidia
-
     MythAVTestCommandLineParser cmdline;
     if (!cmdline.Parse(argc, argv))
     {
@@ -199,26 +191,34 @@ int main(int argc, char *argv[])
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythAVTestCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
+
+    int swapinterval = 1;
+    if (cmdline.toBool("test"))
+    {
+        // try and disable sync to vblank on linux x11
+        qputenv("vblank_mode", "0"); // Intel and AMD
+        qputenv("__GL_SYNC_TO_VBLANK", "0"); // NVidia
+        // the default surface format has a swap interval of 1. This is used by
+        // the MythMainwindow widget that then drives vsync for all widgets/children
+        // (i.e. MythPainterWindow) and we cannot override it on some drivers. So
+        // force the default here.
+        swapinterval = 0;
+    }
+
+    MythDisplay::ConfigureQtGUI(swapinterval, cmdline.toString("display"));
 
     QApplication a(argc, argv);
     QCoreApplication::setApplicationName(MYTH_APPNAME_MYTHAVTEST);
 
-    int retval;
-    if ((retval = cmdline.ConfigureLogging()) != GENERIC_EXIT_OK)
+    int retval = cmdline.ConfigureLogging();
+    if (retval != GENERIC_EXIT_OK)
         return retval;
 
-    if (!cmdline.toString("display").isEmpty())
-    {
-        MythUIHelper::SetX11Display(cmdline.toString("display"));
-    }
-
     if (!cmdline.toString("geometry").isEmpty())
-    {
         MythUIHelper::ParseGeometryOverride(cmdline.toString("geometry"));
-    }
 
     QString filename = "";
     if (!cmdline.toString("infile").isEmpty())
@@ -260,11 +260,7 @@ int main(int argc, char *argv[])
 #endif
 
     MythMainWindow *mainWindow = GetMythMainWindow();
-#if CONFIG_DARWIN
-    mainWindow->Init(OPENGL2_PAINTER);
-#else
     mainWindow->Init();
-#endif
 
 #ifndef _WIN32
     QList<int> signallist;
@@ -282,7 +278,8 @@ int main(int argc, char *argv[])
         int seconds = 5;
         if (!cmdline.toString("seconds").isEmpty())
             seconds = cmdline.toInt("seconds");
-        VideoPerformanceTest *test = new VideoPerformanceTest(filename, false,
+        auto *test = new VideoPerformanceTest(filename,
+                    cmdline.toBool("nodecode"),
                     cmdline.toBool("decodeonly"), seconds,
                     cmdline.toBool("deinterlace"),
                     cmdline.toBool("gpu"));

@@ -55,12 +55,12 @@ void DestroyMythDB(void)
 
 struct SingleSetting
 {
-    QString key;
-    QString value;
-    QString host;
+    QString m_key;
+    QString m_value;
+    QString m_host;
 };
 
-typedef QHash<QString,QString> SettingsMap;
+using SettingsMap = QHash<QString,QString>;
 
 class MythDBPrivate
 {
@@ -68,7 +68,7 @@ class MythDBPrivate
     MythDBPrivate();
    ~MythDBPrivate();
 
-    DatabaseParams  m_DBparams;  ///< Current database host & WOL details
+    DatabaseParams  m_dbParams;  ///< Current database host & WOL details
     QString m_localhostname;
     MDBManager m_dbmanager;
 
@@ -198,12 +198,12 @@ QString MythDB::DBErrorMessage(const QSqlError& err)
 
 DatabaseParams MythDB::GetDatabaseParams(void) const
 {
-    return d->m_DBparams;
+    return d->m_dbParams;
 }
 
 void MythDB::SetDatabaseParams(const DatabaseParams &params)
 {
-    d->m_DBparams = params;
+    d->m_dbParams = params;
 }
 
 void MythDB::SetLocalHostname(const QString &name)
@@ -283,9 +283,9 @@ bool MythDB::SaveSettingOnHost(const QString &key,
         if (!d->m_suppressDBMessages)
             LOG(VB_GENERAL, LOG_ERR, loc + "- No database yet");
         SingleSetting setting;
-        setting.host = host;
-        setting.key = key;
-        setting.value = newValue;
+        setting.m_host = host;
+        setting.m_key = key;
+        setting.m_value = newValue;
         d->m_delayedSettings.append(setting);
         return false;
     }
@@ -297,11 +297,15 @@ bool MythDB::SaveSettingOnHost(const QString &key,
     {
 
         if (!host.isEmpty())
+        {
             query.prepare("DELETE FROM settings WHERE value = :KEY "
                           "AND hostname = :HOSTNAME ;");
+        }
         else
+        {
             query.prepare("DELETE FROM settings WHERE value = :KEY "
                           "AND hostname is NULL;");
+        }
 
         query.bindValue(":KEY", key);
         if (!host.isEmpty())
@@ -321,11 +325,15 @@ bool MythDB::SaveSettingOnHost(const QString &key,
     if (success && (newValue != kClearSettingValue))
     {
         if (!host.isEmpty())
+        {
             query.prepare("INSERT INTO settings (value,data,hostname) "
                           "VALUES ( :VALUE, :DATA, :HOSTNAME );");
+        }
         else
+        {
             query.prepare("INSERT INTO settings (value,data ) "
                           "VALUES ( :VALUE, :DATA );");
+        }
 
         query.bindValue(":VALUE", key);
         query.bindValue(":DATA", newValue);
@@ -434,7 +442,7 @@ QString MythDB::GetSetting(const QString &_key, const QString &defaultval)
 bool MythDB::GetSettings(QMap<QString,QString> &_key_value_pairs)
 {
     QMap<QString,bool> done;
-    typedef QMap<QString,QString>::iterator KVIt;
+    using KVIt = QMap<QString,QString>::iterator;
     KVIt kvit = _key_value_pairs.begin();
     for (; kvit != _key_value_pairs.end(); ++kvit)
         done[kvit.key().toLower()] = false;
@@ -534,7 +542,8 @@ bool MythDB::GetSettings(QMap<QString,QString> &_key_value_pairs)
         QMap<QString,KVIt>::const_iterator it = keymap.begin();
         for (; it != keymap.end(); ++it)
         {
-            QString key = it.key(), value = **it;
+            QString key = it.key();
+            QString value = **it;
 
             // another thread may have inserted a value into the cache
             // while we did not have the lock, check first then save
@@ -554,7 +563,7 @@ bool MythDB::GetSettings(QMap<QString,QString> &_key_value_pairs)
 
 bool MythDB::GetBoolSetting(const QString &key, bool defaultval)
 {
-    QString val = QString::number(defaultval);
+    QString val = QString::number(static_cast<int>(defaultval));
     QString retval = GetSetting(key, val);
 
     return retval.toInt() > 0;
@@ -641,9 +650,11 @@ QString MythDB::GetSettingOnHost(const QString &_key, const QString &_host,
     if (!query.isConnected())
     {
         if (!d->m_suppressDBMessages)
+        {
             LOG(VB_GENERAL, LOG_ERR,
                 QString("Database not open while trying to "
                         "load setting: %1").arg(key));
+        }
         return value;
     }
 
@@ -717,7 +728,9 @@ void MythDB::GetResolutionSetting(const QString &type,
                                        double &refresh_rate,
                                        int index)
 {
-    bool ok = false, ok0 = false, ok1 = false;
+    bool ok = false;
+    bool ok0 = false;
+    bool ok1 = false;
     QString sRes =    QString("%1Resolution").arg(type);
     QString sRR =     QString("%1RefreshRate").arg(type);
     QString sAspect = QString("%1ForceAspect").arg(type);
@@ -737,7 +750,8 @@ void MythDB::GetResolutionSetting(const QString &type,
     if (!res.isEmpty())
     {
         QStringList slist = res.split(QString("x"));
-        int w = width, h = height;
+        int w = width;
+        int h = height;
         if (2 == slist.size())
         {
             w = slist[0].toInt(&ok0);
@@ -786,7 +800,9 @@ void MythDB::GetResolutionSetting(const QString &t, int &w, int &h, int i)
 void MythDB::OverrideSettingForSession(
     const QString &key, const QString &value)
 {
-    QString mk = key.toLower(), mk2 = d->m_localhostname + ' ' + mk, mv = value;
+    QString mk = key.toLower();
+    QString mk2 = d->m_localhostname + ' ' + mk;
+    QString mv = value;
     if ("dbschemaver" == mk)
     {
         LOG(VB_GENERAL, LOG_ERR,
@@ -906,7 +922,7 @@ void MythDB::WriteDelayedSettings(void)
     while (!d->m_delayedSettings.isEmpty())
     {
         SingleSetting setting = d->m_delayedSettings.takeFirst();
-        SaveSettingOnHost(setting.key, setting.value, setting.host);
+        SaveSettingOnHost(setting.m_key, setting.m_value, setting.m_host);
     }
 }
 

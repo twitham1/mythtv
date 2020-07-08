@@ -10,14 +10,14 @@
 
 class ExternalStreamHandler;
 
-typedef QMap<uint,int> FilterMap;
+using FilterMap = QMap<uint,int>;
 
 class ExternalSignalMonitor: public DTVSignalMonitor
 {
   public:
     ExternalSignalMonitor(int db_cardnum, ExternalChannel *_channel,
                           bool _release_stream, uint64_t _flags = 0);
-    virtual ~ExternalSignalMonitor();
+    ~ExternalSignalMonitor() override;
 
     void Stop(void) override; // SignalMonitor
 
@@ -40,6 +40,7 @@ class ExternalSignalMonitor: public DTVSignalMonitor
     ExternalStreamHandler *m_stream_handler         {nullptr};
     bool                   m_stream_handler_started {false};
     int                    m_lock_timeout           {0};
+    QString                m_loc;
 };
 
 #endif // EXTERNALSIGNALMONITOR_H

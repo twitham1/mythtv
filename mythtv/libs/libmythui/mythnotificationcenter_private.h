@@ -39,7 +39,7 @@ public slots:
 
 public:
     NCPrivate(void);
-    virtual ~NCPrivate();
+    ~NCPrivate() override;
 
     /**
      * Queue a notification
@@ -148,14 +148,14 @@ class MythNotificationScreen : public MythScreenType
     Q_OBJECT
 
 public:
-    MythNotificationScreen(MythScreenStack *stack,
+    explicit MythNotificationScreen(MythScreenStack *stack,
                              int id = -1);
     MythNotificationScreen(MythScreenStack *stack,
                              MythNotification &notification);
     MythNotificationScreen(MythScreenStack *stack,
                              const MythNotificationScreen &screen);
     
-    virtual ~MythNotificationScreen();
+    ~MythNotificationScreen() override;
 
     bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
@@ -173,7 +173,7 @@ public:
     void UpdateFrom(const MythNotificationScreen &s);
 
     void SetSingleShotTimer(int s, bool update = false);
-    void SetErrorState(void);
+    void SetErrorState(void) const;
 
     // UI methods
     void AdjustYPosition(void);
@@ -245,20 +245,18 @@ public:
     {
     }
 
-    virtual ~MythNotificationScreenStack()
+    ~MythNotificationScreenStack() override
     {
         m_owner->ScreenStackDeleted();
     }
 
     void CheckDeletes()
     {
-        QVector<MythScreenType*>::const_iterator it;
-
-        for (it = m_ToDelete.begin(); it != m_ToDelete.end(); ++it)
+        for (auto * screen : qAsConst(m_ToDelete))
         {
-            (*it)->SetAlpha(0);
-            (*it)->SetVisible(false);
-            (*it)->Close();
+            screen->SetAlpha(0);
+            screen->SetVisible(false);
+            screen->Close();
         }
         MythScreenStack::CheckDeletes();
     }

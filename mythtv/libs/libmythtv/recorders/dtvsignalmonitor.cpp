@@ -13,7 +13,7 @@ using namespace std;
 
 #undef DBG_SM
 #define DBG_SM(FUNC, MSG) LOG(VB_CHANNEL, LOG_INFO, \
-    QString("DTVSigMon[%1](%2)::%3: %4").arg(m_inputid) \
+    QString("DTVSigMon[%1](%2): %3 %4").arg(m_inputid) \
     .arg(m_channel->GetDevice()).arg(FUNC).arg(MSG))
 
 #define LOC QString("DTVSigMon[%1](%2): ") \
@@ -133,7 +133,7 @@ QStringList DTVSignalMonitor::GetStatusList(void) const
         list<<m_seenCrypt.GetName()<<m_seenCrypt.GetStatus();
         list<<m_matchingCrypt.GetName()<<m_matchingCrypt.GetStatus();
     }
-    if (m_error != "")
+    if (!m_error.isEmpty())
     {
         list<<"error"<<m_error;
     }
@@ -173,24 +173,25 @@ void DTVSignalMonitor::UpdateMonitorValues(void)
 
 void DTVSignalMonitor::UpdateListeningForEIT(void)
 {
-    vector<uint> add_eit, del_eit;
+    vector<uint> add_eit;
+    vector<uint> del_eit;
 
     if (GetStreamData()->HasEITPIDChanges(m_eit_pids) &&
         GetStreamData()->GetEITPIDChanges(m_eit_pids, add_eit, del_eit))
     {
-        for (size_t i = 0; i < del_eit.size(); i++)
+        for (uint eit : del_eit)
         {
             uint_vec_t::iterator it;
-            it = find(m_eit_pids.begin(), m_eit_pids.end(), del_eit[i]);
+            it = find(m_eit_pids.begin(), m_eit_pids.end(), eit);
             if (it != m_eit_pids.end())
                 m_eit_pids.erase(it);
-            GetStreamData()->RemoveListeningPID(del_eit[i]);
+            GetStreamData()->RemoveListeningPID(eit);
         }
 
-        for (size_t i = 0; i < add_eit.size(); i++)
+        for (uint eit : add_eit)
         {
-            m_eit_pids.push_back(add_eit[i]);
-            GetStreamData()->AddListeningPID(add_eit[i]);
+            m_eit_pids.push_back(eit);
+            GetStreamData()->AddListeningPID(eit);
         }
     }
 }
@@ -310,6 +311,14 @@ void DTVSignalMonitor::HandlePAT(const ProgramAssociationTable *pat)
         GetStreamData()->SetVersionPAT(tsid, -1,0);
         // END HACK HACK HACK
 
+        // Discard PAT if we are still on the wrong transport
+        if (m_transportID > 0 && tsid != m_transportID)
+        {
+            DBG_SM("HandlePAT()", QString("Discard PAT for tsid %1 waiting for tsid %2")
+                .arg(tsid).arg(m_transportID));
+            return;
+        }
+
         if (insert_crc(m_seen_table_crc, *pat))
         {
             QString errStr = QString("Program #%1 not found in PAT!")
@@ -350,8 +359,8 @@ void DTVSignalMonitor::HandlePMT(uint /*program_num*/, const ProgramMapTable *pm
     {
         if (insert_crc(m_seen_table_crc, *pmt))
         {
-            LOG(VB_GENERAL, LOG_ERR, LOC +
-                QString("Wrong PMT; pmt->pn(%1) desired(%2)")
+            LOG(VB_CHANNEL, LOG_DEBUG, LOC +
+                QString("Wrong PMT; pmt->ProgramNumber(%1) desired(%2)")
                 .arg(pmt->ProgramNumber()).arg(m_programNumber));
         }
         return; // Not the PMT we are looking for...
@@ -435,7 +444,7 @@ void DTVSignalMonitor::HandleTVCT(
             LOG(VB_GENERAL, LOG_ERR, LOC +
                 QString("Could not find channel %1_%2 in TVCT")
                 .arg(m_majorChannel).arg(m_minorChannel));
-            LOG(VB_GENERAL, LOG_ERR, LOC + tvct->toString());
+            LOG(VB_GENERAL, LOG_DEBUG, LOC + tvct->toString());
         }
         GetATSCStreamData()->SetVersionTVCT(tvct->TransportStreamID(),-1);
         return;
@@ -460,7 +469,7 @@ void DTVSignalMonitor::HandleCVCT(uint /*pid*/, const CableVirtualChannelTable* 
             LOG(VB_GENERAL, LOG_ERR, LOC +
                 QString("Could not find channel %1_%2 in CVCT")
                 .arg(m_majorChannel).arg(m_minorChannel));
-            LOG(VB_GENERAL, LOG_ERR, LOC + cvct->toString());
+            LOG(VB_GENERAL, LOG_DEBUG, LOC + cvct->toString());
         }
         GetATSCStreamData()->SetVersionCVCT(cvct->TransportStreamID(),-1);
         return;

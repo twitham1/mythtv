@@ -1,5 +1,5 @@
-#ifndef _SOCKETREQUESTHANDLER_H_
-#define _SOCKETREQUESTHANDLER_H_
+#ifndef SOCKETREQUESTHANDLER_H
+#define SOCKETREQUESTHANDLER_H
 
 #include <QString>
 
@@ -13,8 +13,8 @@ class PROTOSERVER_PUBLIC SocketRequestHandler : public QObject
 {
     Q_OBJECT
   public:
-    SocketRequestHandler() : m_parent(nullptr) {};
-   ~SocketRequestHandler() = default;
+    SocketRequestHandler() = default;
+   ~SocketRequestHandler() override = default;
 
     virtual bool HandleAnnounce(MythSocket */*socket*/, QStringList &/*commands*/,
                                 QStringList &/*slist*/)
@@ -30,7 +30,7 @@ class PROTOSERVER_PUBLIC SocketRequestHandler : public QObject
     MythSocketManager *GetParent(void)                  { return m_parent; }
 
   protected:
-    MythSocketManager *m_parent;
+    MythSocketManager *m_parent { nullptr };
 };
 
-#endif
+#endif // SOCKETREQUESTHANDLER_H

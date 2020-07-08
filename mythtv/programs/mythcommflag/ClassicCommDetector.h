@@ -1,5 +1,5 @@
-#ifndef _CLASSIC_COMMDETECTOR_H_
-#define _CLASSIC_COMMDETECTOR_H_
+#ifndef CLASSIC_COMMDETECTOR_H
+#define CLASSIC_COMMDETECTOR_H
 
 // C++ headers
 #include <cstdint>
@@ -50,10 +50,10 @@ class ClassicCommDetector : public CommDetectorBase
     public:
         ClassicCommDetector(SkipType commDetectMethod, bool showProgress,
                             bool fullSpeed, MythPlayer* player,
-                            const QDateTime& startedAt_in,
-                            const QDateTime& stopsAt_in,
-                            const QDateTime& recordingStartedAt_in,
-                            const QDateTime& recordingStopsAt_in);
+                            QDateTime startedAt_in,
+                            QDateTime stopsAt_in,
+                            QDateTime recordingStartedAt_in,
+                            QDateTime recordingStopsAt_in);
         virtual void deleteLater(void);
 
         bool go() override; // CommDetectorBase
@@ -70,10 +70,10 @@ class ClassicCommDetector : public CommDetectorBase
         friend class ClassicLogoDetector;
 
     protected:
-        virtual ~ClassicCommDetector() = default;
+        ~ClassicCommDetector() override = default;
 
     private:
-        typedef struct frameblock
+        struct FrameBlock
         {
             long start;
             long end;
@@ -87,8 +87,7 @@ class ClassicCommDetector : public CommDetectorBase
             int formatMatch;
             int aspectMatch;
             int score;
-        }
-        FrameBlock;
+        };
 
         void ClearAllMaps(void);
         void GetBlankCommMap(frm_dir_map_t &comms);
@@ -97,7 +96,7 @@ class ClassicCommDetector : public CommDetectorBase
                                int64_t start_frame);
         frm_dir_map_t Combine2Maps(
             const frm_dir_map_t &a, const frm_dir_map_t &b) const;
-        void UpdateFrameBlock(FrameBlock *fbp, FrameInfoEntry finfo,
+        static void UpdateFrameBlock(FrameBlock *fbp, FrameInfoEntry finfo,
                               int format, int aspect);
         void BuildAllMethodsCommList(void);
         void BuildBlankFrameCommList(void);
@@ -105,14 +104,14 @@ class ClassicCommDetector : public CommDetectorBase
         void BuildLogoCommList();
         void MergeBlankCommList(void);
         bool FrameIsInBreakMap(uint64_t f, const frm_dir_map_t &breakMap) const;
-        void DumpMap(frm_dir_map_t &map);
-        void CondenseMarkMap(show_map_t &map, int spacing, int length);
-        void ConvertShowMapToCommMap(
+        void DumpMap(frm_dir_map_t &map) const;
+        static void CondenseMarkMap(show_map_t &map, int spacing, int length);
+        static void ConvertShowMapToCommMap(
             frm_dir_map_t &out, const show_map_t &in);
         void CleanupFrameInfo(void);
         void GetLogoCommBreakMap(show_map_t &map);
 
-        enum SkipTypes m_commDetectMethod;
+        SkipType m_commDetectMethod;
         frm_dir_map_t m_lastSentCommBreakMap;
         bool m_commBreakMapUpdateRequested {false};
         bool m_sendCommBreakMapUpdates     {false};
@@ -182,13 +181,12 @@ protected:
         void Init();
         void SetVideoParams(float aspect);
         void ProcessFrame(VideoFrame *frame, long long frame_number);
-        QMap<long long, FrameInfoEntry> frameInfo;
+        QMap<long long, FrameInfoEntry> m_frameInfo;
 
 public slots:
         void sceneChangeDetectorHasNewInformation(unsigned int framenum, bool isSceneChange,float debugValue);
 };
 
-#endif
-
+#endif // CLASSIC_COMMDETECTOR_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

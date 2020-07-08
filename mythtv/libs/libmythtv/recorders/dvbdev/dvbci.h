@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef __CI_H
-#define __CI_H
+#ifndef DVBCI_H
+#define DVBCI_H
 
 #if HAVE_STDINT_H
 #include <cstdint>
@@ -46,7 +46,7 @@
 class cMutex {
   friend class cCondVar;
 private:
-  pthread_mutex_t m_mutex;
+  pthread_mutex_t m_mutex      {};
   pid_t           m_lockingPid {0};
   int             m_locked     {0};
 public:
@@ -78,7 +78,7 @@ private:
   char   *m_titleText    {nullptr};
   char   *m_subTitleText {nullptr};
   char   *m_bottomText   {nullptr};
-  char   *m_entries[MAX_CIMENU_ENTRIES];
+  char   *m_entries[MAX_CIMENU_ENTRIES] {};
   int     m_numEntries   {0};
   bool AddEntry(char *s);
   cCiMenu(cCiMMI *MMI, bool Selectable);
@@ -88,8 +88,8 @@ public:
   const char *SubTitleText(void) { return m_subTitleText; }
   const char *BottomText(void) { return m_bottomText; }
   const char *Entry(int n) { return n < m_numEntries ? m_entries[n] : nullptr; }
-  int NumEntries(void) { return m_numEntries; }
-  bool Selectable(void) { return m_selectable; }
+  int NumEntries(void) const { return m_numEntries; }
+  bool Selectable(void) const { return m_selectable; }
   bool Select(int Index);
   bool Cancel(void);
   };
@@ -105,8 +105,8 @@ private:
 public:
   ~cCiEnquiry();
   const char *Text(void) { return m_text; }
-  bool Blind(void) { return m_blind; }
-  int ExpectedLength(void) { return m_expectedLength; }
+  bool Blind(void) const { return m_blind; }
+  int ExpectedLength(void) const { return m_expectedLength; }
   bool Reply(const char *s);
   bool Cancel(void);
   };
@@ -126,9 +126,9 @@ class cCiCaPmt {
 private:
   int     m_length        {0};
   int     m_infoLengthPos {0};
-  uint8_t m_capmt[2048]; ///< XXX is there a specified maximum?
+  uint8_t m_capmt[2048]   {0}; ///< XXX is there a specified maximum?
 public:
-  cCiCaPmt(int ProgramNumber, uint8_t cplm = CPLM_ONLY);
+  explicit cCiCaPmt(int ProgramNumber, uint8_t cplm = CPLM_ONLY);
   void AddElementaryStream(int type, int pid);
   void AddCaDescriptor(int ca_system_id, int ca_pid, int data_len,
                        const uint8_t *data);
@@ -165,10 +165,10 @@ private:
   bool                    m_newCaSupport {false};
   bool                    m_hasUserIO    {false};
   bool                    m_needCaPmt    {false};
-  cCiSession             *m_sessions[MAX_CI_SESSION];
+  cCiSession             *m_sessions[MAX_CI_SESSION] {};
   cCiTransportLayer      *m_tpl          {nullptr};
   cCiTransportConnection *m_tc           {nullptr};
-  int ResourceIdToInt(const uint8_t *Data);
+  static int ResourceIdToInt(const uint8_t *Data);
   bool Send(uint8_t Tag, int SessionId, int ResourceId = 0, int Status = -1);
   cCiSession *GetSessionBySessionId(int SessionId);
   cCiSession *GetSessionByResourceId(int ResourceId, int Slot);
@@ -177,10 +177,10 @@ private:
   bool CloseSession(int SessionId);
   int CloseAllSessions(int Slot);
   cLlCiHandler(int Fd, int NumSlots);
+public:
+  ~cLlCiHandler() override;
   cLlCiHandler(const cLlCiHandler &) = delete;            // not copyable
   cLlCiHandler &operator=(const cLlCiHandler &) = delete; // not copyable
-public:
-  virtual ~cLlCiHandler();
   int NumSlots(void) override // cCiHandler
       { return m_numSlots; }
   bool Process(void) override; // cCiHandler
@@ -196,7 +196,7 @@ public:
   bool SetCaPmt(cCiCaPmt &CaPmt, int Slot) override; // cCiHandler
   void SetTimeOffset(double offset_in_seconds) override; // cCiHandler
   bool Reset(int Slot);
-  bool connected() const;
+  static bool connected();
   };
 
 class cHlCiHandler : public cCiHandler {
@@ -207,13 +207,13 @@ class cHlCiHandler : public cCiHandler {
     int            m_numSlots;
     int            m_state          {0};
     int            m_numCaSystemIds {0};
-    unsigned short m_caSystemIds[MAXCASYSTEMIDS + 1]; // list is zero terminated!
+    unsigned short m_caSystemIds[MAXCASYSTEMIDS + 1] {0}; // list is zero terminated!
     cHlCiHandler(int Fd, int NumSlots);
-    int CommHL(unsigned tag, unsigned function, struct ca_msg *msg);
+    int CommHL(unsigned tag, unsigned function, struct ca_msg *msg) const;
     int GetData(unsigned tag, struct ca_msg *msg);
     int SendData(unsigned tag, struct ca_msg *msg);
   public:
-    virtual ~cHlCiHandler();
+    ~cHlCiHandler() override;
     int NumSlots(void) override // cCiHandler
         { return m_numSlots; }
     bool Process(void) override; // cCiHandler
@@ -225,13 +225,13 @@ class cHlCiHandler : public cCiHandler {
     bool SetCaPmt(cCiCaPmt &CaPmt);
     const unsigned short *GetCaSystemIds(int Slot) override; // cCiHandler
     bool SetCaPmt(cCiCaPmt &CaPmt, int Slot) override; // cCiHandler
-    bool Reset(int Slot);
+    bool Reset(int Slot) const;
     bool connected() const;
 };
 
 int tcp_listen(struct sockaddr_in *name,int sckt,unsigned long address=INADDR_ANY);
 int accept_tcp(int ip_sock,struct sockaddr_in *ip_name);
-int udp_listen(struct sockaddr_un *name,char const * const filename);
+int udp_listen(struct sockaddr_un *name,char const * filename);
 int accept_udp(int ip_sock,struct sockaddr_un *ip_name);
 
-#endif //__CI_H
+#endif // DVBCI_H

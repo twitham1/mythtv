@@ -1,10 +1,12 @@
 #ifndef CDRIP_H_
 #define CDRIP_H_
 
+#include <utility>
+
 // qt
+#include <QCoreApplication>
 #include <QEvent>
 #include <QVector>
-#include <QCoreApplication>
 
 // mythtv
 #include <musicmetadata.h>
@@ -45,13 +47,13 @@ class CDEjectorThread: public MThread
         Ripper    *m_parent {nullptr};
 };
 
-typedef struct
+struct RipTrack
 {
     MusicMetadata *metadata;
     bool           active;
     int            length;
     bool           isNew;
-} RipTrack;
+};
 
 Q_DECLARE_METATYPE(RipTrack *)
 
@@ -64,7 +66,7 @@ class CDRipperThread: public MThread
     public:
         CDRipperThread(RipStatus *parent,  QString device,
                        QVector<RipTrack*> *tracks, int quality);
-        ~CDRipperThread();
+        ~CDRipperThread() override;
 
         void cancel(void);
 
@@ -72,11 +74,11 @@ class CDRipperThread: public MThread
         void run(void) override; // MThread
         int ripTrack(QString &cddevice, Encoder *encoder, int tracknum);
 
-        bool isCancelled(void);
+        bool isCancelled(void) const;
 
         RipStatus         *m_parent           {nullptr};
         bool               m_quit             {false};
-        QString            m_CDdevice;
+        QString            m_cdDevice;
         int                m_quality;
         QVector<RipTrack*> *m_tracks          {nullptr};
 
@@ -95,13 +97,13 @@ class Ripper : public MythScreenType
     Q_OBJECT
   public:
     Ripper(MythScreenStack *parent, QString device);
-   ~Ripper(void);
+   ~Ripper(void) override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
-    void customEvent(QEvent *) override; // MythUIType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
+    void customEvent(QEvent *event) override; // MythUIType
 
-    bool somethingWasRipped();
+    bool somethingWasRipped() const;
     void scanCD(void);
     void ejectCD(void);
 
@@ -124,8 +126,8 @@ class Ripper : public MythScreenType
     void setAlbum(const QString& album);
     void setGenre(const QString& genre);
     void RipComplete(bool result);
-    void toggleTrackActive(MythUIButtonListItem *);
-    void showEditMetadataDialog(MythUIButtonListItem *);
+    void toggleTrackActive(MythUIButtonListItem *item);
+    void showEditMetadataDialog(MythUIButtonListItem *item);
     void EjectFinished(void);
     void ScanFinished(void);
     void metadataChanged(void);
@@ -141,8 +143,8 @@ class Ripper : public MythScreenType
     void deleteAllExistingTracks(void);
     void updateTrackList(void);
     void updateTrackLengths(void);
-    void toggleTrackActive(RipTrack *);
-    void ShowConflictMenu(RipTrack *);
+    void toggleTrackActive(RipTrack *track);
+    void ShowConflictMenu(RipTrack *track);
 
     QString             m_musicStorageDir;
 
@@ -167,12 +169,15 @@ class Ripper : public MythScreenType
 
     QVector<RipTrack*> *m_tracks             {nullptr};
 
-    QString            m_albumName, m_artistName, m_genreName, m_year;
+    QString            m_albumName;
+    QString            m_artistName;
+    QString            m_genreName;
+    QString            m_year;
     QStringList        m_searchList;
     bool               m_somethingwasripped  {false};
     bool               m_mediaMonitorActive  {false};
 
-    QString            m_CDdevice;
+    QString            m_cdDevice;
 
     CDEjectorThread   *m_ejectThread         {nullptr};
     CDScannerThread   *m_scanThread          {nullptr};
@@ -184,9 +189,9 @@ class RipStatusEvent : public QEvent
   public:
     RipStatusEvent(Type type, int val) :
         QEvent(type), m_text(""), m_value(val) {}
-    RipStatusEvent(Type type, const QString &val) :
-        QEvent(type), m_text(val) {}
-    ~RipStatusEvent() = default;
+    RipStatusEvent(Type type, QString val) :
+        QEvent(type), m_text(std::move(val)) {}
+    ~RipStatusEvent() override = default;
 
     QString m_text;
     int     m_value {-1};
@@ -210,14 +215,14 @@ class RipStatus : public MythScreenType
 {
   Q_OBJECT
   public:
-    RipStatus(MythScreenStack *parent, const QString &device,
+    RipStatus(MythScreenStack *parent, QString device,
               QVector<RipTrack*> *tracks, int quality)
         : MythScreenType(parent, "ripstatus"), m_tracks(tracks),
-          m_quality(quality), m_CDdevice(device) {}
-    ~RipStatus(void);
+          m_quality(quality), m_cdDevice(std::move(device)) {}
+    ~RipStatus(void) override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
   signals:
     void Result(bool);
@@ -230,7 +235,7 @@ class RipStatus : public MythScreenType
 
     QVector<RipTrack*> *m_tracks         {nullptr};
     int                m_quality;
-    QString            m_CDdevice;
+    QString            m_cdDevice;
 
     MythUIText        *m_overallText     {nullptr};
     MythUIText        *m_trackText       {nullptr};

@@ -45,12 +45,13 @@ extern Scheduler   *sched;
 //
 /////////////////////////////////////////////////////////////////////////////
 
-DTC::ProgramGuide *Guide::GetProgramGuide( const QDateTime &rawStartTime ,
-                                           const QDateTime &rawEndTime   ,
+DTC::ProgramGuide *Guide::GetProgramGuide( const QDateTime &rawStartTime,
+                                           const QDateTime &rawEndTime,
                                            bool             bDetails,
                                            int              nChannelGroupId,
                                            int              nStartIndex,
-                                           int              nCount)
+                                           int              nCount,
+                                           bool             bWithInvisible)
 {
     if (!rawStartTime.isValid())
         throw QString( "StartTime is invalid" );
@@ -76,7 +77,8 @@ DTC::ProgramGuide *Guide::GetProgramGuide( const QDateTime &rawStartTime ,
 
     uint nTotalAvailable = 0;
     ChannelInfoList chanList = ChannelUtil::LoadChannels(nStartIndex, nCount,
-                                                         nTotalAvailable, true,
+                                                         nTotalAvailable,
+                                                         !bWithInvisible,
                                                          ChannelUtil::kChanOrderByChanNum,
                                                          ChannelUtil::kChanGroupByCallsign,
                                                          0,
@@ -112,7 +114,7 @@ DTC::ProgramGuide *Guide::GetProgramGuide( const QDateTime &rawStartTime ,
 
     // NOTE: Fetching this information directly from the schedule is
     //       significantly faster than using ProgramInfo::LoadFromScheduler()
-    Scheduler *scheduler = dynamic_cast<Scheduler*>(gCoreContext->GetScheduler());
+    auto *scheduler = dynamic_cast<Scheduler*>(gCoreContext->GetScheduler());
     if (scheduler)
         scheduler->GetAllPending(schedList);
 
@@ -120,7 +122,7 @@ DTC::ProgramGuide *Guide::GetProgramGuide( const QDateTime &rawStartTime ,
     // Build Response
     // ----------------------------------------------------------------------
 
-    DTC::ProgramGuide *pGuide = new DTC::ProgramGuide();
+    auto *pGuide = new DTC::ProgramGuide();
 
     ChannelInfoList::iterator chan_it;
     for (chan_it = chanList.begin(); chan_it != chanList.end(); ++chan_it)
@@ -131,7 +133,7 @@ DTC::ProgramGuide *Guide::GetProgramGuide( const QDateTime &rawStartTime ,
 
         // Load the list of programmes for this channel
         ProgramList  progList;
-        bindings[":CHANID"] = (*chan_it).m_chanid;
+        bindings[":CHANID"] = (*chan_it).m_chanId;
         LoadFromProgram( progList, sWhere, sOrderBy, sOrderBy, bindings,
                          schedList );
 
@@ -177,7 +179,8 @@ DTC::ProgramList* Guide::GetProgramList(int              nStartIndex,
                                         bool bOnlyNew,
                                         bool bDetails,
                                         const QString   &sSort,
-                                        bool             bDescending)
+                                        bool             bDescending,
+                                        bool             bWithInvisible)
 {
     if (!rawStartTime.isNull() && !rawStartTime.isValid())
         throw QString( "StartTime is invalid" );
@@ -217,11 +220,18 @@ DTC::ProgramList* Guide::GetProgramList(int              nStartIndex,
         sSQL = "WHERE ";
 
     if (bOnlyNew)
+    {
         sSQL = "LEFT JOIN oldprogram ON oldprogram.oldtitle = program.title "
                 + sSQL
                 + "oldprogram.oldtitle IS NULL AND ";
+    }
 
-    sSQL += "visible != 0 AND program.manualid = 0 "; // Exclude programmes created purely for 'manual' recording schedules
+    sSQL += "deleted IS NULL AND ";
+
+    if (!bWithInvisible)
+        sSQL += "visible > 0 AND ";
+
+    sSQL += "program.manualid = 0 "; // Exclude programmes created purely for 'manual' recording schedules
 
     if (nChanId < 0)
         nChanId = 0;
@@ -269,7 +279,7 @@ DTC::ProgramList* Guide::GetProgramList(int              nStartIndex,
     }
 
     if (sSort == "starttime")
-        sSQL += "ORDER BY program.starttime ";
+        sSQL += "ORDER BY program.starttime ";        // NOLINT(bugprone-branch-clone)
     else if (sSort == "title")
         sSQL += "ORDER BY program.title ";
     else if (sSort == "channel")
@@ -290,7 +300,7 @@ DTC::ProgramList* Guide::GetProgramList(int              nStartIndex,
 
     // NOTE: Fetching this information directly from the schedule is
     //       significantly faster than using ProgramInfo::LoadFromScheduler()
-    Scheduler *scheduler = dynamic_cast<Scheduler*>(gCoreContext->GetScheduler());
+    auto *scheduler = dynamic_cast<Scheduler*>(gCoreContext->GetScheduler());
     if (scheduler)
         scheduler->GetAllPending(schedList);
 
@@ -304,7 +314,7 @@ DTC::ProgramList* Guide::GetProgramList(int              nStartIndex,
     // Build Response
     // ----------------------------------------------------------------------
 
-    DTC::ProgramList *pPrograms = new DTC::ProgramList();
+    auto *pPrograms = new DTC::ProgramList();
 
     nCount        = (int)progList.size();
     int nEndIndex = (int)progList.size();
@@ -351,7 +361,7 @@ DTC::Program* Guide::GetProgramDetails( int              nChanId,
 
     // Build Response
 
-    DTC::Program *pProgram = new DTC::Program();
+    auto *pProgram = new DTC::Program();
     ProgramInfo  *pInfo    = LoadProgramFromProgram(nChanId, dtStartTime);
 
     FillProgramInfo( pProgram, pInfo, true, true, true );
@@ -439,7 +449,7 @@ QFileInfo Guide::GetChannelIcon( int nChanId,
         return QFileInfo();
     }
 
-    QImage *pImage = new QImage( sFullFileName );
+    auto *pImage = new QImage( sFullFileName );
 
     if (!pImage)
     {
@@ -493,7 +503,7 @@ QFileInfo Guide::GetChannelIcon( int nChanId,
 DTC::ChannelGroupList* Guide::GetChannelGroupList( bool bIncludeEmpty )
 {
     ChannelGroupList list = ChannelGroup::GetChannelGroups(bIncludeEmpty);
-    DTC::ChannelGroupList *pGroupList = new DTC::ChannelGroupList();
+    auto *pGroupList = new DTC::ChannelGroupList();
 
     ChannelGroupList::iterator it;
     for (it = list.begin(); it < list.end(); ++it)

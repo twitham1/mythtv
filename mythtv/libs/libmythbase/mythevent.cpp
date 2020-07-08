@@ -26,3 +26,9 @@ QEvent::Type MythEvent::kEnableUDPListenerEventType =
     (QEvent::Type) QEvent::registerEventType();
 QEvent::Type ExternalKeycodeEvent::kEventType =
     (QEvent::Type) QEvent::registerEventType();
+
+// Force this class to have a vtable so that dynamic_cast works.
+// NOLINTNEXTLINE(modernize-use-equals-default)
+MythEvent::~MythEvent()
+{
+}

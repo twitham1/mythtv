@@ -170,7 +170,7 @@ class META_PUBLIC MetaIO
     */
     static MusicMetadata *getMetadata(const QString &filename);
 
-    static const QString ValidFileExtensions;
+    static const QString kValidFileExtensions;
 
   protected:
     void saveTimeStamps(void);
@@ -181,7 +181,7 @@ class META_PUBLIC MetaIO
     QString m_filename;
     QString m_filenameFormat;
 
-    struct stat m_fileinfo;
+    struct stat m_fileinfo {};
 };
 
 #endif

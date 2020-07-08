@@ -21,12 +21,6 @@ extern "C" {
 
 using namespace commDetector2;
 
-PGMConverter::PGMConverter(void)
-{
-    memset(&m_pgm, 0, sizeof(m_pgm));
-    memset(&m_convert_time, 0, sizeof(m_convert_time));
-}
-
 PGMConverter::~PGMConverter(void)
 {
     m_width = -1;
@@ -41,8 +35,8 @@ int
 PGMConverter::MythPlayerInited(const MythPlayer *player)
 {
 #ifdef PGM_CONVERT_GREYSCALE
-    m_time_reported = false;
-    memset(&m_convert_time, 0, sizeof(m_convert_time));
+    m_timeReported = false;
+    memset(&m_convertTime, 0, sizeof(m_convertTime));
 #endif /* PGM_CONVERT_GREYSCALE */
 
     if (m_width != -1)
@@ -79,10 +73,12 @@ PGMConverter::getImage(const VideoFrame *frame, long long _frameno,
         int *pwidth, int *pheight)
 {
 #ifdef PGM_CONVERT_GREYSCALE
-    struct timeval      start, end, elapsed;
+    struct timeval      start {};
+    struct timeval      end {};
+    struct timeval      elapsed {};
 #endif /* PGM_CONVERT_GREYSCALE */
 
-    if (m_frameno == _frameno)
+    if (m_frameNo == _frameno)
         goto out;
 
     if (!frame->buf)
@@ -97,7 +93,7 @@ PGMConverter::getImage(const VideoFrame *frame, long long _frameno,
         goto error;
     (void)gettimeofday(&end, nullptr);
     timersub(&end, &start, &elapsed);
-    timeradd(&m_convert_time, &elapsed, &m_convert_time);
+    timeradd(&m_convertTime, &elapsed, &m_convertTime);
 #else  /* !PGM_CONVERT_GREYSCALE */
     if (av_image_fill_arrays(m_pgm.data, m_pgm.linesize,
         frame->buf, AV_PIX_FMT_GRAY8, m_width, m_height,IMAGE_ALIGN) < 0)
@@ -109,7 +105,7 @@ PGMConverter::getImage(const VideoFrame *frame, long long _frameno,
     }
 #endif /* !PGM_CONVERT_GREYSCALE */
 
-    m_frameno = _frameno;
+    m_frameNo = _frameno;
 
 out:
     *pwidth = m_width;
@@ -124,11 +120,11 @@ int
 PGMConverter::reportTime(void)
 {
 #ifdef PGM_CONVERT_GREYSCALE
-    if (!m_time_reported)
+    if (!m_timeReported)
     {
         LOG(VB_COMMFLAG, LOG_INFO, QString("PGM Time: convert=%1s")
-                .arg(strftimeval(&m_convert_time)));
-        m_time_reported = true;
+                .arg(strftimeval(&m_convertTime)));
+        m_timeReported = true;
     }
 #endif /* PGM_CONVERT_GREYSCALE */
     return 0;

@@ -11,8 +11,8 @@
 
 extern "C" {
 #include "libavcodec/avcodec.h"
-#include "pink.h"
 }
+#include "pink.h"
 
 #define LOC QString("AOUtil: ")
 
@@ -102,7 +102,7 @@ void AudioOutputUtil::AdjustVolume(void *buf, int len, int volume,
                                    bool music, bool upmix)
 {
     float g     = volume / 100.0F;
-    float *fptr = (float *)buf;
+    auto *fptr  = (float *)buf;
     int samples = len >> 2;
     int i       = 0;
 
@@ -156,7 +156,7 @@ void AudioOutputUtil::AdjustVolume(void *buf, int len, int volume,
 }
 
 template <class AudioDataType>
-void _MuteChannel(AudioDataType *buffer, int channels, int ch, int frames)
+void tMuteChannel(AudioDataType *buffer, int channels, int ch, int frames)
 {
     AudioDataType *s1 = buffer + ch;
     AudioDataType *s2 = buffer - ch + 1;
@@ -181,11 +181,11 @@ void AudioOutputUtil::MuteChannel(int obits, int channels, int ch,
     int frames = bytes / ((obits >> 3) * channels);
 
     if (obits == 8)
-        _MuteChannel((uchar *)buffer, channels, ch, frames);
+        tMuteChannel((uchar *)buffer, channels, ch, frames);
     else if (obits == 16)
-        _MuteChannel((short *)buffer, channels, ch, frames);
+        tMuteChannel((short *)buffer, channels, ch, frames);
     else
-        _MuteChannel((int *)buffer, channels, ch, frames);
+        tMuteChannel((int *)buffer, channels, ch, frames);
 }
 
 #if HAVE_BIGENDIAN
@@ -199,14 +199,12 @@ void AudioOutputUtil::MuteChannel(int obits, int channels, int ch,
 char *AudioOutputUtil::GeneratePinkFrames(char *frames, int channels,
                                           int channel, int count, int bits)
 {
-    pink_noise_t pink;
+    pink_noise_t pink{};
 
-    initialize_pink_noise(&pink, bits);
+    initialize_pink_noise(&pink);
 
-    double   res;
-    int32_t  ires;
-    int16_t *samp16 = (int16_t*) frames;
-    int32_t *samp32 = (int32_t*) frames;
+    auto *samp16 = (int16_t*) frames;
+    auto *samp32 = (int32_t*) frames;
 
     while (count-- > 0)
     {
@@ -214,8 +212,10 @@ char *AudioOutputUtil::GeneratePinkFrames(char *frames, int channels,
         {
             if (chn==channel)
             {
-                res = generate_pink_noise_sample(&pink) * 0x03fffffff; /* Don't use MAX volume */
-                ires = res;
+                /* Don't use MAX volume */
+                double res = generate_pink_noise_sample(&pink) *
+                    static_cast<float>(0x03fffffff);
+                int32_t ires = res;
                 if (bits == 16)
                     *samp16++ = LE_SHORT(ires >> 16);
                 else
@@ -246,8 +246,6 @@ int AudioOutputUtil::DecodeAudio(AVCodecContext *ctx,
 {
     MythAVFrame frame;
     bool got_frame = false;
-    int ret;
-    char error[AV_ERROR_MAX_STRING_SIZE];
 
     data_size = 0;
     if (!frame)
@@ -261,7 +259,7 @@ int AudioOutputUtil::DecodeAudio(AVCodecContext *ctx,
 //  into separate routines or separate threads.
 //  Also now that it always consumes a whole buffer some code
 //  in the caller may be able to be optimized.
-    ret = avcodec_receive_frame(ctx,frame);
+    int ret = avcodec_receive_frame(ctx,frame);
     if (ret == 0)
         got_frame = true;
     if (ret == AVERROR(EAGAIN))
@@ -272,9 +270,10 @@ int AudioOutputUtil::DecodeAudio(AVCodecContext *ctx,
         ret = 0;
     else if (ret < 0)
     {
+        std::string error;
         LOG(VB_AUDIO, LOG_ERR, LOC +
             QString("audio decode error: %1 (%2)")
-            .arg(av_make_error_string(error, sizeof(error), ret))
+            .arg(av_make_error_stdstring(error, ret))
             .arg(got_frame));
         return ret;
     }
@@ -288,7 +287,7 @@ int AudioOutputUtil::DecodeAudio(AVCodecContext *ctx,
         return ret;
     }
 
-    AVSampleFormat format = (AVSampleFormat)frame->format;
+    auto format = (AVSampleFormat)frame->format;
 
     data_size = frame->nb_samples * frame->channels * av_get_bytes_per_sample(format);
 

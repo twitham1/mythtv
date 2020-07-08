@@ -59,8 +59,8 @@ class UPNP_PUBLIC SubscriberInfo
             return m_nKey;
         }
 
-        TaskTime            m_ttExpires;
-        TaskTime            m_ttLastNotified;
+        TaskTime            m_ttExpires      {};
+        TaskTime            m_ttLastNotified {};
 
         QString             m_sUUID;
         QUrl                m_qURL;
@@ -84,7 +84,7 @@ class UPNP_PUBLIC SubscriberInfo
 
 //////////////////////////////////////////////////////////////////////////////
 
-typedef QMap<QString,SubscriberInfo*> Subscribers;
+using Subscribers = QMap<QString,SubscriberInfo*>;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -96,7 +96,7 @@ class UPNP_PUBLIC  StateVariableBase
 
         bool        m_bNotify;
         QString     m_sName;
-        TaskTime    m_ttLastChanged;
+        TaskTime    m_ttLastChanged {};
 
     public:
 
@@ -124,7 +124,7 @@ class UPNP_PUBLIC  StateVariable : public StateVariableBase
 
         // ------------------------------------------------------------------
 
-        StateVariable( const QString &sName, bool bNotify = false ) : StateVariableBase( sName, bNotify ), m_value( T( ) )
+        explicit StateVariable( const QString &sName, bool bNotify = false ) : StateVariableBase( sName, bNotify ), m_value( T( ) )
         {
         }
 
@@ -163,16 +163,16 @@ class UPNP_PUBLIC  StateVariable : public StateVariableBase
 //////////////////////////////////////////////////////////////////////////////
 
 template<typename T>
-inline T state_var_init(const T*) { return (T)(0); }
+inline T state_var_init(const T */*unused*/) { return (T)(0); }
 template<>
-inline QString state_var_init(const QString*) { return QString(); }
+inline QString state_var_init(const QString */*unused*/) { return QString(); }
 
 class UPNP_PUBLIC StateVariables
 {
     protected:
 
         virtual void Notify() = 0;
-        typedef QMap<QString, StateVariableBase*> SVMap;
+        using SVMap = QMap<QString, StateVariableBase*>;
         SVMap m_map;
     public:
 
@@ -181,9 +181,8 @@ class UPNP_PUBLIC StateVariables
         StateVariables() = default;
         virtual ~StateVariables()
         {
-            SVMap::iterator it = m_map.begin();
-            for (; it != m_map.end(); ++it)
-                delete *it;
+            for (const auto *it : qAsConst(m_map))
+                delete it;
             m_map.clear();
         }
 
@@ -203,8 +202,7 @@ class UPNP_PUBLIC StateVariables
             if (it == m_map.end())
                 return false;
 
-            StateVariable< T > *pVariable =
-                dynamic_cast< StateVariable< T > *>( *it );
+            auto *pVariable = dynamic_cast< StateVariable< T > *>( *it );
 
             if (pVariable == nullptr)
                 return false;           // It's not the expected type.
@@ -230,8 +228,7 @@ class UPNP_PUBLIC StateVariables
             if (it == m_map.end())
                 return state_var_init(dummy);
 
-            StateVariable< T > *pVariable =
-                dynamic_cast< StateVariable< T > *>( *it );
+            auto *pVariable = dynamic_cast< StateVariable< T > *>( *it );
 
             if (pVariable != nullptr)
                 return pVariable->GetValue();
@@ -283,9 +280,9 @@ class UPNP_PUBLIC  Eventing : public HttpServerExtension,
 
     public:
                  Eventing      ( const QString &sExtensionName,
-                                 const QString &sEventMethodName,
+                                 QString sEventMethodName,
                                  const QString &sSharePath );
-        virtual ~Eventing      ( );
+        ~Eventing ( ) override;
 
         QStringList GetBasePaths() override; // HttpServerExtension
 

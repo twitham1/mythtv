@@ -27,8 +27,8 @@
  *
  */
 
-#ifndef _PANE_DVB_UTILS_IMPORT_H_
-#define _PANE_DVB_UTILS_IMPORT_H_
+#ifndef PANE_DVB_UTILS_IMPORT_H
+#define PANE_DVB_UTILS_IMPORT_H
 
 // Qt headers
 #include <QString>
@@ -43,21 +43,21 @@ class PaneDVBUtilsImport : public GroupSetting
   public:
     PaneDVBUtilsImport() :
         m_filename(new TransTextEditSetting()),
-        m_ignore_signal_timeout(new IgnoreSignalTimeout())
+        m_ignoreSignalTimeout(new IgnoreSignalTimeout())
     {
         m_filename->setLabel(tr("File location"));
         m_filename->setHelpText(tr("Location of the channels.conf file."));
         addChild(m_filename);
-        addChild(m_ignore_signal_timeout);
+        addChild(m_ignoreSignalTimeout);
     }
 
     QString GetFilename(void)   const { return m_filename->getValue();    }
     bool DoIgnoreSignalTimeout(void) const
-        { return m_ignore_signal_timeout->getValue().toInt(); }
+        { return m_ignoreSignalTimeout->getValue().toInt() != 0; }
 
   private:
     TransTextEditSetting    *m_filename              {nullptr};
-    IgnoreSignalTimeout     *m_ignore_signal_timeout {nullptr};
+    IgnoreSignalTimeout     *m_ignoreSignalTimeout   {nullptr};
 };
 
-#endif // _PANE_DVB_UTILS_IMPORT_H_
+#endif // PANE_DVB_UTILS_IMPORT_H

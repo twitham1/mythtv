@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef _MULTICAST_SOCKET_DEVICE_H_
-#define _MULTICAST_SOCKET_DEVICE_H_
+#ifndef MULTICAST_SOCKET_DEVICE_H
+#define MULTICAST_SOCKET_DEVICE_H
 
 #ifdef __FreeBSD__
 #  include <sys/types.h>
@@ -49,17 +49,12 @@ class MMulticastSocketDevice : public MSocketDevice
   public:
     MMulticastSocketDevice() :
         MSocketDevice(MSocketDevice::Datagram),
-        m_local_addresses(QNetworkInterface::allAddresses()),
-        m_port(0)
-    {
-        memset(&m_imr, 0, sizeof(struct ip_mreq));
-    }
-
+        m_localAddresses(QNetworkInterface::allAddresses()) {}
     MMulticastSocketDevice(const QString& sAddress, quint16 nPort, u_char ttl = 0);
 
-    virtual ~MMulticastSocketDevice();
+    ~MMulticastSocketDevice() override;
 
-    virtual qint64 writeBlock(
+    qint64 writeBlock(
         const char *data, quint64 len,
         const QHostAddress & host, quint16 port) override; // MSocketDevice
 
@@ -69,10 +64,10 @@ class MMulticastSocketDevice : public MSocketDevice
         { return m_port; }
 
   private:
-    QList<QHostAddress> m_local_addresses;
+    QList<QHostAddress> m_localAddresses;
     QHostAddress        m_address;
-    quint16             m_port;
-    struct ip_mreq      m_imr;
+    quint16             m_port {0};
+    struct ip_mreq      m_imr {};
 };
 
-#endif // _MULTICAST_SOCKET_DEVICE_H_
+#endif // MULTICAST_SOCKET_DEVICE_H

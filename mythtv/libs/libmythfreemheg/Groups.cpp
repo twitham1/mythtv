@@ -89,7 +89,7 @@ void MHGroup::Initialise(MHParseNode *p, MHEngine *engine)
 
     if (pItems == nullptr)
     {
-        p->Failure("Missing :Items block");
+        MHParseNode::Failure("Missing :Items block");
         return;
     }
 
@@ -205,8 +205,8 @@ void MHGroup::Initialise(MHParseNode *p, MHEngine *engine)
         catch (...)
         {
             MHLOG(MHLogError, "ERROR in MHGroup::Initialise ingredient");
-            if (pIngredient && __mhlogStream)
-                pIngredient->PrintMe(__mhlogStream, 0);
+            if (pIngredient && gMHLogStream)
+                pIngredient->PrintMe(gMHLogStream, 0);
 
             delete(pIngredient);
             throw;
@@ -296,8 +296,8 @@ void MHGroup::Activation(MHEngine *engine)
     }
 
     m_fRunning = true;
-    // Record the time here.  This is the basis for absolute times.
-    m_StartTime.start();
+    // Start the timer here.  This is the basis for expiration..
+    m_RunTime.start();
     // Don't generate IsRunning here - that's done by the sub-classes.
 }
 
@@ -363,25 +363,23 @@ void MHGroup::SetTimer(int nTimerId, bool fAbsolute, int nMilliSecs, MHEngine * 
     }
 
     // If the time has passed we don't set up a timer.
-    QTime currentTime;
-    currentTime.start(); // Set current time
-
-    if (nMilliSecs < 0 || (fAbsolute && m_StartTime.addMSecs(nMilliSecs) < currentTime))
+    if (nMilliSecs < 0 || (fAbsolute && m_RunTime.hasExpired(nMilliSecs)))
     {
         return;
     }
 
-    MHTimer *pTimer = new MHTimer;
+    auto *pTimer = new MHTimer;
     m_Timers.append(pTimer);
     pTimer->m_nTimerId = nTimerId;
 
     if (fAbsolute)
     {
-        pTimer->m_Time = m_StartTime.addMSecs(nMilliSecs);
+        QTime startTime = QTime::currentTime().addMSecs(-m_RunTime.elapsed());
+        pTimer->m_Time = startTime.addMSecs(nMilliSecs);
     }
     else
     {
-        pTimer->m_Time = currentTime.addMSecs(nMilliSecs);
+        pTimer->m_Time = QTime::currentTime().addMSecs(nMilliSecs);
     }
 }
 
@@ -390,12 +388,11 @@ int MHGroup::CheckTimers(MHEngine *engine)
 {
     QTime currentTime = QTime::currentTime(); // Get current time
     QList<MHTimer *>::iterator it = m_Timers.begin();
-    MHTimer *pTimer;
     int nMSecs = 0;
 
     while (it != m_Timers.end())
     {
-        pTimer = *it;
+        MHTimer *pTimer = *it;
 
         if (pTimer->m_Time <= currentTime)   // Use <= rather than < here so we fire timers with zero time immediately.
         {
@@ -834,7 +831,8 @@ void MHSendEvent::PrintArgs(FILE *fd, int /*nTabs*/) const
 void MHSendEvent::Perform(MHEngine *engine)
 {
     // The target is always the current scene so we ignore it here.
-    MHObjectRef target, source;
+    MHObjectRef target;
+    MHObjectRef source;
     m_Target.GetValue(target, engine); // TODO: Check this is the scene?
     m_EventSource.GetValue(source, engine);
 
@@ -921,7 +919,7 @@ void MHPersistent::Initialise(MHParseNode *p, MHEngine *engine)
 
     for (int i = 0; i < pVarSeq->GetSeqCount(); i++)
     {
-        MHObjectRef *pVar = new MHObjectRef;
+        auto *pVar = new MHObjectRef;
         m_Variables.Append(pVar);
         pVar->Initialise(pVarSeq->GetSeqN(i), engine);
     }

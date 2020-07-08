@@ -55,6 +55,7 @@
 #include "mythtimezone.h"
 #include "signalhandling.h"
 #include "hardwareprofile.h"
+#include "eitcache.h"
 
 #include "mediaserver.h"
 #include "httpstatus.h"
@@ -156,6 +157,7 @@ bool setupTVs(bool ismaster, bool &error)
 
     QWriteLocker tvlocker(&TVRec::s_inputsLock);
 
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
     for (size_t i = 0; i < cardids.size(); i++)
     {
         if (hosts[i] == localhostname) {
@@ -178,7 +180,7 @@ bool setupTVs(bool ismaster, bool &error)
                 TVRec *tv = TVRec::GetTVRec(cardid);
                 if (tv && tv->Init())
                 {
-                    EncoderLink *enc = new EncoderLink(cardid, tv);
+                    auto *enc = new EncoderLink(cardid, tv);
                     tvList[cardid] = enc;
                 }
                 else
@@ -199,7 +201,7 @@ bool setupTVs(bool ismaster, bool &error)
                 TVRec *tv = TVRec::GetTVRec(cardid);
                 if (tv && tv->Init())
                 {
-                    EncoderLink *enc = new EncoderLink(cardid, tv);
+                    auto *enc = new EncoderLink(cardid, tv);
                     tvList[cardid] = enc;
                 }
                 else
@@ -211,7 +213,7 @@ bool setupTVs(bool ismaster, bool &error)
             }
             else
             {
-                EncoderLink *enc = new EncoderLink(cardid, nullptr, host);
+                auto *enc = new EncoderLink(cardid, nullptr, host);
                 tvList[cardid] = enc;
             }
         }
@@ -302,9 +304,11 @@ int handle_command(const MythBackendCommandLineParser &cmdline)
     if (cmdline.toBool("event"))
         eventString = cmdline.toString("event");
     else if (cmdline.toBool("systemevent"))
+    {
         eventString = "SYSTEM_EVENT " +
                       cmdline.toString("systemevent") +
                       QString(" SENDER %1").arg(gCoreContext->GetHostName());
+    }
 
     if (!eventString.isEmpty())
     {
@@ -366,7 +370,7 @@ int handle_command(const MythBackendCommandLineParser &cmdline)
     if (cmdline.toBool("printsched") ||
         cmdline.toBool("testsched"))
     {
-        Scheduler *sched = new Scheduler(false, &tvList);
+        auto *sched = new Scheduler(false, &tvList);
         if (cmdline.toBool("printsched"))
         {
             if (!gCoreContext->ConnectToMasterServer())
@@ -441,10 +445,10 @@ using namespace MythTZ;
 
 int connect_to_master(void)
 {
-    MythSocket *tempMonitorConnection = new MythSocket();
+    auto *tempMonitorConnection = new MythSocket();
     if (tempMonitorConnection->ConnectToHost(
             gCoreContext->GetMasterServerIP(),
-            gCoreContext->GetMasterServerPort()))
+            MythCoreContext::GetMasterServerPort()))
     {
         if (!gCoreContext->CheckProtoVersion(tempMonitorConnection))
         {
@@ -606,6 +610,11 @@ int run_backend(MythBackendCommandLineParser &cmdline)
         LOG(VB_GENERAL, LOG_NOTICE, LOC + "Running as a slave backend.");
     }
 
+   if (ismaster)
+    {
+        EITCache::ClearChannelLocks();
+    }
+
     print_warnings(cmdline);
 
     bool fatal_error = false;
@@ -622,7 +631,10 @@ int run_backend(MythBackendCommandLineParser &cmdline)
             sched = new Scheduler(true, &tvList);
             int err = sched->GetError();
             if (err)
+            {
+                delete sched;
                 return err;
+            }
 
             if (cmdline.toBool("nosched"))
                 sched->DisableScheduling();

@@ -27,9 +27,9 @@ class MPUBLIC SchemaUpgradeWizard : public QObject, public DBUtil
     Q_OBJECT
 
   public:
-    SchemaUpgradeWizard(const QString &DBSchemaSetting, const QString &appName,
-                        const QString &upgradeSchemaVal);
-    ~SchemaUpgradeWizard();
+    SchemaUpgradeWizard(QString DBSchemaSetting, QString appName,
+                        QString upgradeSchemaVal);
+    ~SchemaUpgradeWizard() override;
 
 
     /// Call DBUtil::BackupDB(), and store results
@@ -46,11 +46,11 @@ class MPUBLIC SchemaUpgradeWizard : public QObject, public DBUtil
 
     /// Query user, to prevent silent, automatic database upgrades
     enum MythSchemaUpgrade PromptForUpgrade(const char *name,
-                                            const bool upgradeAllowed,
-                                            const bool upgradeIfNoUI,
-                                            const int  minDBMSmajor = 0,
-                                            const int  minDBMSminor = 0,
-                                            const int  minDBMSpoint = 0);
+                                            bool upgradeAllowed,
+                                            bool upgradeIfNoUI,
+                                            int  minDBMSmajor = 0,
+                                            int  minDBMSminor = 0,
+                                            int  minDBMSpoint = 0);
 
     QString m_DBver;               ///< Schema version in the database
     bool    m_emptyDB {false};     ///< Is the database currently empty?
@@ -60,7 +60,7 @@ class MPUBLIC SchemaUpgradeWizard : public QObject, public DBUtil
 
   private:
     void              BusyPopup(const QString &message);
-    MythSchemaUpgrade GuiPrompt(const QString &message,
+    static MythSchemaUpgrade GuiPrompt(const QString &message,
                                 bool upgradable, bool expert);
 
     bool              m_autoUpgrade {false};///< If no UI, always upgrade

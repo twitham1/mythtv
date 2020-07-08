@@ -1,14 +1,18 @@
-#ifndef _MYTHFONTMANAGER_H
-#define _MYTHFONTMANAGER_H
+#ifndef MYTHFONTMANAGER_H
+#define MYTHFONTMANAGER_H
 
+#include <utility>
+
+// Qt headers
 #include <QMultiHash>
 #include <QMutex>
 #include <QString>
 
+// MythTV headers
 #include "mythuiexp.h"
 
 class MythFontReference;
-typedef QMultiHash<QString, MythFontReference*> FontPathToReference;
+using FontPathToReference = QMultiHash<QString, MythFontReference*>;
 
 class MUI_PUBLIC MythFontManager
 {
@@ -27,7 +31,7 @@ class MUI_PUBLIC MythFontManager
                                 const QString &registeredFor);
     void LoadFontFile(const QString &fontPath, const QString &registeredFor);
     bool RegisterFont(const QString &fontPath, const QString &registeredFor,
-                      const int fontID = -1);
+                      int fontID = -1);
     bool IsFontFileLoaded(const QString &fontPath);
 
     QMutex m_lock;
@@ -40,9 +44,11 @@ MUI_PUBLIC MythFontManager *GetGlobalFontManager(void);
 class MythFontReference
 {
   public:
-    MythFontReference(const QString &fontPath, const QString &registeredFor,
+    MythFontReference(QString fontPath, QString registeredFor,
                       const int fontID)
-        : m_fontPath(fontPath), m_registeredFor(registeredFor), m_fontID(fontID) {}
+        : m_fontPath(std::move(fontPath)),
+          m_registeredFor(std::move(registeredFor)),
+          m_fontID(fontID) {}
 
     QString GetFontPath(void) const { return m_fontPath; }
     QString GetRegisteredFor(void) const { return m_registeredFor; }
@@ -54,6 +60,6 @@ class MythFontReference
     const int m_fontID;
 };
 
-#endif
+#endif // MYTHFONTMANAGER_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

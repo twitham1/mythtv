@@ -37,7 +37,7 @@ class SERVICE_PUBLIC VideoLookupList : public QObject
     Q_PROPERTY( QString      Version        READ Version         WRITE setVersion        )
     Q_PROPERTY( QString      ProtoVer       READ ProtoVer        WRITE setProtoVer       )
 
-    Q_PROPERTY( QVariantList VideoLookups READ VideoLookups DESIGNABLE true )
+    Q_PROPERTY( QVariantList VideoLookups READ VideoLookups )
 
     PROPERTYIMP       ( int         , Count           )
     PROPERTYIMP       ( QDateTime   , AsOf            )
@@ -71,7 +71,7 @@ class SERVICE_PUBLIC VideoLookupList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            VideoLookup *pObject = new VideoLookup( this );
+            auto *pObject = new VideoLookup( this );
             m_VideoLookups.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

@@ -89,7 +89,7 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
     // Check set if this can take focus
     bool CanTakeFocus(void) const;
     void SetCanTakeFocus(bool set = true);
-    void SetFocusOrder(int);
+    void SetFocusOrder(int order);
 
     bool IsEnabled(void) const { return m_Enabled; }
     void SetEnabled(bool enable);
@@ -177,7 +177,7 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
     QMap<QString, QString> GetDependsMap() const { return m_dependsMap; }
 
   protected:
-    virtual ~MythUIType();
+    ~MythUIType() override;
     void customEvent(QEvent *event) override; // QObject
 
   public slots:
@@ -212,10 +212,10 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
     void HandleAlphaPulse();
     void HandleMovementPulse();
 
-    int CalcAlpha(int alphamod);
+    int CalcAlpha(int alphamod) const;
 
-    int NormX(const int width);
-    int NormY(const int height);
+    static int NormX(int width);
+    static int NormY(int height);
 
     void ConnectDependants(bool recurse = false);
 

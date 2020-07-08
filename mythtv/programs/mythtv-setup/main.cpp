@@ -44,10 +44,8 @@
 #include "signalhandling.h"
 #include "mythmiscutil.h"
 #include "ssdp.h"
-#if CONFIG_DARWIN
-#include "mythuidefines.h"
-#endif
 #include "cleanupguard.h"
+#include "mythdisplay.h"
 
 using namespace std;
 
@@ -64,8 +62,6 @@ static void cleanup()
     delete gContext;
     gContext = nullptr;
 
-    delete qApp;
-
     SignalHandler::Done();
 }
 
@@ -76,9 +72,8 @@ static void SetupMenuCallback(void* /* data */, QString& selection)
     if (sel == "general")
     {
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-        StandardSettingDialog *ssd =
-            new StandardSettingDialog(mainStack, "generalsettings",
-                                      new BackendSettings());
+        auto *ssd = new StandardSettingDialog(mainStack, "generalsettings",
+                                              new BackendSettings());
 
         if (ssd->Create())
             mainStack->AddScreen(ssd);
@@ -88,9 +83,8 @@ static void SetupMenuCallback(void* /* data */, QString& selection)
     else if (sel == "capture cards")
     {
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-        StandardSettingDialog *ssd =
-            new StandardSettingDialog(mainStack, "capturecardeditor",
-                                      new CaptureCardEditor());
+        auto *ssd = new StandardSettingDialog(mainStack, "capturecardeditor",
+                                              new CaptureCardEditor());
 
         if (ssd->Create())
             mainStack->AddScreen(ssd);
@@ -100,8 +94,7 @@ static void SetupMenuCallback(void* /* data */, QString& selection)
     else if (sel == "video sources")
     {
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-        StandardSettingDialog *ssd =
-            new StandardSettingDialog(mainStack, "videosourceeditor",
+        auto *ssd = new StandardSettingDialog(mainStack, "videosourceeditor",
                new VideoSourceEditor());
         if (ssd->Create())
             mainStack->AddScreen(ssd);
@@ -111,9 +104,8 @@ static void SetupMenuCallback(void* /* data */, QString& selection)
     else if (sel == "card inputs")
     {
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-        StandardSettingDialog *ssd =
-            new StandardSettingDialog(mainStack, "cardinputeditor",
-                                      new CardInputEditor());
+        auto *ssd = new StandardSettingDialog(mainStack, "cardinputeditor",
+                                              new CardInputEditor());
 
         if (ssd->Create())
             mainStack->AddScreen(ssd);
@@ -123,9 +115,8 @@ static void SetupMenuCallback(void* /* data */, QString& selection)
     else if (sel == "recording profile")
     {
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-        StandardSettingDialog *ssd =
-            new StandardSettingDialog(mainStack, "recordingprofileeditor",
-                                      new ProfileGroupEditor());
+        auto *ssd = new StandardSettingDialog(mainStack, "recordingprofileeditor",
+                                              new ProfileGroupEditor());
 
         if (ssd->Create())
             mainStack->AddScreen(ssd);
@@ -136,7 +127,7 @@ static void SetupMenuCallback(void* /* data */, QString& selection)
     {
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-        ChannelEditor *chanedit = new ChannelEditor(mainStack);
+        auto *chanedit = new ChannelEditor(mainStack);
 
         if (chanedit->Create())
             mainStack->AddScreen(chanedit);
@@ -146,9 +137,8 @@ static void SetupMenuCallback(void* /* data */, QString& selection)
     else if (sel == "storage groups")
     {
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-        StandardSettingDialog *ssd =
-            new StandardSettingDialog(mainStack, "storagegroupeditor",
-                                      new StorageGroupListEditor());
+        auto *ssd = new StandardSettingDialog(mainStack, "storagegroupeditor",
+                                              new StorageGroupListEditor());
 
         if (ssd->Create())
             mainStack->AddScreen(ssd);
@@ -159,8 +149,7 @@ static void SetupMenuCallback(void* /* data */, QString& selection)
     {
         MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-        MythSystemEventEditor *msee = new MythSystemEventEditor(
-                                    mainStack, "System Event Editor");
+        auto *msee = new MythSystemEventEditor(mainStack, "System Event Editor");
 
         if (msee->Create())
             mainStack->AddScreen(msee);
@@ -216,11 +205,7 @@ static bool resetTheme(QString themedir, const QString &badtheme)
 
     MythTranslation::reload();
     GetMythUI()->LoadQtConfig();
-#if CONFIG_DARWIN
-    GetMythMainWindow()->Init(QT_PAINTER);
-#else
     GetMythMainWindow()->Init();
-#endif
     GetMythMainWindow()->ReinitDone();
 
     return RunMenu(themedir, themename);
@@ -247,14 +232,8 @@ static int reloadTheme(void)
     {
         menu->Close();
     }
-#if CONFIG_DARWIN
-    GetMythMainWindow()->Init(QT_PAINTER);
-#else
     GetMythMainWindow()->Init();
-#endif
-
     GetMythMainWindow()->ReinitDone();
-
     GetMythMainWindow()->SetEffectsEnabled(true);
 
     if (!RunMenu(themedir, themename) && !resetTheme(themedir, themename))
@@ -266,7 +245,6 @@ static int reloadTheme(void)
 int main(int argc, char *argv[])
 {
     QString geometry;
-    QString display;
     bool    doScan   = false;
     bool    doScanList = false;
     bool    doScanSaveOnly = false;
@@ -276,6 +254,8 @@ int main(int argc, char *argv[])
     bool    scanFTAOnly = false;
     bool    scanLCNOnly = false;
     bool    scanCompleteOnly = false;
+    bool    scanFullChannelSearch = false;
+    bool    scanRemoveDuplicates = false;
     bool    addFullTS = false;
     ServiceRequirements scanServiceRequirements = kRequireAV;
     uint    scanCardId = 0;
@@ -283,10 +263,6 @@ int main(int argc, char *argv[])
     QString modulation = "vsb8";
     QString region = "us";
     QString scanInputName = "";
-
-#if CONFIG_OMX_RPI
-    setenv("QT_XCB_GL_INTEGRATION","none",0);
-#endif
 
     MythTVSetupCommandLineParser cmdline;
     if (!cmdline.Parse(argc, argv))
@@ -303,31 +279,29 @@ int main(int argc, char *argv[])
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythTVSetupCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
 
-    bool quiet = false, use_display = true;
+    bool quiet = false;
+    bool use_display = true;
     if (cmdline.toBool("scan"))
     {
         quiet = true;
         use_display = false;
     }
 
+    std::unique_ptr<QCoreApplication> app {nullptr};
     CleanupGuard callCleanup(cleanup);
 
     if (use_display)
     {
-
-#ifdef Q_OS_MAC
-        // Without this, we can't set focus to any of the CheckBoxSetting, and most
-        // of the MythPushButton widgets, and they don't use the themed background.
-        QApplication::setDesktopSettingsAware(false);
-#endif
-        new QApplication(argc, argv);
+        MythDisplay::ConfigureQtGUI(1, cmdline.toString("display"));
+        app = std::make_unique<QApplication>(argc, argv);
     }
-    else {
-        new QCoreApplication(argc, argv);
+    else
+    {
+        app = std::make_unique<QCoreApplication>(argc, argv);
     }
     QCoreApplication::setApplicationName(MYTH_APPNAME_MYTHTV_SETUP);
 
@@ -342,14 +316,12 @@ int main(int argc, char *argv[])
     SignalHandler::SetHandler(SIGHUP, logSigHup);
 #endif
 
-    if (cmdline.toBool("display"))
-        display = cmdline.toString("display");
     if (cmdline.toBool("geometry"))
         geometry = cmdline.toString("geometry");
 
-    int retval;
     QString mask("general");
-    if ((retval = cmdline.ConfigureLogging(mask, quiet)) != GENERIC_EXIT_OK)
+    int retval = cmdline.ConfigureLogging(mask, quiet);
+    if (retval != GENERIC_EXIT_OK)
         return retval;
 
     if (cmdline.toBool("expert"))
@@ -369,6 +341,10 @@ int main(int argc, char *argv[])
         scanLCNOnly = true;
     if (cmdline.toBool("completeonly"))
         scanCompleteOnly = true;
+    if (cmdline.toBool("fullsearch"))
+        scanFullChannelSearch = true;
+    if (cmdline.toBool("removeduplicates"))
+        scanRemoveDuplicates = true;
     if (cmdline.toBool("addfullts"))
         addFullTS = true;
     if (cmdline.toBool("servicetype"))
@@ -403,11 +379,6 @@ int main(int argc, char *argv[])
         region = cmdline.toString("region").toLower();
     if (cmdline.toBool("inputname"))
         scanInputName = cmdline.toString("inputname");
-
-    if (!display.isEmpty())
-    {
-        MythUIHelper::SetX11Display(display);
-    }
 
     if (!geometry.isEmpty())
     {
@@ -467,14 +438,11 @@ int main(int argc, char *argv[])
                 return GENERIC_EXIT_INVALID_CMDLINE;
             }
             cerr << "Valid cards: " << endl;
-            for (size_t i = 0; i < cardids.size(); i++)
+            for (uint id : cardids)
             {
-                fprintf(stderr, "%5u: %s %s\n",
-                        cardids[i],
-                        CardUtil::GetRawInputType(cardids[i])
-                        .toLatin1().constData(),
-                        CardUtil::GetVideoDevice(cardids[i])
-                        .toLatin1().constData());
+                fprintf(stderr, "%5u: %s %s\n", id,
+                        CardUtil::GetRawInputType(id).toLatin1().constData(),
+                        CardUtil::GetVideoDevice(id).toLatin1().constData());
             }
             return GENERIC_EXIT_INVALID_CMDLINE;
         }
@@ -499,9 +467,9 @@ int main(int argc, char *argv[])
         {
             ChannelScannerCLI scanner(doScanSaveOnly, scanInteractive);
 
-            int scantype;
+            int scantype = ScanTypeSetting::FullScan_ATSC;
             if (frequencyStandard == "atsc")
-                scantype = ScanTypeSetting::FullScan_ATSC;
+                scantype = ScanTypeSetting::FullScan_ATSC; // NOLINT(bugprone-branch-clone)
             else if (frequencyStandard == "dvbt")
                 scantype = ScanTypeSetting::FullScan_DVBT;
             else if (frequencyStandard == "mpeg")
@@ -526,12 +494,14 @@ int main(int argc, char *argv[])
                          scanFTAOnly,
                          scanLCNOnly,
                          scanCompleteOnly,
+                         scanFullChannelSearch,
+                         scanRemoveDuplicates,
                          addFullTS,
                          scanServiceRequirements,
                          // stuff needed for particular scans
                          /* mplexid   */ 0,
                          startChan, frequencyStandard, modulation, region);
-            ret = qApp->exec();
+            ret = QCoreApplication::exec();
         }
         return (ret) ? GENERIC_EXIT_NOT_OK : GENERIC_EXIT_OK;
     }
@@ -541,12 +511,12 @@ int main(int argc, char *argv[])
         vector<ScanInfo> scans = LoadScanList();
 
         cout<<" scanid cardid sourceid processed        date"<<endl;
-        for (size_t i = 0; i < scans.size(); i++)
+        for (auto & scan : scans)
         {
             printf("%5i %6i %8i %8s    %20s\n",
-                   scans[i].m_scanid,   scans[i].m_cardid,
-                   scans[i].m_sourceid, (scans[i].m_processed) ? "yes" : "no",
-                   scans[i].m_scandate.toString(Qt::ISODate)
+                   scan.m_scanid,   scan.m_cardid,
+                   scan.m_sourceid, (scan.m_processed) ? "yes" : "no",
+                   scan.m_scandate.toString(Qt::ISODate)
                    .toLatin1().constData());
         }
         cout<<endl;
@@ -560,7 +530,11 @@ int main(int argc, char *argv[])
         {
             ScanDTVTransportList list = LoadScan(scanImport);
             ChannelImporter ci(false, true, true, true, false,
-                               scanFTAOnly, scanLCNOnly, scanCompleteOnly, scanServiceRequirements);
+                               scanFTAOnly, scanLCNOnly,
+                               scanCompleteOnly,
+                               scanFullChannelSearch,
+                               scanRemoveDuplicates,
+                               scanServiceRequirements);
             ci.Process(list);
         }
         cout<<"*** SCAN IMPORT END ***"<<endl;
@@ -579,11 +553,7 @@ int main(int argc, char *argv[])
     }
 
     MythMainWindow *mainWindow = GetMythMainWindow();
-#if CONFIG_DARWIN
-    mainWindow->Init(QT_PAINTER);
-#else
     mainWindow->Init();
-#endif
     mainWindow->setWindowTitle(QObject::tr("MythTV Setup"));
 
     // We must reload the translation after a language change and this
@@ -640,7 +610,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    qApp->exec();
+    QCoreApplication::exec();
 }
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

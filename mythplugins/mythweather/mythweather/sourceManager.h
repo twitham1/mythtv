@@ -1,5 +1,5 @@
-#ifndef _SOURCEMANAGER_H_
-#define _SOURCEMANAGER_H_
+#ifndef SOURCEMANAGER_H
+#define SOURCEMANAGER_H
 
 // QT headers
 #include <QDir>
@@ -13,7 +13,7 @@
 
 class WeatherScreen;
 class ScriptInfo;
-typedef QMultiMap<long, const WeatherSource*> SourceMap;
+using SourceMap = QMultiMap<long, const WeatherSource*>;
 
 class SourceManager : public QObject
 {
@@ -21,7 +21,7 @@ class SourceManager : public QObject
 
   public:
     SourceManager();
-    ~SourceManager();
+    ~SourceManager() override;
     WeatherSource *needSourceFor(int id, const QString &loc, units_t units);
     QStringList getLocationList(ScriptInfo *si, const QString &str);
     void startTimers();
@@ -46,4 +46,4 @@ class SourceManager : public QObject
     void recurseDirs(QDir dir);
 };
 
-#endif
+#endif /* SOURCEMANAGER_H */

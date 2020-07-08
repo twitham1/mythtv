@@ -4,20 +4,20 @@
  * Detect scene changes based on histogram analysis.
  */
 
-#ifndef __SCENECHANGEDETECTOR_H__
-#define __SCENECHANGEDETECTOR_H__
+#ifndef SCENECHANGEDETECTOR_H
+#define SCENECHANGEDETECTOR_H
 
 #include <QString>
 
 #include "FrameAnalyzer.h"
 
-typedef struct AVFrame AVFrame;
+using AVFrame = struct AVFrame;
 class HistogramAnalyzer;
 
 class SceneChangeDetector : public FrameAnalyzer
 {
 public:
-    SceneChangeDetector(HistogramAnalyzer *ha, const QString& debugdir);
+    SceneChangeDetector(std::shared_ptr<HistogramAnalyzer> ha, const QString& debugdir);
     virtual void deleteLater(void);
 
     /* FrameAnalyzer interface. */
@@ -29,38 +29,38 @@ public:
             long long frameno, long long *pNextFrame) override; // FrameAnalyzer
     int finished(long long nframes, bool final) override; // FrameAnalyzer
     int reportTime(void) const override; // FrameAnalyzer
-    FrameMap GetMap(unsigned int) const override // FrameAnalyzer
+    FrameMap GetMap(unsigned int /*index*/) const override // FrameAnalyzer
         { return m_changeMap; }
 
     /* SceneChangeDetector interface. */
     const FrameAnalyzer::FrameMap *getChanges(void) const { return &m_changeMap; }
 
-    typedef struct scenechange_data {
+    struct scenechange_data {
         unsigned char   color;
         unsigned char   frequency;
-    } SceneChangeData[UCHAR_MAX + 1];
+    };
+    using SceneChangeData = scenechange_data[UCHAR_MAX + 1];
 
   protected:
-    virtual ~SceneChangeDetector(void) = default;
+    ~SceneChangeDetector(void) override = default;
 
   private:
-    HistogramAnalyzer       *m_histogramAnalyzer {nullptr};
+    std::shared_ptr<HistogramAnalyzer> m_histogramAnalyzer {nullptr};
     float                   m_fps                {0.0F};
 
     /* per-frame info */
-    SceneChangeData         *m_scdata            {nullptr};
-    unsigned short          *m_scdiff            {nullptr};
+    SceneChangeData         *m_scData            {nullptr};
+    unsigned short          *m_scDiff            {nullptr};
 
     FrameAnalyzer::FrameMap m_changeMap;
 
     /* Debugging */
     int                     m_debugLevel         {0};
-    QString                 m_debugdata;            /* filename */
-    bool                    m_debug_scenechange  {false};
-    bool                    m_scenechange_done   {false};
+    QString                 m_debugData;            /* filename */
+    bool                    m_debugSceneChange   {false};
+    bool                    m_sceneChangeDone    {false};
 };
 
-#endif  /* !__SCENECHANGEDETECTOR_H__ */
+#endif  /* !SCENECHANGEDETECTOR_H */
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */
-

@@ -88,6 +88,7 @@ bool PortChecker::checkPort(QString &host, int port, int timeLimit, bool linkLoc
 #endif
     if (linkLocalOnly)
     {
+        // cppcheck-suppress knownConditionTrueFalse
         if (islinkLocal)
         {
             // If we already know the scope, set it here and return
@@ -137,7 +138,7 @@ bool PortChecker::checkPort(QString &host, int port, int timeLimit, bool linkLoc
                         // check that IPv6 is enabled on that interface
                         QList<QNetworkAddressEntry> addresses = card.addressEntries();
                         bool foundv6 = false;
-                        foreach (QNetworkAddressEntry ae, addresses)
+                        for (const auto& ae : qAsConst(addresses))
                         {
                             if (ae.ip().protocol() == QAbstractSocket::IPv6Protocol)
                             {

@@ -39,7 +39,7 @@ class SERVICE_PUBLIC Encoder : public QObject
     Q_PROPERTY( int             SleepStatus     READ SleepStatus      WRITE setSleepStatus    )
     Q_PROPERTY( bool            LowOnFreeSpace  READ LowOnFreeSpace   WRITE setLowOnFreeSpace )
 
-    Q_PROPERTY( QVariantList    Inputs          READ Inputs    DESIGNABLE true )
+    Q_PROPERTY( QVariantList    Inputs          READ Inputs     )
     Q_PROPERTY( QObject*        Recording       READ Recording  )
 
     PROPERTYIMP    ( int        , Id             )
@@ -92,7 +92,7 @@ class SERVICE_PUBLIC Encoder : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            Input *pObject = new Input( this );
+            auto *pObject = new Input( this );
             Inputs().append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

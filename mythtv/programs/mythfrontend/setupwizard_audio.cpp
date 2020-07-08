@@ -138,10 +138,9 @@ void AudioSetupWizard::Init(void)
 
     if (!current.isEmpty())
     {
-        for (AudioOutput::ADCVect::const_iterator it = m_outputlist->begin();
-             it != m_outputlist->end(); ++it)
+        for (const auto & ao : qAsConst(*m_outputlist))
         {
-            if (it->m_name == current)
+            if (ao.m_name == current)
             {
                 found = true;
                 break;
@@ -164,17 +163,15 @@ void AudioSetupWizard::Init(void)
             delete adc;
         }
     }
-    for (AudioOutput::ADCVect::const_iterator it = m_outputlist->begin();
-         it != m_outputlist->end(); ++it)
+    for (const auto & ao : qAsConst(*m_outputlist))
     {
-        QString name = it->m_name;
-        MythUIButtonListItem *output =
-                new MythUIButtonListItem(m_audioDeviceButtonList, name);
+        QString name = ao.m_name;
+        auto *output = new MythUIButtonListItem(m_audioDeviceButtonList, name);
         output->SetData(name);
     }
     if (found)
     {
-        m_audioDeviceButtonList->SetValueByData(qVariantFromValue(current));
+        m_audioDeviceButtonList->SetValueByData(QVariant::fromValue(current));
     }
 
     m_maxspeakers = gCoreContext->GetNumSetting("MaxChannels", 2);
@@ -198,12 +195,11 @@ AudioOutputSettings AudioSetupWizard::UpdateCapabilities(bool restore, bool AC3)
 
     AudioOutputSettings settings;
 
-    for (AudioOutput::ADCVect::const_iterator it = m_outputlist->begin();
-         it != m_outputlist->end(); ++it)
+    for (const auto & ao : qAsConst(*m_outputlist))
     {
-        if (it->m_name == out)
+        if (ao.m_name == out)
         {
-            settings = it->m_settings;
+            settings = ao.m_settings;
             break;
         }
     }
@@ -269,7 +265,7 @@ AudioOutputSettings AudioSetupWizard::UpdateCapabilities(bool restore, bool AC3)
             {
                 case 2:
                 {
-                    MythUIButtonListItem *stereo =
+                    auto *stereo =
                         new MythUIButtonListItem(m_speakerNumberButtonList,
                                                  QObject::tr("Stereo"));
                     stereo->SetData(2);
@@ -277,7 +273,7 @@ AudioOutputSettings AudioSetupWizard::UpdateCapabilities(bool restore, bool AC3)
                 }
                 case 6:
                 {
-                    MythUIButtonListItem *sixchan =
+                    auto *sixchan =
                         new MythUIButtonListItem(m_speakerNumberButtonList,
                                                  QObject::tr("5.1 Channel Audio"));
                     sixchan->SetData(6);
@@ -285,7 +281,7 @@ AudioOutputSettings AudioSetupWizard::UpdateCapabilities(bool restore, bool AC3)
                 }
                 case 8:
                 {
-                    MythUIButtonListItem *eightchan =
+                    auto *eightchan =
                         new MythUIButtonListItem(m_speakerNumberButtonList,
                                                  QObject::tr("7.1 Channel Audio"));
                     eightchan->SetData(8);
@@ -296,7 +292,7 @@ AudioOutputSettings AudioSetupWizard::UpdateCapabilities(bool restore, bool AC3)
             }
         }
     }
-    m_speakerNumberButtonList->SetValueByData(qVariantFromValue(cur_speakers));
+    m_speakerNumberButtonList->SetValueByData(QVariant::fromValue(cur_speakers));
 
         // Return values is used by audio test
         // where we mainly are interested by the number of channels
@@ -336,8 +332,8 @@ void AudioSetupWizard::slotNext(void)
     save();
 
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
-    VideoSetupWizard *sw = new VideoSetupWizard(mainStack, m_generalScreen,
-                                                this, "videosetupwizard");
+    auto *sw = new VideoSetupWizard(mainStack, m_generalScreen,
+                                    this, "videosetupwizard");
 
     if (sw->Create())
     {

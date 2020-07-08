@@ -30,38 +30,40 @@ class Program;
 class SERVICE_PUBLIC ChannelInfo : public QObject
 {
     Q_OBJECT
-    Q_CLASSINFO( "version", "2.1" );
+    Q_CLASSINFO( "version", "2.2" );
 
     // Q_CLASSINFO Used to augment Metadata for properties. 
     // See datacontracthelper.h for details
 
     Q_CLASSINFO( "Programs", "type=DTC::Program");
 
-    Q_PROPERTY( uint      ChanId          READ ChanId         WRITE setChanId        )
-    Q_PROPERTY( QString   ChanNum         READ ChanNum        WRITE setChanNum       )
-    Q_PROPERTY( QString   CallSign        READ CallSign       WRITE setCallSign      )
-    Q_PROPERTY( QString   IconURL         READ IconURL        WRITE setIconURL       )
-    Q_PROPERTY( QString   ChannelName     READ ChannelName    WRITE setChannelName   )
+    Q_PROPERTY( uint      ChanId          READ ChanId          WRITE setChanId          )
+    Q_PROPERTY( QString   ChanNum         READ ChanNum         WRITE setChanNum         )
+    Q_PROPERTY( QString   CallSign        READ CallSign        WRITE setCallSign        )
+    Q_PROPERTY( QString   IconURL         READ IconURL         WRITE setIconURL         )
+    Q_PROPERTY( QString   ChannelName     READ ChannelName     WRITE setChannelName     )
 
-    Q_PROPERTY( uint      MplexId         READ MplexId        WRITE setMplexId        DESIGNABLE SerializeDetails )
-    Q_PROPERTY( uint      ServiceId       READ ServiceId      WRITE setServiceId      DESIGNABLE SerializeDetails )
-    Q_PROPERTY( uint      ATSCMajorChan   READ ATSCMajorChan  WRITE setATSCMajorChan  DESIGNABLE SerializeDetails )
-    Q_PROPERTY( uint      ATSCMinorChan   READ ATSCMinorChan  WRITE setATSCMinorChan  DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString   Format          READ Format         WRITE setFormat         DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString   FrequencyId     READ FrequencyId    WRITE setFrequencyId    DESIGNABLE SerializeDetails )
-    Q_PROPERTY( int       FineTune        READ FineTune       WRITE setFineTune       DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString   ChanFilters     READ ChanFilters    WRITE setChanFilters    DESIGNABLE SerializeDetails )
-    Q_PROPERTY( int       SourceId        READ SourceId       WRITE setSourceId       DESIGNABLE SerializeDetails )
-    Q_PROPERTY( int       InputId         READ InputId        WRITE setInputId        DESIGNABLE SerializeDetails )
-    Q_PROPERTY( bool      CommFree        READ CommFree       WRITE setCommFree       DESIGNABLE SerializeDetails )
-    Q_PROPERTY( bool      UseEIT          READ UseEIT         WRITE setUseEIT         DESIGNABLE SerializeDetails )
-    Q_PROPERTY( bool      Visible         READ Visible        WRITE setVisible        DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString   XMLTVID         READ XMLTVID        WRITE setXMLTVID        DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString   DefaultAuth     READ DefaultAuth    WRITE setDefaultAuth    DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString   ChannelGroups   READ ChannelGroups  WRITE setChannelGroups  DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString   Inputs          READ Inputs         WRITE setInputs         DESIGNABLE SerializeDetails )
+    Q_PROPERTY( uint      MplexId         READ MplexId         WRITE setMplexId         )
+    Q_PROPERTY( uint      ServiceId       READ ServiceId       WRITE setServiceId       )
+    Q_PROPERTY( uint      ATSCMajorChan   READ ATSCMajorChan   WRITE setATSCMajorChan   )
+    Q_PROPERTY( uint      ATSCMinorChan   READ ATSCMinorChan   WRITE setATSCMinorChan   )
+    Q_PROPERTY( QString   Format          READ Format          WRITE setFormat          )
+    Q_PROPERTY( QString   FrequencyId     READ FrequencyId     WRITE setFrequencyId     )
+    Q_PROPERTY( int       FineTune        READ FineTune        WRITE setFineTune        )
+    Q_PROPERTY( QString   ChanFilters     READ ChanFilters     WRITE setChanFilters     )
+    Q_PROPERTY( int       SourceId        READ SourceId        WRITE setSourceId        )
+    Q_PROPERTY( int       InputId         READ InputId         WRITE setInputId         )
+    Q_PROPERTY( bool      CommFree        READ CommFree        WRITE setCommFree        )
+    Q_PROPERTY( bool      UseEIT          READ UseEIT          WRITE setUseEIT          )
+    Q_PROPERTY( bool      Visible         READ Visible         WRITE setVisible         )
+    Q_PROPERTY( QString   ExtendedVisible READ ExtendedVisible WRITE setExtendedVisible )
+    Q_PROPERTY( QString   XMLTVID         READ XMLTVID         WRITE setXMLTVID         )
+    Q_PROPERTY( QString   DefaultAuth     READ DefaultAuth     WRITE setDefaultAuth     )
+    Q_PROPERTY( QString   ChannelGroups   READ ChannelGroups   WRITE setChannelGroups   )
+    Q_PROPERTY( QString   Inputs          READ Inputs          WRITE setInputs          )
+    Q_PROPERTY( uint      ServiceType     READ ServiceType     WRITE setServiceType     )
 
-    Q_PROPERTY( QVariantList Programs    READ Programs DESIGNABLE true )
+    Q_PROPERTY( QVariantList Programs    READ Programs )
 
     PROPERTYIMP       ( uint        , ChanId         )
     PROPERTYIMP       ( QString     , ChanNum        )
@@ -81,10 +83,12 @@ class SERVICE_PUBLIC ChannelInfo : public QObject
     PROPERTYIMP       ( bool        , CommFree       )
     PROPERTYIMP       ( bool        , UseEIT         )
     PROPERTYIMP       ( bool        , Visible        )
+    PROPERTYIMP       ( QString     , ExtendedVisible )
     PROPERTYIMP       ( QString     , XMLTVID        )
     PROPERTYIMP       ( QString     , DefaultAuth    )
     PROPERTYIMP       ( QString     , ChannelGroups  )
     PROPERTYIMP       ( QString     , Inputs         )
+    PROPERTYIMP       ( uint        , ServiceType    )
 
     PROPERTYIMP_RO_REF( QVariantList, Programs       )
 
@@ -95,7 +99,7 @@ class SERVICE_PUBLIC ChannelInfo : public QObject
 
         static void InitializeCustomTypes();
 
-        Q_INVOKABLE ChannelInfo(QObject *parent = nullptr)
+        Q_INVOKABLE explicit ChannelInfo(QObject *parent = nullptr)
             : QObject           ( parent ),
               m_ChanId          ( 0      ),
               m_MplexId         ( 0      ),
@@ -105,9 +109,10 @@ class SERVICE_PUBLIC ChannelInfo : public QObject
               m_FineTune        ( 0      ),
               m_SourceId        ( 0      ),
               m_InputId         ( 0      ),
-              m_CommFree        ( 0      ),
+              m_CommFree        ( false  ),
               m_UseEIT          ( false  ),
               m_Visible         ( true   ),
+              m_ServiceType     ( 0      ),
               m_SerializeDetails( true   )
         {
         }
@@ -155,30 +160,30 @@ class SERVICE_PUBLIC Program : public QObject
     Q_PROPERTY( int         AudioProps   READ AudioProps   WRITE setAudioProps)
     Q_PROPERTY( int         SubProps     READ SubProps     WRITE setSubProps  )
 
-    Q_PROPERTY( QString     SeriesId      READ SeriesId      WRITE setSeriesId      DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString     ProgramId     READ ProgramId     WRITE setProgramId     DESIGNABLE SerializeDetails )
-    Q_PROPERTY( double      Stars         READ Stars         WRITE setStars         DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QDateTime   LastModified  READ LastModified  WRITE setLastModified  DESIGNABLE SerializeDetails )
-    Q_PROPERTY( int         ProgramFlags  READ ProgramFlags  WRITE setProgramFlags  DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QDate       Airdate       READ Airdate       WRITE setAirdate       DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString     Description   READ Description   WRITE setDescription   DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString     Inetref       READ Inetref       WRITE setInetref       DESIGNABLE SerializeDetails )
-    Q_PROPERTY( int         Season        READ Season        WRITE setSeason        DESIGNABLE SerializeDetails )
-    Q_PROPERTY( int         Episode       READ Episode       WRITE setEpisode       DESIGNABLE SerializeDetails )
-    Q_PROPERTY( int         TotalEpisodes READ TotalEpisodes WRITE setTotalEpisodes DESIGNABLE SerializeDetails )
+    Q_PROPERTY( QString     SeriesId      READ SeriesId      WRITE setSeriesId      )
+    Q_PROPERTY( QString     ProgramId     READ ProgramId     WRITE setProgramId     )
+    Q_PROPERTY( double      Stars         READ Stars         WRITE setStars         )
+    Q_PROPERTY( QDateTime   LastModified  READ LastModified  WRITE setLastModified  )
+    Q_PROPERTY( int         ProgramFlags  READ ProgramFlags  WRITE setProgramFlags  )
+    Q_PROPERTY( QDate       Airdate       READ Airdate       WRITE setAirdate       )
+    Q_PROPERTY( QString     Description   READ Description   WRITE setDescription   )
+    Q_PROPERTY( QString     Inetref       READ Inetref       WRITE setInetref       )
+    Q_PROPERTY( int         Season        READ Season        WRITE setSeason        )
+    Q_PROPERTY( int         Episode       READ Episode       WRITE setEpisode       )
+    Q_PROPERTY( int         TotalEpisodes READ TotalEpisodes WRITE setTotalEpisodes )
 
     // ----
     // DEPRECATED
     // These don't belong here, they are Recording only metadata
-    Q_PROPERTY( qlonglong   FileSize      READ FileSize      WRITE setFileSize      DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString     FileName      READ FileName      WRITE setFileName      DESIGNABLE SerializeDetails )
-    Q_PROPERTY( QString     HostName      READ HostName      WRITE setHostName      DESIGNABLE SerializeDetails )
+    Q_PROPERTY( qlonglong   FileSize      READ FileSize      WRITE setFileSize      )
+    Q_PROPERTY( QString     FileName      READ FileName      WRITE setFileName      )
+    Q_PROPERTY( QString     HostName      READ HostName      WRITE setHostName      )
     // ----
 
-    Q_PROPERTY( QObject*    Channel      READ Channel   DESIGNABLE SerializeChannel )
-    Q_PROPERTY( QObject*    Recording    READ Recording DESIGNABLE SerializeRecording )
-    Q_PROPERTY( QObject*    Artwork      READ Artwork   DESIGNABLE SerializeArtwork )
-    Q_PROPERTY( QObject*    Cast         READ Cast      DESIGNABLE SerializeCast )
+    Q_PROPERTY( QObject*    Channel      READ Channel   )
+    Q_PROPERTY( QObject*    Recording    READ Recording )
+    Q_PROPERTY( QObject*    Artwork      READ Artwork   )
+    Q_PROPERTY( QObject*    Cast         READ Cast      )
 
     PROPERTYIMP    ( QDateTime   , StartTime    )
     PROPERTYIMP    ( QDateTime   , EndTime      )
@@ -227,7 +232,7 @@ class SERVICE_PUBLIC Program : public QObject
 
         static inline void InitializeCustomTypes();
 
-        Q_INVOKABLE Program(QObject *parent = nullptr)
+        Q_INVOKABLE explicit Program(QObject *parent = nullptr)
             : QObject               ( parent ),
               m_Repeat              ( false  ),
               m_Stars               ( 0      ),
@@ -305,7 +310,7 @@ inline Program *ChannelInfo::AddNewProgram()
     // We must make sure the object added to the QVariantList has
     // a parent of 'this'
 
-    Program *pObject = new Program( this );
+    auto *pObject = new Program( this );
     m_Programs.append( QVariant::fromValue<QObject *>( pObject ));
 
     return pObject;

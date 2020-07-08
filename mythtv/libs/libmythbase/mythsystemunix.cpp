@@ -43,12 +43,12 @@ if( (x) >= 0 ) { \
     (x) = -1; \
 }
 
-typedef struct
+struct FDType_t
 {
-    MythSystemLegacyUnix *ms;
-    int             type;
-} FDType_t;
-typedef QMap<int, FDType_t*> FDMap_t;
+    MythSystemLegacyUnix *m_ms;
+    int                   m_type;
+};
+using FDMap_t = QMap<int, FDType_t*>;
 
 /**********************************
  * MythSystemLegacyManager method defines
@@ -76,15 +76,6 @@ void ShutdownMythSystemLegacy(void)
         writeThread->wait();
 }
 
-MythSystemLegacyIOHandler::MythSystemLegacyIOHandler(bool read) :
-    MThread(QString("SystemIOHandler%1").arg(read ? "R" : "W")),
-    m_pMap(PMap_t()),
-    m_read(read)
-{
-    FD_ZERO(&m_fds);
-    m_readbuf[0] = '\0';
-}
-
 void MythSystemLegacyIOHandler::run(void)
 {
     RunProlog();
@@ -104,9 +95,7 @@ void MythSystemLegacyIOHandler::run(void)
 
         while( run_system )
         {
-            struct timespec ts;
-            ts.tv_sec = 0;
-            ts.tv_nsec = 10*1000*1000;  // 10ms
+            struct timespec ts { 0, 10*1000*1000};  // 10ms
             nanosleep(&ts, nullptr); // ~100x per second, for ~3MBps throughput
             m_pLock.lock();
             if( m_pMap.isEmpty() )
@@ -115,10 +104,9 @@ void MythSystemLegacyIOHandler::run(void)
                 break;
             }
 
-            timeval tv;
-            tv.tv_sec = 0; tv.tv_usec = 0;
+            timeval tv {0, 0};
 
-            int retval;
+            int retval = -1;
             fd_set fds = m_fds;
 
             if( m_read )
@@ -127,13 +115,16 @@ void MythSystemLegacyIOHandler::run(void)
                 retval = select(m_maxfd+1, nullptr, &fds, nullptr, &tv);
 
             if( retval == -1 )
+            {
                 LOG(VB_SYSTEM, LOG_ERR,
                     QString("MythSystemLegacyIOHandler: select(%1, %2) failed: %3")
                         .arg(m_maxfd+1).arg(m_read).arg(strerror(errno)));
 
+            }
             else if( retval > 0 )
             {
-                PMap_t::iterator i, next;
+                PMap_t::iterator i;
+                PMap_t::iterator next;
                 for( i = m_pMap.begin(); i != m_pMap.end(); i = next )
                 {
                     next = i+1;
@@ -156,9 +147,9 @@ void MythSystemLegacyIOHandler::run(void)
 
 void MythSystemLegacyIOHandler::HandleRead(int fd, QBuffer *buff)
 {
-    int len;
     errno = 0;
-    if( (len = read(fd, &m_readbuf, 65536)) <= 0 )
+    int len = read(fd, &m_readbuf, 65536);
+    if( len <= 0 )
     {
         if( errno != EAGAIN )
         {
@@ -177,8 +168,8 @@ void MythSystemLegacyIOHandler::HandleRead(int fd, QBuffer *buff)
         fdLock.unlock();
 
         // Emit the data ready signal (1 = stdout, 2 = stderr)
-        MythSystemLegacyUnix *ms = fdType->ms;
-        emit ms->readDataReady(fdType->type);
+        MythSystemLegacyUnix *ms = fdType->m_ms;
+        emit ms->readDataReady(fdType->m_type);
     }
 }
 
@@ -254,7 +245,7 @@ void MythSystemLegacyIOHandler::wake()
 void MythSystemLegacyIOHandler::BuildFDs()
 {
     // build descriptor list
-    FD_ZERO(&m_fds);
+    FD_ZERO(&m_fds); //NOLINT(readability-isolate-declaration)
     m_maxfd = -1;
 
     PMap_t::iterator i;
@@ -286,9 +277,8 @@ void MythSystemLegacyManager::run(void)
         }
         m_mapLock.unlock();
 
-        MythSystemLegacyUnix     *ms;
-        pid_t               pid;
-        int                 status;
+        pid_t pid = 0;
+        int   status = 0;
 
         // check for any newly exited processes
         listLock.lock();
@@ -305,7 +295,7 @@ void MythSystemLegacyManager::run(void)
             }
 
             // pop exited process off managed list, add to cleanup list
-            ms = m_pMap.take(pid);
+            MythSystemLegacyUnix *ms = m_pMap.take(pid);
             m_mapLock.unlock();
 
             // Occasionally, the caller has deleted the structure from under
@@ -379,7 +369,8 @@ void MythSystemLegacyManager::run(void)
 
 
         // loop through running processes for any that require action
-        MSMap_t::iterator   i, next;
+        MSMap_t::iterator   i;
+        MSMap_t::iterator   next;
         time_t              now = time(nullptr);
 
         m_mapLock.lock();
@@ -388,7 +379,7 @@ void MythSystemLegacyManager::run(void)
         {
             next = i + 1;
             pid  = i.key();
-            ms   = i.value();
+            MythSystemLegacyUnix *ms = i.value();
             if (!ms)
                 continue;
 
@@ -463,9 +454,9 @@ void MythSystemLegacyManager::append(MythSystemLegacyUnix *ms)
 
     if( ms->GetSetting("UseStdout") )
     {
-        FDType_t *fdType = new FDType_t;
-        fdType->ms = ms;
-        fdType->type = 1;
+        auto *fdType = new FDType_t;
+        fdType->m_ms = ms;
+        fdType->m_type = 1;
         fdLock.lock();
         fdMap.insert( ms->m_stdpipe[1], fdType );
         fdLock.unlock();
@@ -474,9 +465,9 @@ void MythSystemLegacyManager::append(MythSystemLegacyUnix *ms)
 
     if( ms->GetSetting("UseStderr") )
     {
-        FDType_t *fdType = new FDType_t;
-        fdType->ms = ms;
-        fdType->type = 2;
+        auto *fdType = new FDType_t;
+        fdType->m_ms = ms;
+        fdType->m_type = 2;
         fdLock.lock();
         fdMap.insert( ms->m_stdpipe[2], fdType );
         fdLock.unlock();
@@ -497,9 +488,7 @@ void MythSystemLegacySignalManager::run(void)
     LOG(VB_GENERAL, LOG_INFO, "Starting process signal handler");
     while (run_system)
     {
-        struct timespec ts;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 50 * 1000 * 1000; // 50ms
+        struct timespec ts {0, 50 * 1000 * 1000}; // 50ms
         nanosleep(&ts, nullptr); // sleep 50ms
 
         while (run_system)
@@ -561,10 +550,6 @@ MythSystemLegacyUnix::MythSystemLegacyUnix(MythSystemLegacy *parent) :
 {
     m_parent = parent;
 
-    m_stdpipe[0] = -1;
-    m_stdpipe[1] = -1;
-    m_stdpipe[2] = -1;
-
     connect(this, SIGNAL(started()), m_parent, SIGNAL(started()));
     connect(this, SIGNAL(finished()), m_parent, SIGNAL(finished()));
     connect(this, SIGNAL(error(uint)), m_parent, SIGNAL(error(uint)));
@@ -602,12 +587,12 @@ bool MythSystemLegacyUnix::ParseShell(const QString &cmd, QString &abscmd,
 {
     QList<QChar> whitespace; whitespace << ' ' << '\t' << '\n' << '\r';
     QList<QChar> whitechr; whitechr << 't' << 'n' << 'r';
-    QChar quote = '"',
-      hardquote = '\'',
-         escape = '\\';
-    bool quoted = false,
-     hardquoted = false,
-        escaped = false;
+    QChar quote     = '"';
+    QChar hardquote = '\'';
+    QChar escape    = '\\';
+    bool quoted     = false;
+    bool hardquoted = false;
+    bool escaped    = false;
 
     QString tmp;
     QString::const_iterator i = cmd.begin();
@@ -619,14 +604,20 @@ bool MythSystemLegacyUnix::ParseShell(const QString &cmd, QString &abscmd,
             {
                 if ((quote == *i) || (escape == *i) ||
                             whitespace.contains(*i))
+                {
                     // pass through escape (\), quote ("), and any whitespace
                     tmp += *i;
+                }
                 else if (whitechr.contains(*i))
+                {
                     // process whitespace escape code, and pass character
                     tmp += whitespace[whitechr.indexOf(*i)+1];
+                }
                 else
+                {
                     // unhandled escape code, abort
                     return false;
+                }
 
                 escaped = false;
             }
@@ -634,35 +625,48 @@ bool MythSystemLegacyUnix::ParseShell(const QString &cmd, QString &abscmd,
             else if (*i == escape)
             {
                 if (hardquoted)
+                {
                     // hard quotes (') pass everything
                     tmp += *i;
+                }
                 else
+                {
                     // otherwise, mark escaped to handle next character
                     escaped = true;
+                }
             }
 
             else if ((quoted && (*i == quote)) ||
                             (hardquoted && (*i == hardquote)))
+            {
                 // end of quoted sequence
                 quoted = hardquoted = false;
-
+            }
             else
+            {
                 // pass through character
                 tmp += *i;
+            }
         }
 
         else if (escaped)
         {
             if ((*i == quote) || (*i == hardquote) || (*i == escape) ||
                     whitespace.contains(*i))
+            {
                 // pass through special characters
                 tmp += *i;
+            }
             else if (whitechr.contains(*i))
+            {
                 // process whitespace escape code, and pass character
                 tmp += whitespace[whitechr.indexOf(*i)+1];
+            }
             else
+            {
                 // unhandled escape code, abort
                 return false;
+            }
 
             escaped = false;
         }
@@ -673,7 +677,9 @@ bool MythSystemLegacyUnix::ParseShell(const QString &cmd, QString &abscmd,
         else if (hardquote == *i)
             hardquoted = true;
         else if (escape == *i)
+        {
             escaped = true;
+        }
 
         // handle whitespace characters
         else if (whitespace.contains(*i) && !tmp.isEmpty())
@@ -708,9 +714,9 @@ bool MythSystemLegacyUnix::ParseShell(const QString &cmd, QString &abscmd,
     {
         // search for absolute path
         QStringList path = QString(getenv("PATH")).split(':');
-        for (auto pit = path.begin(); pit != path.end(); ++pit)
+        for (const auto& pit : qAsConst(path))
         {
-            QFile file(QString("%1/%2").arg(*pit).arg(abscmd));
+            QFile file(QString("%1/%2").arg(pit).arg(abscmd));
             if (file.exists())
             {
                 abscmd = file.fileName();
@@ -877,12 +883,11 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
     char *command = strdup(cmdUTF8.constData());
 
     char **cmdargs = (char **)malloc((args.size() + 1) * sizeof(char *));
-    QStringList::const_iterator it;
 
     if (cmdargs)
     {
-        int i;
-        for (i = 0, it = args.constBegin(); it != args.constEnd(); ++it)
+        int i = 0;
+        for (auto it = args.constBegin(); it != args.constEnd(); ++it)
         {
             cmdargs[i++] = strdup(it->toUtf8().constData());
         }

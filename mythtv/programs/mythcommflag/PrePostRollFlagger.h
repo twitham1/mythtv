@@ -14,7 +14,7 @@ public:
                             const QDateTime& recordingStopsAt_in);
 
     void GetCommercialBreakList(frm_dir_map_t &marks) override; // ClassicCommDetector
-    virtual ~PrePostRollFlagger() = default;
+    ~PrePostRollFlagger() override = default;
     bool go() override; // ClassicCommDetector
 
 private:
@@ -29,7 +29,7 @@ private:
     long long findBreakInrange(long long start, long long stopFrame,
                                long long totalFrames,
                                long long &framesProcessed,
-                               QTime &flagTime, bool findLast);
+                               QElapsedTimer &flagTime, bool findLast);
 };
 
 #endif // PREPOSTROLLFLAGGER_H

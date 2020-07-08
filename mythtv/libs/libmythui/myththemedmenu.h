@@ -18,8 +18,8 @@ struct ThemedButton
     QString text;
     QString alttext;
     QString description;
-    MythImage *icon;
-    bool active;
+    MythImage *icon     {nullptr};
+    bool    active      {false};
     QString password;
 };
 
@@ -33,7 +33,7 @@ class MUI_PUBLIC MythThemedMenuState : public MythScreenType
   public:
     MythThemedMenuState(MythScreenStack *parent, const QString &name)
         : MythScreenType(parent, name) {}
-   ~MythThemedMenuState() = default;
+   ~MythThemedMenuState() override = default;
 
     bool Create(void) override; // MythScreenType
 
@@ -49,7 +49,7 @@ class MUI_PUBLIC MythThemedMenuState : public MythScreenType
     MythUIText       *m_descriptionText {nullptr};
 
   protected:
-    void CopyFrom(MythUIType*) override; // MythScreenType
+    void CopyFrom(MythUIType *base) override; // MythScreenType
 };
 
 /// \brief Themed menu class, used for main menus in %MythTV frontend
@@ -60,9 +60,9 @@ class MUI_PUBLIC MythThemedMenu : public MythThemedMenuState
     MythThemedMenu(const QString &cdir, const QString &menufile,
                     MythScreenStack *parent, const QString &name,
                     bool allowreorder = false, MythThemedMenuState *state = nullptr);
-   ~MythThemedMenu();
+   ~MythThemedMenu() override;
 
-    bool foundTheme(void);
+    bool foundTheme(void) const;
 
     void getCallback(void (**lcallback)(void *, QString &), void **data);
     void setCallback(void (*lcallback)(void *, QString &), void *data);
@@ -95,9 +95,9 @@ class MUI_PUBLIC MythThemedMenu : public MythThemedMenuState
                    const QString &description, const QString &password);
 
     bool handleAction(const QString &action, const QString &password = QString());
-    bool findDepends(const QString &fileList);
-    bool findDependsExec(const QString &filename);
-    QString findMenuFile(const QString &menuname);
+    static bool findDepends(const QString &fileList);
+    static bool findDependsExec(const QString &filename);
+    static QString findMenuFile(const QString &menuname);
 
     bool checkPinCode(const QString &password_setting);
 

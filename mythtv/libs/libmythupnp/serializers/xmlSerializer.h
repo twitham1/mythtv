@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __XMLSERIALIZER_H__
-#define __XMLSERIALIZER_H__
+#ifndef XMLSERIALIZER_H
+#define XMLSERIALIZER_H
 
 #include <QXmlStreamWriter>
 #include <QVariant>
@@ -60,13 +60,13 @@ class UPNP_PUBLIC XmlSerializer : public Serializer
         void    RenderList      ( const QString &sName, const QVariantList &list );
         void    RenderMap       ( const QString &sName, const QVariantMap  &map  );
 
-        QString GetItemName     ( const QString &sName );
+        static QString GetItemName     ( const QString &sName );
 
-        QString GetContentName  ( const QString        &sName,
-                                  const QMetaObject   *pMetaObject,
-                                  const QMetaProperty *pMetaProp );
+        static QString GetContentName  ( const QString        &sName,
+                                         const QMetaObject   *pMetaObject,
+                                         const QMetaProperty *pMetaProp );
 
-        QString FindOptionValue ( const QStringList &sOptions, 
+        static QString FindOptionValue ( const QStringList &sOptions, 
                                   const QString &sName );
 
     public:
@@ -78,9 +78,9 @@ class UPNP_PUBLIC XmlSerializer : public Serializer
 
         QString GetContentType() override; // Serializer
 
-    private:
+        // Deleted functions should be public.
         XmlSerializer(const XmlSerializer &) = delete;            // not copyable
         XmlSerializer &operator=(const XmlSerializer &) = delete; // not copyable
 };
 
-#endif
+#endif // XMLSERIALIZER_H

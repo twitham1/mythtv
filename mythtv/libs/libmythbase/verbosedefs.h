@@ -13,10 +13,10 @@
 /// This file gets included in two different ways:
 /// 1) from mythlogging.h from nearly every file.  This will define the
 ///    VerboseMask enum
-/// 2) specifically (and a second include with _IMPLEMENT_VERBOSE defined) from
-///    mythlogging.cpp.  This is done in verboseInit (in the middle of the
-///    function) as it will expand out to a series of calls to verboseAdd()
-///    to fill the verboseMap.
+/// 2) specifically (and a second include with MYTH_IMPLEMENT_VERBOSE defined)
+///    from mythlogging.cpp.  This is done in verboseInit (in the middle of the
+///    function) as it will expand out to a series of calls to verboseAdd() to
+///    fill the verboseMap.
 ///
 /// The 4 fields are:
 ///     enum name (expected to start with VB_)
@@ -37,7 +37,7 @@
 #undef LOGLEVEL_POSTAMBLE
 #undef LOGLEVEL_MAP
 
-#ifdef _IMPLEMENT_VERBOSE
+#ifdef MYTH_IMPLEMENT_VERBOSE
 
 // This is used to actually implement the mask in mythlogging.cpp
 #define VERBOSE_PREAMBLE
@@ -50,7 +50,7 @@
 #define LOGLEVEL_MAP(name,value,shortname) \
     loglevelAdd(value,QString(#name),shortname);
 
-#else // !defined(_IMPLEMENT_VERBOSE)
+#else // !defined(MYTH_IMPLEMENT_VERBOSE)
 
 // This is used to define the enumerated type (used by all files)
 
@@ -61,7 +61,7 @@
             VB_LAST_ITEM \
         };
     #define VERBOSE_MAP(name,mask,additive,help) \
-        name = mask,
+        name = (mask),
 #else
     // msvc can't have 64bit enums
     #define VERBOSE_PREAMBLE
@@ -71,9 +71,9 @@
 #endif
 
 #define LOGLEVEL_PREAMBLE \
-    typedef enum {
+    enum LogLevel_t {
 #define LOGLEVEL_POSTAMBLE \
-    } LogLevel_t;
+    };
 #define LOGLEVEL_MAP(name,value,shortname) \
     name = (value),
 
@@ -171,11 +171,11 @@ VERBOSE_MAP(VB_STDIO,     0x2000000000ULL, true,
    programs that have debugging enabled.
  */
 VERBOSE_MAP(VB_GPU,       0x4000000000ULL, true,
-            "GPU Commercial Flagging messages")
+            "GPU OpenGL driver messages")
 VERBOSE_MAP(VB_GPUAUDIO,  0x8000000000ULL, true,
             "GPU Audio Processing messages")
 VERBOSE_MAP(VB_GPUVIDEO,  0x10000000000ULL, true,
-            "GPU Video Processing messages")
+            "GPU video rendering messages")
 VERBOSE_MAP(VB_REFCOUNT,  0x20000000000ULL, true,
             "Reference Count messages")
 VERBOSE_MAP(VB_HTTP,  0x40000000000ULL, true,
@@ -198,23 +198,23 @@ LOGLEVEL_MAP(LOG_DEBUG,   7, 'D')
 LOGLEVEL_MAP(LOG_UNKNOWN, 8, '-')
 LOGLEVEL_POSTAMBLE
 
-#ifndef _IMPLEMENT_VERBOSE
+#ifndef MYTH_IMPLEMENT_VERBOSE
 #ifdef __cplusplus
-typedef struct {
-    uint64_t    mask;
+struct VerboseDef {
+    uint64_t    mask     {0};
     QString     name;
-    bool        additive;
+    bool        additive {false};
     QString     helpText;
-} VerboseDef;
-typedef QMap<QString, VerboseDef *> VerboseMap;
+};
+using VerboseMap = QMap<QString, VerboseDef *>;
 
-typedef struct {
-    int         value;
+struct LoglevelDef {
+    int         value     {LOG_UNKNOWN};
     QString     name;
-    char        shortname;
-} LoglevelDef;
-typedef QMap<int, LoglevelDef *> LoglevelMap;
-typedef QMap<uint64_t, LogLevel_t> ComponentLogLevelMap;
+    char        shortname {'-'};
+};
+using LoglevelMap = QMap<int, LoglevelDef *>;
+using ComponentLogLevelMap = QMap<uint64_t, LogLevel_t>;
 
 extern VerboseMap verboseMap;
 extern QMutex verboseMapMutex;

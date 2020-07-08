@@ -2,17 +2,19 @@
 #ifndef TFW_H_
 #define TFW_H_
 
+#include <cstdint>
+#include <fcntl.h>
+#include <utility>
 #include <vector>
 using namespace std;
 
+// Qt headers
 #include <QWaitCondition>
 #include <QDateTime>
 #include <QString>
 #include <QMutex>
 
-#include <cstdint>
-#include <fcntl.h>
-
+// MythTV headers
 #include "mythbaseexp.h"
 #include "mthread.h"
 
@@ -22,7 +24,7 @@ class TFWWriteThread : public MThread
 {
   public:
     explicit TFWWriteThread(ThreadedFileWriter *p) : MThread("TFWWrite"), m_parent(p) {}
-    virtual ~TFWWriteThread() { wait(); m_parent = nullptr; }
+    ~TFWWriteThread() override { wait(); m_parent = nullptr; }
     void run(void) override; // MThread
   private:
     ThreadedFileWriter *m_parent {nullptr};
@@ -32,7 +34,7 @@ class TFWSyncThread : public MThread
 {
   public:
     explicit TFWSyncThread(ThreadedFileWriter *p) : MThread("TFWSync"), m_parent(p) {}
-    virtual ~TFWSyncThread() { wait(); m_parent = nullptr; }
+    ~TFWSyncThread() override { wait(); m_parent = nullptr; }
     void run(void) override; // MThread
   private:
     ThreadedFileWriter *m_parent {nullptr};
@@ -46,8 +48,8 @@ class MBASE_PUBLIC ThreadedFileWriter
     /** \fn ThreadedFileWriter::ThreadedFileWriter(const QString&,int,mode_t)
      *  \brief Creates a threaded file writer.
      */
-    ThreadedFileWriter(const QString &fname, int flags, mode_t mode)
-        : m_filename(fname), m_flags(flags), m_mode(mode) {}
+    ThreadedFileWriter(QString fname, int flags, mode_t mode)
+        : m_filename(std::move(fname)), m_flags(flags), m_mode(mode) {}
     ~ThreadedFileWriter();
 
     bool Open(void);
@@ -58,10 +60,10 @@ class MBASE_PUBLIC ThreadedFileWriter
 
     void SetWriteBufferMinWriteSize(uint newMinSize = kMinWriteSize);
 
-    void Sync(void);
+    void Sync(void) const;
     void Flush(void);
     bool SetBlocking(bool block = true);
-    bool WritesFailing(void) const { return m_ignore_writes; }
+    bool WritesFailing(void) const { return m_ignoreWrites; }
 
   protected:
     void DiskLoop(void);
@@ -77,9 +79,9 @@ class MBASE_PUBLIC ThreadedFileWriter
 
     // state
     bool            m_flush              {false};         // protected by buflock
-    bool            m_in_dtor            {false};         // protected by buflock
-    bool            m_ignore_writes      {false};         // protected by buflock
-    uint            m_tfw_min_write_size {kMinWriteSize}; // protected by buflock
+    bool            m_inDtor             {false};         // protected by buflock
+    bool            m_ignoreWrites       {false};         // protected by buflock
+    uint            m_tfwMinWriteSize    {kMinWriteSize}; // protected by buflock
     uint            m_totalBufferUse     {0};             // protected by buflock
 
     // buffers
@@ -89,7 +91,7 @@ class MBASE_PUBLIC ThreadedFileWriter
         vector<char> data;
         QDateTime    lastUsed;
     };
-    mutable QMutex    m_buflock;
+    mutable QMutex    m_bufLock;
     QList<TFWBuffer*> m_writeBuffers;     // protected by buflock
     QList<TFWBuffer*> m_emptyBuffers;     // protected by buflock
 

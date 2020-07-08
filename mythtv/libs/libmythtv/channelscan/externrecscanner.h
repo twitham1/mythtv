@@ -3,8 +3,8 @@
  *  Distributed as part of MythTV under GPL v2 and later.
  */
 
-#ifndef _EXTERNREC_CHANNEL_FETCHER_H_
-#define _EXTERNREC_CHANNEL_FETCHER_H_
+#ifndef EXTERNREC_CHANNEL_FETCHER_H
+#define EXTERNREC_CHANNEL_FETCHER_H
 
 // Qt headers
 #include <QString>
@@ -24,9 +24,9 @@ class ExternRecChannelScanner : public QRunnable
     Q_DECLARE_TR_FUNCTIONS(ExternRecChannelScanner);
 
   public:
-    ExternRecChannelScanner(uint cardid, const QString &inputname, uint sourceid,
+    ExternRecChannelScanner(uint cardid, QString inputname, uint sourceid,
                             ScanMonitor *monitor = nullptr);
-    ~ExternRecChannelScanner();
+    ~ExternRecChannelScanner() override;
 
     void Scan(void);
     void Stop(void);
@@ -40,18 +40,18 @@ class ExternRecChannelScanner : public QRunnable
     void run(void) override; // QRunnable
 
   private:
-    ScanMonitor *m_scan_monitor   {nullptr};
-    uint         m_cardid;
-    QString      m_inputname;
-    uint         m_sourceid;
-    uint         m_channel_total  {0};
-    uint         m_channel_cnt    {1};
-    bool         m_thread_running {false};
-    bool         m_stop_now       {false};
-    MThread     *m_thread         {nullptr};
+    ScanMonitor *m_scanMonitor   {nullptr};
+    uint         m_cardId;
+    QString      m_inputName;
+    uint         m_sourceId;
+    uint         m_channelTotal  {0};
+    uint         m_channelCnt    {1};
+    bool         m_threadRunning {false};
+    bool         m_stopNow       {false};
+    MThread     *m_thread        {nullptr};
     QMutex       m_lock;
 };
 
-#endif // _EXTERNREC_CHANNEL_FETCHER_H_
+#endif // EXTERNREC_CHANNEL_FETCHER_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

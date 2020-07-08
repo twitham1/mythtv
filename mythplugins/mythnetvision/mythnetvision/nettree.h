@@ -44,10 +44,10 @@ class NetTree : public NetBase
 
   public:
     NetTree(DialogType type, MythScreenStack *parent, const char *name = nullptr);
-    ~NetTree();
+    ~NetTree() override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
   protected:
     ResultItem *GetStreamItem() override; // NetBase
@@ -66,14 +66,14 @@ class NetTree : public NetBase
     void BuildGenericTree(MythGenericTree *dst,
                           QStringList paths,
                           const QString& dirthumb,
-                          QList<ResultItem*> videos);
+                          const QList<ResultItem*>& videos);
 
     void AddFileNode(MythGenericTree *where_to_add,
                      ResultItem *video);
 
     void SwitchView(void);
 
-    void SetSubfolderData(MythGenericTree *folder);
+    static void SetSubfolderData(MythGenericTree *folder);
     void UpdateResultItem(ResultItem *item);
     void UpdateSiteItem(RSSSite *site);
     void UpdateCurrentItem(void);
@@ -123,9 +123,9 @@ class NetTree : public NetBase
     void customEvent(QEvent *levent) override; // NetBase
 
   protected:
-    static const QString RSSNode;
-    static const QString SearchNode;
-    static const QString DownloadNode;
+    static const QString kRSSNode;
+    static const QString kSearchNode;
+    static const QString kDownloadNode;
 };
 
 #endif

@@ -23,8 +23,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef _SERVICEUTIL_H_
-#define _SERVICEUTIL_H_
+#ifndef SERVICEUTIL_H
+#define SERVICEUTIL_H
 
 #include "datacontracts/programAndChannel.h"
 #include "datacontracts/recRule.h"
@@ -45,6 +45,13 @@
 #include "channelinfo.h"
 #include "recordinginfo.h"
 #include "musicmetadata.h"
+
+#define ADD_SQL(settings_var, bindvar, col, api_param, val) { \
+    (settings_var) += QString("%1=:%2, ").arg(col).arg(api_param); \
+    (bindvar)[QString(":").append(api_param)] = val; \
+    }
+
+#define HAS_PARAM(p) m_parsedParams.contains(p)
 
 const QStringList KnownServices = { "Capture", "Channel", "Content", \
                                     "Dvr",     "Guide",   "Music",   \
@@ -95,4 +102,4 @@ void FillCommBreak( DTC::CutList* pCutList, RecordingInfo* rInfo, int marktype);
 void FillSeek(DTC::CutList* pCutList, RecordingInfo* rInfo, MarkTypes marktype);
 
 
-#endif
+#endif // SERVICEUTIL_H

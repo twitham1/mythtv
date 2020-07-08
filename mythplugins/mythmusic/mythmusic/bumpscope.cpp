@@ -32,11 +32,11 @@ BumpScope::BumpScope()
 
 BumpScope::~BumpScope()
 {
-    delete [] m_rgb_buf;
+    delete [] m_rgbBuf;
     delete m_image;
-    for (size_t i = 0; i < m_phongdat.size(); i++)
-        m_phongdat[i].resize(0);
-    m_phongdat.resize(0);
+    for (auto & dat : m_phongDat)
+        dat.resize(0);
+    m_phongDat.resize(0);
 }
 
 void BumpScope::resize(const QSize &newsize)
@@ -46,11 +46,11 @@ void BumpScope::resize(const QSize &newsize)
     m_size.setHeight((m_size.height() / 2) * 2);
     m_size.setWidth((m_size.width() / 4) * 4);
 
-    delete [] m_rgb_buf;
+    delete [] m_rgbBuf;
 
     int bufsize = (m_size.height() + 2) * (m_size.width() + 2);
 
-    m_rgb_buf = new unsigned char[bufsize];
+    m_rgbBuf = new unsigned char[bufsize];
 
     m_bpl = m_size.width() + 2;
 
@@ -59,14 +59,14 @@ void BumpScope::resize(const QSize &newsize)
 
     m_width = m_size.width();
     m_height = m_size.height();
-    m_phongrad = m_width;
+    m_phongRad = m_width;
 
     m_x = m_width / 2;
     m_y = m_height;
 
-    m_phongdat.resize(m_phongrad * 2);
-    for (size_t i = 0; i < m_phongdat.size(); i++)
-        m_phongdat[i].resize(m_phongrad * 2);
+    m_phongDat.resize(m_phongRad * 2);
+    for (auto & dat : m_phongDat)
+        dat.resize(m_phongRad * 2);
 
     generate_phongdat();
     generate_cmap(m_color);
@@ -98,16 +98,15 @@ void BumpScope::generate_cmap(unsigned int color)
 
         for (uint i = 255; i > 0; i--)
         {
-             uint r, g, b;
-             r = (unsigned int)((100 * static_cast<double>(red) / 255)
+             uint r = (unsigned int)((100 * static_cast<double>(red) / 255)
                                 * m_intense1[i] + m_intense2[i]);
              if (r > 255)
                  r = 255;
-             g = (unsigned int)((100 * static_cast<double>(green) / 255)
+             uint g = (unsigned int)((100 * static_cast<double>(green) / 255)
                                 * m_intense1[i] + m_intense2[i]);
              if (g > 255)
                  g = 255;
-             b = (unsigned int)((100 * static_cast<double>(blue) / 255)
+             uint b = (unsigned int)((100 * static_cast<double>(blue) / 255)
                                 * m_intense1[i] + m_intense2[i]);
              if (b > 255)
                  b = 255;
@@ -121,17 +120,14 @@ void BumpScope::generate_cmap(unsigned int color)
 
 void BumpScope::generate_phongdat(void)
 {
-    unsigned int y, x;
-    double i, i2;
+    unsigned int PHONGRES = m_phongRad * 2;
 
-    unsigned int PHONGRES = m_phongrad * 2;
-
-    for (y = 0; y < m_phongrad; y++)
+    for (uint y = 0; y < m_phongRad; y++)
     {
-        for (x = 0; x < m_phongrad; x++)
+        for (uint x = 0; x < m_phongRad; x++)
         {
-            i = (double)x / ((double)m_phongrad) - 1;
-            i2 = (double)y / ((double)m_phongrad) - 1;
+            double i = (double)x / ((double)m_phongRad) - 1;
+            double i2 = (double)y / ((double)m_phongRad) - 1;
 
             //if (m_diamond)
                i = 1 - pow(i*i2,.75) - i*i - i2*i2;
@@ -147,19 +143,19 @@ void BumpScope::generate_phongdat(void)
 
                 if (i > 255)
                     i = 255;
-                unsigned char uci = (unsigned char)i;
+                auto uci = (unsigned char)i;
 
-                m_phongdat[y][x] = uci;
-                m_phongdat[(PHONGRES-1)-y][x] = uci;
-                m_phongdat[y][(PHONGRES-1)-x] = uci;
-                m_phongdat[(PHONGRES-1)-y][(PHONGRES-1)-x] = uci;
+                m_phongDat[y][x] = uci;
+                m_phongDat[(PHONGRES-1)-y][x] = uci;
+                m_phongDat[y][(PHONGRES-1)-x] = uci;
+                m_phongDat[(PHONGRES-1)-y][(PHONGRES-1)-x] = uci;
             }
             else
             {
-                m_phongdat[y][x] = 0;
-                m_phongdat[(PHONGRES-1)-y][x] = 0;
-                m_phongdat[y][(PHONGRES-1)-x] = 0;
-                m_phongdat[(PHONGRES-1)-y][(PHONGRES-1)-x] = 0;
+                m_phongDat[y][x] = 0;
+                m_phongDat[(PHONGRES-1)-y][x] = 0;
+                m_phongDat[y][(PHONGRES-1)-x] = 0;
+                m_phongDat[(PHONGRES-1)-y][(PHONGRES-1)-x] = 0;
             }
         }
     }
@@ -167,7 +163,7 @@ void BumpScope::generate_phongdat(void)
 
 #define M_PI_F static_cast<float>(M_PI)
 void BumpScope::translate(int x, int y, int *xo, int *yo, int *xd, int *yd,
-                          int *angle)
+                          int *angle) const
 {
     unsigned int HEIGHT = m_height;
     unsigned int WIDTH = m_width;
@@ -217,15 +213,12 @@ void BumpScope::translate(int x, int y, int *xo, int *yo, int *xd, int *yd,
 }
 
 inline void BumpScope::draw_vert_line(unsigned char *buffer, int x, int y1,
-                                      int y2)
+                                      int y2) const
 {
-    int y;
-    unsigned char *p;
-
     if (y1 < y2)
     {
-        p = buffer + ((y1 + 1) * m_bpl) + x + 1;
-        for (y = y1; y <= y2; y++)
+        uchar *p = buffer + ((y1 + 1) * m_bpl) + x + 1;
+        for (int y = y1; y <= y2; y++)
         {
             *p = 0xff;
             p += m_bpl;
@@ -233,8 +226,8 @@ inline void BumpScope::draw_vert_line(unsigned char *buffer, int x, int y1,
     }
     else if (y2 < y1)
     {
-        p = buffer + ((y2 + 1) * m_bpl) + x + 1;
-        for (y = y2; y <= y1; y++)
+        uchar *p = buffer + ((y2 + 1) * m_bpl) + x + 1;
+        for (int y = y2; y <= y1; y++)
         {
             *p = 0xff;
             p += m_bpl;
@@ -246,12 +239,14 @@ inline void BumpScope::draw_vert_line(unsigned char *buffer, int x, int y1,
 
 void BumpScope::render_light(int lx, int ly)
 {
-    int prev_y, out_y, dy, dx, xp, yp;
-    unsigned int PHONGRES = m_phongrad * 2;
-    unsigned int i, j;
+    int dx = 0;
+    int dy = 0;
+    unsigned int PHONGRES = m_phongRad * 2;
+    unsigned int i = 0;
+    unsigned int j = 0;
 
-    prev_y = m_bpl + 1;
-    out_y = 0;
+    int prev_y = m_bpl + 1;
+    int out_y = 0;
     unsigned char *outputbuf = m_image->bits();
 
     for (dy = (-ly) + (PHONGRES / 2), j = 0; j < m_height; j++, dy++,
@@ -260,8 +255,8 @@ void BumpScope::render_light(int lx, int ly)
         for (dx = (-lx) + (PHONGRES / 2), i = 0; i < m_width; i++, dx++,
              prev_y++, out_y++)
         {
-            xp = (m_rgb_buf[prev_y - 1] - m_rgb_buf[prev_y + 1]) + dx;
-            yp = (m_rgb_buf[prev_y - m_bpl] - m_rgb_buf[prev_y + m_bpl]) + dy;
+            int xp = (m_rgbBuf[prev_y - 1] - m_rgbBuf[prev_y + 1]) + dx;
+            int yp = (m_rgbBuf[prev_y - m_bpl] - m_rgbBuf[prev_y + m_bpl]) + dy;
 
             if (yp < 0 || yp >= (int)PHONGRES ||
                 xp < 0 || xp >= (int)PHONGRES)
@@ -270,7 +265,7 @@ void BumpScope::render_light(int lx, int ly)
                 continue;
             }
 
-            outputbuf[out_y] = m_phongdat[yp][xp];
+            outputbuf[out_y] = m_phongDat[yp][xp];
         }
     }
 }
@@ -311,7 +306,9 @@ void BumpScope::rgb_to_hsv(unsigned int color, double *h, double *s, double *v)
 
 void BumpScope::hsv_to_rgb(double h, double s, double v, unsigned int *color)
 {
-  double r, g, b;
+  double r = NAN;
+  double g = NAN;
+  double b = NAN;
 
   if (s == 0.0)
     s = 0.000001;
@@ -372,11 +369,11 @@ bool BumpScope::process(VisualNode *node)
         if (y >= (int)m_height)
             y = m_height - 1;
 
-        draw_vert_line(m_rgb_buf, i, prev_y, y);
+        draw_vert_line(m_rgbBuf, i, prev_y, y);
         prev_y = y;
     }
 
-    blur_8(m_rgb_buf, m_width, m_height, m_bpl);
+    blur_8(m_rgbBuf, m_width, m_height, m_bpl);
 
     return false;
 }
@@ -394,12 +391,12 @@ bool BumpScope::draw(QPainter *p, const QColor &back)
     m_ilx = m_x;
     m_ily = m_y;
 
-    if (m_moving_light)
+    if (m_movingLight)
     {
-        if (!m_was_moving)
+        if (!m_wasMoving)
         {
             translate(m_ilx, m_ily, &m_ixo, &m_iyo, &m_ixd, &m_iyd, &m_iangle);
-            m_was_moving = 1;
+            m_wasMoving = 1;
         }
 
         m_ilx = (int)(m_width / 2.0F + cosf(m_iangle * (M_PI / 180.0)) * m_ixo);
@@ -442,12 +439,12 @@ bool BumpScope::draw(QPainter *p, const QColor &back)
         }
     }
 
-    if (m_color_cycle)
+    if (m_colorCycle)
     {
-        if (!m_was_color)
+        if (!m_wasColor)
         {
             rgb_to_hsv(m_color, &m_ih, &m_is, &m_iv);
-            m_was_color = 1;
+            m_wasColor = 1;
 
             if (random() & 1)
             {
@@ -530,9 +527,9 @@ static class BumpScopeFactory : public VisFactory
   public:
     const QString &name(void) const override // VisFactory
     {
-        static QString name = QCoreApplication::translate("Visualizers",
-                                                          "BumpScope");
-        return name;
+        static QString s_name = QCoreApplication::translate("Visualizers",
+                                                            "BumpScope");
+        return s_name;
     }
 
     uint plugins(QStringList *list) const override // VisFactory

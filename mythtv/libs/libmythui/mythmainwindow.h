@@ -1,8 +1,10 @@
 #ifndef MYTHMAINWINDOW_H_
 #define MYTHMAINWINDOW_H_
 
+// Qt
 #include <QWidget>
 
+// MythTV
 #include "mythscreenstack.h"
 #include "mythnotificationcenter.h"
 #include "mythuiactions.h"
@@ -19,30 +21,29 @@ class MythMediaDevice;
 #define REG_JUMPEX(a, b, c, d, e) GetMythMainWindow()->RegisterJump(a, b, c, d, e)
 #define REG_MEDIAPLAYER(a,b,c) GetMythMainWindow()->RegisterMediaPlugin(a, b, c)
 
-typedef int (*MediaPlayCallback)(const QString &, const QString &, const QString &, const QString &, const QString &, int, int, const QString &, int, const QString &, const QString &, bool);
+using MediaPlayCallback = int (*)(const QString &, const QString &, const QString &, const QString &, const QString &, int, int, const QString &, int, const QString &, const QString &, bool);
 
+class MythDisplay;
+class MythInputDeviceHandler;
 class MythMainWindowPrivate;
-
-class MythPainterWindowGL;
-class MythPainterWindowQt;
-class MythPainterWindowVDPAU;
-class MythPainterWindowD3D9;
+class MythPainterWindow;
 class MythRender;
 
 class MUI_PUBLIC MythMainWindow : public QWidget
 {
     Q_OBJECT
-    friend class MythPainterWindowGL;
+    friend class MythPainterWindowOpenGL;
+    friend class MythPainterWindowVulkan;
     friend class MythPainterWindowQt;
-    friend class MythPainterWindowVDPAU;
-    friend class MythPainterWindowD3D9;
 
   public:
     enum {drawRefresh = 70};
 
-    void Init(const QString& forcedpainter = QString(), bool mayReInit=true);
+    void Init(bool mayReInit = true);
     void ReinitDone(void);
     void Show(void);
+    void MoveResize(QRect &Geometry);
+    static bool WindowIsAlwaysFullscreen(void);
 
     void AddScreenStack(MythScreenStack *stack, bool main = false);
     void PopScreenStack();
@@ -63,7 +64,8 @@ class MUI_PUBLIC MythMainWindow : public QWidget
                  const QString &key);
     void RegisterKey(const QString &context, const QString &action,
                      const QString &description, const QString &key);
-    QString GetKey(const QString &context, const QString &action) const;
+    static QString GetKey(const QString &context, const QString &action);
+    QObject *getTarget(QKeyEvent &key);
     QString GetActionText(const QString &context, const QString &action) const;
 
     void ClearJump(const QString &destination);
@@ -82,7 +84,7 @@ class MUI_PUBLIC MythMainWindow : public QWidget
                      int season=0, int episode=0, const QString& inetref="",
                      int lenMins=120, const QString& year="1895",
                      const QString &id="", bool useBookmarks = false);
-    void HandleTVPower(bool poweron);
+    void HandleTVAction(const QString &Action);
 
     void JumpTo(const QString &destination, bool pop = true);
     bool DestinationExists(const QString &destination) const;
@@ -90,7 +92,7 @@ class MUI_PUBLIC MythMainWindow : public QWidget
 
     bool IsExitingToMain(void) const;
 
-    static MythMainWindow *getMainWindow(const bool useDB = true);
+    static MythMainWindow *getMainWindow(bool useDB = true);
     static void destroyMainWindow();
 
     MythPainter *GetCurrentPainter();
@@ -99,11 +101,10 @@ class MUI_PUBLIC MythMainWindow : public QWidget
     MythNotificationCenter *GetCurrentNotificationCenter();
     void         ShowPainterWindow();
     void         HidePainterWindow();
-    void         ResizePainterWindow(const QSize &size);
 
-    void GrabWindow(QImage &image);
-    bool SaveScreenShot(const QImage &image, QString filename = "");
-    bool ScreenShot(int w = 0, int h = 0, QString filename = "");
+    static void GrabWindow(QImage &image);
+    static bool SaveScreenShot(const QImage &image, QString filename = "");
+    static bool ScreenShot(int w = 0, int h = 0, QString filename = "");
     void RemoteScreenShot(QString filename, int x, int y);
 
     void AllowInput(bool allow);
@@ -116,22 +117,14 @@ class MUI_PUBLIC MythMainWindow : public QWidget
     MythRect NormRect(const MythRect &rect);
     QPoint NormPoint(const QPoint &point);
     QSize NormSize(const QSize &size);
-    int NormX(const int x);
-    int NormY(const int y);
+    int NormX(int x);
+    int NormY(int y);
     void SetScalingFactors(float wmult, float hmult);
-
-    void StartLIRC(void);
-
-    /* compatibility functions, to go away once everything's mythui */
-    void attach(QWidget *child);
-    void detach(QWidget *child);
-
-    QWidget *currentWidget(void);
-
+    void RestartInputHandlers(void);
     uint PushDrawDisabled(void);
     uint PopDrawDisabled(void);
     void SetEffectsEnabled(bool enable);
-    void draw(MythPainter *painter = nullptr);
+    void Draw(MythPainter *Painter = nullptr);
 
     void ResetIdleTimer(void);
     void PauseIdleTimer(bool pause);
@@ -155,33 +148,35 @@ class MUI_PUBLIC MythMainWindow : public QWidget
   signals:
     void signalRemoteScreenShot(QString filename, int x, int y);
     void signalSetDrawEnabled(bool enable);
+    void signalWindowReady(void);
 
   protected:
-    explicit MythMainWindow(const bool useDB = true);
-    virtual ~MythMainWindow();
+    explicit MythMainWindow(bool useDB = true);
+    ~MythMainWindow() override;
 
     void InitKeys(void);
 
     bool eventFilter(QObject *o, QEvent *e) override; // QWidget
     void customEvent(QEvent *ce) override; // QWidget
     void closeEvent(QCloseEvent *e) override; // QWidget
-
-    void drawScreen();
-
+    void drawScreen(QPaintEvent* Event = nullptr);
     bool event(QEvent* e) override; // QWidget
-
     void ExitToMainMenu();
-
-    QObject *getTarget(QKeyEvent &key);
-
-    void LockInputDevices(bool locked);
-
     void ShowMouseCursor(bool show);
 
-    MythMainWindowPrivate *d {nullptr};
+    MythMainWindowPrivate *d {nullptr}; // NOLINT(readability-identifier-naming)
 
   private slots:
     void DelayedAction(void);
+
+  private:
+    MythDisplay*       m_display       { nullptr };
+    QRegion            m_repaintRegion;
+    MythPainter*       m_painter       { nullptr };
+    MythPainter*       m_oldPainter    { nullptr };
+    MythPainterWindow* m_painterWin    { nullptr };
+    MythPainterWindow* m_oldPainterWin { nullptr };
+    MythInputDeviceHandler* m_deviceHandler { nullptr };
 };
 
 MUI_PUBLIC MythMainWindow *GetMythMainWindow();

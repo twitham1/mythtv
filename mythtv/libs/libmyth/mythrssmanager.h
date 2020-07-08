@@ -27,7 +27,7 @@ class MPUBLIC RSSSite : public QObject
       public:
         void clear(void)
         {
-            while (size())
+            while (!empty())
             {
                 RSSSite *tmp = back();
                 pop_back();
@@ -36,19 +36,19 @@ class MPUBLIC RSSSite : public QObject
         }
     };
 
-    RSSSite(const QString& title,
-                  const QString& sortTitle,
-                  const QString& image,
-                  const ArticleType& type,
-                  const QString& description,
-                  const QString& url,
-                  const QString& author,
-                  const bool& download,
-                  const QDateTime& updated);
+    RSSSite(QString title,
+            QString sortTitle,
+            QString image,
+            const ArticleType& type,
+            QString description,
+            QString url,
+            QString author,
+            const bool& download,
+            QDateTime updated);
 
-    ~RSSSite() = default;
+    ~RSSSite() override = default;
 
-    typedef QList<RSSSite *> rssList;
+    using rssList = QList<RSSSite *>;
 
     const QString& GetTitle() const { return m_title; }
     const QString& GetSortTitle() const { return m_sortTitle; }
@@ -73,8 +73,8 @@ class MPUBLIC RSSSite : public QObject
 
   private:
 
-    QUrl redirectUrl(const QUrl& possibleRedirectUrl,
-                     const QUrl& oldRedirectUrl) const;
+    static QUrl redirectUrl(const QUrl& possibleRedirectUrl,
+                            const QUrl& oldRedirectUrl) ;
 
     QString     m_title;
     QString     m_sortTitle;
@@ -112,7 +112,7 @@ class MPUBLIC RSSManager : public QObject
 
   public:
     RSSManager();
-    ~RSSManager();
+    ~RSSManager() override;
     void startTimer();
     void stopTimer();
 
@@ -124,7 +124,7 @@ class MPUBLIC RSSManager : public QObject
 
   private slots:
     void slotRefreshRSS(void);
-    void slotRSSRetrieved(RSSSite*);
+    void slotRSSRetrieved(RSSSite *site);
 
   private:
     void processAndInsertRSS(RSSSite *site);

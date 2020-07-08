@@ -23,9 +23,9 @@ using namespace std;
 #include "mthread.h"
 
 #define DBG_SM(FUNC, MSG) LOG(VB_CHANNEL, LOG_DEBUG, \
-    QString("SM(%1)::%2: %3") .arg(channel->GetDevice()).arg(FUNC).arg(<MSG));
+    QString("SM(%1)::%2: %3") .arg(channel->GetDevice()).arg(FUNC).arg(<(MSG)));
 
-inline QString sm_flags_to_string(uint64_t);
+inline QString sm_flags_to_string(uint64_t flags);
 
 class TVRec;
 
@@ -40,7 +40,10 @@ class SignalMonitor : protected MThread
     static SignalMonitor *Init(const QString& cardtype, int db_cardnum,
                                ChannelBase *channel,
                                bool release_stream);
-    virtual ~SignalMonitor();
+    ~SignalMonitor() override;
+
+    // Prevent implicit conversion of wrongly ordered arguments
+    SignalMonitor(int, ChannelBase *, uint64_t, bool) = delete;
 
     // // // // // // // // // // // // // // // // // // // // // // // //
     // Control  // // // // // // // // // // // // // // // // // // // //
@@ -67,6 +70,7 @@ class SignalMonitor : protected MThread
     /// \brief Returns milliseconds between signal monitoring events.
     int GetUpdateRate() const { return m_update_rate; }
     virtual QStringList GetStatusList(void) const;
+    int GetSignalStrength(void) { return m_signalStrength.GetNormalizedValue(0,100); }
 
     /// \brief Returns true iff scriptStatus.IsGood() and signalLock.IsGood()
     ///        return true
@@ -119,8 +123,6 @@ class SignalMonitor : protected MThread
   protected:
     SignalMonitor(int _inputid, ChannelBase *_channel,
                   bool _release_stream, uint64_t wait_for_mask);
-    // Prevent implicit conversion of wrongly ordered arguments
-    SignalMonitor(int, ChannelBase *, uint64_t, bool) = delete;
 
     void run(void) override; // MThread
 

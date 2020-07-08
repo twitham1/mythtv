@@ -39,15 +39,15 @@ class ProgLister : public ScheduleCommon
 
   public:
     ProgLister(MythScreenStack *parent, ProgListType pltype,
-               const QString &view, const QString &extraArg,
-               const QDateTime &selectedTime = QDateTime());
+               QString view, QString extraArg,
+               QDateTime selectedTime = QDateTime());
     explicit ProgLister(MythScreenStack *parent, uint recid = 0,
-                        const QString &title = QString());
-    ~ProgLister();
+                        QString title = QString());
+    ~ProgLister() override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
-    void customEvent(QEvent *) override; // ScheduleCommon
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
+    void customEvent(QEvent *event) override; // ScheduleCommon
 
   protected slots:
     void HandleSelected(MythUIButtonListItem *item);
@@ -83,14 +83,14 @@ class ProgLister : public ScheduleCommon
     void SwitchToPreviousView(void);
     void SwitchToNextView(void);
 
-    typedef enum { kTimeSort, kPrevTitleSort, kTitleSort, } SortBy;
+    enum SortBy { kTimeSort, kPrevTitleSort, kTitleSort, };
     SortBy GetSortBy(void) const;
     void SortList(SortBy sortby, bool reverseSort);
 
     ProgramInfo *GetCurrentProgram(void) const override; // ScheduleCommon
 
-    bool PowerStringToSQL(
-        const QString &qphrase, QString &output, MSqlBindings &bindings) const;
+    static bool PowerStringToSQL(
+        const QString &qphrase, QString &output, MSqlBindings &bindings) ;
 
   private:
     ProgListType      m_type;

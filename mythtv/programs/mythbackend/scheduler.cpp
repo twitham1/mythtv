@@ -60,18 +60,16 @@ Scheduler::Scheduler(bool runthread, QMap<int, EncoderLink *> *tvList,
     MThread("Scheduler"),
     m_recordTable(tmptable),
     m_priorityTable("powerpriority"),
-    m_specsched(master_sched),
+    m_specSched(master_sched),
     m_tvList(tvList),
     m_doRun(runthread),
-    m_livetvTime(QDateTime()),
-    m_lastPrepareTime(QDateTime()),
     m_openEnd(openEndNever)
 {
     char *debug = getenv("DEBUG_CONFLICTS");
     debugConflicts = (debug != nullptr);
 
     if (master_sched)
-        master_sched->GetAllPending(m_reclist);
+        master_sched->GetAllPending(m_recList);
 
     if (!m_doRun)
         m_dbConn = MSqlQuery::ChannelCon();
@@ -111,25 +109,25 @@ Scheduler::~Scheduler()
         locker.relock();
     }
 
-    while (!m_reclist.empty())
+    while (!m_recList.empty())
     {
-        delete m_reclist.back();
-        m_reclist.pop_back();
+        delete m_recList.back();
+        m_recList.pop_back();
     }
 
-    while (!m_worklist.empty())
+    while (!m_workList.empty())
     {
-        delete m_worklist.back();
-        m_worklist.pop_back();
+        delete m_workList.back();
+        m_workList.pop_back();
     }
 
-    while (!m_conflictlists.empty())
+    while (!m_conflictLists.empty())
     {
-        delete m_conflictlists.back();
-        m_conflictlists.pop_back();
+        delete m_conflictLists.back();
+        m_conflictLists.pop_back();
     }
 
-    m_sinputinfomap.clear();
+    m_sinputInfoMap.clear();
 
     locker.unlock();
     wait();
@@ -149,9 +147,9 @@ void Scheduler::SetMainServer(MainServer *ms)
 
 void Scheduler::ResetIdleTime(void)
 {
-    m_resetIdleTime_lock.lock();
+    m_resetIdleTimeLock.lock();
     m_resetIdleTime = true;
-    m_resetIdleTime_lock.unlock();
+    m_resetIdleTimeLock.unlock();
 }
 
 bool Scheduler::VerifyCards(void)
@@ -311,14 +309,16 @@ static bool comp_recstart(RecordingInfo *a, RecordingInfo *b)
 
 static bool comp_priority(RecordingInfo *a, RecordingInfo *b)
 {
-    int arec = (a->GetRecordingStatus() != RecStatus::Recording &&
-                a->GetRecordingStatus() != RecStatus::Tuning &&
-                a->GetRecordingStatus() != RecStatus::Failing &&
-                a->GetRecordingStatus() != RecStatus::Pending);
-    int brec = (b->GetRecordingStatus() != RecStatus::Recording &&
-                b->GetRecordingStatus() != RecStatus::Tuning &&
-                b->GetRecordingStatus() != RecStatus::Failing &&
-                b->GetRecordingStatus() != RecStatus::Pending);
+    int arec = static_cast<int>
+        (a->GetRecordingStatus() != RecStatus::Recording &&
+         a->GetRecordingStatus() != RecStatus::Tuning &&
+         a->GetRecordingStatus() != RecStatus::Failing &&
+         a->GetRecordingStatus() != RecStatus::Pending);
+    int brec = static_cast<int>
+        (b->GetRecordingStatus() != RecStatus::Recording &&
+         b->GetRecordingStatus() != RecStatus::Tuning &&
+         b->GetRecordingStatus() != RecStatus::Failing &&
+         b->GetRecordingStatus() != RecStatus::Pending);
 
     if (arec != brec)
         return arec < brec;
@@ -329,16 +329,20 @@ static bool comp_priority(RecordingInfo *a, RecordingInfo *b)
     if (a->GetRecordingPriority2() != b->GetRecordingPriority2())
         return a->GetRecordingPriority2() > b->GetRecordingPriority2();
 
-    int atype = (a->GetRecordingRuleType() == kOverrideRecord ||
-                 a->GetRecordingRuleType() == kSingleRecord);
-    int btype = (b->GetRecordingRuleType() == kOverrideRecord ||
-                 b->GetRecordingRuleType() == kSingleRecord);
+    int atype = static_cast<int>
+        (a->GetRecordingRuleType() == kOverrideRecord ||
+         a->GetRecordingRuleType() == kSingleRecord);
+    int btype = static_cast<int>
+         (b->GetRecordingRuleType() == kOverrideRecord ||
+          b->GetRecordingRuleType() == kSingleRecord);
     if (atype != btype)
         return atype > btype;
 
     QDateTime pasttime = MythDate::current().addSecs(-30);
-    int apast = (a->GetRecordingStartTime() < pasttime && !a->IsReactivated());
-    int bpast = (b->GetRecordingStartTime() < pasttime && !b->IsReactivated());
+    int apast = static_cast<int>
+        (a->GetRecordingStartTime() < pasttime && !a->IsReactivated());
+    int bpast = static_cast<int>
+        (b->GetRecordingStartTime() < pasttime && !b->IsReactivated());
     if (apast != bpast)
         return apast < bpast;
 
@@ -360,8 +364,8 @@ static bool comp_priority(RecordingInfo *a, RecordingInfo *b)
     if (a->GetDescription() != b->GetDescription())
         return a->GetDescription() < b->GetDescription();
 
-    if (a->m_schedorder != b->m_schedorder)
-        return a->m_schedorder < b->m_schedorder;
+    if (a->m_schedOrder != b->m_schedOrder)
+        return a->m_schedOrder < b->m_schedOrder;
 
     if (a->GetInputID() != b->GetInputID())
         return a->GetInputID() < b->GetInputID();
@@ -371,10 +375,12 @@ static bool comp_priority(RecordingInfo *a, RecordingInfo *b)
 
 static bool comp_retry(RecordingInfo *a, RecordingInfo *b)
 {
-    int arec = (a->GetRecordingStatus() != RecStatus::Recording &&
-                a->GetRecordingStatus() != RecStatus::Tuning);
-    int brec = (b->GetRecordingStatus() != RecStatus::Recording &&
-                b->GetRecordingStatus() != RecStatus::Tuning);
+    int arec = static_cast<int>
+        (a->GetRecordingStatus() != RecStatus::Recording &&
+         a->GetRecordingStatus() != RecStatus::Tuning);
+    int brec = static_cast<int>
+        (b->GetRecordingStatus() != RecStatus::Recording &&
+         b->GetRecordingStatus() != RecStatus::Tuning);
 
     if (arec != brec)
         return arec < brec;
@@ -385,16 +391,20 @@ static bool comp_retry(RecordingInfo *a, RecordingInfo *b)
     if (a->GetRecordingPriority2() != b->GetRecordingPriority2())
         return a->GetRecordingPriority2() > b->GetRecordingPriority2();
 
-    int atype = (a->GetRecordingRuleType() == kOverrideRecord ||
-                 a->GetRecordingRuleType() == kSingleRecord);
-    int btype = (b->GetRecordingRuleType() == kOverrideRecord ||
-                 b->GetRecordingRuleType() == kSingleRecord);
+    int atype = static_cast<int>
+        (a->GetRecordingRuleType() == kOverrideRecord ||
+         a->GetRecordingRuleType() == kSingleRecord);
+    int btype = static_cast<int>
+         (b->GetRecordingRuleType() == kOverrideRecord ||
+          b->GetRecordingRuleType() == kSingleRecord);
     if (atype != btype)
         return atype > btype;
 
     QDateTime pasttime = MythDate::current().addSecs(-30);
-    int apast = (a->GetRecordingStartTime() < pasttime && !a->IsReactivated());
-    int bpast = (b->GetRecordingStartTime() < pasttime && !b->IsReactivated());
+    int apast = static_cast<int>
+        (a->GetRecordingStartTime() < pasttime && !a->IsReactivated());
+    int bpast = static_cast<int>
+        (b->GetRecordingStartTime() < pasttime && !b->IsReactivated());
     if (apast != bpast)
         return apast < bpast;
 
@@ -416,8 +426,8 @@ static bool comp_retry(RecordingInfo *a, RecordingInfo *b)
     if (a->GetDescription() != b->GetDescription())
         return a->GetDescription() < b->GetDescription();
 
-    if (a->m_schedorder != b->m_schedorder)
-        return a->m_schedorder > b->m_schedorder;
+    if (a->m_schedOrder != b->m_schedOrder)
+        return a->m_schedOrder > b->m_schedOrder;
 
     if (a->GetInputID() != b->GetInputID())
         return a->GetInputID() > b->GetInputID();
@@ -442,12 +452,12 @@ bool Scheduler::FillRecordList(void)
     AddNotListed();
 
     LOG(VB_SCHEDULE, LOG_INFO, "Sort by time...");
-    SORT_RECLIST(m_worklist, comp_overlap);
+    SORT_RECLIST(m_workList, comp_overlap);
     LOG(VB_SCHEDULE, LOG_INFO, "PruneOverlaps...");
     PruneOverlaps();
 
     LOG(VB_SCHEDULE, LOG_INFO, "Sort by priority...");
-    SORT_RECLIST(m_worklist, comp_priority);
+    SORT_RECLIST(m_workList, comp_priority);
     LOG(VB_SCHEDULE, LOG_INFO, "BuildListMaps...");
     BuildListMaps();
     LOG(VB_SCHEDULE, LOG_INFO, "SchedNewRecords...");
@@ -460,12 +470,12 @@ bool Scheduler::FillRecordList(void)
     m_schedLock.lock();
 
     LOG(VB_SCHEDULE, LOG_INFO, "Sort by time...");
-    SORT_RECLIST(m_worklist, comp_redundant);
+    SORT_RECLIST(m_workList, comp_redundant);
     LOG(VB_SCHEDULE, LOG_INFO, "PruneRedundants...");
     PruneRedundants();
 
     LOG(VB_SCHEDULE, LOG_INFO, "Sort by time...");
-    SORT_RECLIST(m_worklist, comp_recstart);
+    SORT_RECLIST(m_workList, comp_recstart);
     LOG(VB_SCHEDULE, LOG_INFO, "ClearWorkList...");
     bool res = ClearWorkList();
 
@@ -478,8 +488,8 @@ bool Scheduler::FillRecordList(void)
  */
 void Scheduler::FillRecordListFromDB(uint recordid)
 {
-    struct timeval fillstart, fillend;
-    float matchTime, checkTime, placeTime;
+    struct timeval fillstart {};
+    struct timeval fillend {};
 
     MSqlQuery query(m_dbConn);
     QString thequery;
@@ -493,9 +503,9 @@ void Scheduler::FillRecordListFromDB(uint recordid)
                            "SELECT * FROM recordmatch " + where + "; ";
 
     query.prepare(thequery);
-    m_recordmatchLock.lock();
+    m_recordMatchLock.lock();
     bool ok = query.exec();
-    m_recordmatchLock.unlock();
+    m_recordMatchLock.unlock();
     if (!ok)
     {
         MythDB::DBError("FillRecordListFromDB", query);
@@ -525,8 +535,8 @@ void Scheduler::FillRecordListFromDB(uint recordid)
     gettimeofday(&fillstart, nullptr);
     UpdateMatches(recordid, 0, 0, QDateTime());
     gettimeofday(&fillend, nullptr);
-    matchTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
-                 (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
+    float matchTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
+                       (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
 
     LOG(VB_SCHEDULE, LOG_INFO, "CreateTempTables...");
     CreateTempTables();
@@ -535,14 +545,14 @@ void Scheduler::FillRecordListFromDB(uint recordid)
     LOG(VB_SCHEDULE, LOG_INFO, "UpdateDuplicates...");
     UpdateDuplicates();
     gettimeofday(&fillend, nullptr);
-    checkTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
-                 (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
+    float checkTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
+                       (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
 
     gettimeofday(&fillstart, nullptr);
     FillRecordList();
     gettimeofday(&fillend, nullptr);
-    placeTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
-                 (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
+    float placeTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
+                       (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
 
     LOG(VB_SCHEDULE, LOG_INFO, "DeleteTempTables...");
     DeleteTempTables();
@@ -557,7 +567,7 @@ void Scheduler::FillRecordListFromDB(uint recordid)
 
     QString msg = QString("Speculative scheduled %1 items in %2 "
                           "= %3 match + %4 check + %5 place")
-        .arg(m_reclist.size())
+        .arg(m_recList.size())
         .arg(matchTime + checkTime + placeTime, 0, 'f', 1)
         .arg(matchTime, 0, 'f', 2)
         .arg(checkTime, 0, 'f', 2)
@@ -568,14 +578,13 @@ void Scheduler::FillRecordListFromDB(uint recordid)
 void Scheduler::FillRecordListFromMaster(void)
 {
     RecordingList schedList(false);
-    bool dummy;
+    bool dummy = false;
     LoadFromScheduler(schedList, dummy);
 
     QMutexLocker lockit(&m_schedLock);
 
-    RecordingList::iterator it = schedList.begin();
-    for (; it != schedList.end(); ++it)
-        m_reclist.push_back(*it);
+    for (auto & it : schedList)
+        m_recList.push_back(it);
 }
 
 void Scheduler::PrintList(RecList &list, bool onlyFutureRecordings)
@@ -589,11 +598,8 @@ void Scheduler::PrintList(RecList &list, bool onlyFutureRecordings)
     LOG(VB_SCHEDULE, LOG_INFO, "Title - Subtitle                     Ch Station "
                                "Day Start  End    G  I  T  N Pri");
 
-    RecIter i = list.begin();
-    for ( ; i != list.end(); ++i)
+    for (auto *first : list)
     {
-        RecordingInfo *first = (*i);
-
         if (onlyFutureRecordings &&
             ((first->GetRecordingEndTime() < now &&
               first->GetScheduledEndTime() < now) ||
@@ -638,9 +644,8 @@ void Scheduler::UpdateRecStatus(RecordingInfo *pginfo)
 {
     QMutexLocker lockit(&m_schedLock);
 
-    for (auto dreciter = m_reclist.begin(); dreciter != m_reclist.end(); ++dreciter)
+    for (auto *p : m_recList)
     {
-        RecordingInfo *p = *dreciter;
         if (p->IsSameTitleTimeslotAndChannel(*pginfo))
         {
             // FIXME!  If we are passed an RecStatus::Unknown recstatus, an
@@ -674,7 +679,7 @@ void Scheduler::UpdateRecStatus(RecordingInfo *pginfo)
                      (pginfo->GetRecordingStatus() != RecStatus::Recording &&
                       pginfo->GetRecordingStatus() != RecStatus::Tuning));
                 p->SetRecordingStatus(pginfo->GetRecordingStatus());
-                m_reclist_changed = true;
+                m_recListChanged = true;
                 p->AddHistory(false);
                 if (resched)
                 {
@@ -699,9 +704,8 @@ void Scheduler::UpdateRecStatus(uint cardid, uint chanid,
 {
     QMutexLocker lockit(&m_schedLock);
 
-    for (auto dreciter = m_reclist.begin(); dreciter != m_reclist.end(); ++dreciter)
+    for (auto *p : m_recList)
     {
-        RecordingInfo *p = *dreciter;
         if (p->GetInputID() == cardid && p->GetChanID() == chanid &&
             p->GetScheduledStartTime() == startts)
         {
@@ -723,7 +727,7 @@ void Scheduler::UpdateRecStatus(uint cardid, uint chanid,
                      (recstatus != RecStatus::Recording &&
                       recstatus != RecStatus::Tuning));
                 p->SetRecordingStatus(recstatus);
-                m_reclist_changed = true;
+                m_recListChanged = true;
                 p->AddHistory(false);
                 if (resched)
                 {
@@ -745,7 +749,7 @@ bool Scheduler::ChangeRecordingEnd(RecordingInfo *oldp, RecordingInfo *newp)
 {
     QMutexLocker lockit(&m_schedLock);
 
-    if (m_reclist_changed)
+    if (m_recListChanged)
         return false;
 
     RecordingType oldrectype = oldp->GetRecordingRuleType();
@@ -756,7 +760,7 @@ bool Scheduler::ChangeRecordingEnd(RecordingInfo *oldp, RecordingInfo *newp)
     oldp->SetRecordingRuleID(newp->GetRecordingRuleID());
     oldp->SetRecordingEndTime(newp->GetRecordingEndTime());
 
-    if (m_specsched ||
+    if (m_specSched ||
         oldp->GetRecordingStatus() == RecStatus::Pending)
     {
         if (newp->GetRecordingEndTime() < MythDate::current())
@@ -786,14 +790,14 @@ bool Scheduler::ChangeRecordingEnd(RecordingInfo *oldp, RecordingInfo *newp)
     else
     {
         RecordingInfo *foundp = nullptr;
-        for (auto i = m_reclist.begin(); i != m_reclist.end(); ++i)
+        for (auto & p : m_recList)
         {
-            RecordingInfo *recp = *i;
+            RecordingInfo *recp = p;
             if (recp->GetInputID() == oldp->GetInputID() &&
                 recp->IsSameTitleStartTimeAndChannel(*oldp))
             {
                 *recp = *oldp;
-                foundp = *i;
+                foundp = p;
                 break;
             }
         }
@@ -801,8 +805,8 @@ bool Scheduler::ChangeRecordingEnd(RecordingInfo *oldp, RecordingInfo *newp)
         // If any pending recordings are affected, set them to
         // future conflicting and force a reschedule by marking
         // reclist as changed.
-        RecConstIter j = m_reclist.begin();
-        while (FindNextConflict(m_reclist, foundp, j, openEndNever, nullptr))
+        auto j = m_recList.cbegin();
+        while (FindNextConflict(m_recList, foundp, j, openEndNever, nullptr))
         {
             RecordingInfo *recp = *j;
             if (recp->GetRecordingStatus() == RecStatus::Pending)
@@ -810,7 +814,7 @@ bool Scheduler::ChangeRecordingEnd(RecordingInfo *oldp, RecordingInfo *newp)
                 QString schedid = recp->MakeUniqueSchedulerKey();
                 recp->SetRecordingStatus(RecStatus::Conflict);
                 recp->AddHistory(false, false, true);
-                m_reclist_changed = true;
+                m_recListChanged = true;
             }
             ++j;
         }
@@ -824,16 +828,12 @@ void Scheduler::SlaveConnected(RecordingList &slavelist)
     QMutexLocker lockit(&m_schedLock);
     QReadLocker tvlocker(&TVRec::s_inputsLock);
 
-    RecordingList::iterator it = slavelist.begin();
-    for (; it != slavelist.end(); ++it)
+    for (auto *sp : slavelist)
     {
-        RecordingInfo *sp = *it;
         bool found = false;
 
-        for (auto ri = m_reclist.begin(); ri != m_reclist.end(); ++ri)
+        for (auto *rp : m_recList)
         {
-            RecordingInfo *rp = *ri;
-
             if (!sp->GetTitle().isEmpty() &&
                 sp->GetScheduledStartTime() == rp->GetScheduledStartTime() &&
                 sp->GetChannelSchedulingID().compare(
@@ -842,12 +842,12 @@ void Scheduler::SlaveConnected(RecordingList &slavelist)
                                        Qt::CaseInsensitive) == 0)
             {
                 if (sp->GetInputID() == rp->GetInputID() ||
-                    m_sinputinfomap[sp->GetInputID()].m_sgroupid ==
+                    m_sinputInfoMap[sp->GetInputID()].m_sgroupId ==
                     rp->GetInputID())
                 {
                     found = true;
                     rp->SetRecordingStatus(sp->GetRecordingStatus());
-                    m_reclist_changed = true;
+                    m_recListChanged = true;
                     rp->AddHistory(false);
                     LOG(VB_GENERAL, LOG_INFO,
                         QString("setting %1/%2/\"%3\" as %4")
@@ -872,7 +872,7 @@ void Scheduler::SlaveConnected(RecordingList &slavelist)
                       rp->GetRecordingStatus() == RecStatus::Failing))
             {
                 rp->SetRecordingStatus(RecStatus::Aborted);
-                m_reclist_changed = true;
+                m_recListChanged = true;
                 rp->AddHistory(false);
                 LOG(VB_GENERAL, LOG_INFO,
                     QString("setting %1/%2/\"%3\" as aborted")
@@ -884,10 +884,10 @@ void Scheduler::SlaveConnected(RecordingList &slavelist)
 
         if (sp->GetInputID() && !found)
         {
-            sp->m_mplexid = sp->QueryMplexID();
-            sp->m_sgroupid = m_sinputinfomap[sp->GetInputID()].m_sgroupid;
-            m_reclist.push_back(new RecordingInfo(*sp));
-            m_reclist_changed = true;
+            sp->m_mplexId = sp->QueryMplexID();
+            sp->m_sgroupId = m_sinputInfoMap[sp->GetInputID()].m_sgroupId;
+            m_recList.push_back(new RecordingInfo(*sp));
+            m_recListChanged = true;
             sp->AddHistory(false);
             LOG(VB_GENERAL, LOG_INFO,
                 QString("adding %1/%2/\"%3\" as recording")
@@ -902,10 +902,8 @@ void Scheduler::SlaveDisconnected(uint cardid)
 {
     QMutexLocker lockit(&m_schedLock);
 
-    for (auto ri = m_reclist.begin(); ri != m_reclist.end(); ++ri)
+    for (auto *rp : m_recList)
     {
-        RecordingInfo *rp = *ri;
-
         if (rp->GetInputID() == cardid &&
             (rp->GetRecordingStatus() == RecStatus::Recording ||
              rp->GetRecordingStatus() == RecStatus::Tuning ||
@@ -923,7 +921,7 @@ void Scheduler::SlaveDisconnected(uint cardid)
                 rp->SetRecordingStatus(RecStatus::Aborted);
                 rp->AddHistory(false);
             }
-            m_reclist_changed = true;
+            m_recListChanged = true;
             LOG(VB_GENERAL, LOG_INFO, QString("setting %1/%2/\"%3\" as aborted")
                     .arg(rp->GetInputID()).arg(rp->GetChannelSchedulingID())
                     .arg(rp->GetTitle()));
@@ -933,45 +931,42 @@ void Scheduler::SlaveDisconnected(uint cardid)
 
 void Scheduler::BuildWorkList(void)
 {
-    for (auto i = m_reclist.begin(); i != m_reclist.end(); ++i)
+    for (auto *p : m_recList)
     {
-        RecordingInfo *p = *i;
         if (p->GetRecordingStatus() == RecStatus::Recording ||
             p->GetRecordingStatus() == RecStatus::Tuning ||
             p->GetRecordingStatus() == RecStatus::Failing ||
             p->GetRecordingStatus() == RecStatus::Pending)
-            m_worklist.push_back(new RecordingInfo(*p));
+            m_workList.push_back(new RecordingInfo(*p));
     }
 }
 
 bool Scheduler::ClearWorkList(void)
 {
-    RecordingInfo *p;
-
-    if (m_reclist_changed)
+    if (m_recListChanged)
     {
-        while (!m_worklist.empty())
+        while (!m_workList.empty())
         {
-            p = m_worklist.front();
+            RecordingInfo *p = m_workList.front();
             delete p;
-            m_worklist.pop_front();
+            m_workList.pop_front();
         }
 
         return false;
     }
 
-    while (!m_reclist.empty())
+    while (!m_recList.empty())
     {
-        p = m_reclist.front();
+        RecordingInfo *p = m_recList.front();
         delete p;
-        m_reclist.pop_front();
+        m_recList.pop_front();
     }
 
-    while (!m_worklist.empty())
+    while (!m_workList.empty())
     {
-        p = m_worklist.front();
-        m_reclist.push_back(p);
-        m_worklist.pop_front();
+        RecordingInfo *p = m_workList.front();
+        m_recList.push_back(p);
+        m_workList.pop_front();
     }
 
     return true;
@@ -995,8 +990,8 @@ void Scheduler::PruneOverlaps(void)
 {
     RecordingInfo *lastp = nullptr;
 
-    RecIter dreciter = m_worklist.begin();
-    while (dreciter != m_worklist.end())
+    auto dreciter = m_workList.begin();
+    while (dreciter != m_workList.end())
     {
         RecordingInfo *p = *dreciter;
         if (!lastp || lastp->GetRecordingRuleID() == p->GetRecordingRuleID() ||
@@ -1012,16 +1007,15 @@ void Scheduler::PruneOverlaps(void)
         }
     }
 
-    erase_nulls(m_worklist);
+    erase_nulls(m_workList);
 }
 
 void Scheduler::BuildListMaps(void)
 {
     QMap<uint, uint> badinputs;
 
-    for (auto i = m_worklist.begin(); i != m_worklist.end(); ++i)
+    for (auto *p : m_workList)
     {
-        RecordingInfo *p = *i;
         if (p->GetRecordingStatus() == RecStatus::Recording ||
             p->GetRecordingStatus() == RecStatus::Tuning ||
             p->GetRecordingStatus() == RecStatus::Failing ||
@@ -1030,15 +1024,15 @@ void Scheduler::BuildListMaps(void)
             p->GetRecordingStatus() == RecStatus::Unknown)
         {
             RecList *conflictlist =
-                m_sinputinfomap[p->GetInputID()].m_conflictlist;
+                m_sinputInfoMap[p->GetInputID()].m_conflictList;
             if (!conflictlist)
             {
                 ++badinputs[p->GetInputID()];
                 continue;
             }
             conflictlist->push_back(p);
-            m_titlelistmap[p->GetTitle().toLower()].push_back(p);
-            m_recordidlistmap[p->GetRecordingRuleID()].push_back(p);
+            m_titleListMap[p->GetTitle().toLower()].push_back(p);
+            m_recordIdListMap[p->GetRecordingRuleID()].push_back(p);
         }
     }
 
@@ -1053,27 +1047,27 @@ void Scheduler::BuildListMaps(void)
 
 void Scheduler::ClearListMaps(void)
 {
-    for (size_t i = 0; i < m_conflictlists.size(); ++i)
-        m_conflictlists[i]->clear();
-    m_titlelistmap.clear();
-    m_recordidlistmap.clear();
-    m_cache_is_same_program.clear();
+    for (auto & conflict : m_conflictLists)
+        conflict->clear();
+    m_titleListMap.clear();
+    m_recordIdListMap.clear();
+    m_cacheIsSameProgram.clear();
 }
 
 bool Scheduler::IsSameProgram(
     const RecordingInfo *a, const RecordingInfo *b) const
 {
     IsSameKey X(a,b);
-    IsSameCacheType::const_iterator it = m_cache_is_same_program.find(X);
-    if (it != m_cache_is_same_program.end())
+    IsSameCacheType::const_iterator it = m_cacheIsSameProgram.find(X);
+    if (it != m_cacheIsSameProgram.end())
         return *it;
 
     IsSameKey Y(b,a);
-    it = m_cache_is_same_program.find(Y);
-    if (it != m_cache_is_same_program.end())
+    it = m_cacheIsSameProgram.find(Y);
+    if (it != m_cacheIsSameProgram.end())
         return *it;
 
-    return m_cache_is_same_program[X] = a->IsDuplicateProgram(*b);
+    return m_cacheIsSameProgram[X] = a->IsDuplicateProgram(*b);
 }
 
 bool Scheduler::FindNextConflict(
@@ -1101,7 +1095,7 @@ bool Scheduler::FindNextConflict(
         if (p->GetInputID() != q->GetInputID())
         {
             const vector <uint> &conflicting_inputs =
-                m_sinputinfomap[p->GetInputID()].m_conflicting_inputs;
+                m_sinputInfoMap[p->GetInputID()].m_conflictingInputs;
             if (find(conflicting_inputs.begin(), conflicting_inputs.end(),
                      q->GetInputID()) == conflicting_inputs.end())
             {
@@ -1120,10 +1114,10 @@ bool Scheduler::FindNextConflict(
         }
 
         bool mplexid_ok =
-            (p->m_sgroupid != q->m_sgroupid ||
-             m_sinputinfomap[p->m_sgroupid].m_schedgroup) &&
-            (((p->m_mplexid != 0U) && p->m_mplexid == q->m_mplexid) ||
-             ((p->m_mplexid == 0U) && p->GetChanID() == q->GetChanID()));
+            (p->m_sgroupId != q->m_sgroupId ||
+             m_sinputInfoMap[p->m_sgroupId].m_schedGroup) &&
+            (((p->m_mplexId != 0U) && p->m_mplexId == q->m_mplexId) ||
+             ((p->m_mplexId == 0U) && p->GetChanID() == q->GetChanID()));
 
         if (p->GetRecordingEndTime() == q->GetRecordingStartTime() ||
             p->GetRecordingStartTime() == q->GetRecordingEndTime())
@@ -1149,7 +1143,7 @@ bool Scheduler::FindNextConflict(
                 QString("  cardid's: [%1], [%2] Share an input group"
                         "mplexid's: %3, %4")
                      .arg(p->GetInputID()).arg(q->GetInputID())
-                     .arg(p->m_mplexid).arg(q->m_mplexid));
+                     .arg(p->m_mplexId).arg(q->m_mplexId));
         }
 
         // if two inputs are in the same input group we have a conflict
@@ -1182,8 +1176,8 @@ const RecordingInfo *Scheduler::FindConflict(
     uint *affinity,
     bool checkAll) const
 {
-    RecList &conflictlist = *m_sinputinfomap[p->GetInputID()].m_conflictlist;
-    RecConstIter k = conflictlist.begin();
+    RecList &conflictlist = *m_sinputInfoMap[p->GetInputID()].m_conflictList;
+    auto k = conflictlist.cbegin();
     if (FindNextConflict(conflictlist, p, k, openend, affinity))
     {
         RecordingInfo *firstConflict = *k;
@@ -1198,31 +1192,27 @@ const RecordingInfo *Scheduler::FindConflict(
 
 void Scheduler::MarkOtherShowings(RecordingInfo *p)
 {
-    RecList *showinglist;
-
-    showinglist = &m_titlelistmap[p->GetTitle().toLower()];
+    RecList *showinglist = &m_titleListMap[p->GetTitle().toLower()];
     MarkShowingsList(*showinglist, p);
 
     if (p->GetRecordingRuleType() == kOneRecord ||
         p->GetRecordingRuleType() == kDailyRecord ||
         p->GetRecordingRuleType() == kWeeklyRecord)
     {
-        showinglist = &m_recordidlistmap[p->GetRecordingRuleID()];
+        showinglist = &m_recordIdListMap[p->GetRecordingRuleID()];
         MarkShowingsList(*showinglist, p);
     }
     else if (p->GetRecordingRuleType() == kOverrideRecord && p->GetFindID())
     {
-        showinglist = &m_recordidlistmap[p->GetParentRecordingRuleID()];
+        showinglist = &m_recordIdListMap[p->GetParentRecordingRuleID()];
         MarkShowingsList(*showinglist, p);
     }
 }
 
 void Scheduler::MarkShowingsList(RecList &showinglist, RecordingInfo *p)
 {
-    RecIter i = showinglist.begin();
-    for ( ; i != showinglist.end(); ++i)
+    for (auto *q : showinglist)
     {
-        RecordingInfo *q = *i;
         if (q == p)
             continue;
         if (q->GetRecordingStatus() != RecStatus::Unknown &&
@@ -1246,18 +1236,16 @@ void Scheduler::MarkShowingsList(RecList &showinglist, RecordingInfo *p)
 
 void Scheduler::BackupRecStatus(void)
 {
-    for (auto i = m_worklist.begin(); i != m_worklist.end(); ++i)
+    for (auto *p : m_workList)
     {
-        RecordingInfo *p = *i;
         p->m_savedrecstatus = p->GetRecordingStatus();
     }
 }
 
 void Scheduler::RestoreRecStatus(void)
 {
-    for (auto i = m_worklist.begin(); i != m_worklist.end(); ++i)
+    for (auto *p : m_workList)
     {
-        RecordingInfo *p = *i;
         p->SetRecordingStatus(p->m_savedrecstatus);
     }
 }
@@ -1273,7 +1261,7 @@ bool Scheduler::TryAnotherShowing(RecordingInfo *p, bool samePriority,
         p->GetRecordingStatus() == RecStatus::Pending)
         return false;
 
-    RecList *showinglist = &m_recordidlistmap[p->GetRecordingRuleID()];
+    RecList *showinglist = &m_recordIdListMap[p->GetRecordingRuleID()];
 
     RecStatus::Type oldstatus = p->GetRecordingStatus();
     p->SetRecordingStatus(RecStatus::LaterShowing);
@@ -1281,10 +1269,8 @@ bool Scheduler::TryAnotherShowing(RecordingInfo *p, bool samePriority,
     RecordingInfo *best = nullptr;
     uint bestaffinity = 0;
 
-    RecIter j = showinglist->begin();
-    for ( ; j != showinglist->end(); ++j)
+    for (auto *q : *showinglist)
     {
-        RecordingInfo *q = *j;
         if (q == p)
             continue;
 
@@ -1329,8 +1315,8 @@ bool Scheduler::TryAnotherShowing(RecordingInfo *p, bool samePriority,
         {
             // It is pointless to preempt another livetv session.
             // (the livetvlist contains dummy livetv pginfo's)
-            RecConstIter k = m_livetvlist.begin();
-            if (FindNextConflict(m_livetvlist, q, k))
+            auto k = m_livetvList.cbegin();
+            if (FindNextConflict(m_livetvList, q, k))
             {
                 PrintRec(q, "    #");
                 PrintRec(*k, "       !");
@@ -1398,9 +1384,8 @@ void Scheduler::SchedNewRecords(void)
     m_openEnd =
         (OpenEndType)gCoreContext->GetNumSetting("SchedOpenEnd", openEndNever);
 
-    RecIter i = m_worklist.begin();
-
-    for ( ; i != m_worklist.end(); ++i)
+    auto i = m_workList.begin();
+    for ( ; i != m_workList.end(); ++i)
     {
         if ((*i)->GetRecordingStatus() != RecStatus::Recording &&
             (*i)->GetRecordingStatus() != RecStatus::Tuning &&
@@ -1409,23 +1394,23 @@ void Scheduler::SchedNewRecords(void)
         MarkOtherShowings(*i);
     }
 
-    while (i != m_worklist.end())
+    while (i != m_workList.end())
     {
-        RecIter levelStart = i;
+        auto levelStart = i;
         int recpriority = (*i)->GetRecordingPriority();
 
-        while (i != m_worklist.end())
+        while (i != m_workList.end())
         {
-            if (i == m_worklist.end() ||
+            if (i == m_workList.end() ||
                 (*i)->GetRecordingPriority() != recpriority)
                 break;
 
-            RecIter sublevelStart = i;
+            auto sublevelStart = i;
             int recpriority2 = (*i)->GetRecordingPriority2();
             LOG(VB_SCHEDULE, LOG_DEBUG, QString("Trying priority %1/%2...")
                 .arg(recpriority).arg(recpriority2));
             // First pass for anything in this priority sublevel.
-            SchedNewFirstPass(i, m_worklist.end(), recpriority, recpriority2);
+            SchedNewFirstPass(i, m_workList.end(), recpriority, recpriority2);
 
             LOG(VB_SCHEDULE, LOG_DEBUG, QString("Retrying priority %1/%2...")
                 .arg(recpriority).arg(recpriority2));
@@ -1532,10 +1517,8 @@ void Scheduler::SchedNewRetryPass(const RecIter& start, const RecIter& end,
     }
     SORT_RECLIST(retry_list, comp_retry);
 
-    i = retry_list.begin();
-    for ( ; i != retry_list.end(); ++i)
+    for (auto *p : retry_list)
     {
-        RecordingInfo *p = *i;
         if (p->GetRecordingStatus() != RecStatus::Unknown)
             continue;
 
@@ -1552,8 +1535,8 @@ void Scheduler::SchedNewRetryPass(const RecIter& start, const RecIter& end,
 
         // Try to move each conflict.  Restore the old status if we
         // can't.
-        RecList &conflictlist = *m_sinputinfomap[p->GetInputID()].m_conflictlist;
-        RecConstIter k = conflictlist.begin();
+        RecList &conflictlist = *m_sinputInfoMap[p->GetInputID()].m_conflictList;
+        auto k = conflictlist.cbegin();
         for ( ; FindNextConflict(conflictlist, p, k); ++k)
         {
             if (!TryAnotherShowing(*k, samePriority, livetv))
@@ -1577,8 +1560,8 @@ void Scheduler::PruneRedundants(void)
     RecordingInfo *lastp = nullptr;
     int lastrecpri2 = 0;
 
-    RecIter i = m_worklist.begin();
-    while (i != m_worklist.end())
+    auto i = m_workList.begin();
+    while (i != m_workList.end())
     {
         RecordingInfo *p = *i;
 
@@ -1622,7 +1605,7 @@ void Scheduler::PruneRedundants(void)
             p->SetInputID(0);
             p->SetSourceID(0);
             p->ClearInputName();
-            p->m_sgroupid = 0;
+            p->m_sgroupId = 0;
         }
 
         // Check for redundant against last non-deleted
@@ -1650,18 +1633,18 @@ void Scheduler::PruneRedundants(void)
         }
     }
 
-    erase_nulls(m_worklist);
+    erase_nulls(m_workList);
 }
 
 void Scheduler::UpdateNextRecord(void)
 {
-    if (m_specsched)
+    if (m_specSched)
         return;
 
     QMap<int, QDateTime> nextRecMap;
 
-    RecIter i = m_reclist.begin();
-    while (i != m_reclist.end())
+    auto i = m_recList.begin();
+    while (i != m_recList.end())
     {
         RecordingInfo *p = *i;
         if ((p->GetRecordingStatus() == RecStatus::WillRecord ||
@@ -1741,8 +1724,8 @@ void Scheduler::getConflicting(RecordingInfo *pginfo, RecList *retlist)
     QMutexLocker lockit(&m_schedLock);
     QReadLocker tvlocker(&TVRec::s_inputsLock);
 
-    RecConstIter i = m_reclist.begin();
-    for (; FindNextConflict(m_reclist, pginfo, i); ++i)
+    auto i = m_recList.cbegin();
+    for (; FindNextConflict(m_recList, pginfo, i); ++i)
     {
         const RecordingInfo *p = *i;
         retlist->push_back(new RecordingInfo(*p));
@@ -1755,14 +1738,14 @@ bool Scheduler::GetAllPending(RecList &retList, int recRuleId) const
 
     bool hasconflicts = false;
 
-    for (auto it = m_reclist.begin(); it != m_reclist.end(); ++it)
+    for (auto *p : m_recList)
     {
         if (recRuleId > 0 &&
-            (*it)->GetRecordingRuleID() != static_cast<uint>(recRuleId))
+            p->GetRecordingRuleID() != static_cast<uint>(recRuleId))
             continue;
-        if ((*it)->GetRecordingStatus() == RecStatus::Conflict)
+        if (p->GetRecordingStatus() == RecStatus::Conflict)
             hasconflicts = true;
-        retList.push_back(new RecordingInfo(**it));
+        retList.push_back(new RecordingInfo(*p));
     }
 
     return hasconflicts;
@@ -1774,15 +1757,15 @@ bool Scheduler::GetAllPending(ProgramList &retList, int recRuleId) const
 
     bool hasconflicts = false;
 
-    for (auto it = m_reclist.begin(); it != m_reclist.end(); ++it)
+    for (auto *p : m_recList)
     {
         if (recRuleId > 0 &&
-            (*it)->GetRecordingRuleID() != static_cast<uint>(recRuleId))
+            p->GetRecordingRuleID() != static_cast<uint>(recRuleId))
             continue;
 
-        if ((*it)->GetRecordingStatus() == RecStatus::Conflict)
+        if (p->GetRecordingStatus() == RecStatus::Conflict)
             hasconflicts = true;
-        retList.push_back(new ProgramInfo(**it));
+        retList.push_back(new ProgramInfo(*p));
     }
 
     return hasconflicts;
@@ -1793,12 +1776,12 @@ QMap<QString,ProgramInfo*> Scheduler::GetRecording(void) const
     QMutexLocker lockit(&m_schedLock);
 
     QMap<QString,ProgramInfo*> recMap;
-    for (auto it = m_reclist.begin(); it != m_reclist.end(); ++it)
+    for (auto *p : m_recList)
     {
-        if (RecStatus::Recording == (*it)->GetRecordingStatus() ||
-            RecStatus::Tuning == (*it)->GetRecordingStatus() ||
-            RecStatus::Failing == (*it)->GetRecordingStatus())
-            recMap[(*it)->MakeUniqueKey()] = new ProgramInfo(**it);
+        if (RecStatus::Recording == p->GetRecordingStatus() ||
+            RecStatus::Tuning    == p->GetRecordingStatus() ||
+            RecStatus::Failing   == p->GetRecordingStatus())
+            recMap[p->MakeUniqueKey()] = new ProgramInfo(*p);
     }
 
     return recMap;
@@ -1808,15 +1791,15 @@ RecStatus::Type Scheduler::GetRecStatus(const ProgramInfo &pginfo)
 {
     QMutexLocker lockit(&m_schedLock);
 
-    for (RecConstIter it = m_reclist.begin(); it != m_reclist.end(); ++it)
+    for (auto *p : m_recList)
     {
-        if (pginfo.IsSameRecording(**it))
+        if (pginfo.IsSameRecording(*p))
         {
-            return (RecStatus::Recording == (**it).GetRecordingStatus() ||
-                    RecStatus::Tuning == (**it).GetRecordingStatus() ||
-                    RecStatus::Failing == (**it).GetRecordingStatus() ||
-                    RecStatus::Pending == (**it).GetRecordingStatus()) ?
-                (**it).GetRecordingStatus() : pginfo.GetRecordingStatus();
+            return (RecStatus::Recording == (*p).GetRecordingStatus() ||
+                    RecStatus::Tuning    == (*p).GetRecordingStatus() ||
+                    RecStatus::Failing   == (*p).GetRecordingStatus() ||
+                    RecStatus::Pending   == (*p).GetRecordingStatus()) ?
+                (*p).GetRecordingStatus() : pginfo.GetRecordingStatus();
         }
     }
 
@@ -1828,7 +1811,7 @@ void Scheduler::GetAllPending(QStringList &strList) const
     RecList retlist;
     bool hasconflicts = GetAllPending(retlist);
 
-    strList << QString::number(hasconflicts);
+    strList << QString::number(static_cast<int>(hasconflicts));
     strList << QString::number(retlist.size());
 
     while (!retlist.empty())
@@ -1873,9 +1856,8 @@ void Scheduler::AddRecording(const RecordingInfo &pi)
     LOG(VB_GENERAL, LOG_INFO, LOC + QString("AddRecording() recid: %1")
             .arg(pi.GetRecordingRuleID()));
 
-    for (RecIter it = m_reclist.begin(); it != m_reclist.end(); ++it)
+    for (auto *p : m_recList)
     {
-        RecordingInfo *p = *it;
         if (p->GetRecordingStatus() == RecStatus::Recording &&
             p->IsSameTitleTimeslotAndChannel(pi))
         {
@@ -1889,11 +1871,11 @@ void Scheduler::AddRecording(const RecordingInfo &pi)
     LOG(VB_SCHEDULE, LOG_INFO, LOC +
         QString("Adding '%1' to reclist.").arg(pi.GetTitle()));
 
-    RecordingInfo * new_pi = new RecordingInfo(pi);
-    new_pi->m_mplexid = new_pi->QueryMplexID();
-    new_pi->m_sgroupid = m_sinputinfomap[new_pi->GetInputID()].m_sgroupid;
-    m_reclist.push_back(new_pi);
-    m_reclist_changed = true;
+    auto * new_pi = new RecordingInfo(pi);
+    new_pi->m_mplexId = new_pi->QueryMplexID();
+    new_pi->m_sgroupId = m_sinputInfoMap[new_pi->GetInputID()].m_sgroupId;
+    m_recList.push_back(new_pi);
+    m_recListChanged = true;
 
     // Save RecStatus::Recording recstatus to DB
     // This allows recordings to resume on backend restart
@@ -1927,36 +1909,36 @@ bool Scheduler::IsBusyRecording(const RecordingInfo *rcinfo)
     bool is_busy = rctv1->IsBusy(&busy_input, -1);
     if (is_busy &&
         (rcinfo->GetRecordingStatus() == RecStatus::Pending ||
-         !m_sinputinfomap[rcinfo->GetInputID()].m_schedgroup ||
-         (((busy_input.m_mplexid == 0U) || busy_input.m_mplexid != rcinfo->m_mplexid) &&
-          ((busy_input.m_mplexid != 0U) || busy_input.m_chanid != rcinfo->GetChanID()))))
+         !m_sinputInfoMap[rcinfo->GetInputID()].m_schedGroup ||
+         (((busy_input.m_mplexId == 0U) || busy_input.m_mplexId != rcinfo->m_mplexId) &&
+          ((busy_input.m_mplexId != 0U) || busy_input.m_chanId != rcinfo->GetChanID()))))
     {
         return true;
     }
 
     // now check other inputs in the same input group as the recording.
     uint inputid = rcinfo->GetInputID();
-    vector<uint> &inputids = m_sinputinfomap[inputid].m_conflicting_inputs;
-    vector<uint> &group_inputs = m_sinputinfomap[inputid].m_group_inputs;
-    for (size_t i = 0; i < inputids.size(); i++)
+    vector<uint> &inputids = m_sinputInfoMap[inputid].m_conflictingInputs;
+    vector<uint> &group_inputs = m_sinputInfoMap[inputid].m_groupInputs;
+    for (uint id : inputids)
     {
-        if (!m_tvList->contains(inputids[i]))
+        if (!m_tvList->contains(id))
         {
 #if 0
             LOG(VB_SCHEDULE, LOG_ERR, LOC +
                 QString("IsBusyRecording() -> true, rctv(NULL) for input %2")
-                    .arg(inputids[i]));
+                    .arg(id));
 #endif
             return true;
         }
 
-        EncoderLink *rctv2 = (*m_tvList)[inputids[i]];
+        EncoderLink *rctv2 = (*m_tvList)[id];
         if (rctv2->IsBusy(&busy_input, -1))
         {
-            if ((!busy_input.m_mplexid ||
-                 busy_input.m_mplexid != rcinfo->m_mplexid) &&
-                (busy_input.m_mplexid ||
-                 busy_input.m_chanid != rcinfo->GetChanID()))
+            if ((!busy_input.m_mplexId ||
+                 busy_input.m_mplexId != rcinfo->m_mplexId) &&
+                (busy_input.m_mplexId ||
+                 busy_input.m_chanId != rcinfo->GetChanID()))
             {
                 // This conflicting input is busy on a different
                 // multiplex than is desired.  There is no way the
@@ -1973,7 +1955,7 @@ bool Scheduler::IsBusyRecording(const RecordingInfo *rcinfo)
         }
         else if (is_busy &&
                  std::find(group_inputs.begin(), group_inputs.end(),
-                           inputids[i]) != group_inputs.end())
+                           id) != group_inputs.end())
         {
             // This conflicting input is not busy, is also a child
             // input and the main input is busy on the desired
@@ -2060,7 +2042,7 @@ void Scheduler::run(void)
         gCoreContext->GetBoolSetting("blockSDWUwithoutClient", true);
     bool      firstRun        = true;
     QDateTime nextSleepCheck  = MythDate::current();
-    RecIter   startIter       = m_reclist.begin();
+    auto      startIter       = m_recList.begin();
     QDateTime idleSince       = QDateTime();
     int       schedRunTime    = 0; // max scheduler run time in seconds
     bool      statuschanged   = false;
@@ -2073,10 +2055,10 @@ void Scheduler::run(void)
         // through the list or changed the next run times.  Start a
         // new pass immediately to take care of anything that still
         // needs attention right now and reset the run times.
-        if (m_reclist_changed)
+        if (m_recListChanged)
         {
             nextStartTime = MythDate::current();
-            m_reclist_changed = false;
+            m_recListChanged = false;
         }
 
         nextWakeTime = min(nextWakeTime, nextStartTime);
@@ -2121,11 +2103,11 @@ void Scheduler::run(void)
                     gCoreContext->GetNumSetting("idleWaitForRecordingTime",
                                                 15);
 
-                QTime t; t.start();
+                QElapsedTimer t; t.start();
                 if (HandleReschedule())
                 {
                     statuschanged = true;
-                    startIter = m_reclist.begin();
+                    startIter = m_recList.begin();
                 }
                 int elapsed = (t.elapsed() + 999) / 1000;
                 schedRunTime = max(static_cast<int>(elapsed * 1.5 + 2),
@@ -2141,7 +2123,7 @@ void Scheduler::run(void)
                 // HandleRunSchedulerStartup releases the schedLock so the
                 // reclist may have changed. If it has go to top of loop
                 // and update secs_to_next...
-                if (m_reclist_changed)
+                if (m_recListChanged)
                     continue;
             }
 
@@ -2164,7 +2146,7 @@ void Scheduler::run(void)
 
         // Skip past recordings that are already history
         // (i.e. AddHistory() has been called setting oldrecstatus)
-        for ( ; startIter != m_reclist.end(); ++startIter)
+        for ( ; startIter != m_recList.end(); ++startIter)
         {
             if ((*startIter)->GetRecordingStatus() !=
                 (*startIter)->m_oldrecstatus)
@@ -2177,7 +2159,7 @@ void Scheduler::run(void)
         // & call RecordPending for recordings due to start in 30 seconds
         // & handle RecStatus::Tuning updates
         bool done = false;
-        for (RecIter it = startIter; it != m_reclist.end() && !done; ++it)
+        for (auto it = startIter; it != m_recList.end() && !done; ++it)
         {
             done = HandleRecording(
                 **it, statuschanged, nextStartTime, nextWakeTime,
@@ -2187,12 +2169,12 @@ void Scheduler::run(void)
         // HandleRecording() temporarily unlocks schedLock.  If
         // anything changed, reclist iterators could be invalidated so
         // start over.
-        if (m_reclist_changed)
+        if (m_recListChanged)
             continue;
 
         /// Wake any slave backends that need waking
         curtime = MythDate::current();
-        for (RecIter it = startIter; it != m_reclist.end(); ++it)
+        for (auto it = startIter; it != m_recList.end(); ++it)
         {
             int secsleft = curtime.secsTo((*it)->GetRecordingStartTime());
             if ((secsleft - prerollseconds) <= wakeThreshold)
@@ -2312,8 +2294,8 @@ bool Scheduler::HandleReschedule(void)
     // sure our DB connection is fresh before continuing.
     m_dbConn = MSqlQuery::SchedCon();
 
-    struct timeval fillstart, fillend;
-    float matchTime, checkTime, placeTime;
+    struct timeval fillstart {};
+    struct timeval fillend {};
 
     gettimeofday(&fillstart, nullptr);
     QString msg;
@@ -2325,7 +2307,13 @@ bool Scheduler::HandleReschedule(void)
         QStringList request = m_reschedQueue.dequeue();
         QStringList tokens;
         if (!request.empty())
+        {
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
             tokens = request[0].split(' ', QString::SkipEmptyParts);
+#else
+            tokens = request[0].split(' ', Qt::SkipEmptyParts);
+#endif
+        }
 
         if (request.empty() || tokens.empty())
         {
@@ -2353,9 +2341,9 @@ bool Scheduler::HandleReschedule(void)
             deleteFuture = true;
             runCheck = true;
             m_schedLock.unlock();
-            m_recordmatchLock.lock();
+            m_recordMatchLock.lock();
             UpdateMatches(recordid, sourceid, mplexid, maxstarttime);
-            m_recordmatchLock.unlock();
+            m_recordMatchLock.unlock();
             m_schedLock.lock();
         }
         else if (tokens[0] == "CHECK")
@@ -2376,10 +2364,10 @@ bool Scheduler::HandleReschedule(void)
             QString programid = request[4];
             runCheck = true;
             m_schedLock.unlock();
-            m_recordmatchLock.lock();
+            m_recordMatchLock.lock();
             ResetDuplicates(recordid, findid, title, subtitle, descrip,
                             programid);
-            m_recordmatchLock.unlock();
+            m_recordMatchLock.unlock();
             m_schedLock.lock();
         }
         else if (tokens[0] != "PLACE")
@@ -2406,8 +2394,8 @@ bool Scheduler::HandleReschedule(void)
     }
 
     gettimeofday(&fillend, nullptr);
-    matchTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
-                 (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
+    float matchTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
+                       (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
 
     LOG(VB_SCHEDULE, LOG_INFO, "CreateTempTables...");
     CreateTempTables();
@@ -2419,14 +2407,14 @@ bool Scheduler::HandleReschedule(void)
         UpdateDuplicates();
     }
     gettimeofday(&fillend, nullptr);
-    checkTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
-                 (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
+    float checkTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
+                       (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
 
     gettimeofday(&fillstart, nullptr);
     bool worklistused = FillRecordList();
     gettimeofday(&fillend, nullptr);
-    placeTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
-                 (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
+    float placeTime = ((fillend.tv_sec - fillstart.tv_sec ) * 1000000 +
+                       (fillend.tv_usec - fillstart.tv_usec)) / 1000000.0;
 
     LOG(VB_SCHEDULE, LOG_INFO, "DeleteTempTables...");
     DeleteTempTables();
@@ -2445,7 +2433,7 @@ bool Scheduler::HandleReschedule(void)
 
     msg = QString("Scheduled %1 items in %2 "
                   "= %3 match + %4 check + %5 place")
-        .arg(m_reclist.size())
+        .arg(m_recList.size())
         .arg(matchTime + checkTime + placeTime, 0, 'f', 1)
         .arg(matchTime, 0, 'f', 2)
         .arg(checkTime, 0, 'f', 2)
@@ -2453,13 +2441,12 @@ bool Scheduler::HandleReschedule(void)
     LOG(VB_GENERAL, LOG_INFO, msg);
 
     // Write changed entries to oldrecorded.
-    for (RecIter it = m_reclist.begin(); it != m_reclist.end(); ++it)
+    for (auto *p : m_recList)
     {
-        RecordingInfo *p = *it;
         if (p->GetRecordingStatus() != p->m_oldrecstatus)
         {
             if (p->GetRecordingEndTime() < m_schedTime)
-                p->AddHistory(false, false, false);
+                p->AddHistory(false, false, false); // NOLINT(bugprone-branch-clone)
             else if (p->GetRecordingStartTime() < m_schedTime &&
                      p->GetRecordingStatus() != RecStatus::WillRecord &&
                      p->GetRecordingStatus() != RecStatus::Pending)
@@ -2492,8 +2479,8 @@ bool Scheduler::HandleRunSchedulerStartup(
     QString startupParam = "user";
 
     // find the first recording that WILL be recorded
-    RecIter firstRunIter = m_reclist.begin();
-    for ( ; firstRunIter != m_reclist.end(); ++firstRunIter)
+    auto firstRunIter = m_recList.begin();
+    for ( ; firstRunIter != m_recList.end(); ++firstRunIter)
     {
         if ((*firstRunIter)->GetRecordingStatus() == RecStatus::WillRecord ||
             (*firstRunIter)->GetRecordingStatus() == RecStatus::Pending)
@@ -2503,7 +2490,7 @@ bool Scheduler::HandleRunSchedulerStartup(
     // have we been started automatically?
     QDateTime curtime = MythDate::current();
     if (WasStartedAutomatically() ||
-        ((firstRunIter != m_reclist.end()) &&
+        ((firstRunIter != m_recList.end()) &&
          ((curtime.secsTo((*firstRunIter)->GetRecordingStartTime()) -
            prerollseconds) < (idleWaitForRecordingTime * 60))))
     {
@@ -2534,7 +2521,7 @@ bool Scheduler::HandleRunSchedulerStartup(
 // If a recording is about to start on a backend in a few minutes, wake it...
 void Scheduler::HandleWakeSlave(RecordingInfo &ri, int prerollseconds)
 {
-    static const int sysEventSecs[5] = { 120, 90, 60, 30, 0 };
+    static constexpr int kSysEventSecs[5] = { 120, 90, 60, 30, 0 };
 
     QDateTime curtime = MythDate::current();
     QDateTime nextrectime = ri.GetRecordingStartTime();
@@ -2542,17 +2529,17 @@ void Scheduler::HandleWakeSlave(RecordingInfo &ri, int prerollseconds)
 
     QReadLocker tvlocker(&TVRec::s_inputsLock);
 
-    QMap<int, EncoderLink*>::iterator tvit = m_tvList->find(ri.GetInputID());
-    if (tvit == m_tvList->end())
+    QMap<int, EncoderLink*>::const_iterator tvit = m_tvList->constFind(ri.GetInputID());
+    if (tvit == m_tvList->constEnd())
         return;
 
     QString sysEventKey = ri.MakeUniqueKey();
 
     int i = 0;
     bool pendingEventSent = false;
-    while (sysEventSecs[i] != 0)
+    while (kSysEventSecs[i] != 0)
     {
-        if ((secsleft <= sysEventSecs[i]) &&
+        if ((secsleft <= kSysEventSecs[i]) &&
             (!m_sysEvents[i].contains(sysEventKey)))
         {
             if (!pendingEventSent)
@@ -2569,16 +2556,15 @@ void Scheduler::HandleWakeSlave(RecordingInfo &ri, int prerollseconds)
 
     // cleanup old sysEvents once in a while
     QSet<QString> keys;
-    for (i = 0; sysEventSecs[i] != 0; i++)
+    for (i = 0; kSysEventSecs[i] != 0; i++)
     {
         if (m_sysEvents[i].size() < 20)
             continue;
 
         if (keys.empty())
         {
-            RecConstIter it = m_reclist.begin();
-            for ( ; it != m_reclist.end(); ++it)
-                keys.insert((*it)->MakeUniqueKey());
+            for (auto *rec : m_recList)
+                keys.insert(rec->MakeUniqueKey());
             keys.insert("something");
         }
 
@@ -2627,11 +2613,10 @@ void Scheduler::HandleWakeSlave(RecordingInfo &ri, int prerollseconds)
                     "to reschedule around its tuners.")
                 .arg(nexttv->GetHostName()));
 
-        QMap<int, EncoderLink*>::iterator it = m_tvList->begin();
-        for (; it != m_tvList->end(); ++it)
+        for (auto * enc : qAsConst(*m_tvList))
         {
-            if ((*it)->GetHostName() == nexttv->GetHostName())
-                (*it)->SetSleepStatus(sStatus_Undefined);
+            if (enc->GetHostName() == nexttv->GetHostName())
+                enc->SetSleepStatus(sStatus_Undefined);
         }
 
         EnqueuePlace("HandleWakeSlave3");
@@ -2702,8 +2687,8 @@ bool Scheduler::HandleRecording(
 
     QReadLocker tvlocker(&TVRec::s_inputsLock);
 
-    QMap<int, EncoderLink*>::iterator tvit = m_tvList->find(ri.GetInputID());
-    if (tvit == m_tvList->end())
+    QMap<int, EncoderLink*>::const_iterator tvit = m_tvList->constFind(ri.GetInputID());
+    if (tvit == m_tvList->constEnd())
     {
         QString msg = QString("Invalid cardid [%1] for %2")
             .arg(ri.GetInputID()).arg(ri.GetTitle());
@@ -2746,8 +2731,8 @@ bool Scheduler::HandleRecording(
         m_schedLock.unlock();
         bool isBusyRecording = IsBusyRecording(&tempri);
         m_schedLock.lock();
-        if (m_reclist_changed)
-            return m_reclist_changed;
+        if (m_recListChanged)
+            return m_recListChanged;
 
         if (isBusyRecording)
         {
@@ -2785,11 +2770,8 @@ bool Scheduler::HandleRecording(
                         "to reschedule around its tuners.")
                     .arg(nexttv->GetHostName()));
 
-            QMap<int, EncoderLink *>::Iterator enciter =
-                m_tvList->begin();
-            for (; enciter != m_tvList->end(); ++enciter)
+            for (auto * enc : qAsConst(*m_tvList))
             {
-                EncoderLink *enc = *enciter;
                 if (enc->GetHostName() == nexttv->GetHostName())
                     enc->SetSleepStatus(sStatus_Undefined);
             }
@@ -2813,7 +2795,7 @@ bool Scheduler::HandleRecording(
                                 ri.GetRecordingEndTime(),
                                 ri.GetInputID(),
                                 recording_dir,
-                                m_reclist);
+                                m_recList);
         ri.SetPathname(recording_dir);
         tempri.SetPathname(recording_dir);
     }
@@ -2828,7 +2810,7 @@ bool Scheduler::HandleRecording(
                          .arg(tempri.GetInputID()));
             gCoreContext->dispatch(me);
             nextWakeTime = min(nextWakeTime, curtime.addSecs(1));
-            return m_reclist_changed;
+            return m_recListChanged;
         }
         ri.SetInputID(tempri.GetInputID());
         nexttv = (*m_tvList)[ri.GetInputID()];
@@ -2839,8 +2821,8 @@ bool Scheduler::HandleRecording(
         m_schedLock.unlock();
         nexttv->RecordPending(&tempri, max(secsleft, 0), false);
         m_schedLock.lock();
-        if (m_reclist_changed)
-            return m_reclist_changed;
+        if (m_recListChanged)
+            return m_recListChanged;
     }
 
     if (secsleft - prerollseconds > 0)
@@ -2885,7 +2867,7 @@ bool Scheduler::HandleRecording(
     HandleRecordingStatusChange(ri, recStatus, details);
     statuschanged = true;
 
-    return m_reclist_changed;
+    return m_recListChanged;
 }
 
 void Scheduler::HandleRecordingStatusChange(
@@ -2929,7 +2911,7 @@ void Scheduler::HandleRecordingStatusChange(
 bool Scheduler::AssignGroupInput(RecordingInfo &ri,
                                  int prerollseconds)
 {
-    if (!m_sinputinfomap[ri.GetInputID()].m_schedgroup)
+    if (!m_sinputInfoMap[ri.GetInputID()].m_schedGroup)
         return true;
 
     LOG(VB_SCHEDULE, LOG_DEBUG,
@@ -2943,7 +2925,7 @@ bool Scheduler::AssignGroupInput(RecordingInfo &ri,
     QDateTime now = MythDate::current();
 
     // Check each child input to find the best one to use.
-    vector<uint> inputs = m_sinputinfomap[ri.GetInputID()].m_group_inputs;
+    vector<uint> inputs = m_sinputInfoMap[ri.GetInputID()].m_groupInputs;
     for (uint i = 0; !bestid && i < inputs.size(); ++i)
     {
         uint inputid = inputs[i];
@@ -2952,9 +2934,8 @@ bool Scheduler::AssignGroupInput(RecordingInfo &ri,
 
         // First, see if anything is already pending or still
         // recording.
-        for (RecIter j = m_reclist.begin(); j != m_reclist.end(); ++j)
+        for (auto *p : m_recList)
         {
-            RecordingInfo *p = (*j);
             if (now.secsTo(p->GetRecordingStartTime()) >
                 prerollseconds + 60)
                 break;
@@ -2998,8 +2979,8 @@ bool Scheduler::AssignGroupInput(RecordingInfo &ri,
             }
             else // rec->end == ri.start
             {
-                if ((ri.m_mplexid && rec->m_mplexid != ri.m_mplexid) ||
-                    (!ri.m_mplexid && rec->GetChanID() != ri.GetChanID()))
+                if ((ri.m_mplexId && rec->m_mplexId != ri.m_mplexId) ||
+                    (!ri.m_mplexId && rec->GetChanID() != ri.GetChanID()))
                 {
                     LOG(VB_SCHEDULE, LOG_DEBUG,
                         QString("Input %1 is recording but has to stop")
@@ -3023,7 +3004,7 @@ bool Scheduler::AssignGroupInput(RecordingInfo &ri,
         m_schedLock.unlock();
         bool isbusy = rctv->IsBusy(&busy_info, -1);
         m_schedLock.lock();
-        if (m_reclist_changed)
+        if (m_recListChanged)
             return false;
         if (!isbusy)
         {
@@ -3031,8 +3012,8 @@ bool Scheduler::AssignGroupInput(RecordingInfo &ri,
                 QString("Input %1 is free").arg(inputid));
             bestid = inputid;
         }
-        else if ((ri.m_mplexid && busy_info.m_mplexid != ri.m_mplexid) ||
-                 (!ri.m_mplexid && busy_info.m_chanid != ri.GetChanID()))
+        else if ((ri.m_mplexId && busy_info.m_mplexId != ri.m_mplexId) ||
+                 (!ri.m_mplexId && busy_info.m_chanId != ri.GetChanID()))
         {
             LOG(VB_SCHEDULE, LOG_DEBUG,
                 QString("Input %1 is on livetv but has to stop")
@@ -3063,6 +3044,12 @@ bool Scheduler::AssignGroupInput(RecordingInfo &ri,
     return bestid != 0U;
 }
 
+// Called to delay shutdown for 5 minutes
+void Scheduler::DelayShutdown()
+{
+    m_delayShutdownTime = QDateTime::currentMSecsSinceEpoch() + 5*60*1000;
+}
+
 void Scheduler::HandleIdleShutdown(
     bool &blockShutdown, QDateTime &idleSince,
     int prerollseconds, int idleTimeoutSecs, int idleWaitForRecordingTime,
@@ -3085,7 +3072,12 @@ void Scheduler::HandleIdleShutdown(
     // the frontend may have connected then gone idle between scheduler runs
     if (blockShutdown)
     {
-        if (m_mainServer->isClientConnected())
+        m_schedLock.unlock();
+        bool b = m_mainServer->isClientConnected();
+        m_schedLock.lock();
+        if (m_recListChanged)
+            return;
+        if (b)
         {
             LOG(VB_GENERAL, LOG_NOTICE, "Client is connected, removing startup block on shutdown");
             blockShutdown = false;
@@ -3093,13 +3085,17 @@ void Scheduler::HandleIdleShutdown(
     }
     else
     {
+        // Check for delay shutdown request
+        bool delay = (m_delayShutdownTime > QDateTime::currentMSecsSinceEpoch());
+
         QDateTime curtime = MythDate::current();
 
         // find out, if we are currently recording (or LiveTV)
         bool recording = false;
+        m_schedLock.unlock();
         TVRec::s_inputsLock.lockForRead();
-        QMap<int, EncoderLink *>::Iterator it;
-        for (it = m_tvList->begin(); (it != m_tvList->end()) &&
+        QMap<int, EncoderLink *>::const_iterator it;
+        for (it = m_tvList->constBegin(); (it != m_tvList->constEnd()) &&
                  !recording; ++it)
         {
             if ((*it)->IsBusy())
@@ -3109,14 +3105,17 @@ void Scheduler::HandleIdleShutdown(
 
         // If there are BLOCKING clients, then we're not idle
         bool blocking = m_mainServer->isClientConnected(true);
+        m_schedLock.lock();
+        if (m_recListChanged)
+            return;
 
         // If there are active jobs, then we're not idle
         bool activeJobs = JobQueue::HasRunningOrPendingJobs(0);
 
-        if (!blocking && !recording && !activeJobs)
+        if (!blocking && !recording && !activeJobs && !delay)
         {
             // have we received a RESET_IDLETIME message?
-            m_resetIdleTime_lock.lock();
+            m_resetIdleTimeLock.lock();
             if (m_resetIdleTime)
             {
                 // yes - so reset the idleSince time
@@ -3128,7 +3127,7 @@ void Scheduler::HandleIdleShutdown(
                 idleSince = QDateTime();
                 m_resetIdleTime = false;
             }
-            m_resetIdleTime_lock.unlock();
+            m_resetIdleTimeLock.unlock();
 
             if (statuschanged || !idleSince.isValid())
             {
@@ -3136,15 +3135,17 @@ void Scheduler::HandleIdleShutdown(
                 if (!wasValid)
                     idleSince = curtime;
 
-                RecIter idleIter = m_reclist.begin();
-                for ( ; idleIter != m_reclist.end(); ++idleIter)
+                auto idleIter = m_recList.begin();
+                for ( ; idleIter != m_recList.end(); ++idleIter)
+                {
                     if ((*idleIter)->GetRecordingStatus() ==
                         RecStatus::WillRecord ||
                         (*idleIter)->GetRecordingStatus() ==
                         RecStatus::Pending)
                         break;
+                }
 
-                if (idleIter != m_reclist.end())
+                if (idleIter != m_recList.end())
                 {
                     if ((curtime.secsTo((*idleIter)->GetRecordingStartTime()) -
                         prerollseconds) <
@@ -3259,6 +3260,10 @@ void Scheduler::HandleIdleShutdown(
                 LOG(logmask, LOG_NOTICE, "Blocking shutdown because "
                                          "of active jobs");
 
+            if (delay)
+                LOG(logmask, LOG_NOTICE, "Blocking shutdown because "
+                                         "of delay request from external application");
+
             // not idle, make the time invalid
             if (idleSince.isValid())
             {
@@ -3333,15 +3338,17 @@ void Scheduler::ShutdownServer(int prerollseconds, QDateTime &idleSince)
 {
     m_isShuttingDown = true;
 
-    RecIter recIter = m_reclist.begin();
-    for ( ; recIter != m_reclist.end(); ++recIter)
+    auto recIter = m_recList.begin();
+    for ( ; recIter != m_recList.end(); ++recIter)
+    {
         if ((*recIter)->GetRecordingStatus() == RecStatus::WillRecord ||
             (*recIter)->GetRecordingStatus() == RecStatus::Pending)
             break;
+    }
 
     // set the wakeuptime if needed
     QDateTime restarttime;
-    if (recIter != m_reclist.end())
+    if (recIter != m_recList.end())
     {
         RecordingInfo *nextRecording = (*recIter);
         restarttime = nextRecording->GetRecordingStartTime()
@@ -3383,11 +3390,7 @@ void Scheduler::ShutdownServer(int prerollseconds, QDateTime &idleSince)
         {
             QString time_ts;
             setwakeup_cmd.replace("$time",
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-                                  time_ts.setNum(restarttime.toTime_t())
-#else
                                   time_ts.setNum(restarttime.toSecsSinceEpoch())
-#endif
                 );
         }
         else
@@ -3451,11 +3454,8 @@ void Scheduler::PutInactiveSlavesToSleep(void)
     QReadLocker tvlocker(&TVRec::s_inputsLock);
 
     bool someSlavesCanSleep = false;
-    QMap<int, EncoderLink *>::Iterator enciter = m_tvList->begin();
-    for (; enciter != m_tvList->end(); ++enciter)
+    for (auto * enc : qAsConst(*m_tvList))
     {
-        EncoderLink *enc = *enciter;
-
         if (enc->CanSleep())
             someSlavesCanSleep = true;
     }
@@ -3474,13 +3474,10 @@ void Scheduler::PutInactiveSlavesToSleep(void)
                 "next %1 minutes.") .arg(sleepThreshold / 60));
 
     LOG(VB_SCHEDULE, LOG_DEBUG, "Checking scheduler's reclist");
-    RecIter recIter = m_reclist.begin();
     QDateTime curtime = MythDate::current();
     QStringList SlavesInUse;
-    for ( ; recIter != m_reclist.end(); ++recIter)
+    for (auto *pginfo : m_recList)
     {
-        RecordingInfo *pginfo = *recIter;
-
         if (pginfo->GetRecordingStatus() != RecStatus::Recording &&
             pginfo->GetRecordingStatus() != RecStatus::Tuning &&
             pginfo->GetRecordingStatus() != RecStatus::Failing &&
@@ -3493,7 +3490,7 @@ void Scheduler::PutInactiveSlavesToSleep(void)
         if (secsleft > sleepThreshold)
             continue;
 
-        if (m_tvList->find(pginfo->GetInputID()) != m_tvList->end())
+        if (m_tvList->constFind(pginfo->GetInputID()) != m_tvList->constEnd())
         {
             EncoderLink *enc = (*m_tvList)[pginfo->GetInputID()];
             if ((!enc->IsLocal()) &&
@@ -3501,14 +3498,18 @@ void Scheduler::PutInactiveSlavesToSleep(void)
             {
                 if (pginfo->GetRecordingStatus() == RecStatus::WillRecord ||
                     pginfo->GetRecordingStatus() == RecStatus::Pending)
+                {
                     LOG(VB_SCHEDULE, LOG_DEBUG,
                         QString("    Slave %1 will be in use in %2 minutes")
                             .arg(enc->GetHostName()) .arg(secsleft / 60));
+                }
                 else
+                {
                     LOG(VB_SCHEDULE, LOG_DEBUG,
                         QString("    Slave %1 is in use currently "
                                 "recording '%1'")
                             .arg(enc->GetHostName()).arg(pginfo->GetTitle()));
+                }
                 SlavesInUse << enc->GetHostName();
             }
         }
@@ -3535,11 +3536,8 @@ void Scheduler::PutInactiveSlavesToSleep(void)
         "be inactive for the next %1 minutes and can be put to sleep.")
             .arg(sleepThreshold / 60));
 
-    enciter = m_tvList->begin();
-    for (; enciter != m_tvList->end(); ++enciter)
+    for (auto * enc : qAsConst(*m_tvList))
     {
-        EncoderLink *enc = *enciter;
-
         if ((!enc->IsLocal()) &&
             (enc->IsAwake()) &&
             (!SlavesInUse.contains(enc->GetHostName())) &&
@@ -3562,11 +3560,8 @@ void Scheduler::PutInactiveSlavesToSleep(void)
 
                 if (enc->GoToSleep())
                 {
-                    QMap<int, EncoderLink *>::Iterator slviter =
-                        m_tvList->begin();
-                    for (; slviter != m_tvList->end(); ++slviter)
+                    for (auto * slv : qAsConst(*m_tvList))
                     {
-                        EncoderLink *slv = *slviter;
                         if (slv->GetHostName() == thisHost)
                         {
                             LOG(VB_SCHEDULE, LOG_DEBUG,
@@ -3583,11 +3578,8 @@ void Scheduler::PutInactiveSlavesToSleep(void)
                     LOG(VB_GENERAL, LOG_ERR, LOC +
                         QString("Unable to shutdown %1 slave backend, setting "
                                 "sleep status to undefined.").arg(thisHost));
-                    QMap<int, EncoderLink *>::Iterator slviter =
-                        m_tvList->begin();
-                    for (; slviter != m_tvList->end(); ++slviter)
+                    for (auto * slv : qAsConst(*m_tvList))
                     {
-                        EncoderLink *slv = *slviter;
                         if (slv->GetHostName() == thisHost)
                             slv->SetSleepStatus(sStatus_Undefined);
                     }
@@ -3616,10 +3608,8 @@ bool Scheduler::WakeUpSlave(const QString& slaveHostname, bool setWakingStatus)
             QString("Trying to Wake Up %1, but this slave "
                     "does not have a WakeUpCommand set.").arg(slaveHostname));
 
-        QMap<int, EncoderLink *>::Iterator enciter = m_tvList->begin();
-        for (; enciter != m_tvList->end(); ++enciter)
+        for (auto * enc : qAsConst(*m_tvList))
         {
-            EncoderLink *enc = *enciter;
             if (enc->GetHostName() == slaveHostname)
                 enc->SetSleepStatus(sStatus_Undefined);
         }
@@ -3628,10 +3618,8 @@ bool Scheduler::WakeUpSlave(const QString& slaveHostname, bool setWakingStatus)
     }
 
     QDateTime curtime = MythDate::current();
-    QMap<int, EncoderLink *>::Iterator enciter = m_tvList->begin();
-    for (; enciter != m_tvList->end(); ++enciter)
+    for (auto * enc : qAsConst(*m_tvList))
     {
-        EncoderLink *enc = *enciter;
         if (setWakingStatus && (enc->GetHostName() == slaveHostname))
             enc->SetSleepStatus(sStatus_Waking);
         enc->SetLastWakeTime(curtime);
@@ -3654,11 +3642,8 @@ void Scheduler::WakeUpSlaves(void)
 
     QStringList SlavesThatCanWake;
     QString thisSlave;
-    QMap<int, EncoderLink *>::Iterator enciter = m_tvList->begin();
-    for (; enciter != m_tvList->end(); ++enciter)
+    for (auto * enc : qAsConst(*m_tvList))
     {
-        EncoderLink *enc = *enciter;
-
         if (enc->IsLocal())
             continue;
 
@@ -3685,8 +3670,9 @@ void Scheduler::UpdateManuals(uint recordid)
 {
     MSqlQuery query(m_dbConn);
 
-    query.prepare(QString("SELECT type,title,station,startdate,starttime, "
-                  " enddate,endtime "
+    query.prepare(QString("SELECT type,title,subtitle,description,"
+                          "station,startdate,starttime,"
+                          "enddate,endtime,season,episode,inetref,last_record "
                   "FROM %1 WHERE recordid = :RECORDID").arg(m_recordTable));
     query.bindValue(":RECORDID", recordid);
     if (!query.exec() || query.size() != 1)
@@ -3700,15 +3686,28 @@ void Scheduler::UpdateManuals(uint recordid)
 
     RecordingType rectype = RecordingType(query.value(0).toInt());
     QString title = query.value(1).toString();
-    QString station = query.value(2).toString() ;
-    QDateTime startdt = QDateTime(query.value(3).toDate(),
-                                  query.value(4).toTime(), Qt::UTC);
+    QString subtitle = query.value(2).toString();
+    QString description = query.value(3).toString();
+    QString station = query.value(4).toString();
+    QDateTime startdt = QDateTime(query.value(5).toDate(),
+                                  query.value(6).toTime(), Qt::UTC);
     int duration = startdt.secsTo(
-        QDateTime(query.value(5).toDate(),
-                  query.value(6).toTime(), Qt::UTC));
+        QDateTime(query.value(7).toDate(),
+                  query.value(8).toTime(), Qt::UTC));
+
+    int season = query.value(9).toInt();
+    int episode = query.value(10).toInt();
+    QString inetref = query.value(11).toString();
+
+    // A bit of a hack: mythconverg.record.last_record can be used by
+    // the services API to propegate originalairdate information.
+    QDate originalairdate = QDate(query.value(12).toDate());
+
+    if (description.isEmpty())
+        description = startdt.toLocalTime().toString();
 
     query.prepare("SELECT chanid from channel "
-                  "WHERE callsign = :STATION");
+                  "WHERE deleted IS NULL AND callsign = :STATION");
     query.bindValue(":STATION", station);
     if (!query.exec())
     {
@@ -3720,10 +3719,10 @@ void Scheduler::UpdateManuals(uint recordid)
     while (query.next())
         chanidlist.push_back(query.value(0).toUInt());
 
-    int progcount;
-    int skipdays;
-    bool weekday;
-    int daysoff;
+    int progcount = 0;
+    int skipdays = 1;
+    bool weekday = false;
+    int daysoff = 0;
     QDateTime lstartdt = startdt.toLocalTime();
 
     switch (rectype)
@@ -3763,20 +3762,27 @@ void Scheduler::UpdateManuals(uint recordid)
 
     while (progcount--)
     {
-        for (int i = 0; i < (int)chanidlist.size(); i++)
+        for (uint id : chanidlist)
         {
             if (weekday && startdt.toLocalTime().date().dayOfWeek() >= 6)
                 continue;
 
             query.prepare("REPLACE INTO program (chanid, starttime, endtime,"
-                          " title, subtitle, manualid, generic) "
+                          " title, subtitle, description, manualid,"
+                          " season, episode, inetref, originalairdate, generic) "
                           "VALUES (:CHANID, :STARTTIME, :ENDTIME, :TITLE,"
-                          " :SUBTITLE, :RECORDID, 1)");
-            query.bindValue(":CHANID", chanidlist[i]);
+                          " :SUBTITLE, :DESCRIPTION, :RECORDID, "
+                          " :SEASON, :EPISODE, :INETREF, :ORIGINALAIRDATE, 1)");
+            query.bindValue(":CHANID", id);
             query.bindValue(":STARTTIME", startdt);
             query.bindValue(":ENDTIME", startdt.addSecs(duration));
             query.bindValue(":TITLE", title);
-            query.bindValue(":SUBTITLE", startdt.toLocalTime());
+            query.bindValue(":SUBTITLE", subtitle);
+            query.bindValue(":DESCRIPTION", description);
+            query.bindValue(":SEASON", season);
+            query.bindValue(":EPISODE", episode);
+            query.bindValue(":INETREF", inetref);
+            query.bindValue(":ORIGINALAIRDATE", originalairdate);
             query.bindValue(":RECORDID", recordid);
             if (!query.exec())
             {
@@ -3956,7 +3962,8 @@ static QString progfindid = QString(
 void Scheduler::UpdateMatches(uint recordid, uint sourceid, uint mplexid,
                               const QDateTime &maxstarttime)
 {
-    struct timeval dbstart, dbend;
+    struct timeval dbstart {};
+    struct timeval dbend {};
 
     MSqlQuery query(m_dbConn);
     MSqlBindings bindings;
@@ -4039,14 +4046,14 @@ void Scheduler::UpdateMatches(uint recordid, uint sourceid, uint mplexid,
             MythDB::DBError("UpdateMatches4", query);
     }
 
-    int clause;
-    QStringList fromclauses, whereclauses;
+    QStringList fromclauses;
+    QStringList whereclauses;
 
     BuildNewRecordsQueries(recordid, fromclauses, whereclauses, bindings);
 
     if (VERBOSE_LEVEL_CHECK(VB_SCHEDULE, LOG_INFO))
     {
-        for (clause = 0; clause < fromclauses.count(); ++clause)
+        for (int clause = 0; clause < fromclauses.count(); ++clause)
         {
             LOG(VB_SCHEDULE, LOG_INFO, QString("Query %1: %2/%3")
                 .arg(clause).arg(fromclauses[clause])
@@ -4054,7 +4061,7 @@ void Scheduler::UpdateMatches(uint recordid, uint sourceid, uint mplexid,
         }
     }
 
-    for (clause = 0; clause < fromclauses.count(); ++clause)
+    for (int clause = 0; clause < fromclauses.count(); ++clause)
     {
         QString query2 = QString(
 "REPLACE INTO recordmatch (recordid, chanid, starttime, manualid, "
@@ -4065,7 +4072,8 @@ void Scheduler::UpdateMatches(uint recordid, uint sourceid, uint mplexid,
 "FROM (RECTABLE, program INNER JOIN channel "
 "      ON channel.chanid = program.chanid) ") + fromclauses[clause] + QString(
 " WHERE ") + whereclauses[clause] +
-    QString(" AND channel.visible = 1 ") +
+    QString(" AND channel.deleted IS NULL "
+            " AND channel.visible > 0 ") +
     filterClause + QString(" AND "
 
 "("
@@ -4302,15 +4310,14 @@ void Scheduler::AddNewRecords(void)
     if (schedTmpRecord == "record")
         schedTmpRecord = "sched_temp_record";
 
-    struct timeval dbstart, dbend;
+    struct timeval dbstart {};
+    struct timeval dbend {};
 
     RecList tmpList;
 
     QMap<int, bool> cardMap;
-    QMap<int, EncoderLink *>::Iterator enciter = m_tvList->begin();
-    for (; enciter != m_tvList->end(); ++enciter)
+    for (auto * enc : qAsConst(*m_tvList))
     {
-        EncoderLink *enc = *enciter;
         if (enc->IsConnected() || enc->IsAsleep())
             cardMap[enc->GetInputID()] = true;
     }
@@ -4396,14 +4403,18 @@ void Scheduler::AddNewRecords(void)
         "(FIND_IN_SET('ONSCREEN', program.subtitletypes) > 0) * %1").arg(onscrpriority);
 
     if (ccpriority)
+    {
         pwrpri += QString(" + "
         "(FIND_IN_SET('NORMAL', program.subtitletypes) > 0 OR "
         "program.closecaptioned > 0 OR program.subtitled > 0) * %1").arg(ccpriority);
+    }
 
     if (hhpriority)
+    {
         pwrpri += QString(" + "
         "(FIND_IN_SET('HARDHEAR', program.subtitletypes) > 0 OR "
         "FIND_IN_SET('HARDHEAR', program.audioprop) > 0) * %1").arg(hhpriority);
+    }
 
     if (adpriority)
         pwrpri += QString(" + "
@@ -4529,7 +4540,7 @@ void Scheduler::AddNewRecords(void)
         if (inputname.isEmpty())
             inputname = QString("Input %1").arg(result.value(24).toUInt());
 
-        RecordingInfo *p = new RecordingInfo(
+        auto *p = new RecordingInfo(
             title,
             QString(),//sorttitle
             result.value(5).toString(),//subtitle
@@ -4613,12 +4624,11 @@ void Scheduler::AddNewRecords(void)
         // time should be done after PruneOverlaps, but that would
         // complicate the list handling.  Do it here unless it becomes
         // problematic.
-        for (RecIter rec = m_worklist.begin(); rec != m_worklist.end(); ++rec)
+        for (auto *r : m_workList)
         {
-            RecordingInfo *r = *rec;
             if (p->IsSameTitleStartTimeAndChannel(*r))
             {
-                if (r->m_sgroupid == p->m_sgroupid &&
+                if (r->m_sgroupId == p->m_sgroupId &&
                     r->GetRecordingEndTime() != p->GetRecordingEndTime() &&
                     (r->GetRecordingRuleID() == p->GetRecordingRuleID() ||
                      p->GetRecordingRuleType() == kOverrideRecord))
@@ -4641,21 +4651,21 @@ void Scheduler::AddNewRecords(void)
 
         RecStatus::Type newrecstatus = RecStatus::Unknown;
         // Check for RecStatus::Offline
-        if ((m_doRun || m_specsched) &&
-            (!cardMap.contains(p->GetInputID()) || (p->m_schedorder == 0)))
+        if ((m_doRun || m_specSched) &&
+            (!cardMap.contains(p->GetInputID()) || (p->m_schedOrder == 0)))
         {
             newrecstatus = RecStatus::Offline;
-            if (p->m_schedorder == 0 &&
-                m_schedorder_warned.find(p->GetInputID()) ==
-                                            m_schedorder_warned.end())
+            if (p->m_schedOrder == 0 &&
+                m_schedOrderWarned.find(p->GetInputID()) ==
+                                            m_schedOrderWarned.end())
             {
                 LOG(VB_GENERAL, LOG_WARNING, LOC +
                     QString("Channel %1, Title %2 %3 cardinput.schedorder = %4, "
                             "it must be >0 to record from this input.")
                     .arg(p->GetChannelName()).arg(p->GetTitle())
                     .arg(p->GetScheduledStartTime().toString())
-                    .arg(p->m_schedorder));
-                m_schedorder_warned.insert(p->GetInputID());
+                    .arg(p->m_schedOrder));
+                m_schedOrderWarned.insert(p->GetInputID());
             }
         }
 
@@ -4714,14 +4724,14 @@ void Scheduler::AddNewRecords(void)
     }
 
     LOG(VB_SCHEDULE, LOG_INFO, " +-- Cleanup...");
-    RecIter tmp = tmpList.begin();
-    for ( ; tmp != tmpList.end(); ++tmp)
-        m_worklist.push_back(*tmp);
+    for (auto & tmp : tmpList)
+        m_workList.push_back(tmp);
 }
 
 void Scheduler::AddNotListed(void) {
 
-    struct timeval dbstart, dbend;
+    struct timeval dbstart {};
+    struct timeval dbend {};
     RecList tmpList;
 
     QString query = QString(
@@ -4796,7 +4806,7 @@ void Scheduler::AddNotListed(void) {
 
         bool sor = (kSingleRecord == rectype) || (kOverrideRecord == rectype);
 
-        RecordingInfo *p = new RecordingInfo(
+        auto *p = new RecordingInfo(
             result.value(0).toString(), // Title
             QString(), // Title Sort
             (sor) ? result.value(1).toString() : QString(), // Subtitle
@@ -4838,9 +4848,8 @@ void Scheduler::AddNotListed(void) {
         tmpList.push_back(p);
     }
 
-    RecIter tmp = tmpList.begin();
-    for ( ; tmp != tmpList.end(); ++tmp)
-        m_worklist.push_back(*tmp);
+    for (auto & tmp : tmpList)
+        m_workList.push_back(tmp);
 }
 
 /** \brief Returns all scheduled programs
@@ -4900,6 +4909,7 @@ void Scheduler::GetAllScheduled(RecList &proglist, SchedSortColumn sortBy,
         "       channel.commmethod                      " // 25
         "FROM record "
         "LEFT JOIN channel ON channel.callsign = record.station "
+        "WHERE deleted IS NULL "
         "GROUP BY recordid "
         "ORDER BY %1 %2");
 
@@ -5057,7 +5067,7 @@ void Scheduler::GetNextLiveTVDir(uint cardid)
         "LiveTV",
         (tv->IsLocal()) ? gCoreContext->GetHostName() : tv->GetHostName(),
         "LiveTV", cur, cur.addSecs(3600), cardid,
-        recording_dir, m_reclist);
+        recording_dir, m_recList);
 
     tv->SetNextLiveTVDir(recording_dir);
 
@@ -5134,6 +5144,7 @@ int Scheduler::FillRecordingDir(
     LOG(VB_FILE | VB_SCHEDULE, LOG_INFO, LOC +
         "FillRecordingDir: Calculating initial FS Weights.");
 
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (auto fsit = m_fsInfoCache.begin(); fsit != m_fsInfoCache.end(); ++fsit)
     {
         FileSystemInfo *fs = &(*fsit);
@@ -5250,10 +5261,9 @@ int Scheduler::FillRecordingDir(
                                 .arg(fs->getFSysID()).arg(weightOffset));
 
                         // need to offset all directories on this filesystem
-                        for (auto fsit2 = m_fsInfoCache.begin();
-                             fsit2 != m_fsInfoCache.end(); ++fsit2)
+                        for (auto & fsit2 : m_fsInfoCache)
                         {
-                            FileSystemInfo *fs2 = &(*fsit2);
+                            FileSystemInfo *fs2 = &fsit2;
                             if (fs2->getFSysID() == fs->getFSysID())
                             {
                                 LOG(VB_FILE | VB_SCHEDULE, LOG_INFO,
@@ -5278,10 +5288,8 @@ int Scheduler::FillRecordingDir(
     LOG(VB_FILE | VB_SCHEDULE, LOG_INFO, LOC +
         "FillRecordingDir: Adjusting FS Weights from scheduler.");
 
-    for (RecConstIter recIter = reclist.begin(); recIter != reclist.end(); ++recIter)
+    for (auto *thispg : reclist)
     {
-        RecordingInfo *thispg = *recIter;
-
         if ((recendts < thispg->GetRecordingStartTime()) ||
             (recstartts > thispg->GetRecordingEndTime()) ||
             (thispg->GetRecordingStatus() != RecStatus::WillRecord &&
@@ -5307,6 +5315,7 @@ int Scheduler::FillRecordingDir(
                         .arg(fs->getHostname()).arg(fs->getPath())
                         .arg(fs->getFSysID()).arg(weightPerRecording));
 
+                // NOLINTNEXTLINE(modernize-loop-convert)
                 for (auto fsit2 = m_fsInfoCache.begin();
                      fsit2 != m_fsInfoCache.end(); ++fsit2)
                 {
@@ -5406,8 +5415,7 @@ int Scheduler::FillRecordingDir(
             pginfolist_t expiring;
             m_expirer->GetAllExpiring(expiring);
 
-            for(pginfolist_t::iterator it=expiring.begin();
-                it != expiring.end(); ++it)
+            for (auto & expire : expiring)
             {
                 // find the filesystem its on
                 FileSystemInfo *fs = nullptr;
@@ -5415,7 +5423,7 @@ int Scheduler::FillRecordingDir(
                     fslistit != fsInfoList.end(); ++fslistit)
                 {
                     // recording is not on this filesystem's host
-                    if ((*it)->GetHostname() != (*fslistit)->getHostname())
+                    if (expire->GetHostname() != (*fslistit)->getHostname())
                         continue;
 
                     // directory is not in the Storage Group dir list
@@ -5423,10 +5431,10 @@ int Scheduler::FillRecordingDir(
                         continue;
 
                     QString filename =
-                        (*fslistit)->getPath() + "/" + (*it)->GetPathname();
+                        (*fslistit)->getPath() + "/" + expire->GetPathname();
 
                     // recording is local
-                    if ((*it)->GetHostname() == gCoreContext->GetHostName())
+                    if (expire->GetHostname() == gCoreContext->GetHostName())
                     {
                         QFile checkFile(filename);
 
@@ -5438,18 +5446,16 @@ int Scheduler::FillRecordingDir(
                     }
                     else // recording is remote
                     {
-                        QString backuppath = (*it)->GetPathname();
-                        ProgramInfo *programinfo = *it;
+                        QString backuppath = expire->GetPathname();
+                        ProgramInfo *programinfo = expire;
                         bool foundSlave = false;
 
-                        QMap<int, EncoderLink *>::Iterator enciter =
-                            m_tvList->begin();
-                        for (; enciter != m_tvList->end(); ++enciter)
+                        for (auto * enc : qAsConst(*m_tvList))
                         {
-                            if ((*enciter)->GetHostName() ==
+                            if (enc->GetHostName() ==
                                 programinfo->GetHostname())
                             {
-                                (*enciter)->CheckFile(programinfo);
+                                enc->CheckFile(programinfo);
                                 foundSlave = true;
                                 break;
                             }
@@ -5470,13 +5476,13 @@ int Scheduler::FillRecordingDir(
                     LOG(VB_GENERAL, LOG_ERR,
                         QString("Unable to match '%1' "
                                 "to any file system.  Ignoring it.")
-                            .arg((*it)->GetBasename()));
+                            .arg(expire->GetBasename()));
                     continue;
                 }
 
                 // add this files size to the remaining free space
                 remainingSpaceKB[fs->getFSysID()] +=
-                    (*it)->GetFilesize() / 1024;
+                    expire->GetFilesize() / 1024;
 
                 // check if we have enough space for new file
                 long long desiredSpaceKB =
@@ -5505,7 +5511,7 @@ int Scheduler::FillRecordingDir(
                 }
             }
 
-            m_expirer->ClearExpireList(expiring);
+            AutoExpire::ClearExpireList(expiring);
         }
         else // passes 1 & 3 (or 1 & 2 if !simulateAutoExpire)
         {
@@ -5527,6 +5533,7 @@ int Scheduler::FillRecordingDir(
                     fsID = fs->getFSysID();
 
                     if (pass == 1)
+                    {
                         LOG(VB_FILE, LOG_INFO,
                             QString("pass 1: '%1' will record in "
                                     "'%2' which has %3 MB free. This recording "
@@ -5537,7 +5544,9 @@ int Scheduler::FillRecordingDir(
                                 .arg(fs->getFreeSpace() / 1024)
                                 .arg(maxSizeKB / 1024)
                                 .arg(desiredSpaceKB / 1024));
+                    }
                     else
+                    {
                         LOG(VB_FILE, LOG_INFO,
                             QString("pass %1: '%2' will record in "
                                 "'%3' although there is only %4 MB free and "
@@ -5549,6 +5558,7 @@ int Scheduler::FillRecordingDir(
                                 .arg(recording_dir)
                                 .arg(fs->getFreeSpace() / 1024)
                                 .arg(desiredSpaceKB / 1024));
+                    }
 
                     foundDir = true;
                     break;
@@ -5598,46 +5608,42 @@ void Scheduler::SchedLiveTV(void)
         return;
 
     // Build a list of active livetv programs
-    QMap<int, EncoderLink *>::Iterator enciter = m_tvList->begin();
-    for (; enciter != m_tvList->end(); ++enciter)
+    for (auto * enc : qAsConst(*m_tvList))
     {
-        EncoderLink *enc = *enciter;
-
         if (kState_WatchingLiveTV != enc->GetState())
             continue;
 
         InputInfo in;
         enc->IsBusy(&in);
 
-        if (!in.m_inputid)
+        if (!in.m_inputId)
             continue;
 
         // Get the program that will be recording on this channel at
         // record start time and assume this LiveTV session continues
         // for at least another 30 minutes from now.
-        RecordingInfo *dummy = new RecordingInfo(
-            in.m_chanid, m_livetvTime, true, 4);
+        auto *dummy = new RecordingInfo(in.m_chanId, m_livetvTime, true, 4);
         dummy->SetRecordingStartTime(m_schedTime);
         if (m_schedTime.secsTo(dummy->GetRecordingEndTime()) < 1800)
             dummy->SetRecordingEndTime(m_schedTime.addSecs(1800));
         dummy->SetInputID(enc->GetInputID());
-        dummy->m_mplexid = dummy->QueryMplexID();
-        dummy->m_sgroupid = m_sinputinfomap[dummy->GetInputID()].m_sgroupid;
+        dummy->m_mplexId = dummy->QueryMplexID();
+        dummy->m_sgroupId = m_sinputInfoMap[dummy->GetInputID()].m_sgroupId;
         dummy->SetRecordingStatus(RecStatus::Unknown);
 
-        m_livetvlist.push_front(dummy);
+        m_livetvList.push_front(dummy);
     }
 
-    if (m_livetvlist.empty())
+    if (m_livetvList.empty())
         return;
 
-    SchedNewRetryPass(m_livetvlist.begin(), m_livetvlist.end(), false, true);
+    SchedNewRetryPass(m_livetvList.begin(), m_livetvList.end(), false, true);
 
-    while (!m_livetvlist.empty())
+    while (!m_livetvList.empty())
     {
-        RecordingInfo *p = m_livetvlist.back();
+        RecordingInfo *p = m_livetvList.back();
         delete p;
-        m_livetvlist.pop_back();
+        m_livetvList.pop_back();
     }
 }
 
@@ -5680,9 +5686,11 @@ bool Scheduler::WasStartedAutomatically()
                 "NOT close to auto-start time, USER-initiated startup assumed");
     }
     else if (!s.isEmpty())
+    {
         LOG(VB_GENERAL, LOG_ERR, LOC +
             QString("Invalid MythShutdownWakeupTime specified in database (%1)")
                 .arg(s));
+    }
 
     return autoStart;
 }
@@ -5718,7 +5726,7 @@ bool Scheduler::CreateConflictLists(void)
     for (mit = inputSets.begin(); mit != inputSets.end(); ++mit)
     {
         uint inputid = mit.key();
-        if (m_sinputinfomap[inputid].m_conflictlist)
+        if (m_sinputInfoMap[inputid].m_conflictList)
             continue;
 
         // Find the union of all inputs grouped with those already in
@@ -5737,19 +5745,19 @@ bool Scheduler::CreateConflictLists(void)
 
         // Create a new conflict list for the resulting set of inputs
         // and point each inputs list at it.
-        RecList *conflictlist = new RecList();
-        m_conflictlists.push_back(conflictlist);
+        auto *conflictlist = new RecList();
+        m_conflictLists.push_back(conflictlist);
         for (sit = checkset.begin(); sit != checkset.end(); ++sit)
         {
             LOG(VB_SCHEDULE, LOG_INFO,
                 QString("Assigning input %1 to conflict set %2")
-                .arg(*sit).arg(m_conflictlists.size()));
-            m_sinputinfomap[*sit].m_conflictlist = conflictlist;
+                .arg(*sit).arg(m_conflictLists.size()));
+            m_sinputInfoMap[*sit].m_conflictList = conflictlist;
         }
     }
 
     bool result = true;
-    
+
     query.prepare("SELECT ci.cardid "
                   "FROM capturecard ci "
                   "LEFT JOIN inputgroup ig "
@@ -5766,13 +5774,13 @@ bool Scheduler::CreateConflictLists(void)
         uint id = query.value(0).toUInt();
         LOG(VB_GENERAL, LOG_ERR, LOC +
             QString("Input %1 is not assigned to any input group").arg(id));
-        RecList *conflictlist = new RecList();
-        m_conflictlists.push_back(conflictlist);
+        auto *conflictlist = new RecList();
+        m_conflictLists.push_back(conflictlist);
         LOG(VB_SCHEDULE, LOG_INFO,
             QString("Assigning input %1 to conflict set %2")
-            .arg(id).arg(m_conflictlists.size()));
-        m_sinputinfomap[id].m_conflictlist = conflictlist;
-    }                  
+            .arg(id).arg(m_conflictLists.size()));
+        m_sinputInfoMap[id].m_conflictList = conflictlist;
+    }
 
     return result;
 }
@@ -5799,22 +5807,22 @@ bool Scheduler::InitInputInfoMap(void)
 
         // This code should stay substantially similar to that below
         // in AddChildInput().
-        SchedInputInfo &siinfo = m_sinputinfomap[inputid];
-        siinfo.m_inputid = inputid;
-        if (parentid && m_sinputinfomap[parentid].m_schedgroup)
-            siinfo.m_sgroupid = parentid;
+        SchedInputInfo &siinfo = m_sinputInfoMap[inputid];
+        siinfo.m_inputId = inputid;
+        if (parentid && m_sinputInfoMap[parentid].m_schedGroup)
+            siinfo.m_sgroupId = parentid;
         else
-            siinfo.m_sgroupid = inputid;
-        siinfo.m_schedgroup = query.value(2).toBool();
-        if (!parentid && siinfo.m_schedgroup)
+            siinfo.m_sgroupId = inputid;
+        siinfo.m_schedGroup = query.value(2).toBool();
+        if (!parentid && siinfo.m_schedGroup)
         {
-            siinfo.m_group_inputs = CardUtil::GetChildInputIDs(inputid);
-            siinfo.m_group_inputs.insert(siinfo.m_group_inputs.begin(), inputid);
+            siinfo.m_groupInputs = CardUtil::GetChildInputIDs(inputid);
+            siinfo.m_groupInputs.insert(siinfo.m_groupInputs.begin(), inputid);
         }
-        siinfo.m_conflicting_inputs = CardUtil::GetConflictingInputs(inputid);
+        siinfo.m_conflictingInputs = CardUtil::GetConflictingInputs(inputid);
         LOG(VB_SCHEDULE, LOG_INFO,
             QString("Added SchedInputInfo i=%1, g=%2, sg=%3")
-            .arg(inputid).arg(siinfo.m_sgroupid).arg(siinfo.m_schedgroup));
+            .arg(inputid).arg(siinfo.m_sgroupId).arg(siinfo.m_schedGroup));
     }
 
     return CreateConflictLists();
@@ -5828,24 +5836,22 @@ void Scheduler::AddChildInput(uint parentid, uint inputid)
 
     // This code should stay substantially similar to that above in
     // InitInputInfoMap().
-    SchedInputInfo &siinfo = m_sinputinfomap[inputid];
-    siinfo.m_inputid = inputid;
-    if (m_sinputinfomap[parentid].m_schedgroup)
-        siinfo.m_sgroupid = parentid;
+    SchedInputInfo &siinfo = m_sinputInfoMap[inputid];
+    siinfo.m_inputId = inputid;
+    if (m_sinputInfoMap[parentid].m_schedGroup)
+        siinfo.m_sgroupId = parentid;
     else
-        siinfo.m_sgroupid = inputid;
-    siinfo.m_schedgroup = false;
-    siinfo.m_conflicting_inputs = CardUtil::GetConflictingInputs(inputid);
+        siinfo.m_sgroupId = inputid;
+    siinfo.m_schedGroup = false;
+    siinfo.m_conflictingInputs = CardUtil::GetConflictingInputs(inputid);
 
-    siinfo.m_conflictlist = m_sinputinfomap[parentid].m_conflictlist;
+    siinfo.m_conflictList = m_sinputInfoMap[parentid].m_conflictList;
 
     // Now, fixup the infos for the parent and conflicting inputs.
-    m_sinputinfomap[parentid].m_group_inputs.push_back(inputid);
-    for (auto it = siinfo.m_conflicting_inputs.begin();
-         it != siinfo.m_conflicting_inputs.end(); ++it)
+    m_sinputInfoMap[parentid].m_groupInputs.push_back(inputid);
+    for (uint otherid : siinfo.m_conflictingInputs)
     {
-        uint otherid = *it;
-        m_sinputinfomap[otherid].m_conflicting_inputs.push_back(inputid);
+        m_sinputInfoMap[otherid].m_conflictingInputs.push_back(inputid);
     }
 }
 

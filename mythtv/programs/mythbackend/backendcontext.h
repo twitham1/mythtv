@@ -1,5 +1,5 @@
-#ifndef _BACKEND_CONTEXT_H_
-#define _BACKEND_CONTEXT_H_
+#ifndef BACKEND_CONTEXT_H
+#define BACKEND_CONTEXT_H
 
 #include <QString>
 #include <QMap>
@@ -48,12 +48,12 @@ class BackendContext
     void SetFrontendConnected(Frontend *frontend);
     void SetFrontendDisconnected(const QString &name);
 
-    const QMap<QString, Frontend*> GetConnectedFrontends() const { return m_connectedFrontends; }
-    const QMap<QString, Frontend*> GetFrontends() const { return m_knownFrontends; }
+    QMap<QString, Frontend*> GetConnectedFrontends() const { return m_connectedFrontends; }
+    QMap<QString, Frontend*> GetFrontends() const { return m_knownFrontends; }
 
   private:
     QMap<QString, Frontend*> m_connectedFrontends;
     QMap<QString, Frontend*> m_knownFrontends;
 };
 
-#endif // _BACKEND_CONTEXT_H_
+#endif // BACKEND_CONTEXT_H

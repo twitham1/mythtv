@@ -1,10 +1,10 @@
-#ifndef _LOGODETECTORBASE_H_
-#define _LOGODETECTORBASE_H_
+#ifndef LOGODETECTORBASE_H
+#define LOGODETECTORBASE_H
 
 #include <QObject>
+#include "mythframe.h"
 
 class MythPlayer;
-typedef struct VideoFrame_ VideoFrame;
 
 class LogoDetectorBase : public QObject
 {
@@ -24,14 +24,13 @@ class LogoDetectorBase : public QObject
                             float debugValue = 0.0);
 
   protected:
-    virtual ~LogoDetectorBase() = default;
+    ~LogoDetectorBase() override = default;
 
   protected:
     bool m_foundLogo {false};
     unsigned int m_width, m_height;
 };
 
-#endif
+#endif // LOGODETECTORBASE_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */
-

@@ -25,8 +25,7 @@ win32-msvc* {
 }
 
 CONFIG += $$CCONFIG
-# enable C++11 support, QT5.7 will be based on C++11 anyway
-CONFIG += c++11
+CONFIG += c++17
 
 defineReplace(avLibName) {
         NAME = $$1
@@ -72,8 +71,8 @@ isEmpty( LIBDIR ) {
     LIBDIR = $${RUNPREFIX}/$${LIBDIRNAME}
 }
 
-LIBVERSION = 31
-VERSION = 31.0
+LIBVERSION = 32
+VERSION = 32.0
 
 # Die on the (common) case where OS X users inadvertently use Fink's
 # Qt/X11 install instead of Qt/Mac. '
@@ -109,9 +108,6 @@ win32 {
 
         DEFINES += _WIN32 WIN32 WIN32_LEAN_AND_MEAN NOMINMAX _USE_MATH_DEFINES
         DEFINES += _CRT_SECURE_NO_WARNINGS
-        DEFINES += __STDC_CONSTANT_MACROS
-        DEFINES += __STDC_FORMAT_MACROS
-        DEFINES += __STDC_LIMIT_MACROS
 
         debug  :DEFINES += _DEBUG
         release:DEFINES += NDEBUG
@@ -223,6 +219,10 @@ win32 {
 
     EXTRA_LIBS += $$LOCAL_LIBDIR_OGL
     EXTRA_LIBS += $$LOCAL_LIBDIR_X11
+    # FIXME MK Jan/20 I'm not sure this is necessary or necessarily accurate.
+    # FFmpeg OpenGL is an option that we do not (and should not imho) enable -
+    # and we should in that case be stripping out GLES etc as well.
+    # and CONFIG_OPENGL_LIBS is always empty as we never set gl_lib anymore
     !isEmpty( CONFIG_OPENGL_LIBS ) {
         # Replace FFmpeg's OpenGL with OpenGLES
         EXTRA_LIBS -= -lGL

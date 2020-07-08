@@ -1,6 +1,6 @@
 // -*- Mode: c++ -*-
-#ifndef _STREAMLISTENERS_H_
-#define _STREAMLISTENERS_H_
+#ifndef STREAMLISTENERS_H
+#define STREAMLISTENERS_H
 
 #include "tspacket.h"
 #include "mythdate.h"
@@ -83,11 +83,11 @@ class MPEGStreamListener
   protected:
     virtual ~MPEGStreamListener() = default;
   public:
-    virtual void HandlePAT(const ProgramAssociationTable*) = 0;
-    virtual void HandleCAT(const ConditionalAccessTable*) = 0;
-    virtual void HandlePMT(uint program_num, const ProgramMapTable*) = 0;
-    virtual void HandleEncryptionStatus(uint program_number, bool) = 0;
-    virtual void HandleSplice(const SpliceInformationTable*) { }
+    virtual void HandlePAT(const ProgramAssociationTable *pat) = 0;
+    virtual void HandleCAT(const ConditionalAccessTable *cat) = 0;
+    virtual void HandlePMT(uint program_num, const ProgramMapTable *pmt) = 0;
+    virtual void HandleEncryptionStatus(uint program_number, bool encrypted) = 0;
+    virtual void HandleSplice(const SpliceInformationTable */*sit*/) { }
 };
 
 class MPEGSingleProgramStreamListener
@@ -199,4 +199,4 @@ class DVBEITStreamListener
 };
 
 
-#endif // _STREAMLISTENERS_H_
+#endif // STREAMLISTENERS_H

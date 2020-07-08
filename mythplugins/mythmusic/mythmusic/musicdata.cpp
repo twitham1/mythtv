@@ -47,14 +47,14 @@ MusicData::~MusicData(void)
 void MusicData::scanMusic (void)
 {
     QStringList strList("SCAN_MUSIC");
-    SendStringListThread *thread = new SendStringListThread(strList);
+    auto *thread = new SendStringListThread(strList);
     MThreadPool::globalInstance()->start(thread, "Send SCAN_MUSIC");
 
     LOG(VB_GENERAL, LOG_INFO, "Requested a music file scan");
 }
 
 /// reload music after a scan, rip or import
-void MusicData::reloadMusic(void)
+void MusicData::reloadMusic(void) const
 {
     if (!m_all_music || !m_all_playlists)
         return;
@@ -62,8 +62,7 @@ void MusicData::reloadMusic(void)
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
     QString message = tr("Rebuilding music tree");
 
-    MythUIBusyDialog *busy = new MythUIBusyDialog(message, popupStack,
-                                                  "musicscanbusydialog");
+    auto *busy = new MythUIBusyDialog(message, popupStack, "musicscanbusydialog");
 
     if (busy->Create())
         popupStack->AddScreen(busy, false);
@@ -83,7 +82,7 @@ void MusicData::reloadMusic(void)
     m_all_music->startLoading();
     while (!m_all_music->doneLoading())
     {
-        qApp->processEvents();
+        QCoreApplication::processEvents();
         usleep(50000);
     }
 
@@ -96,18 +95,17 @@ void MusicData::reloadMusic(void)
         gPlayer->restorePosition();
 }
 
-void MusicData::loadMusic(void)
+void MusicData::loadMusic(void) const
 {
     // only do this once
     if (m_initialized)
         return;
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
-    QString message = qApp->translate("(MythMusicMain)",
+    QString message = QCoreApplication::translate("(MythMusicMain)",
                                       "Loading Music. Please wait ...");
 
-    MythUIBusyDialog *busy = new MythUIBusyDialog(message, popupStack,
-                                                  "musicscanbusydialog");
+    auto *busy = new MythUIBusyDialog(message, popupStack, "musicscanbusydialog");
     if (busy->Create())
         popupStack->AddScreen(busy, false);
     else
@@ -116,10 +114,10 @@ void MusicData::loadMusic(void)
     // Set the various track formatting modes
     MusicMetadata::setArtistAndTrackFormats();
 
-    AllMusic *all_music = new AllMusic();
+    auto *all_music = new AllMusic();
 
     //  Load all playlists into RAM (once!)
-    PlaylistContainer *all_playlists = new PlaylistContainer(all_music);
+    auto *all_playlists = new PlaylistContainer(all_music);
 
     gMusicData->m_all_music = all_music;
     gMusicData->m_all_streams = new AllStream();
@@ -130,7 +128,7 @@ void MusicData::loadMusic(void)
     while (!gMusicData->m_all_playlists->doneLoading()
            || !gMusicData->m_all_music->doneLoading())
     {
-        qApp->processEvents();
+        QCoreApplication::processEvents();
         usleep(50000);
     }
 

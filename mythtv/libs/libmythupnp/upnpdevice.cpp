@@ -91,7 +91,7 @@ bool UPnpDeviceDesc::Load( const QDomDocument &xmlDevDesc )
 
     QDomNode  oNode = xmlDevDesc.documentElement();
 
-    _InternalLoad( oNode.namedItem( "device" ), &m_rootDevice );
+    InternalLoad( oNode.namedItem( "device" ), &m_rootDevice );
 
     return true;
 }
@@ -100,7 +100,7 @@ bool UPnpDeviceDesc::Load( const QDomDocument &xmlDevDesc )
 //
 /////////////////////////////////////////////////////////////////////////////
 
-void UPnpDeviceDesc::_InternalLoad( QDomNode oNode, UPnpDevice *pCurDevice )
+void UPnpDeviceDesc::InternalLoad( QDomNode oNode, UPnpDevice *pCurDevice )
 {
     QString pin = GetMythDB()->GetSetting( "SecurityPin", "");
     pCurDevice->m_securityPin = !(pin.isEmpty() || pin == "0000");
@@ -184,7 +184,7 @@ void UPnpDeviceDesc::ProcessIconList( const QDomNode& oListNode, UPnpDevice *pDe
 
         if ( e.tagName() == "icon" )
         {
-            UPnpIcon *pIcon = new UPnpIcon();
+            auto *pIcon = new UPnpIcon();
             pDevice->m_listIcons.append( pIcon );
 
             SetStrValue( e.namedItem( "mimetype" ), pIcon->m_sMimeType );
@@ -213,7 +213,7 @@ void UPnpDeviceDesc::ProcessServiceList( const QDomNode& oListNode, UPnpDevice *
 
         if ( e.tagName() == "service" )
         {
-            UPnpService *pService = new UPnpService();
+            auto *pService = new UPnpService();
             pDevice->m_listServices.append( pService );
 
             SetStrValue(e.namedItem( "serviceType" ), pService->m_sServiceType);
@@ -248,9 +248,9 @@ void UPnpDeviceDesc::ProcessDeviceList( const QDomNode&    oListNode,
 
         if ( e.tagName() == "device")
         {
-            UPnpDevice *pNewDevice = new UPnpDevice();
+            auto *pNewDevice = new UPnpDevice();
             pDevice->m_listDevices.append( pNewDevice );
-            _InternalLoad( e, pNewDevice );
+            InternalLoad( e, pNewDevice );
         }
     }
 }
@@ -398,10 +398,9 @@ void UPnpDeviceDesc::OutputDevice( QTextStream &os,
                        pDevice->m_securityPin ? "true" : "false");
     os << FormatValue( "mythtv:X_protocol", pDevice->m_protocolVersion );
 
-    NameValues::const_iterator nit = pDevice->m_lstExtra.begin();
-    for (; nit != pDevice->m_lstExtra.end(); ++nit)
+    for (const auto & nit : qAsConst(pDevice->m_lstExtra))
     {
-        os << FormatValue( (*nit) );
+        os << FormatValue( nit );
     }
 
     // ----------------------------------------------------------------------
@@ -412,15 +411,14 @@ void UPnpDeviceDesc::OutputDevice( QTextStream &os,
     {
         os << "<iconList>\n";
 
-        UPnpIconList::const_iterator it = pDevice->m_listIcons.begin();
-        for (; it != pDevice->m_listIcons.end(); ++it)
+        for (auto *icon : qAsConst(pDevice->m_listIcons))
         {
             os << "<icon>\n";
-            os << FormatValue( "mimetype", (*it)->m_sMimeType );
-            os << FormatValue( "width"   , (*it)->m_nWidth    );
-            os << FormatValue( "height"  , (*it)->m_nHeight   );
-            os << FormatValue( "depth"   , (*it)->m_nDepth    );
-            os << FormatValue( "url"     , (*it)->m_sURL      );
+            os << FormatValue( "mimetype", icon->m_sMimeType );
+            os << FormatValue( "width"   , icon->m_nWidth    );
+            os << FormatValue( "height"  , icon->m_nHeight   );
+            os << FormatValue( "depth"   , icon->m_nDepth    );
+            os << FormatValue( "url"     , icon->m_sURL      );
             os << "</icon>\n";
         }
         os << "</iconList>\n";
@@ -453,10 +451,9 @@ void UPnpDeviceDesc::OutputDevice( QTextStream &os,
 
         os << "<serviceList>\n";
 
-        UPnpServiceList::const_iterator it = pDevice->m_listServices.begin();
-        for (; it != pDevice->m_listServices.end(); ++it)
+        for (auto *service : qAsConst(pDevice->m_listServices))
         {
-            if (!bIsXbox360 && (*it)->m_sServiceType.startsWith(
+            if (!bIsXbox360 && service->m_sServiceType.startsWith(
                     "urn:microsoft.com:service:X_MS_MediaReceiverRegistrar",
                     Qt::CaseInsensitive))
             {
@@ -464,11 +461,11 @@ void UPnpDeviceDesc::OutputDevice( QTextStream &os,
             }
 
             os << "<service>\n";
-            os << FormatValue( "serviceType", (*it)->m_sServiceType );
-            os << FormatValue( "serviceId"  , (*it)->m_sServiceId   );
-            os << FormatValue( "SCPDURL"    , (*it)->m_sSCPDURL     );
-            os << FormatValue( "controlURL" , (*it)->m_sControlURL  );
-            os << FormatValue( "eventSubURL", (*it)->m_sEventSubURL );
+            os << FormatValue( "serviceType", service->m_sServiceType );
+            os << FormatValue( "serviceId"  , service->m_sServiceId   );
+            os << FormatValue( "SCPDURL"    , service->m_sSCPDURL     );
+            os << FormatValue( "controlURL" , service->m_sControlURL  );
+            os << FormatValue( "eventSubURL", service->m_sEventSubURL );
             os << "</service>\n";
         }
         os << "</serviceList>\n";
@@ -554,8 +551,8 @@ QString UPnpDeviceDesc::FindDeviceUDN( UPnpDevice *pDevice, QString sST )
     // Check for matching Service
     // ----------------------------------------------------------------------
 
-    UPnpServiceList::const_iterator sit = pDevice->m_listServices.begin();
-    for (; sit != pDevice->m_listServices.end(); ++sit)
+    for (auto sit = pDevice->m_listServices.cbegin();
+         sit != pDevice->m_listServices.cend(); ++sit)
     {
         // Ignore the service version, UPnP is backwards compatible
         if (sST.section(':', 0, -2) == (*sit)->m_sServiceType.section(':', 0, -2))
@@ -566,10 +563,9 @@ QString UPnpDeviceDesc::FindDeviceUDN( UPnpDevice *pDevice, QString sST )
     // Check Embedded Devices for a Match
     // ----------------------------------------------------------------------
 
-    UPnpDeviceList::const_iterator dit = pDevice->m_listDevices.begin();
-    for (; dit != pDevice->m_listDevices.end(); ++dit)
+    for (auto *device : qAsConst(pDevice->m_listDevices))
     {
-        QString sUDN = FindDeviceUDN( *dit, sST );
+        QString sUDN = FindDeviceUDN( device, sST );
         if (sUDN.length() > 0)
             return sUDN;
     }
@@ -601,10 +597,9 @@ UPnpDevice *UPnpDeviceDesc::FindDevice( UPnpDevice    *pDevice,
     // Check Embedded Devices for a Match
     // ----------------------------------------------------------------------
 
-    UPnpDeviceList::iterator dit = pDevice->m_listDevices.begin();
-    for (; dit != pDevice->m_listDevices.end(); ++dit)
+    for (const auto & dev : qAsConst(pDevice->m_listDevices))
     {
-        UPnpDevice *pFound = FindDevice(*dit, sURI);
+        UPnpDevice *pFound = FindDevice(dev, sURI);
 
         if (pFound != nullptr)
             return pFound;
@@ -640,8 +635,8 @@ UPnpDeviceDesc *UPnpDeviceDesc::Retrieve( QString &sURL )
         {
             pDevice = new UPnpDeviceDesc();
             pDevice->Load( xml );
-            pDevice->m_HostUrl   = sURL;
-            pDevice->m_sHostName = pDevice->m_HostUrl.host();
+            pDevice->m_hostUrl   = sURL;
+            pDevice->m_sHostName = pDevice->m_hostUrl.host();
         }
         else
         {
@@ -662,7 +657,7 @@ UPnpDeviceDesc *UPnpDeviceDesc::Retrieve( QString &sURL )
 //
 /////////////////////////////////////////////////////////////////////////////
 
-QString UPnpDeviceDesc::GetHostName()
+QString UPnpDeviceDesc::GetHostName() const
 {
     if (m_sHostName.length() == 0)
     {
@@ -692,7 +687,6 @@ QString UPnpDeviceDesc::GetHostName()
 UPnpDevice::UPnpDevice() :
     m_sModelNumber(MYTH_BINARY_VERSION),
     m_sSerialNumber(MYTH_SOURCE_VERSION),
-    m_securityPin(false),
     m_protocolVersion(MYTH_PROTO_VERSION)
 {
 
@@ -708,7 +702,7 @@ UPnpDevice::UPnpDevice() :
 //       devices too.
 
     // Large PNG Icon
-    UPnpIcon *pngIconLrg = new UPnpIcon();
+    auto *pngIconLrg = new UPnpIcon();
     pngIconLrg->m_nDepth = 24;
     pngIconLrg->m_nHeight = 120;
     pngIconLrg->m_nWidth = 120;
@@ -717,7 +711,7 @@ UPnpDevice::UPnpDevice() :
     m_listIcons.append(pngIconLrg);
 
     // Large JPG Icon
-    UPnpIcon *jpgIconLrg = new UPnpIcon();
+    auto *jpgIconLrg = new UPnpIcon();
     jpgIconLrg->m_nDepth = 24;
     jpgIconLrg->m_nHeight = 120;
     jpgIconLrg->m_nWidth = 120;
@@ -726,7 +720,7 @@ UPnpDevice::UPnpDevice() :
     m_listIcons.append(jpgIconLrg);
 
     // Small PNG Icon
-    UPnpIcon *pngIconSm = new UPnpIcon();
+    auto *pngIconSm = new UPnpIcon();
     pngIconSm->m_nDepth = 24;
     pngIconSm->m_nHeight = 48;
     pngIconSm->m_nWidth = 48;
@@ -735,7 +729,7 @@ UPnpDevice::UPnpDevice() :
     m_listIcons.append(pngIconSm);
 
     // Small JPG Icon
-    UPnpIcon *jpgIconSm = new UPnpIcon();
+    auto *jpgIconSm = new UPnpIcon();
     jpgIconSm->m_nDepth = 24;
     jpgIconSm->m_nHeight = 48;
     jpgIconSm->m_nWidth = 48;
@@ -771,7 +765,7 @@ QString UPnpDevice::GetUDN(void) const
     return m_sUDN;
 }
 
-void UPnpDevice::toMap(InfoMap &map)
+void UPnpDevice::toMap(InfoMap &map) const
 {
     map["name"] = m_sFriendlyName;
     map["modelname"] = m_sModelName;
@@ -793,13 +787,12 @@ UPnpService UPnpDevice::GetService(const QString &urn, bool *found) const
 
     bool done = false;
 
-    UPnpServiceList::const_iterator it = m_listServices.begin();
-    for (; it != m_listServices.end(); ++it)
+    for (auto *service : qAsConst(m_listServices))
     {
         // Ignore the service version
-        if ((*it)->m_sServiceType.section(':', 0, -2) == urn.section(':', 0, -2))
+        if (service->m_sServiceType.section(':', 0, -2) == urn.section(':', 0, -2))
         {
-            srv = **it;
+            srv = *service;
             done = true;
             break;
         }
@@ -850,41 +843,37 @@ QString UPnpDevice::toString(uint padding) const
 
     if (!m_lstExtra.empty())
     {
-        NameValues::const_iterator it = m_lstExtra.begin();
         ret += "Extra key value pairs\n";
-        for (; it != m_lstExtra.end(); ++it)
+        for (const auto & extra : qAsConst(m_lstExtra))
         {
-            ret += (*it).m_sName;
+            ret += extra.m_sName;
             ret += ":";
-            int int_padding = 18 - ((*it).m_sName.length() + 1);
+            int int_padding = 18 - (extra.m_sName.length() + 1);
             for (int i = 0; i < int_padding; i++)
                 ret += " ";
-            ret += QString("%1\n").arg((*it).m_sValue);
+            ret += QString("%1\n").arg(extra.m_sValue);
         }
     }
 
     if (!m_listIcons.empty())
     {
         ret += "Icon List:\n";
-        UPnpIconList::const_iterator it = m_listIcons.begin();
-        for (; it != m_listIcons.end(); ++it)
-            ret += (*it)->toString(padding+2) + "\n";
+        for (auto *icon : qAsConst(m_listIcons))
+            ret += icon->toString(padding+2) + "\n";
     }
 
     if (!m_listServices.empty())
     {
         ret += "Service List:\n";
-        UPnpServiceList::const_iterator it = m_listServices.begin();
-        for (; it != m_listServices.end(); ++it)
-            ret += (*it)->toString(padding+2) + "\n";
+        for (auto *service : qAsConst(m_listServices))
+            ret += service->toString(padding+2) + "\n";
     }
 
     if (!m_listDevices.empty())
     {
         ret += "Device List:\n";
-        UPnpDeviceList::const_iterator it = m_listDevices.begin();
-        for (; it != m_listDevices.end(); ++it)
-            ret += (*it)->toString(padding+2) + "\n";
+        for (auto *device : qAsConst(m_listDevices))
+            ret += device->toString(padding+2) + "\n";
         ret += "\n";
     }
 

@@ -32,7 +32,7 @@ class SERVICE_PUBLIC ArtworkInfoList : public QObject
 
     Q_CLASSINFO( "ArtworkInfos", "type=DTC::ArtworkInfo");
 
-    Q_PROPERTY( QVariantList ArtworkInfos     READ ArtworkInfos DESIGNABLE true )
+    Q_PROPERTY( QVariantList ArtworkInfos     READ ArtworkInfos )
 
     PROPERTYIMP_RO_REF( QVariantList, ArtworkInfos );
 
@@ -40,7 +40,7 @@ class SERVICE_PUBLIC ArtworkInfoList : public QObject
 
         static inline void InitializeCustomTypes();
 
-        Q_INVOKABLE ArtworkInfoList(QObject *parent = nullptr)
+        Q_INVOKABLE explicit ArtworkInfoList(QObject *parent = nullptr)
             : QObject         ( parent )
         {
         }
@@ -55,7 +55,7 @@ class SERVICE_PUBLIC ArtworkInfoList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            ArtworkInfo *pObject = new ArtworkInfo( this );
+            auto *pObject = new ArtworkInfo( this );
             m_ArtworkInfos.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

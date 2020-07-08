@@ -30,16 +30,16 @@ class DecoderEvent : public MythEvent
 {
   public:
     explicit DecoderEvent(Type type) : MythEvent(type) { ; }
+    explicit DecoderEvent(QString *e) : MythEvent(Error), m_errorMsg(e) { ; }
 
-    explicit DecoderEvent(QString *e) : MythEvent(Error), m_error_msg(e) { ; }
-
-    ~DecoderEvent()
+    ~DecoderEvent() override
     {
-        if (m_error_msg)
-            delete m_error_msg;
+        delete m_errorMsg;
     }
 
-    const QString *errorMessage() const { return m_error_msg; }
+    const QString *errorMessage() const { return m_errorMsg; }
+
+    DecoderEvent &operator=(const DecoderEvent&) = delete;
 
     MythEvent *clone(void) const override // MythEvent
         { return new DecoderEvent(*this); }
@@ -52,21 +52,20 @@ class DecoderEvent : public MythEvent
   private:
     DecoderEvent(const DecoderEvent &o) : MythEvent(o)
     {
-        if (o.m_error_msg)
+        if (o.m_errorMsg)
         {
-            m_error_msg = new QString(*o.m_error_msg);
+            m_errorMsg = new QString(*o.m_errorMsg);
         }
     }
-    DecoderEvent &operator=(const DecoderEvent&);
 
   private:
-    QString *m_error_msg {nullptr};
+    QString *m_errorMsg {nullptr};
 };
 
 class Decoder : public MThread, public MythObservable
 {
   public:
-    virtual ~Decoder();
+    ~Decoder() override;
 
     virtual bool initialize() = 0;
     virtual void seek(double) = 0;
@@ -75,7 +74,7 @@ class Decoder : public MThread, public MythObservable
     DecoderFactory *factory() const { return m_fctry; }
 
     AudioOutput *output() { return m_out; }
-    void setOutput(AudioOutput *);
+    void setOutput(AudioOutput *o);
     void setURL(const QString &url) { m_url = url; }
 
     virtual void lock(void) { return m_mtx.lock(); }
@@ -88,15 +87,15 @@ class Decoder : public MThread, public MythObservable
 
     // static methods
     static QStringList all();
-    static bool supports(const QString &);
-    static void registerFactory(DecoderFactory *);
-    static Decoder *create(const QString &, AudioOutput *, bool = false);
+    static bool supports(const QString &source);
+    static void registerFactory(DecoderFactory *fact);
+    static Decoder *create(const QString &source, AudioOutput *output, bool deletable = false);
 
   protected:
     Decoder(DecoderFactory *d, AudioOutput *o)
         : MThread("MythMusicDecoder"), m_fctry(d), m_out(o) {}
     QMutex* getMutex(void) { return &m_mtx; }
-    void error(const QString &);
+    void error(const QString &e);
 
     QString m_url;
 
@@ -116,7 +115,7 @@ public:
     virtual bool supports(const QString &source) const = 0;
     virtual const QString &extension() const = 0; // file extension, ie. ".mp3" or ".ogg"
     virtual const QString &description() const = 0; // file type, ie. "MPEG Audio Files"
-    virtual Decoder *create(const QString &, AudioOutput *, bool) = 0;
+    virtual Decoder *create(const QString &source, AudioOutput *output, bool deletable) = 0;
     virtual ~DecoderFactory() = default;
 };
 
@@ -125,10 +124,10 @@ class CdDecoderFactory : public DecoderFactory
     Q_DECLARE_TR_FUNCTIONS(CdDecoderFactory);
 
 public:
-    bool supports(const QString &) const override; // DecoderFactory
+    bool supports(const QString &source) const override; // DecoderFactory
     const QString &extension() const override; // DecoderFactory
     const QString &description() const override; // DecoderFactory
-    Decoder *create(const QString &, AudioOutput *, bool) override; // DecoderFactory
+    Decoder *create(const QString &file, AudioOutput *output, bool deletable) override; // DecoderFactory
 };
 
 class avfDecoderFactory : public DecoderFactory
@@ -136,10 +135,10 @@ class avfDecoderFactory : public DecoderFactory
     Q_DECLARE_TR_FUNCTIONS(avfDecoderFactory);
 
 public:
-    bool supports(const QString &) const override; // DecoderFactory
+    bool supports(const QString &source) const override; // DecoderFactory
     const QString &extension() const override; // DecoderFactory
     const QString &description() const override; // DecoderFactory
-    Decoder *create(const QString &, AudioOutput *, bool) override; // DecoderFactory
+    Decoder *create(const QString &file, AudioOutput *output, bool deletable) override; // DecoderFactory
 };
 
 #endif

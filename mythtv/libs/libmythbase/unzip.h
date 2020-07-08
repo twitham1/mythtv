@@ -25,8 +25,8 @@
 **
 **********************************************************************/
 
-#ifndef OSDAB_UNZIP__H
-#define OSDAB_UNZIP__H
+#ifndef OSDAB_UNZIP_H
+#define OSDAB_UNZIP_H
 
 #include <QtGlobal>
 #include <QMap>
@@ -112,6 +112,9 @@ public:
 	UnZip();
 	virtual ~UnZip();
 
+	UnZip(const UnZip &) = delete;		  // not copyable
+	UnZip &operator=(const UnZip &) = delete; // not copyable
+
 	bool isOpen() const;
 
 	ErrorCode openArchive(const QString& filename);
@@ -120,7 +123,7 @@ public:
 
 	QString archiveComment() const;
 
-	QString formatError(UnZip::ErrorCode c) const;
+	static QString formatError(UnZip::ErrorCode c) ;
 
 	bool contains(const QString& file) const;
 
@@ -140,12 +143,9 @@ public:
 	void setPassword(const QString& pwd);
 
 private:
-        UnZip(const UnZip &) = delete;            // not copyable
-        UnZip &operator=(const UnZip &) = delete; // not copyable
-
-	UnzipPrivate* d;
+	UnzipPrivate* d;  // NOLINT(readability-identifier-naming)
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(UnZip::ExtractionOptions)
 
-#endif // OSDAB_UNZIP__H
+#endif // OSDAB_UNZIP_H

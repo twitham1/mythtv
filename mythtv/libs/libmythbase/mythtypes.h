@@ -5,15 +5,15 @@
 //  Created by Jean-Yves Avenard on 16/07/13.
 //
 
-#ifndef __MythTV__mythtypes__
-#define __MythTV__mythtypes__
+#ifndef MYTHTV_MYTHTYPES_H
+#define MYTHTV_MYTHTYPES_H
 
 #include <QObject>
 #include <QHash>
 #include "mythbaseexp.h"
 
-typedef QHash<QString,QString> InfoMap;
+using InfoMap = QHash<QString,QString>;
 
 QString InfoMapToString(const InfoMap &infoMap, const QString &sep="\n");
 
-#endif /* defined(__MythTV__mythtypes__) */
+#endif /* defined(MYTHTV_MYTHTYPES_H) */

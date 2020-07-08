@@ -5,10 +5,10 @@
  * implementation.
  */
 
-#ifndef __EDGEDETECTOR_H__
-#define __EDGEDETECTOR_H__
+#ifndef EDGEDETECTOR_H
+#define EDGEDETECTOR_H
 
-typedef struct AVFrame AVFrame;
+using AVFrame = struct AVFrame;
 
 namespace edgeDetector {
 
@@ -37,6 +37,6 @@ public:
             int percentile) = 0;
 };
 
-#endif  /* !__EDGEDETECTOR_H__ */
+#endif  /* !EDGEDETECTOR_H */
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

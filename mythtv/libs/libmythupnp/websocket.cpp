@@ -49,7 +49,7 @@ void WebSocketServer::newTcpConnection(qt_socket_fd_t socket)
 {
 
     PoolServerType type = kTCPServer;
-    PrivTcpServer *server = dynamic_cast<PrivTcpServer *>(QObject::sender());
+    auto *server = dynamic_cast<PrivTcpServer *>(QObject::sender());
     if (server)
         type = server->GetServerType();
 
@@ -83,7 +83,7 @@ WebSocketWorkerThread::WebSocketWorkerThread(WebSocketServer& webSocketServer,
 
 void WebSocketWorkerThread::run(void)
 {
-    WebSocketWorker *worker = new WebSocketWorker(m_webSocketServer, m_socketFD,
+    auto *worker = new WebSocketWorker(m_webSocketServer, m_socketFD,
                                                   m_connectionType
 #ifndef QT_NO_OPENSSL
                                                   , m_sslConfig
@@ -163,7 +163,7 @@ void WebSocketWorker::SetupSocket()
     {
 
 #ifndef QT_NO_OPENSSL
-        QSslSocket *pSslSocket = new QSslSocket();
+        auto *pSslSocket = new QSslSocket();
         if (pSslSocket->setSocketDescriptor(m_socketFD)
            && gCoreContext->CheckSubnet(pSslSocket))
         {
@@ -326,7 +326,11 @@ bool WebSocketWorker::ProcessHandshake(QTcpSocket *socket)
     if (line.isEmpty())
         return false;
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList tokens = QString(line).split(' ', QString::SkipEmptyParts);
+#else
+    QStringList tokens = QString(line).split(' ', Qt::SkipEmptyParts);
+#endif
 
     if (tokens.length() != 3) // Anything but 3 is invalid - {METHOD} {HOST/PATH} {PROTOCOL}
     {
@@ -398,7 +402,11 @@ bool WebSocketWorker::ProcessHandshake(QTcpSocket *socket)
         return false;
     }
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList connectionValues = requestHeaders["connection"].split(',', QString::SkipEmptyParts);
+#else
+    QStringList connectionValues = requestHeaders["connection"].split(',', Qt::SkipEmptyParts);
+#endif
     if (!connectionValues.contains("Upgrade", Qt::CaseInsensitive)) // RFC 6455 - 1.3. Opening Handshake
     {
         LOG(VB_GENERAL, LOG_ERR, "WebSocketWorker::ProcessHandshake() - Invalid 'Connection' header");
@@ -667,7 +675,6 @@ void WebSocketWorker::HandleDataFrame(const WebSocketFrame &frame)
 {
     if (frame.m_finalFrame)
     {
-        QList<WebSocketExtension*>::iterator it;
         switch (frame.m_opCode)
         {
             case WebSocketFrame::kOpTextFrame :
@@ -680,20 +687,18 @@ void WebSocketWorker::HandleDataFrame(const WebSocketFrame &frame)
                 // For Debugging and fuzz testing
                 if (m_fuzzTesting)
                     SendText(frame.m_payload);
-                it = m_extensions.begin();
-                for (; it != m_extensions.end(); ++it)
+                for (auto *const extension : qAsConst(m_extensions))
                 {
-                    if ((*it)->HandleTextFrame(frame))
+                    if (extension->HandleTextFrame(frame))
                         break;
                 }
                 break;
             case WebSocketFrame::kOpBinaryFrame :
                 if (m_fuzzTesting)
                     SendBinary(frame.m_payload);
-                it = m_extensions.begin();
-                for (; it != m_extensions.end(); ++it)
+                for (auto *const extension : qAsConst(m_extensions))
                 {
-                    if ((*it)->HandleBinaryFrame(frame))
+                    if (extension->HandleBinaryFrame(frame))
                         break;
                 }
                 break;
@@ -938,8 +943,7 @@ void WebSocketWorker::DeregisterExtension(WebSocketExtension* extension)
     if (!extension)
         return;
 
-    QList<WebSocketExtension*>::iterator it = m_extensions.begin();
-    for (; it != m_extensions.end(); ++it)
+    for (auto it = m_extensions.begin(); it != m_extensions.end(); ++it)
     {
         if ((*it) == extension)
         {

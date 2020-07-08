@@ -22,7 +22,7 @@ using namespace std;
 #include "compat.h" // for gmtime_r on windows.
 
 const uint EITHelper::kChunkSize = 20;
-EITCache *EITHelper::s_eitcache = new EITCache();
+EITCache *EITHelper::s_eitCache = new EITCache();
 
 static uint get_chan_id_from_db_atsc(uint sourceid,
                                      uint atsc_major, uint atsc_minor);
@@ -35,27 +35,24 @@ static void init_fixup(FixupMap &fix);
 #define LOC QString("EITHelper: ")
 
 EITHelper::EITHelper() :
-    eitfixup(new EITFixUp()),
-    gps_offset(-1 * GPS_LEAP_SECONDS),
-    sourceid(0), channelid(0),
-    maxStarttime(QDateTime()), seenEITother(false)
+    m_eitFixup(new EITFixUp())
 {
-    init_fixup(fixup);
+    init_fixup(m_fixup);
 }
 
 EITHelper::~EITHelper()
 {
-    QMutexLocker locker(&eitList_lock);
-    while (!db_events.empty())
-        delete db_events.dequeue();
+    QMutexLocker locker(&m_eitListLock);
+    while (!m_dbEvents.empty())
+        delete m_dbEvents.dequeue();
 
-    delete eitfixup;
+    delete m_eitFixup;
 }
 
 uint EITHelper::GetListSize(void) const
 {
-    QMutexLocker locker(&eitList_lock);
-    return db_events.size();
+    QMutexLocker locker(&m_eitListLock);
+    return m_dbEvents.size();
 }
 
 /** \fn EITHelper::ProcessEvents(void)
@@ -65,37 +62,36 @@ uint EITHelper::GetListSize(void) const
  */
 uint EITHelper::ProcessEvents(void)
 {
-    QMutexLocker locker(&eitList_lock);
+    QMutexLocker locker(&m_eitListLock);
     uint insertCount = 0;
 
-    if (db_events.empty())
+    if (m_dbEvents.empty())
         return 0;
 
     MSqlQuery query(MSqlQuery::InitCon());
-    for (uint i = 0; (i < kChunkSize) && (!db_events.empty()); i++)
+    for (uint i = 0; (i < kChunkSize) && (!m_dbEvents.empty()); i++)
     {
-        DBEventEIT *event = db_events.dequeue();
-        eitList_lock.unlock();
+        DBEventEIT *event = m_dbEvents.dequeue();
+        m_eitListLock.unlock();
 
-        eitfixup->Fix(*event);
+        m_eitFixup->Fix(*event);
 
         insertCount += event->UpdateDB(query, 1000);
-        maxStarttime = max (maxStarttime, event->m_starttime);
+        m_maxStarttime = max (m_maxStarttime, event->m_starttime);
 
         delete event;
-        eitList_lock.lock();
+        m_eitListLock.lock();
     }
 
     if (!insertCount)
         return 0;
 
-    if (!incomplete_events.empty() || !unmatched_etts.empty())
+    if (!m_incompleteEvents.empty())
     {
         LOG(VB_EIT, LOG_INFO,
-            LOC + QString("Added %1 events -- complete(%2) "
-                          "incomplete(%3) unmatched(%4)")
-                .arg(insertCount).arg(db_events.size())
-                .arg(incomplete_events.size()).arg(unmatched_etts.size()));
+            LOC + QString("Added %1 events -- complete: %2 incomplete: %3")
+                .arg(insertCount).arg(m_dbEvents.size())
+                .arg(m_incompleteEvents.size()));
     }
     else
     {
@@ -106,16 +102,16 @@ uint EITHelper::ProcessEvents(void)
     return insertCount;
 }
 
-void EITHelper::SetFixup(uint atsc_major, uint atsc_minor, FixupValue drheitfixup)
+void EITHelper::SetFixup(uint atsc_major, uint atsc_minor, FixupValue eitfixup)
 {
-    QMutexLocker locker(&eitList_lock);
+    QMutexLocker locker(&m_eitListLock);
     FixupKey atsc_key = (atsc_major << 16) | atsc_minor;
-    fixup[atsc_key] = drheitfixup;
+    m_fixup[atsc_key] = eitfixup;
 }
 
 void EITHelper::SetLanguagePreferences(const QStringList &langPref)
 {
-    QMutexLocker locker(&eitList_lock);
+    QMutexLocker locker(&m_eitListLock);
 
     uint priority = 1;
     QStringList::const_iterator it;
@@ -125,62 +121,56 @@ void EITHelper::SetLanguagePreferences(const QStringList &langPref)
         {
             uint language_key   = iso639_str3_to_key(*it);
             uint canonoical_key = iso639_key_to_canonical_key(language_key);
-            languagePreferences[canonoical_key] = priority++;
+            m_languagePreferences[canonoical_key] = priority++;
         }
     }
 }
 
 void EITHelper::SetSourceID(uint _sourceid)
 {
-    QMutexLocker locker(&eitList_lock);
-    sourceid = _sourceid;
+    QMutexLocker locker(&m_eitListLock);
+    m_sourceid = _sourceid;
 }
 
 void EITHelper::SetChannelID(uint _channelid)
 {
-    QMutexLocker locker(&eitList_lock);
-    channelid = _channelid;
+    QMutexLocker locker(&m_eitListLock);
+    m_channelid = _channelid;
 }
 
 void EITHelper::AddEIT(uint atsc_major, uint atsc_minor,
                        const EventInformationTable *eit)
 {
     uint atsc_key = (atsc_major << 16) | atsc_minor;
-    EventIDToATSCEvent &events = incomplete_events[atsc_key];
-    EventIDToETT &etts = unmatched_etts[atsc_key];
+    EventIDToATSCEvent &events = m_incompleteEvents[atsc_key];
 
     for (uint i = 0; i < eit->EventCount(); i++)
     {
         ATSCEvent ev(eit->StartTimeRaw(i), eit->LengthInSeconds(i),
                      eit->ETMLocation(i),
-                     eit->title(i).GetBestMatch(languagePreferences),
+                     eit->title(i).GetBestMatch(m_languagePreferences),
                      eit->Descriptors(i), eit->DescriptorsLength(i));
 
-        // Look to see if there has been a recent ett message with the same event id.
-        EventIDToETT::iterator it = etts.find(eit->EventID(i));
-        QString ett_text;
-        bool found_matching_ett = false;
-        if (it != etts.end())
+        // Create an event immediately if the ETM_location specifies
+        // that there is no ETT event coming; otherwise save the EIT
+        // event in the incomplete_events for this channel.
+        if (!ev.m_etm)
         {
-            // Don't use an ett description if it was scanned long in the past.
-            if (!it->IsStale()) {
-              ett_text = it->m_ett_text;
-              found_matching_ett = true;
-            }
-            etts.erase(it);
-        }
-
-        // Create an event immediately if a matching ett description was found,
-        // or if item is false, indicating that no ett description should be
-        // expected.
-        if (found_matching_ett || !ev.m_etm)
-        {
-            CompleteEvent(atsc_major, atsc_minor, ev, ett_text);
+            CompleteEvent(atsc_major, atsc_minor, ev, "");
         }
         else
         {
-            unsigned char *tmp = new unsigned char[ev.m_desc_length];
-            memcpy(tmp, eit->Descriptors(i), ev.m_desc_length);
+            // If there is an existing EIT event with this event_id then
+            // delete the descriptor to avoid a memory leak.
+            EventIDToATSCEvent::iterator it = events.find(eit->EventID(i));
+            if (it != events.end())
+            {
+                delete [] (*it).m_desc;
+            }
+
+            // Save the EIT event in the incomplete_events for this channel.
+            auto *tmp = new unsigned char[ev.m_descLength];
+            memcpy(tmp, eit->Descriptors(i), ev.m_descLength);
             ev.m_desc = tmp;
             events.insert(eit->EventID(i), ev);
         }
@@ -190,51 +180,27 @@ void EITHelper::AddEIT(uint atsc_major, uint atsc_minor,
 void EITHelper::AddETT(uint atsc_major, uint atsc_minor,
                        const ExtendedTextTable *ett)
 {
+    // Find the matching incomplete EIT event for this ETT
+    // If we have no EIT event then just discard the ETT.
     uint atsc_key = (atsc_major << 16) | atsc_minor;
-    // Try to match up the ett with an eit event.
-    ATSCSRCToEvents::iterator eits_it = incomplete_events.find(atsc_key);
-    if (eits_it != incomplete_events.end())
+    ATSCSRCToEvents::iterator eits_it = m_incompleteEvents.find(atsc_key);
+    if (eits_it != m_incompleteEvents.end())
     {
         EventIDToATSCEvent::iterator it = (*eits_it).find(ett->EventID());
         if (it != (*eits_it).end())
         {
-            bool completed_event = false;
-            // Only consider eit events from the recent past.
+            // Only consider EIT events from the very recent past.
             if (!it->IsStale()) {
-              completed_event = true;
               CompleteEvent(
                   atsc_major, atsc_minor, *it,
-                  ett->ExtendedTextMessage().GetBestMatch(languagePreferences));
+                  ett->ExtendedTextMessage().GetBestMatch(m_languagePreferences));
             }
 
+            // Remove EIT event from the incomplete_event list.
             delete [] (*it).m_desc;
-
             (*eits_it).erase(it);
-
-            if (completed_event) return;
         }
     }
-
-    // Report if an unmatched ett was previously noted and overwrite it.
-    // See also https://code.mythtv.org/trac/ticket/11739
-    EventIDToETT &elist = unmatched_etts[atsc_key];
-    EventIDToETT::iterator existing_unmatched_ett_it =
-        elist.find(ett->EventID());
-    const QString next_ett_text = ett->ExtendedTextMessage()
-        .GetBestMatch(languagePreferences);
-    if (existing_unmatched_ett_it != elist.end() &&
-        existing_unmatched_ett_it->m_ett_text != next_ett_text)
-    {
-       LOG(VB_EIT, LOG_DEBUG, LOC +
-           QString("Overwriting previously unmatched ett. stale: %1 major: %2 "
-                   "minor: %3 old ett: %4  new ett: %5")
-               .arg(existing_unmatched_ett_it->IsStale())
-               .arg(atsc_major)
-               .arg(atsc_minor)
-               .arg(existing_unmatched_ett_it->m_ett_text)
-               .arg(next_ett_text));
-    }
-    elist.insert(ett->EventID(), ATSCEtt(next_ett_text));
 }
 
 static void parse_dvb_event_descriptors(const desc_list_t& list, FixupValue fix,
@@ -318,15 +284,15 @@ static void parse_dvb_event_descriptors(const desc_list_t& list, FixupValue fix,
             list, DescriptorID::extended_event, languagePreferences);
 
     description = "";
-    for (size_t j = 0; j < bestExtendedEvents.size(); j++)
+    for (auto & best_event : bestExtendedEvents)
     {
-        if (!bestExtendedEvents[j])
+        if (!best_event)
         {
             description = "";
             break;
         }
 
-        ExtendedEventDescriptor eed(bestExtendedEvents[j]);
+        ExtendedEventDescriptor eed(best_event);
         if (eed.IsValid())
         {
             if (enc)
@@ -334,7 +300,7 @@ static void parse_dvb_event_descriptors(const desc_list_t& list, FixupValue fix,
             else
                 description += eed.Text();
         }
-        // add items from the decscriptor to the items
+        // add items from the descriptor to the items
         items.unite (eed.Items());
     }
 }
@@ -346,9 +312,9 @@ static inline void parse_dvb_component_descriptors(const desc_list_t& list,
 {
     desc_list_t components =
         MPEGDescriptor::FindAll(list, DescriptorID::component);
-    for (size_t j = 0; j < components.size(); j++)
+    for (auto & comp : components)
     {
-        ComponentDescriptor component(components[j]);
+        ComponentDescriptor component(comp);
         if (!component.IsValid())
             continue;
         video_properties |= component.VideoProperties();
@@ -373,19 +339,19 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
         // do not reschedule if its only present+following
         if (eit->TableID() != TableID::PF_EITo)
         {
-            seenEITother = true;
+            m_seenEITother = true;
         }
     }
     if (!chanid)
         return;
 
     uint descCompression = (eit->TableID() > 0x80) ? 2 : 1;
-    FixupValue fix = fixup.value((FixupKey)eit->OriginalNetworkID() << 16);
-    fix |= fixup.value((((FixupKey)eit->TSID()) << 32) |
+    FixupValue fix = m_fixup.value((FixupKey)eit->OriginalNetworkID() << 16);
+    fix |= m_fixup.value((((FixupKey)eit->TSID()) << 32) |
                  ((FixupKey)eit->OriginalNetworkID() << 16));
-    fix |= fixup.value(((FixupKey)eit->OriginalNetworkID() << 16) |
+    fix |= m_fixup.value(((FixupKey)eit->OriginalNetworkID() << 16) |
                  (FixupKey)eit->ServiceID());
-    fix |= fixup.value((((FixupKey)eit->TSID()) << 32) |
+    fix |= m_fixup.value((((FixupKey)eit->TSID()) << 32) |
                  ((FixupKey)eit->OriginalNetworkID() << 16) |
                   (FixupKey)eit->ServiceID());
     fix |= EITFixUp::kFixGenericDVB;
@@ -395,7 +361,7 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
     for (uint i = 0; i < eit->EventCount(); i++)
     {
         // Skip event if we have already processed it before...
-        if (!s_eitcache->IsNewEIT(chanid, tableid, version, eit->EventID(i),
+        if (!s_eitCache->IsNewEIT(chanid, tableid, version, eit->EventID(i),
                               eit->EndTimeUnixUTC(i)))
         {
             continue;
@@ -406,8 +372,12 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
         QString description   = QString("");
         QString category      = QString("");
         ProgramInfo::CategoryType category_type = ProgramInfo::kCategoryNone;
-        unsigned char subtitle_type=0, audio_props=0, video_props=0;
-        uint season = 0, episode = 0, totalepisodes = 0;
+        unsigned char subtitle_type=0;
+        unsigned char audio_props=0;
+        unsigned char video_props=0;
+        uint season = 0;
+        uint episode = 0;
+        uint totalepisodes = 0;
         QMap<QString,QString> items;
 
         // Parse descriptors
@@ -439,7 +409,7 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
         }
         else
         {
-            parse_dvb_event_descriptors(list, fix, languagePreferences,
+            parse_dvb_event_descriptors(list, fix, m_languagePreferences,
                                         title, subtitle, description, items);
         }
 
@@ -463,7 +433,7 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
                 DishEventMPAADescriptor mpaa(mpaa_data);
                 stars = mpaa.stars();
 
-                if (stars) // Only movies for now
+                if (stars != 0.0F) // Only movies for now
                 {
                     rating = mpaa.rating();
                     rating_system = "MPAA";
@@ -471,7 +441,7 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
                 }
             }
 
-            if (!stars) // Not MPAA rated, check VCHIP
+            if (stars == 0.0F) // Not MPAA rated, check VCHIP
             {
                 const unsigned char *vchip_data = MPEGDescriptor::Find(
                     list, PrivateDescriptorID::dish_event_vchip);
@@ -541,7 +511,7 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
             }
             else if (EITFixUp::kFixAUDescription & fix)//AU Freeview assigned genres
             {
-                static const char *AUGenres[] =
+                static const std::array<const std::string,16> s_auGenres
                     {/* 0*/"Unknown", "Movie", "News", "Entertainment",
                      /* 4*/"Sport", "Children", "Music", "Arts/Culture",
                      /* 8*/"Current Affairs", "Education", "Infotainment",
@@ -550,13 +520,13 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
                 ContentDescriptor content(content_data);
                 if (content.IsValid())
                 {
-                    category = AUGenres[content.Nibble1(0)];
+                    category = QString::fromStdString(s_auGenres[content.Nibble1(0)]);
                     category_type = content.GetMythCategory(0);
                 }
             }
             else if (EITFixUp::kFixGreekEIT & fix)//Greek
             {
-                static const char *GrGenres[] =
+                static const std::array<const std::string,16>s_grGenres
                     {/* 0*/"Unknown",  "Ταινία", "Ενημερωτικό", "Unknown",
                      /* 4*/"Αθλητικό", "Παιδικό", "Unknown", "Unknown",
                      /* 8*/"Unknown", "Ντοκιμαντέρ", "Unknown", "Unknown",
@@ -564,7 +534,7 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
                 ContentDescriptor content(content_data);
                 if (content.IsValid())
                 {
-                    category = GrGenres[content.Nibble2(0)];
+                    category = QString::fromStdString(s_grGenres[content.Nibble2(0)]);
                     category_type = content.GetMythCategory(2);
                 }
             }
@@ -583,9 +553,9 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
 
         desc_list_t contentIds =
             MPEGDescriptor::FindAll(list, DescriptorID::dvb_content_identifier);
-        for (size_t j = 0; j < contentIds.size(); j++)
+        for (auto & id : contentIds)
         {
-            DVBContentIdentifierDescriptor desc(contentIds[j]);
+            DVBContentIdentifierDescriptor desc(id);
             if (!desc.IsValid())
                 continue;
             for (size_t k = 0; k < desc.CRIDCount(); k++)
@@ -620,8 +590,8 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
             bool isUPC = false;
             /* is this event carrying UPC private data? */
             desc_list_t private_data_specifiers = MPEGDescriptor::FindAll(list, DescriptorID::private_data_specifier);
-            for (size_t j = 0; j < private_data_specifiers.size(); j++) {
-                PrivateDataSpecifierDescriptor desc(private_data_specifiers[j]);
+            for (auto & specifier : private_data_specifiers) {
+                PrivateDataSpecifierDescriptor desc(specifier);
                 if (!desc.IsValid())
                     continue;
                 if (desc.PrivateDataSpecifier() == PrivateDataSpecifierID::UPC1) {
@@ -631,8 +601,8 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
 
             if (isUPC) {
                 desc_list_t subtitles = MPEGDescriptor::FindAll(list, PrivateDescriptorID::upc_event_episode_title);
-                for (size_t j = 0; j < subtitles.size(); j++) {
-                    PrivateUPCCablecomEpisodeTitleDescriptor desc(subtitles[j]);
+                for (auto & st : subtitles) {
+                    PrivateUPCCablecomEpisodeTitleDescriptor desc(st);
                     if (!desc.IsValid())
                         continue;
                     subtitle = desc.Text();
@@ -647,7 +617,7 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
             EITFixUp::TimeFix(starttime);
         QDateTime endtime   = starttime.addSecs(eit->DurationInSeconds(i));
 
-        DBEventEIT *event = new DBEventEIT(
+        auto *event = new DBEventEIT(
             chanid,
             title,     subtitle,      description,
             category,  category_type,
@@ -659,7 +629,7 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
             season, episode, totalepisodes);
         event->m_items = items;
 
-        db_events.enqueue(event);
+        m_dbEvents.enqueue(event);
     }
 }
 
@@ -668,7 +638,7 @@ void EITHelper::AddEIT(const DVBEventInformationTable *eit)
 void EITHelper::AddEIT(const PremiereContentInformationTable *cit)
 {
     // set fixup for Premiere
-    FixupValue fix = fixup.value(133 << 16);
+    FixupValue fix = m_fixup.value(133 << 16);
     fix |= EITFixUp::kFixGenericDVB;
 
     QString title         = QString("");
@@ -676,15 +646,19 @@ void EITHelper::AddEIT(const PremiereContentInformationTable *cit)
     QString description   = QString("");
     QString category      = QString("");
     ProgramInfo::CategoryType category_type = ProgramInfo::kCategoryNone;
-    unsigned char subtitle_type=0, audio_props=0, video_props=0;
-    uint season = 0, episode = 0, totalepisodes = 0;
+    unsigned char subtitle_type=0;
+    unsigned char audio_props=0;
+    unsigned char video_props=0;
+    uint season = 0;
+    uint episode = 0;
+    uint totalepisodes = 0;
     QMap<QString,QString> items;
 
     // Parse descriptors
     desc_list_t list = MPEGDescriptor::Parse(
         cit->Descriptors(), cit->DescriptorsLength());
 
-    parse_dvb_event_descriptors(list, fix, languagePreferences,
+    parse_dvb_event_descriptors(list, fix, m_languagePreferences,
                                 title, subtitle, description, items);
 
     parse_dvb_component_descriptors(list, subtitle_type, audio_props,
@@ -719,19 +693,15 @@ void EITHelper::AddEIT(const PremiereContentInformationTable *cit)
     uint version   = cit->Version();
     uint contentid = cit->ContentID();
     // fake endtime
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-    uint endtime   = MythDate::current().addDays(1).toTime_t();
-#else
     uint endtime   = MythDate::current().addDays(1).toSecsSinceEpoch();
-#endif
 
     // Find Transmissions
     desc_list_t transmissions =
         MPEGDescriptor::FindAll(
             list, PrivateDescriptorID::premiere_content_transmission);
-    for(size_t j=0; j< transmissions.size(); j++)
+    for (auto & trans : transmissions)
     {
-        PremiereContentTransmissionDescriptor transmission(transmissions[j]);
+        PremiereContentTransmissionDescriptor transmission(trans);
         if (!transmission.IsValid())
             continue;
         uint networkid = transmission.OriginalNetworkID();
@@ -751,7 +721,7 @@ void EITHelper::AddEIT(const PremiereContentInformationTable *cit)
         }
 
         // Skip event if we have already processed it before...
-        if (!s_eitcache->IsNewEIT(chanid, tableid, version, contentid, endtime))
+        if (!s_eitCache->IsNewEIT(chanid, tableid, version, contentid, endtime))
         {
             continue;
         }
@@ -764,7 +734,7 @@ void EITHelper::AddEIT(const PremiereContentInformationTable *cit)
                 EITFixUp::TimeFix(txstart);
             QDateTime txend = txstart.addSecs(cit->DurationInSeconds());
 
-            DBEventEIT *event = new DBEventEIT(
+            auto *event = new DBEventEIT(
                 chanid,
                 title,     subtitle,      description,
                 category,  category_type,
@@ -776,7 +746,7 @@ void EITHelper::AddEIT(const PremiereContentInformationTable *cit)
                 season, episode, totalepisodes);
             event->m_items = items;
 
-            db_events.enqueue(event);
+            m_dbEvents.enqueue(event);
         }
     }
 }
@@ -784,12 +754,12 @@ void EITHelper::AddEIT(const PremiereContentInformationTable *cit)
 
 void EITHelper::PruneEITCache(uint timestamp)
 {
-    s_eitcache->PruneOldEntries(timestamp);
+    s_eitCache->PruneOldEntries(timestamp);
 }
 
 void EITHelper::WriteEITCache(void)
 {
-    s_eitcache->WriteToDB();
+    s_eitCache->WriteToDB();
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -804,20 +774,15 @@ void EITHelper::CompleteEvent(uint atsc_major, uint atsc_minor,
     if (!chanid)
         return;
 
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-    QDateTime starttime = MythDate::fromTime_t(
-        event.m_start_time + GPS_EPOCH + gps_offset);
-#else
     QDateTime starttime = MythDate::fromSecsSinceEpoch(
-        event.m_start_time + GPS_EPOCH + gps_offset);
-#endif
+        event.m_startTime + GPS_EPOCH + m_gpsOffset);
 
     // fix starttime only if the duration is a multiple of a minute
     if (!(event.m_length % 60))
         EITFixUp::TimeFix(starttime);
     QDateTime endtime = starttime.addSecs(event.m_length);
 
-    desc_list_t list = MPEGDescriptor::Parse(event.m_desc, event.m_desc_length);
+    desc_list_t list = MPEGDescriptor::Parse(event.m_desc, event.m_descLength);
     unsigned char subtitle_type =
         MPEGDescriptor::Find(list, DescriptorID::caption_service) ?
         SUB_HARDHEAR : SUB_UNKNOWN;
@@ -826,63 +791,60 @@ void EITHelper::CompleteEvent(uint atsc_major, uint atsc_minor,
 
     uint atsc_key = (atsc_major << 16) | atsc_minor;
 
-    QMutexLocker locker(&eitList_lock);
+    QMutexLocker locker(&m_eitListLock);
     QString title = event.m_title;
     const QString& subtitle = ett;
-    db_events.enqueue(new DBEventEIT(chanid, title, subtitle,
+    m_dbEvents.enqueue(new DBEventEIT(chanid, title, subtitle,
                                      starttime, endtime,
-                                     fixup.value(atsc_key), subtitle_type,
+                                     m_fixup.value(atsc_key), subtitle_type,
                                      audio_properties, video_properties));
 }
 
 uint EITHelper::GetChanID(uint atsc_major, uint atsc_minor)
 {
-    uint64_t key;
-    key  = ((uint64_t) sourceid);
+    uint64_t key  = ((uint64_t) m_sourceid);
     key |= ((uint64_t) atsc_minor) << 16;
     key |= ((uint64_t) atsc_major) << 32;
 
-    ServiceToChanID::const_iterator it = srv_to_chanid.find(key);
-    if (it != srv_to_chanid.end())
+    ServiceToChanID::const_iterator it = m_srvToChanid.find(key);
+    if (it != m_srvToChanid.end())
         return *it;
 
-    uint chanid = get_chan_id_from_db_atsc(sourceid, atsc_major, atsc_minor);
-    srv_to_chanid[key] = chanid;
+    uint chanid = get_chan_id_from_db_atsc(m_sourceid, atsc_major, atsc_minor);
+    m_srvToChanid[key] = chanid;
 
     return chanid;
 }
 
 uint EITHelper::GetChanID(uint serviceid, uint networkid, uint tsid)
 {
-    uint64_t key;
-    key  = ((uint64_t) sourceid);
+    uint64_t key  = ((uint64_t) m_sourceid);
     key |= ((uint64_t) serviceid) << 16;
     key |= ((uint64_t) networkid) << 32;
     key |= ((uint64_t) tsid)      << 48;
 
-    ServiceToChanID::const_iterator it = srv_to_chanid.find(key);
-    if (it != srv_to_chanid.end())
+    ServiceToChanID::const_iterator it = m_srvToChanid.find(key);
+    if (it != m_srvToChanid.end())
         return *it;
 
-    uint chanid = get_chan_id_from_db_dvb(sourceid, serviceid, networkid, tsid);
-    srv_to_chanid[key] = chanid;
+    uint chanid = get_chan_id_from_db_dvb(m_sourceid, serviceid, networkid, tsid);
+    m_srvToChanid[key] = chanid;
 
     return chanid;
 }
 
 uint EITHelper::GetChanID(uint program_number)
 {
-    uint64_t key;
-    key  = ((uint64_t) sourceid);
+    uint64_t key  = ((uint64_t) m_sourceid);
     key |= ((uint64_t) program_number) << 16;
-    key |= ((uint64_t) channelid)      << 32;
+    key |= ((uint64_t) m_channelid)    << 32;
 
-    ServiceToChanID::const_iterator it = srv_to_chanid.find(key);
-    if (it != srv_to_chanid.end())
+    ServiceToChanID::const_iterator it = m_srvToChanid.find(key);
+    if (it != m_srvToChanid.end())
         return *it;
 
-    uint chanid = get_chan_id_from_db_dtv(sourceid, program_number, channelid);
-    srv_to_chanid[key] = chanid;
+    uint chanid = get_chan_id_from_db_dtv(m_sourceid, program_number, m_channelid);
+    m_srvToChanid[key] = chanid;
 
     return chanid;
 }
@@ -894,7 +856,8 @@ static uint get_chan_id_from_db_atsc(uint sourceid,
     query.prepare(
             "SELECT chanid, useonairguide "
             "FROM channel "
-            "WHERE atsc_major_chan = :MAJORCHAN AND "
+            "WHERE deleted         IS NULL AND "
+            "      atsc_major_chan = :MAJORCHAN AND "
             "      atsc_minor_chan = :MINORCHAN AND "
             "      sourceid        = :SOURCEID");
     query.bindValue(":MAJORCHAN", atsc_major);
@@ -924,7 +887,8 @@ static uint get_chan_id_from_db_dvb(uint sourceid, uint serviceid,
     QString qstr =
         "SELECT chanid, useonairguide, channel.sourceid "
         "FROM channel, dtv_multiplex "
-        "WHERE serviceid        = :SERVICEID   AND "
+        "WHERE deleted          IS NULL        AND "
+        "      serviceid        = :SERVICEID   AND "
         "      networkid        = :NETWORKID   AND "
         "      transportid      = :TRANSPORTID AND "
         "      channel.mplexid  = dtv_multiplex.mplexid";
@@ -943,7 +907,8 @@ static uint get_chan_id_from_db_dvb(uint sourceid, uint serviceid,
         qstr =
             "SELECT chanid, useonairguide, channel.sourceid "
             "FROM channel, dtv_multiplex "
-            "WHERE serviceid        = :SERVICEID   AND "
+            "WHERE deleted          IS NULL        AND "
+            "      serviceid        = :SERVICEID   AND "
             "      networkid        = :NETWORKID   AND "
             "      channel.mplexid  = dtv_multiplex.mplexid";
 
@@ -966,7 +931,7 @@ static uint get_chan_id_from_db_dvb(uint sourceid, uint serviceid,
     if (query.size() > 1)
     {
         LOG(VB_EIT, LOG_INFO,
-            LOC + QString("found %1 channels for networdid %2, "
+            LOC + QString("found %1 channels for networkid %2, "
                           "transportid %3, serviceid %4 but none "
                           "for current sourceid %5.")
                 .arg(query.size()).arg(networkid).arg(transportid)
@@ -993,7 +958,8 @@ static uint get_chan_id_from_db_dtv(uint sourceid, uint serviceid,
     QString qstr =
         "SELECT c1.chanid, c1.useonairguide, c1.sourceid "
         "FROM channel c1, dtv_multiplex m, channel c2 "
-        "WHERE c1.serviceid        = :SERVICEID   AND "
+        "WHERE c1.deleted IS NULL AND "
+        "      c1.serviceid = :SERVICEID   AND "
         "      c1.mplexid  = m.mplexid AND "
         "      m.mplexid = c2.mplexid AND "
         "      c2.chanid = :CHANID";
@@ -1432,8 +1398,8 @@ static void init_fixup(FixupMap &fix)
 void EITHelper::RescheduleRecordings(void)
 {
     ScheduledRecording::RescheduleMatch(
-        0, sourceid, seenEITother ? 0 : ChannelUtil::GetMplexID(channelid),
-        maxStarttime, "EITScanner");
-    seenEITother = false;
-    maxStarttime = QDateTime();
+        0, m_sourceid, m_seenEITother ? 0 : ChannelUtil::GetMplexID(m_channelid),
+        m_maxStarttime, "EITScanner");
+    m_seenEITother = false;
+    m_maxStarttime = QDateTime();
 }

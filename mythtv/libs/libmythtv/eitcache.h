@@ -3,8 +3,8 @@
  * License: GPL v2
  */
 
-#ifndef _EIT_CACHE_H
-#define _EIT_CACHE_H
+#ifndef EIT_CACHE_H
+#define EIT_CACHE_H
 
 #include <cstdint>
 
@@ -16,8 +16,8 @@
 // MythTV headers
 #include "mythtvexp.h"
 
-typedef QMap<uint, uint64_t> event_map_t;
-typedef QMap<uint, event_map_t*> key_map_t;
+using event_map_t = QMap<uint, uint64_t>;
+using key_map_t = QMap<uint, event_map_t*>;
 
 class EITCache
 {
@@ -62,6 +62,6 @@ class EITCache
     static MTV_PUBLIC void ClearChannelLocks(void);
 };
 
-#endif // _EIT_CACHE_H
+#endif // EIT_CACHE_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

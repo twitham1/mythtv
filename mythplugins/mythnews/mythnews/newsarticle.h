@@ -1,5 +1,5 @@
-#ifndef _NEWSARTICLE_H_
-#define _NEWSARTICLE_H_
+#ifndef NEWSARTICLE_H
+#define NEWSARTICLE_H
 
 // C++ headers
 #include <vector>
@@ -11,15 +11,12 @@ using namespace std;
 class NewsArticle
 {
   public:
-    typedef vector<NewsArticle> List;
+    using List = vector<NewsArticle>;
 
-    NewsArticle(const QString &title,
-                const QString &desc, const QString &articleURL,
-                const QString &thumbnail, const QString &mediaURL,
-                const QString &enclosure);
-    NewsArticle(const QString &title,
-                const QString &desc, const QString &articleURL);
-    explicit NewsArticle(const QString &title);
+    NewsArticle(QString title, QString desc, QString articleURL,
+                QString thumbnail, QString mediaURL, QString enclosure);
+    NewsArticle(QString title, QString desc, QString articleURL);
+    explicit NewsArticle(QString title);
 
     NewsArticle() = default;
 
@@ -40,4 +37,4 @@ class NewsArticle
     QString   m_enclosureType;
 };
 
-#endif // _NEWSARTICLE_H_
+#endif // NEWSARTICLE_H

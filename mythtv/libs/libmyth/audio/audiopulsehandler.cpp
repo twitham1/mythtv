@@ -1,7 +1,7 @@
 #include <QMutexLocker>
 #include <QString>
 #include <QMutex>
-#include <QTime>
+#include <QElapsedTimer>
 
 #include <unistd.h> // for usleep
 
@@ -38,8 +38,8 @@ bool          PulseHandler::g_pulseHandlerActive = false;
 bool PulseHandler::Suspend(enum PulseAction action)
 {
     // global lock around all access to our global singleton
-    static QMutex global_lock;
-    QMutexLocker locker(&global_lock);
+    static QMutex s_globalLock;
+    QMutexLocker locker(&s_globalLock);
 
     // cleanup the PulseAudio server connection if requested
     if (kPulseCleanup == action)
@@ -54,11 +54,11 @@ bool PulseHandler::Suspend(enum PulseAction action)
     }
 
     static int s_iPulseRunning = -1;
-    static QTime s_time;
-    static enum PulseAction s_ePulseAction = PulseAction(-1);
+    static QElapsedTimer s_time;
+    static auto s_ePulseAction = PulseAction(-1);
 
     // Use the last result of IsPulseAudioRunning if within time
-    if (!s_time.isNull() && s_time.elapsed() < 30000)
+    if (s_time.isValid() && !s_time.hasExpired(30000))
     {
         if (!s_iPulseRunning)
             return false;
@@ -93,7 +93,7 @@ bool PulseHandler::Suspend(enum PulseAction action)
     // create our handler
     if (!g_pulseHandler)
     {
-        PulseHandler* handler = new PulseHandler();
+        auto* handler = new PulseHandler();
         if (handler)
         {
             LOG(VB_AUDIO, LOG_INFO, LOC + "Created PulseHandler object");
@@ -107,10 +107,9 @@ bool PulseHandler::Suspend(enum PulseAction action)
         }
     }
 
-    bool result;
     // enable processing of incoming callbacks
     g_pulseHandlerActive = true;
-    result = g_pulseHandler->SuspendInternal(kPulseSuspend == action);
+    bool result = g_pulseHandler->SuspendInternal(kPulseSuspend == action);
     // disable processing of incoming callbacks in case we delete/recreate our
     // instance due to a termination or other failure
     g_pulseHandlerActive = false;
@@ -126,7 +125,7 @@ static void StatusCallback(pa_context *ctx, void *userdata)
         return;
 
     // validate the callback
-    PulseHandler *handler = static_cast<PulseHandler*>(userdata);
+    auto *handler = static_cast<PulseHandler*>(userdata);
     if (!handler)
     {
         LOG(VB_GENERAL, LOG_ERR, LOC + "Callback: no handler.");
@@ -149,9 +148,9 @@ static void StatusCallback(pa_context *ctx, void *userdata)
     // update our status
     pa_context_state state = pa_context_get_state(ctx);
     LOG(VB_AUDIO, LOG_INFO, LOC + QString("Callback: State changed %1->%2")
-            .arg(state_to_string(handler->m_ctx_state))
+            .arg(state_to_string(handler->m_ctxState))
             .arg(state_to_string(state)));
-    handler->m_ctx_state = state;
+    handler->m_ctxState = state;
 }
 
 static void OperationCallback(pa_context *ctx, int success, void *userdata)
@@ -168,7 +167,7 @@ static void OperationCallback(pa_context *ctx, int success, void *userdata)
     }
 
     // validate the callback
-    PulseHandler *handler = static_cast<PulseHandler*>(userdata);
+    auto *handler = static_cast<PulseHandler*>(userdata);
     if (!handler)
     {
         LOG(VB_GENERAL, LOG_ERR, LOC + "Operation: no handler.");
@@ -189,9 +188,9 @@ static void OperationCallback(pa_context *ctx, int success, void *userdata)
     }
 
     // update the context
-    handler->m_pending_operations--;
+    handler->m_pendingOperations--;
     LOG(VB_AUDIO, LOG_INFO, LOC + QString("Operation: success %1 remaining %2")
-            .arg(success).arg(handler->m_pending_operations));
+            .arg(success).arg(handler->m_pendingOperations));
 }
 
 PulseHandler::~PulseHandler(void)
@@ -218,8 +217,8 @@ bool PulseHandler::Valid(void)
 {
     if (m_initialised && m_valid)
     {
-        m_ctx_state = pa_context_get_state(m_ctx);
-        return PA_CONTEXT_READY == m_ctx_state;
+        m_ctxState = pa_context_get_state(m_ctx);
+        return PA_CONTEXT_READY == m_ctxState;
     }
     return false;
 }
@@ -268,13 +267,13 @@ bool PulseHandler::Init(void)
     pa_context_connect(m_ctx, nullptr, PA_CONTEXT_NOAUTOSPAWN, nullptr);
     int ret = 0;
     int tries = 0;
-    while ((tries++ < 100) && !IS_READY(m_ctx_state))
+    while ((tries++ < 100) && !IS_READY(m_ctxState))
     {
         pa_mainloop_iterate(m_loop, 0, &ret);
         usleep(10000);
     }
 
-    if (PA_CONTEXT_READY != m_ctx_state)
+    if (PA_CONTEXT_READY != m_ctxState)
     {
         LOG(VB_GENERAL, LOG_ERR, LOC + "Context not ready after 1000ms");
         return m_valid;
@@ -307,7 +306,7 @@ bool PulseHandler::SuspendInternal(bool suspend)
 
     // create and dispatch 2 operations to suspend or resume all current sinks
     // and all current sources
-    m_pending_operations = 2;
+    m_pendingOperations = 2;
     pa_operation *operation_sink =
         pa_context_suspend_sink_by_index(
             m_ctx, PA_INVALID_INDEX, static_cast<int>(suspend), OperationCallback, this);
@@ -321,16 +320,16 @@ bool PulseHandler::SuspendInternal(bool suspend)
     // run the loop manually and wait for the callbacks
     int count = 0;
     int ret = 0;
-    while (m_pending_operations && count++ < 100)
+    while (m_pendingOperations && count++ < 100)
     {
         pa_mainloop_iterate(m_loop, 0, &ret);
         usleep(10000);
     }
 
     // a failure isn't necessarily disastrous
-    if (m_pending_operations)
+    if (m_pendingOperations)
     {
-        m_pending_operations = 0;
+        m_pendingOperations = 0;
         LOG(VB_GENERAL, LOG_ERR, LOC + "Failed to " + action);
         return false;
     }

@@ -44,6 +44,7 @@
 #include "mythdate.h"
 #include "serviceUtil.h"
 #include "mythmiscutil.h"
+#include "mythavutil.h"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -90,7 +91,7 @@ DTC::VideoMetadataInfoList* Video::GetVideoList( const QString &Folder,
     // Build Response
     // ----------------------------------------------------------------------
 
-    DTC::VideoMetadataInfoList *pVideoMetadataInfos = new DTC::VideoMetadataInfoList();
+    auto *pVideoMetadataInfos = new DTC::VideoMetadataInfoList();
 
     nStartIndex   = (nStartIndex > 0) ? min( nStartIndex, (int)videos.size() ) : 0;
     nCount        = (nCount > 0) ? min( nCount, (int)videos.size() ) : videos.size();
@@ -106,7 +107,8 @@ DTC::VideoMetadataInfoList* Video::GetVideoList( const QString &Folder,
             FillVideoMetadataInfo ( pVideoMetadataInfo, metadata, true );
     }
 
-    int curPage = 0, totalPages = 0;
+    int curPage = 0;
+    int totalPages = 0;
     if (nCount == 0)
         totalPages = 1;
     else
@@ -143,7 +145,7 @@ DTC::VideoMetadataInfo* Video::GetVideo( int Id )
     if ( !metadata )
         throw( QString( "No metadata found for selected ID!." ));
 
-    DTC::VideoMetadataInfo *pVideoMetadataInfo = new DTC::VideoMetadataInfo();
+    auto *pVideoMetadataInfo = new DTC::VideoMetadataInfo();
 
     FillVideoMetadataInfo ( pVideoMetadataInfo, metadata, true );
 
@@ -165,7 +167,7 @@ DTC::VideoMetadataInfo* Video::GetVideoByFileName( const QString &FileName )
     if ( !metadata )
         throw( QString( "No metadata found for selected filename!." ));
 
-    DTC::VideoMetadataInfo *pVideoMetadataInfo = new DTC::VideoMetadataInfo();
+    auto *pVideoMetadataInfo = new DTC::VideoMetadataInfo();
 
     FillVideoMetadataInfo ( pVideoMetadataInfo, metadata, true );
 
@@ -184,16 +186,18 @@ DTC::VideoLookupList* Video::LookupVideo( const QString    &Title,
                                               const QString    &GrabberType,
                                               bool             AllowGeneric )
 {
-    DTC::VideoLookupList *pVideoLookups = new DTC::VideoLookupList();
+    auto *pVideoLookups = new DTC::VideoLookupList();
 
     MetadataLookupList list;
 
-    MetadataFactory *factory = new MetadataFactory(nullptr);
+    auto *factory = new MetadataFactory(nullptr);
 
     if (factory)
+    {
         list = factory->SynchronousLookup(Title, Subtitle,
                                          Inetref, Season, Episode,
                                          GrabberType, AllowGeneric);
+    }
 
     if ( list.empty() )
         return pVideoLookups;
@@ -401,7 +405,7 @@ DTC::BlurayInfo* Video::GetBluray( const QString &sPath )
     LOG(VB_GENERAL, LOG_NOTICE,
         QString("Parsing Blu-ray at path: %1 ").arg(path));
 
-    BlurayMetadata *bdmeta = new BlurayMetadata(path);
+    auto *bdmeta = new BlurayMetadata(path);
 
     if ( !bdmeta )
         throw( QString( "Unable to open Blu-ray Metadata Parser!" ));
@@ -412,7 +416,7 @@ DTC::BlurayInfo* Video::GetBluray( const QString &sPath )
     if ( !bdmeta->ParseDisc() )
         throw( QString( "Unable to parse metadata from Blu-ray Disc/Path!" ));
 
-    DTC::BlurayInfo *pBlurayInfo = new DTC::BlurayInfo();
+    auto *pBlurayInfo = new DTC::BlurayInfo();
 
     pBlurayInfo->setPath(path);
     pBlurayInfo->setTitle(bdmeta->GetTitle());
@@ -729,7 +733,11 @@ bool Video::UpdateVideoMetadata ( int           nId,
     if (m_parsedParams.contains("genres"))
     {
         VideoMetadata::genre_list genres;
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList genresList = sGenres.split(',', QString::SkipEmptyParts);
+#else
+        QStringList genresList = sGenres.split(',', Qt::SkipEmptyParts);
+#endif
 
         for (int x = 0; x < genresList.size(); x++)
         {
@@ -744,7 +752,11 @@ bool Video::UpdateVideoMetadata ( int           nId,
     if (m_parsedParams.contains("cast"))
     {
         VideoMetadata::cast_list cast;
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList castList = sCast.split(',', QString::SkipEmptyParts);
+#else
+        QStringList castList = sCast.split(',', Qt::SkipEmptyParts);
+#endif
 
         for (int x = 0; x < castList.size(); x++)
         {
@@ -759,7 +771,11 @@ bool Video::UpdateVideoMetadata ( int           nId,
     if (m_parsedParams.contains("countries"))
     {
         VideoMetadata::country_list countries;
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList countryList = sCountries.split(',', QString::SkipEmptyParts);
+#else
+        QStringList countryList = sCountries.split(',', Qt::SkipEmptyParts);
+#endif
 
         for (int x = 0; x < countryList.size(); x++)
         {
@@ -775,6 +791,55 @@ bool Video::UpdateVideoMetadata ( int           nId,
         metadata->UpdateDatabase();
 
     return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Jun 3, 2020
+// Service to get stream info for all streams in a media file.
+// This gets some basic info. If anything more is needed it can be added,
+// depending on whether it is available from ffmpeg avformat apis.
+// See the MythStreamInfoList class for the code that uses avformat to
+// extract the information.
+/////////////////////////////////////////////////////////////////////////////
+
+DTC::VideoStreamInfoList* Video::GetStreamInfo
+           ( const QString &storageGroup,
+             const QString &FileName  )
+{
+
+    // Search for the filename
+
+    StorageGroup storage( storageGroup );
+    QString sFullFileName = storage.FindFile( FileName );
+    MythStreamInfoList infos(sFullFileName);
+
+    // The constructor of this class reads the file and gets the needed
+    // information.
+    auto *pVideoStreamInfos = new DTC::VideoStreamInfoList();
+
+    pVideoStreamInfos->setCount         ( infos.m_streamInfoList.size() );
+    pVideoStreamInfos->setAsOf          ( MythDate::current() );
+    pVideoStreamInfos->setVersion       ( MYTH_BINARY_VERSION );
+    pVideoStreamInfos->setProtoVer      ( MYTH_PROTO_VERSION  );
+    pVideoStreamInfos->setErrorCode     ( infos.m_errorCode   );
+    pVideoStreamInfos->setErrorMsg      ( infos.m_errorMsg    );
+
+    for (const auto & info : qAsConst(infos.m_streamInfoList))
+    {
+        DTC::VideoStreamInfo *pVideoStreamInfo = pVideoStreamInfos->AddNewVideoStreamInfo();
+        pVideoStreamInfo->setCodecType       ( QString(QChar(info.m_codecType)) );
+        pVideoStreamInfo->setCodecName       ( info.m_codecName   );
+        pVideoStreamInfo->setWidth           ( info.m_width 			   );
+        pVideoStreamInfo->setHeight          ( info.m_height 			   );
+        pVideoStreamInfo->setAspectRatio     ( info.m_SampleAspectRatio    );
+        pVideoStreamInfo->setFieldOrder      ( info.m_fieldOrder           );
+        pVideoStreamInfo->setFrameRate       ( info.m_frameRate            );
+        pVideoStreamInfo->setAvgFrameRate    ( info.m_avgFrameRate 		   );
+        pVideoStreamInfo->setChannels        ( info.m_channels   );
+        pVideoStreamInfo->setDuration        ( info.m_duration   );
+
+    }
+    return pVideoStreamInfos;
 }
 
 /////////////////////////////////////////////////////////////////////////////

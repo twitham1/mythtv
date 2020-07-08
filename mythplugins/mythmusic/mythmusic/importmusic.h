@@ -2,6 +2,7 @@
 #define IMPORTMUSIC_H_
 
 #include <iostream>
+#include <utility>
 #include <vector>
 using namespace std;
 
@@ -21,12 +22,12 @@ class MythUIButtonList;
 class MythUICheckBox;
 class MythDialogBox;
 
-typedef struct
+struct TrackInfo
 {
     MusicMetadata *metadata;
     bool           isNewTune;
     bool           metadataHasChanged;
-} TrackInfo;
+};
 
 class FileScannerThread: public MThread
 {
@@ -41,11 +42,12 @@ class FileScannerThread: public MThread
 class FileCopyThread: public MThread
 {
     public:
-        FileCopyThread(const QString &src, const QString &dst)
-            : MThread("FileCopy"), m_srcFile(src), m_dstFile(dst) {}
+        FileCopyThread(QString src, QString dst)
+            : MThread("FileCopy"), m_srcFile(std::move(src)),
+              m_dstFile(std::move(dst)) {}
         void run() override; // MThread
 
-        bool GetResult(void) { return m_result; }
+        bool GetResult(void) const { return m_result; }
 
     private:
         QString m_srcFile;
@@ -60,13 +62,13 @@ class ImportMusicDialog : public MythScreenType
 
   public:
     explicit ImportMusicDialog(MythScreenStack *parent);
-    ~ImportMusicDialog();
+    ~ImportMusicDialog() override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
-    void customEvent(QEvent *) override; // MythUIType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
+    void customEvent(QEvent *event) override; // MythUIType
 
-    bool somethingWasImported() { return m_somethingWasImported; }
+    bool somethingWasImported() const { return m_somethingWasImported; }
     void doScan(void);
     void doFileCopy(const QString &src, const QString &dst);
 
@@ -108,7 +110,7 @@ class ImportMusicDialog : public MythScreenType
     void fillWidgets();
     void scanDirectory(QString &directory, vector<TrackInfo*> *tracks);
     void showImportCoverArtDialog();
-    bool copyFile(const QString &src, const QString &dst);
+    static bool copyFile(const QString &src, const QString &dst);
 
     QString              m_musicStorageDir;
     bool                 m_somethingWasImported {false};
@@ -165,14 +167,16 @@ class ImportCoverArtDialog : public MythScreenType
 
   public:
 
-    ImportCoverArtDialog(MythScreenStack *parent, const QString &sourceDir,
-                         MusicMetadata *metadata, const QString &storageDir)
-        : MythScreenType(parent, "import_coverart"), m_sourceDir(sourceDir),
-          m_musicStorageDir(storageDir), m_metadata(metadata) {}
-    ~ImportCoverArtDialog() = default;
+    ImportCoverArtDialog(MythScreenStack *parent, QString sourceDir,
+                         MusicMetadata *metadata, QString storageDir)
+        : MythScreenType(parent, "import_coverart"),
+          m_sourceDir(std::move(sourceDir)),
+          m_musicStorageDir(std::move(storageDir)),
+          m_metadata(metadata) {}
+    ~ImportCoverArtDialog() override = default;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
   public slots:
     void copyPressed(void);

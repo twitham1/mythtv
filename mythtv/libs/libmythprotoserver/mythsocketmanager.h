@@ -1,5 +1,5 @@
-#ifndef _MYTHSOCKETMANAGER_H_
-#define _MYTHSOCKETMANAGER_H_
+#ifndef MYTHSOCKETMANAGER_H
+#define MYTHSOCKETMANAGER_H
 
 // Qt
 #include <QMap>
@@ -36,7 +36,7 @@ class PROTOSERVER_PUBLIC MythSocketManager : public QObject, public MythSocketCB
     Q_OBJECT
   public:
     MythSocketManager();
-   ~MythSocketManager();
+   ~MythSocketManager() override;
 
     void readyRead(MythSocket *socket) override; // MythSocketCBs
     void connectionClosed(MythSocket *socket) override; // MythSocketCBs
@@ -60,8 +60,8 @@ class PROTOSERVER_PUBLIC MythSocketManager : public QObject, public MythSocketCB
 
   private:
     void ProcessRequestWork(MythSocket *socket);
-    void HandleVersion(MythSocket *socket, const QStringList &slist);
-    void HandleDone(MythSocket *socket);
+    static void HandleVersion(MythSocket *socket, const QStringList &slist);
+    static void HandleDone(MythSocket *socket);
 
     QMap<MythSocket*, SocketHandler*>   m_socketMap;
     QReadWriteLock                      m_socketLock;
@@ -69,10 +69,10 @@ class PROTOSERVER_PUBLIC MythSocketManager : public QObject, public MythSocketCB
     QMap<QString, SocketRequestHandler*>    m_handlerMap;
     QReadWriteLock                          m_handlerLock;
 
-    MythServer     *m_server;
+    MythServer     *m_server     { nullptr };
     MThreadPool     m_threadPool;
 
     QMutex m_socketListLock;
     QSet<MythSocket*> m_socketList;
 };
-#endif
+#endif // MYTHSOCKETMANAGER_H

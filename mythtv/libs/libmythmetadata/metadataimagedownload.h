@@ -9,11 +9,11 @@
 #include "mythmetaexp.h"
 #include "metadatacommon.h"
 
-typedef struct {
+struct ThumbnailData {
     QString title;
     QVariant data;
     QString url;
-} ThumbnailData;
+};
 
 class META_PUBLIC ImageDLEvent : public QEvent
 {
@@ -27,7 +27,7 @@ class META_PUBLIC ImageDLEvent : public QEvent
             m_item->IncrRef();
         }
     }
-    ~ImageDLEvent()
+    ~ImageDLEvent() override
     {
         if (m_item)
         {
@@ -53,7 +53,7 @@ class META_PUBLIC ImageDLFailureEvent : public QEvent
             m_item->IncrRef();
         }
     }
-    ~ImageDLFailureEvent()
+    ~ImageDLFailureEvent() override
     {
         if (m_item)
         {
@@ -73,7 +73,7 @@ class META_PUBLIC ThumbnailDLEvent : public QEvent
     explicit ThumbnailDLEvent(ThumbnailData *data) :
                  QEvent(kEventType),
                  m_thumb(data) {}
-    ~ThumbnailDLEvent()
+    ~ThumbnailDLEvent() override
     {
         delete m_thumb;
         m_thumb = nullptr;
@@ -90,7 +90,7 @@ class META_PUBLIC MetadataImageDownload : public MThread
 
     explicit MetadataImageDownload(QObject *parent)
         : MThread("MetadataImageDownload"), m_parent(parent) {}
-    ~MetadataImageDownload();
+    ~MetadataImageDownload() override;
 
     void addThumb(QString title, QString url, QVariant data);
     void addDownloads(MetadataLookup *lookup);

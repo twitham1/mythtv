@@ -47,7 +47,7 @@ private:
     static void CachePut(const Cddb::Album& album);
 
     // DiscID to album info cache
-    typedef QMap< Cddb::discid_t, Cddb::Album > cache_t; 
+    using cache_t = QMap< Cddb::discid_t, Cddb::Album >;
     static cache_t s_cache;
 
     static const QString& GetDB();
@@ -644,14 +644,14 @@ const QString& Dbase::GetDB()
 // CDDB hello string
 static const QString& helloID()
 {
-    static QString helloID;
-    if (helloID.isEmpty())
+    static QString s_helloId;
+    if (s_helloId.isEmpty())
     {
-        helloID = getenv("USER");
-        if (helloID.isEmpty())
-            helloID = "anon";
-        helloID += QString("+%1+MythTV+%2+")
+        s_helloId = getenv("USER");
+        if (s_helloId.isEmpty())
+            s_helloId = "anon";
+        s_helloId += QString("+%1+MythTV+%2+")
                    .arg(gCoreContext->GetHostName()).arg(MYTH_BINARY_VERSION);
     }
-    return helloID;
+    return s_helloId;
 }

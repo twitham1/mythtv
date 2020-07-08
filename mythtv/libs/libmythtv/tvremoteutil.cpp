@@ -63,7 +63,7 @@ bool RemoteRecordPending(uint inputid, const ProgramInfo *pginfo,
     QStringList strlist(QString("QUERY_REMOTEENCODER %1").arg(inputid));
     strlist << "RECORD_PENDING";
     strlist << QString::number(secsleft);
-    strlist << QString::number(hasLater);
+    strlist << QString::number(static_cast<int>(hasLater));
     pginfo->ToStringList(strlist);
 
     if (!gCoreContext->SendReceiveStringList(strlist) || strlist.empty())
@@ -155,7 +155,7 @@ vector<InputInfo> RemoteRequestFreeInputInfo(uint excluded_input)
         inputs.push_back(info);
         LOG(VB_CHANNEL, LOG_INFO,
             QString("RemoteRequestFreeInputInfo got input %1 (%2/%3)")
-            .arg(info.m_inputid).arg(info.m_chanid).arg(info.m_mplexid));
+            .arg(info.m_inputId).arg(info.m_chanId).arg(info.m_mplexId));
     }
 
     LOG(VB_CHANNEL, LOG_INFO,
@@ -193,9 +193,9 @@ RemoteEncoder *RemoteRequestNextFreeRecorder(int inputid)
         return nullptr;
     }
 
-    size_t i;
-    for (i = 0; i < inputs.size(); ++i)
-        if (inputs[i].m_inputid == (uint)inputid)
+    size_t i = 0;
+    for ( ; i < inputs.size(); ++i)
+        if (inputs[i].m_inputId == (uint)inputid)
             break;
 
     if (i >= inputs.size())
@@ -218,9 +218,9 @@ RemoteEncoder *RemoteRequestNextFreeRecorder(int inputid)
 
     LOG(VB_CHANNEL, LOG_INFO,
         QString("RemoteRequestNextFreeRecorder got input %1")
-        .arg(inputs[i].m_inputid));
+        .arg(inputs[i].m_inputId));
 
-    return RemoteGetExistingRecorder(inputs[i].m_inputid);
+    return RemoteGetExistingRecorder(inputs[i].m_inputId);
 }
 
 vector<uint> RemoteRequestFreeRecorderList(uint excluded_input)
@@ -233,8 +233,8 @@ vector<uint> RemoteRequestFreeRecorderList(uint excluded_input)
         RemoteRequestFreeInputInfo(excluded_input);
 
     vector<uint> inputids;
-    for (size_t j = 0; j < inputs.size(); j++)
-        inputids.push_back(inputs[j].m_inputid);
+    for (auto & input : inputs)
+        inputids.push_back(input.m_inputId);
 
     LOG(VB_CHANNEL, LOG_INFO,
         QString("RemoteRequestFreeRecorderList got inputs"));
@@ -251,8 +251,8 @@ vector<uint> RemoteRequestFreeInputList(uint excluded_input)
         RemoteRequestFreeInputInfo(excluded_input);
 
     vector<uint> inputids;
-    for (size_t j = 0; j < inputs.size(); j++)
-        inputids.push_back(inputs[j].m_inputid);
+    for (auto & input : inputs)
+        inputids.push_back(input.m_inputId);
 
     LOG(VB_CHANNEL, LOG_INFO,
         QString("RemoteRequestFreeInputList got inputs"));
@@ -269,13 +269,12 @@ RemoteEncoder *RemoteRequestFreeRecorderFromList
     vector<InputInfo> inputs =
         RemoteRequestFreeInputInfo(excluded_input);
 
-    for (QStringList::const_iterator recIter = qualifiedRecorders.begin();
-         recIter != qualifiedRecorders.end(); ++recIter)
+    for (const auto & recorder : qAsConst(qualifiedRecorders))
     {
-        uint inputid = (*recIter).toUInt();
-        for (size_t i = 0; i < inputs.size(); ++i)
+        uint inputid = recorder.toUInt();
+        for (auto & input : inputs)
         {
-            if (inputs[i].m_inputid == inputid)
+            if (input.m_inputId == inputid)
             {
                 LOG(VB_CHANNEL, LOG_INFO,
                     QString("RemoteRequestFreeRecorderFromList got input %1")
@@ -307,8 +306,8 @@ RemoteEncoder *RemoteRequestRecorder(void)
 
     LOG(VB_CHANNEL, LOG_INFO,
         QString("RemoteRequestRecorder got input %1")
-        .arg(inputs[0].m_inputid));
-    return RemoteGetExistingRecorder(inputs[0].m_inputid);
+        .arg(inputs[0].m_inputId));
+    return RemoteGetExistingRecorder(inputs[0].m_inputId);
 }
 
 RemoteEncoder *RemoteGetExistingRecorder(const ProgramInfo *pginfo)
@@ -408,10 +407,9 @@ bool RemoteGetRecordingStatus(
     if (tunerList)
         tunerList->clear();
 
-    for (size_t i = 0; i < inputlist.size(); i++)
+    for (uint inputid : inputlist)
     {
         QString     status      = "";
-        uint        inputid     = inputlist[i];
         int         state       = kState_ChangingState;
         QString     channelName = "";
         QString     title       = "";

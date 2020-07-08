@@ -2,6 +2,7 @@
 #define SMARTPLAYLIST_H_
 
 // c/c++
+#include <utility>
 #include <vector>
 
 class MythUIButton;using namespace std;
@@ -27,10 +28,10 @@ enum SmartPLFieldType
 };
 
 // used by playlist.cpp
-QString getCriteriaSQL(const QString& fieldName, QString operatorName,
+QString getCriteriaSQL(const QString& fieldName, const QString &operatorName,
                        QString value1, QString value2);
 
-QString getSQLFieldName(QString fieldName);
+QString getSQLFieldName(const QString &fieldName);
 QString getOrderBySQL(const QString& orderByFields);
 
 // used by playbackbox.cpp
@@ -46,18 +47,18 @@ class SmartPLCriteriaRow
 
   public:
 
-    SmartPLCriteriaRow(const QString &_Field, const QString &_Operator,
-                       const QString &_Value1, const QString &_Value2)
-        : m_field(_Field), m_operator(_Operator),
-          m_value1(_Value1), m_value2(_Value2) {}
+    SmartPLCriteriaRow(QString field, QString op,
+                       QString value1, QString value2)
+        : m_field(std::move(field)), m_operator(std::move(op)),
+          m_value1(std::move(value1)), m_value2(std::move(value2)) {}
     SmartPLCriteriaRow(void) = default;
     ~SmartPLCriteriaRow(void) = default;
 
-    QString getSQL(void);
+    QString getSQL(void) const;
 
-    bool saveToDatabase(int smartPlaylistID);
+    bool saveToDatabase(int smartPlaylistID) const;
 
-    QString toString(void);
+    QString toString(void) const;
 
   public:
     QString m_field;
@@ -75,7 +76,7 @@ class SmartPlaylistEditor : public MythScreenType
 
     explicit SmartPlaylistEditor(MythScreenStack *parent)
         : MythScreenType(parent, "smartplaylisteditor") {}
-   ~SmartPlaylistEditor(void);
+   ~SmartPlaylistEditor(void) override;
 
     bool Create(void) override; // MythScreenType
 
@@ -88,7 +89,7 @@ class SmartPlaylistEditor : public MythScreenType
     void getCategoryAndName(QString &category, QString &name);
     void newSmartPlaylist(const QString& category);
     void editSmartPlaylist(const QString& category, const QString& name);
-    static bool deleteSmartPlaylist(QString category, const QString& name);
+    static bool deleteSmartPlaylist(const QString &category, const QString& name);
     static bool deleteCategory(const QString& category);
     static int  lookupCategoryID(const QString& category);
 
@@ -156,7 +157,7 @@ class CriteriaRowEditor : public MythScreenType
     CriteriaRowEditor(MythScreenStack *parent, SmartPLCriteriaRow *row)
         : MythScreenType(parent, "CriteriaRowEditor"),
           m_criteriaRow(row) {}
-   ~CriteriaRowEditor(void) = default;
+   ~CriteriaRowEditor(void) override = default;
 
     bool Create(void) override; // MythScreenType
 
@@ -217,14 +218,14 @@ class SmartPLResultViewer : public MythScreenType
 
     explicit SmartPLResultViewer(MythScreenStack *parent)
         : MythScreenType(parent, "SmartPLResultViewer") {}
-   ~SmartPLResultViewer(void) = default;
+   ~SmartPLResultViewer(void) override = default;
 
     bool Create(void) override; // MythScreenType
     bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
     void setSQL(const QString& sql);
 
   private slots:
-    void trackVisible(MythUIButtonListItem *item);
+    static void trackVisible(MythUIButtonListItem *item);
     void trackSelected(MythUIButtonListItem *item);
 
   private:
@@ -243,7 +244,7 @@ class SmartPLOrderByDialog: public MythScreenType
 
     explicit SmartPLOrderByDialog(MythScreenStack *parent)
         :MythScreenType(parent, "SmartPLOrderByDialog") {}
-    ~SmartPLOrderByDialog() = default;
+    ~SmartPLOrderByDialog() override = default;
 
     bool Create(void) override; // MythScreenType
 
@@ -287,7 +288,7 @@ class SmartPLDateDialog: public MythScreenType
 
     explicit SmartPLDateDialog(MythScreenStack *parent)
         :MythScreenType(parent, "SmartPLDateDialog") {}
-    ~SmartPLDateDialog() = default;
+    ~SmartPLDateDialog() override = default;
 
     bool Create(void) override; // MythScreenType
 

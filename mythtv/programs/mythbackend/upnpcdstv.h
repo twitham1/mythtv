@@ -22,7 +22,7 @@ class UPnpCDSTv : public UPnpCDSExtension
     public:
 
         UPnpCDSTv();
-        virtual ~UPnpCDSTv() = default;
+        ~UPnpCDSTv() override = default;
 
     protected:
 
@@ -33,12 +33,12 @@ class UPnpCDSTv : public UPnpCDSExtension
 
         bool LoadMetadata( const UPnpCDSRequest *pRequest,
                            UPnpCDSExtensionResults *pResults,
-                           IDTokenMap tokens,
-                           QString currentToken ) override; // UPnpCDSExtension
+                           const IDTokenMap& tokens,
+                           const QString& currentToken ) override; // UPnpCDSExtension
         bool LoadChildren( const UPnpCDSRequest *pRequest,
                            UPnpCDSExtensionResults *pResults,
-                           IDTokenMap tokens,
-                           QString currentToken ) override; // UPnpCDSExtension
+                           const IDTokenMap& tokens,
+                           const QString& currentToken ) override; // UPnpCDSExtension
 
     private:
         bool  LoadRecordings ( const UPnpCDSRequest *pRequest,
@@ -47,18 +47,18 @@ class UPnpCDSTv : public UPnpCDSExtension
         bool  LoadTitles     ( const UPnpCDSRequest *pRequest,
                                UPnpCDSExtensionResults *pResults,
                                const IDTokenMap& tokens );
-        bool  LoadDates      ( const UPnpCDSRequest *pRequest,
-                               UPnpCDSExtensionResults *pResults,
-                               const IDTokenMap& tokens );
-        bool  LoadGenres     ( const UPnpCDSRequest *pRequest,
-                               UPnpCDSExtensionResults *pResults,
-                               const IDTokenMap& tokens );
-        bool  LoadChannels   ( const UPnpCDSRequest *pRequest,
-                               UPnpCDSExtensionResults *pResults,
-                               const IDTokenMap& tokens );
-        bool  LoadRecGroups  ( const UPnpCDSRequest *pRequest,
-                               UPnpCDSExtensionResults *pResults,
-                               const IDTokenMap& tokens );
+        static bool  LoadDates     ( const UPnpCDSRequest *pRequest,
+                                     UPnpCDSExtensionResults *pResults,
+                                     const IDTokenMap& tokens );
+        static bool  LoadGenres    ( const UPnpCDSRequest *pRequest,
+                                     UPnpCDSExtensionResults *pResults,
+                                     const IDTokenMap& tokens );
+        static bool  LoadChannels  ( const UPnpCDSRequest *pRequest,
+                                     UPnpCDSExtensionResults *pResults,
+                                     const IDTokenMap& tokens );
+        static bool  LoadRecGroups ( const UPnpCDSRequest *pRequest,
+                                     UPnpCDSExtensionResults *pResults,
+                                     const IDTokenMap& tokens );
         bool  LoadMovies     ( const UPnpCDSRequest *pRequest,
                                UPnpCDSExtensionResults *pResults,
                                IDTokenMap tokens );
@@ -69,16 +69,16 @@ class UPnpCDSTv : public UPnpCDSExtension
 //                                UPnpCDSExtensionResults *pResults,
 //                                IDTokenMap tokens );
 
-        void PopulateArtworkURIS( CDSObject *pItem, const QString &sInetRef,
+        static void PopulateArtworkURIS( CDSObject *pItem, const QString &sInetRef,
                                   int nSeason, const QUrl &URIBase );
 
         // Common code helpers
-        QString BuildWhereClause( QStringList clauses,
+        static QString BuildWhereClause( QStringList clauses,
                                   IDTokenMap tokens );
-        void    BindValues ( MSqlQuery &query,
+        static void    BindValues ( MSqlQuery &query,
                              IDTokenMap tokens );
 
-        QUrl                   m_URIBase;
+        QUrl                   m_uriBase;
 
         QStringMap             m_mapBackendIp;
         QMap<QString, int>     m_mapBackendPort;

@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __SSDPCLIENT_H__
-#define __SSDPCLIENT_H__
+#ifndef SSDPCLIENT_H
+#define SSDPCLIENT_H
 
 // Qt headers
 #include <QObject>
@@ -25,7 +25,7 @@
 #include "upnpexp.h"
 
 /// Key == Unique Service Name (USN)
-typedef QMap< QString, DeviceLocation * > EntryMap;
+using EntryMap = QMap< QString, DeviceLocation * >;
 
 /////////////////////////////////////////////////////////////////////////////
 // QDict Implementation that uses RefCounted pointers
@@ -35,7 +35,7 @@ class UPNP_PUBLIC SSDPCacheEntries : public ReferenceCounter
 {
   protected:
     /// Destructor protected to enforce Release method usage
-    virtual ~SSDPCacheEntries();
+    ~SSDPCacheEntries() override;
 
   public:
     SSDPCacheEntries();
@@ -51,7 +51,7 @@ class UPNP_PUBLIC SSDPCacheEntries : public ReferenceCounter
 
     DeviceLocation *GetFirst(void);
 
-    void GetEntryMap(EntryMap&);
+    void GetEntryMap(EntryMap &map);
 
     QTextStream &OutputXML(QTextStream &os, uint *pnEntryCount = nullptr) const;
     void Dump(uint &nEntryCount) const;
@@ -67,7 +67,7 @@ class UPNP_PUBLIC SSDPCacheEntries : public ReferenceCounter
 };
 
 /// Key == Service Type URI
-typedef QMap< QString, SSDPCacheEntries * > SSDPCacheEntriesMap;
+using SSDPCacheEntriesMap = QMap< QString, SSDPCacheEntries * >;
 
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
@@ -111,7 +111,7 @@ class UPNP_PUBLIC SSDPCache : public QObject,
 
         static SSDPCache* Instance();
 
-        virtual ~SSDPCache();
+        ~SSDPCache() override;
 
         void Lock       () { m_mutex.lock();   }
         void Unlock     () { m_mutex.unlock(); }
@@ -139,4 +139,4 @@ class UPNP_PUBLIC SSDPCache : public QObject,
         DeviceLocation   *Find( const QString &sURI, const QString &sUSN );
 };
 
-#endif
+#endif // SSDPCLIENT_H

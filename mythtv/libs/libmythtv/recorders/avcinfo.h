@@ -1,5 +1,5 @@
-#ifndef _AVC_INFO_H_
-#define _AVC_INFO_H_
+#ifndef AVC_INFO_H
+#define AVC_INFO_H
 
 // C++ headers
 #include <cstdint>
@@ -9,8 +9,15 @@ using namespace std;
 // Qt headers
 #include <QString>
 
-QString guid_to_string(uint64_t guid);
-uint64_t string_to_guid(const QString &guid);
+static inline QString guid_to_string(uint64_t guid)
+{
+    return QString("%1").arg(guid, 16, 16, QLatin1Char('0')).toUpper();
+}
+
+static inline uint64_t string_to_guid(const QString &guid)
+{
+    return guid.toULongLong(nullptr, 16);
+}
 
 class AVCInfo
 {
@@ -43,7 +50,7 @@ class AVCInfo
     uint     m_modelid           {0};
     uint     m_firmware_revision {0};
     QString  m_product_name;
-    uint8_t  m_unit_table[32];
+    uint8_t  m_unit_table[32]    {};
 };
 
-#endif // _AVC_INFO_H_
+#endif // AVC_INFO_H

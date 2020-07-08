@@ -32,7 +32,7 @@ class SERVICE_PUBLIC Enum : public QObject
     Q_CLASSINFO( "EnumItems", "type=DTC::Enum");
 
     Q_PROPERTY( QString      Type      READ Type       WRITE setType   )
-    Q_PROPERTY( QVariantList EnumItems READ EnumItems  DESIGNABLE true )
+    Q_PROPERTY( QVariantList EnumItems READ EnumItems )
 
 
     PROPERTYIMP       ( QString     , Type      )
@@ -59,7 +59,7 @@ class SERVICE_PUBLIC Enum : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            EnumItem *pObject = new EnumItem( this );
+            auto *pObject = new EnumItem( this );
             m_EnumItems.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

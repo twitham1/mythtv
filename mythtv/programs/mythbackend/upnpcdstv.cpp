@@ -136,9 +136,9 @@ UPnpCDSTv::UPnpCDSTv()
 {
     QString sServerIp   = gCoreContext->GetBackendServerIP();
     int sPort           = gCoreContext->GetBackendStatusPort();
-    m_URIBase.setScheme("http");
-    m_URIBase.setHost(sServerIp);
-    m_URIBase.setPort(sPort);
+    m_uriBase.setScheme("http");
+    m_uriBase.setHost(sServerIp);
+    m_uriBase.setPort(sPort);
 
     // ShortCuts
     m_shortcuts.insert(UPnPShortcutFeature::VIDEOS_RECORDINGS, "Recordings");
@@ -153,22 +153,21 @@ void UPnpCDSTv::CreateRoot()
                                          m_sName,
                                          "0");
 
-    CDSObject* pContainer;
     QString containerId = m_sExtensionId + "/%1";
 
     // HACK: I'm not entirely happy with this solution, but it's at least
     // tidier than passing through half a dozen extra args to Load[Foo]
     // or having yet more methods just to load the counts
-    UPnpCDSRequest *pRequest = new UPnpCDSRequest();
+    auto *pRequest = new UPnpCDSRequest();
     pRequest->m_nRequestedCount = 0; // We don't want to load any results, we just want the TotalCount
-    UPnpCDSExtensionResults *pResult = new UPnpCDSExtensionResults();
+    auto *pResult = new UPnpCDSExtensionResults();
     IDTokenMap tokens;
     // END HACK
 
     // -----------------------------------------------------------------------
     // All Recordings
     // -----------------------------------------------------------------------
-    pContainer = CDSObject::CreateContainer ( containerId.arg("Recording"),
+    CDSObject* pContainer = CDSObject::CreateContainer ( containerId.arg("Recording"),
                                               QObject::tr("All Recordings"),
                                               m_sExtensionId, // Parent Id
                                               nullptr );
@@ -279,7 +278,7 @@ void UPnpCDSTv::CreateRoot()
 
 bool UPnpCDSTv::LoadMetadata(const UPnpCDSRequest* pRequest,
                               UPnpCDSExtensionResults* pResults,
-                              IDTokenMap tokens, QString currentToken)
+                              const IDTokenMap& tokens, const QString& currentToken)
 {
     if (currentToken.isEmpty())
     {
@@ -338,9 +337,11 @@ bool UPnpCDSTv::LoadMetadata(const UPnpCDSRequest* pRequest,
         return LoadMovies(pRequest, pResults, tokens);
     }
     else
+    {
         LOG(VB_GENERAL, LOG_ERR,
             QString("UPnpCDSTV::LoadMetadata(): "
                     "Unhandled metadata request for '%1'.").arg(currentToken));
+    }
 
     return false;
 }
@@ -351,7 +352,7 @@ bool UPnpCDSTv::LoadMetadata(const UPnpCDSRequest* pRequest,
 
 bool UPnpCDSTv::LoadChildren(const UPnpCDSRequest* pRequest,
                              UPnpCDSExtensionResults* pResults,
-                             IDTokenMap tokens, QString currentToken)
+                             const IDTokenMap& tokens, const QString& currentToken)
 {
     if (currentToken.isEmpty() || currentToken == m_sExtensionId.toLower())
     {
@@ -573,7 +574,7 @@ bool UPnpCDSTv::LoadTitles(const UPnpCDSRequest* pRequest,
             pContainer->SetPropValue("storageMedium", "HDD");
 
             // Artwork
-            PopulateArtworkURIS(pContainer, sInetRef, 0, m_URIBase); // No particular season
+            PopulateArtworkURIS(pContainer, sInetRef, 0, m_uriBase); // No particular season
 
             pResults->Add(pContainer);
             pContainer->DecrRef();
@@ -1200,15 +1201,9 @@ bool UPnpCDSTv::LoadRecordings(const UPnpCDSRequest* pRequest,
         // recordedmarkup
         if (nDurationMS == 0)
         {
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-            uint uiStart = dtStartTime.toTime_t();
-            uint uiEnd   = dtEndTime.toTime_t();
-            nDurationMS  = (uiEnd - uiStart) * 1000; // To milliseconds
-#else
             qint64 uiStart = dtStartTime.toMSecsSinceEpoch();
             qint64 uiEnd   = dtEndTime.toMSecsSinceEpoch();
             nDurationMS  = (uiEnd - uiStart);
-#endif
             nDurationMS  = (nDurationMS > 0) ? nDurationMS : 0;
         }
 

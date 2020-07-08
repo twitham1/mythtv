@@ -20,7 +20,7 @@ class Synaesthesia : public VisualBase
 {
 public:
     Synaesthesia(void);
-    virtual ~Synaesthesia();
+    ~Synaesthesia() override;
 
     void resize(const QSize &size) override; // VisualBase
     bool process(VisualNode *node) override; // VisualBase
@@ -31,27 +31,27 @@ public:
 private:
     void setupPalette(void);
     void coreInit(void);
-    int bitReverser(int i);
+    static int bitReverser(int i);
     void fft(double *x, double *y);
     void setStarSize(double lsize);
 
-    inline void addPixel(int x, int y, int br1, int br2);
-    inline void addPixelFast(unsigned char *p, int br1, int br2);
-    inline unsigned char getPixel(int x, int y, int where);
+    inline void addPixel(int x, int y, int br1, int br2) const;
+    static inline void addPixelFast(unsigned char *p, int br1, int br2);
+    inline unsigned char getPixel(int x, int y, int where) const;
 
     inline void fadePixelWave(int x, int y, int where, int step);
     void fadeWave(void);
     inline void fadePixelHeat(int x, int y, int where, int step);
     void fadeHeat(void);
-    void fadeFade(void);
+    void fadeFade(void) const;
     void fade(void);
 
     QSize m_size                 {0,0};
 
-    double m_cosTable[NumSamples];
-    double m_negSinTable[NumSamples];
-    int    m_bitReverse[NumSamples];
-    int    m_scaleDown[256];
+    double m_cosTable[NumSamples]    {};
+    double m_negSinTable[NumSamples] {};
+    int    m_bitReverse[NumSamples]  {};
+    int    m_scaleDown[256]          {};
     int    m_maxStarRadius       {1};
     int    m_fadeMode            {Stars};
     bool   m_pointsAreDiamonds   {true};
@@ -61,16 +61,18 @@ private:
     int    m_outWidth            {0};
     int    m_outHeight           {0};
 
-    Bitmap<unsigned short> m_outputBmp, m_lastOutputBmp, m_lastLastOutputBmp;
+    Bitmap<unsigned short> m_outputBmp;
+    Bitmap<unsigned short> m_lastOutputBmp;
+    Bitmap<unsigned short> m_lastLastOutputBmp;
     QImage *m_outputImage        {nullptr};
 
-    unsigned char m_palette[768];
+    unsigned char m_palette[768] {};
     double m_fgRedSlider         {0.0};
     double m_fgGreenSlider       {0.5};
     double m_bgRedSlider         {0.75};
     double m_bgGreenSlider       {0.4};
 
-    double m_energy_avg          {80.0};
+    double m_energyAvg           {80.0};
 };
 
 #endif // SYNAETHESIA

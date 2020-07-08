@@ -88,7 +88,7 @@ DTC::CaptureCardList* Capture::GetCaptureCardList( const QString &sHostName,
     // return the results of the query
     // ----------------------------------------------------------------------
 
-    DTC::CaptureCardList* pList = new DTC::CaptureCardList();
+    auto* pList = new DTC::CaptureCardList();
 
     while (query.next())
     {
@@ -179,7 +179,7 @@ DTC::CaptureCard* Capture::GetCaptureCard( int nCardId )
         throw( QString( "Database Error executing query." ));
     }
 
-    DTC::CaptureCard* pCaptureCard = new DTC::CaptureCard();
+    auto* pCaptureCard = new DTC::CaptureCard();
 
     if (query.next())
     {
@@ -333,6 +333,9 @@ int Capture::AddCardInput       ( const uint nCardId,
          sInputName.isEmpty() || sInputName == "None" )
         throw( QString( "This API requires at least a card ID, a source ID, "
                         "and an input name." ));
+
+    if ( !CardUtil::IsUniqueDisplayName(sDisplayName, 0 ))
+        throw QString(" DisplayName is not set or is not unique.");
 
     int nResult = CardUtil::CreateCardInput(nCardId, nSourceId, sInputName,
                       sExternalCommand, sChangerDevice, sChangerModel,

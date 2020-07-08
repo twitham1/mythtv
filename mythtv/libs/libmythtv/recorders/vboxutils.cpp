@@ -92,10 +92,8 @@ QStringList VBox::doUPNPSearch(void)
     EntryMap map;
     vboxes->GetEntryMap(map);
 
-    EntryMap::const_iterator it = map.begin();
-    for (; it != map.end(); ++it)
+    for (auto *BE : qAsConst(map))
     {
-        DeviceLocation *BE = (*it);
         if (!BE->GetDeviceDesc())
         {
             LOG(VB_GENERAL, LOG_INFO, LOC + QString("GetDeviceDesc() failed for %1").arg(BE->GetFriendlyName()));
@@ -103,8 +101,8 @@ QStringList VBox::doUPNPSearch(void)
         }
 
         QString friendlyName = BE->GetDeviceDesc()->m_rootDevice.m_sFriendlyName;
-        QString ip = BE->GetDeviceDesc()->m_HostUrl.host();
-        int port = BE->GetDeviceDesc()->m_HostUrl.port();
+        QString ip = BE->GetDeviceDesc()->m_hostUrl.host();
+        int port = BE->GetDeviceDesc()->m_hostUrl.port();
 
         LOG(VB_GENERAL, LOG_DEBUG, LOC + QString("Found possible VBox at %1 (%2:%3)").arg(friendlyName).arg(ip).arg(port));
 
@@ -164,7 +162,7 @@ QString VBox::getIPFromVideoDevice(const QString& dev)
     QString id = devItems.at(0).trimmed();
 
     // if we already have an ip address use that
-    QRegExp ipRegExp("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}");
+    QRegExp ipRegExp(R"([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})");
     if (id.indexOf(ipRegExp) == 0)
         return id;
 
@@ -193,7 +191,7 @@ QString VBox::getIPFromVideoDevice(const QString& dev)
 
 QDomDocument *VBox::getBoardInfo(void)
 {
-    QDomDocument *xmlDoc = new QDomDocument();
+    auto *xmlDoc = new QDomDocument();
     QString query = QUERY_BOARDINFO;
 
     query.replace("{URL}", m_url);
@@ -294,8 +292,8 @@ QStringList VBox::getTuners(void)
 
 vbox_chan_map_t *VBox::getChannels(void)
 {
-    vbox_chan_map_t *result = new vbox_chan_map_t;
-    QDomDocument *xmlDoc = new QDomDocument();
+    auto *result = new vbox_chan_map_t;
+    auto *xmlDoc = new QDomDocument();
     QString query = QUERY_CHANNELS;
 
     query.replace("{URL}", m_url);

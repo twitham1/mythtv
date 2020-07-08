@@ -44,8 +44,7 @@ bool V4L2util::Open(const QString& dev_name, const QString& vbi_dev_name)
     }
     m_deviceName = dev_name;
 
-    struct v4l2_query_ext_ctrl qc;
-    memset(&qc, 0, sizeof(v4l2_query_ext_ctrl));
+    struct v4l2_query_ext_ctrl qc {};
     qc.id = V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND;
     m_haveQueryExtCtrl = (v4l2_ioctl(m_fd, VIDIOC_QUERY_EXT_CTRL, &qc) == 0);
 
@@ -54,8 +53,7 @@ bool V4L2util::Open(const QString& dev_name, const QString& vbi_dev_name)
     m_version = 0;
     m_capabilities = 0;
 
-    struct v4l2_capability capability;
-    memset(&capability, 0, sizeof(v4l2_capability));
+    struct v4l2_capability capability {};
     if (ioctl(m_fd, VIDIOC_QUERYCAP, &capability) >= 0)
     {
         m_cardName     = QString::fromLatin1((const char*)capability.card);
@@ -94,7 +92,7 @@ bool V4L2util::HasStreaming(void) const
     if (m_capabilities ^ V4L2_CAP_STREAMING)
         return false;
 
-    struct v4l2_requestbuffers reqbuf;
+    struct v4l2_requestbuffers reqbuf {};
 
     if (-1 == ioctl (m_fd, VIDIOC_REQBUFS, &reqbuf))
     {
@@ -191,10 +189,9 @@ QString V4L2util::queryctrl_toString(int type)
 void V4L2util::log_qctrl(struct v4l2_queryctrl& queryctrl,
                          DriverOption& drv_opt, QString& msg)
 {
-    struct v4l2_querymenu qmenu;
+    struct v4l2_querymenu qmenu {};
     QString  nameStr((char *)queryctrl.name);
 
-    memset(&qmenu, 0, sizeof(qmenu));
     qmenu.id = queryctrl.id;
 
     // Replace non-printable with _
@@ -204,7 +201,7 @@ void V4L2util::log_qctrl(struct v4l2_queryctrl& queryctrl,
     drv_opt.m_minimum       = queryctrl.minimum;
     drv_opt.m_maximum       = queryctrl.maximum;
     drv_opt.m_step          = queryctrl.step;
-    drv_opt.m_default_value = queryctrl.default_value;;
+    drv_opt.m_defaultValue  = queryctrl.default_value;;
 
     if (nameStr == "Stream Type")
         drv_opt.m_category = DriverOption::STREAM_TYPE;
@@ -345,9 +342,11 @@ void V4L2util::log_qctrl(struct v4l2_queryctrl& queryctrl,
             if (queryctrl.type == V4L2_CTRL_TYPE_MENU)
                 msg += QString("\t\t%1: %2").arg(idx).arg((char *)qmenu.name);
             else
+            {
                 msg += QString("\t\t%1: %2 (0x%3)")
                        .arg(idx).arg(qmenu.value)
                        .arg(qmenu.value, 0, 16, QChar('0'));
+            }
         }
     }
 
@@ -357,13 +356,10 @@ void V4L2util::log_qctrl(struct v4l2_queryctrl& queryctrl,
 bool V4L2util::log_control(struct v4l2_queryctrl& qctrl, DriverOption& drv_opt,
                            QString& msg)
 {
-    struct v4l2_control ctrl;
-    struct v4l2_ext_control ext_ctrl;
-    struct v4l2_ext_controls ctrls;
+    struct v4l2_control ctrl {};
+    struct v4l2_ext_control ext_ctrl {};
+    struct v4l2_ext_controls ctrls {};
 
-    memset(&ctrl, 0, sizeof(ctrl));
-    memset(&ext_ctrl, 0, sizeof(ext_ctrl));
-    memset(&ctrls, 0, sizeof(ctrls));
     if (qctrl.flags& V4L2_CTRL_FLAG_DISABLED)
     {
         msg += QString("'%1' Disabled").arg((char *)qctrl.name);
@@ -438,9 +434,9 @@ void V4L2util::SetDefaultOptions(DriverOption::Options& options)
         DriverOption drv_opt;
         drv_opt.m_category = DriverOption::VIDEO_ENCODING;
         drv_opt.m_name = "Video Encoding";
-        drv_opt.m_minimum = drv_opt.m_maximum = drv_opt.m_default_value =
+        drv_opt.m_minimum = drv_opt.m_maximum = drv_opt.m_defaultValue =
                           V4L2_MPEG_VIDEO_ENCODING_MPEG_2;
-        drv_opt.m_menu[drv_opt.m_default_value] = "MPEG-2 Video";
+        drv_opt.m_menu[drv_opt.m_defaultValue] = "MPEG-2 Video";
         options[drv_opt.m_category] = drv_opt;
     }
 
@@ -451,32 +447,32 @@ void V4L2util::SetDefaultOptions(DriverOption::Options& options)
         // V4L2_CID_MPEG_AUDIO_ENCODING
         drv_opt.m_category = DriverOption::AUDIO_ENCODING;
         drv_opt.m_name = "Audio Encoding";
-        drv_opt.m_minimum = drv_opt.m_maximum = drv_opt.m_default_value =
+        drv_opt.m_minimum = drv_opt.m_maximum = drv_opt.m_defaultValue =
                           V4L2_MPEG_AUDIO_ENCODING_LAYER_2;
-        drv_opt.m_menu[drv_opt.m_default_value] = "MPEG-1/2 Layer II encoding";
+        drv_opt.m_menu[drv_opt.m_defaultValue] = "MPEG-1/2 Layer II encoding";
         options[drv_opt.m_category] = drv_opt;
 
         drv_opt.m_category = DriverOption::AUDIO_BITRATE;
         drv_opt.m_name = "Audio Bitrate";
-        drv_opt.m_minimum = drv_opt.m_maximum = drv_opt.m_default_value =
+        drv_opt.m_minimum = drv_opt.m_maximum = drv_opt.m_defaultValue =
                           V4L2_MPEG_AUDIO_ENCODING_LAYER_2;
-        drv_opt.m_menu[drv_opt.m_default_value] = "MPEG-1/2 Layer II encoding";
+        drv_opt.m_menu[drv_opt.m_defaultValue] = "MPEG-1/2 Layer II encoding";
         options[drv_opt.m_category] = drv_opt;
 
         // V4L2_CID_MPEG_AUDIO_SAMPLING_FREQ
         drv_opt.m_category = DriverOption::AUDIO_SAMPLERATE;
         drv_opt.m_name = "MPEG Audio sampling frequency";
-        drv_opt.m_minimum = drv_opt.m_maximum = drv_opt.m_default_value =
+        drv_opt.m_minimum = drv_opt.m_maximum = drv_opt.m_defaultValue =
                           V4L2_MPEG_AUDIO_SAMPLING_FREQ_48000;
-        drv_opt.m_menu[drv_opt.m_default_value] = "48 kHz";
+        drv_opt.m_menu[drv_opt.m_defaultValue] = "48 kHz";
         options[drv_opt.m_category] = drv_opt;
 
         // VIDIOC_S_TUNER
         drv_opt.m_category = DriverOption::AUDIO_LANGUAGE;
         drv_opt.m_name = "Tuner Audio Modes";
-        drv_opt.m_minimum = drv_opt.m_maximum = drv_opt.m_default_value =
+        drv_opt.m_minimum = drv_opt.m_maximum = drv_opt.m_defaultValue =
                           V4L2_TUNER_MODE_STEREO;
-        drv_opt.m_menu[drv_opt.m_default_value] = "Play stereo audio";
+        drv_opt.m_menu[drv_opt.m_defaultValue] = "Play stereo audio";
         options[drv_opt.m_category] = drv_opt;
     }
 
@@ -515,16 +511,15 @@ void V4L2util::SetDefaultOptions(DriverOption::Options& options)
 
 bool V4L2util::GetFormats(QStringList& formats)
 {
-    struct v4l2_fmtdesc vid_fmtdesc;
-    memset(&vid_fmtdesc, 0, sizeof(vid_fmtdesc));
-    const char *flags[] = {"uncompressed", "compressed"};
+    struct v4l2_fmtdesc vid_fmtdesc {};
+    const std::array<const QString,2> flags {"uncompressed", "compressed"};
 
     vid_fmtdesc.index = 0;
     vid_fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     while(ioctl(m_fd, VIDIOC_ENUM_FMT, &vid_fmtdesc) == 0)
     {
         formats << QString("%1 (%2)").arg((char *)vid_fmtdesc.description)
-                                    .arg((char *)flags[vid_fmtdesc.flags]);
+                                    .arg(flags[vid_fmtdesc.flags]);
 
         /* Convert the pixelformat attributes from FourCC into 'human readab
            fprintf(stdout, "  pixelformat  :%c%c%c%c\\n",
@@ -551,8 +546,7 @@ bool V4L2util::GetOptions(DriverOption::Options& options)
         return true;
     }
 
-    struct v4l2_queryctrl qctrl;
-    memset(&qctrl, 0, sizeof(v4l2_queryctrl));
+    struct v4l2_queryctrl qctrl {};
     qctrl.id = V4L2_CTRL_FLAG_NEXT_CTRL;
     while (0 == ioctl (m_fd, VIDIOC_QUERYCTRL, &qctrl))
     {
@@ -601,10 +595,9 @@ int V4L2util::GetOptionValue(DriverOption::category_t cat, const QString& desc)
 
 bool V4L2util::GetVideoStandard(QString& name) const
 {
-    v4l2_std_id std_id;
-    struct v4l2_standard standard;
+    v4l2_std_id std_id = 0;
+    struct v4l2_standard standard {};
 
-    memset(&standard, 0, sizeof(v4l2_standard));
     if (-1 == ioctl (m_fd, VIDIOC_G_STD, &std_id))
     {
         /* Note when VIDIOC_ENUMSTD always returns EINVAL this
@@ -643,9 +636,8 @@ int V4L2util::GetSignalStrength(void) const
 {
     return -1;   // Does not work
 
-    struct v4l2_tuner tuner;
+    struct v4l2_tuner tuner {};
 
-    memset(&tuner, 0, sizeof(v4l2_tuner));
     if (ioctl(m_fd, VIDIOC_G_TUNER, &tuner, 0) != 0)
     {
         LOG(VB_GENERAL, LOG_ERR, "GetSignalStrength() : "
@@ -663,9 +655,8 @@ int V4L2util::GetSignalStrength(void) const
 
 bool V4L2util::GetResolution(int& width, int& height) const
 {
-    struct v4l2_format vfmt;
+    struct v4l2_format vfmt {};
 
-    memset(&vfmt, 0, sizeof(v4l2_format));
     vfmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (ioctl(m_fd, VIDIOC_G_FMT, &vfmt) != 0)
     {
@@ -682,6 +673,21 @@ bool V4L2util::GetResolution(int& width, int& height) const
     return true;
 }
 
+uint32_t V4L2util::GetCapabilities(void) const
+{
+    return m_capabilities;
+}
+
+QString V4L2util::GetDeviceName(void) const
+{
+    return m_deviceName;
+}
+
+QString V4L2util::GetDriverName(void) const
+{
+    return m_driverName;
+}
+
 bool V4L2util::HasTuner(void) const
 {
     return (m_capabilities & V4L2_CAP_TUNER) != 0U;
@@ -694,9 +700,8 @@ bool V4L2util::HasAudioSupport(void) const
 
 bool V4L2util::IsEncoder(void) const
 {
-    struct v4l2_queryctrl qctrl;
+    struct v4l2_queryctrl qctrl {};
 
-    memset(&qctrl, 0, sizeof(v4l2_queryctrl));
     qctrl.id = V4L2_CTRL_CLASS_MPEG | V4L2_CTRL_FLAG_NEXT_CTRL;
     return (0 == ioctl (m_fd, VIDIOC_QUERYCTRL, &qctrl) &&
             V4L2_CTRL_ID2CLASS (qctrl.id) == V4L2_CTRL_CLASS_MPEG);
@@ -712,13 +717,11 @@ bool V4L2util::UserAdjustableResolution(void) const
 
 int V4L2util::GetExtControl(int request, const QString& ctrl_desc) const
 {
-    struct v4l2_ext_control  ctrl;
-    struct v4l2_ext_controls ctrls;
+    struct v4l2_ext_control  ctrl {};
+    struct v4l2_ext_controls ctrls {};
 
-    memset(&ctrl, 0, sizeof(v4l2_ext_control));
     ctrl.id     = request;
 
-    memset(&ctrls, 0, sizeof(v4l2_ext_controls));
     ctrls.count      = 1;
     ctrls.ctrl_class = V4L2_CTRL_CLASS_MPEG;
     ctrls.controls   = &ctrl;
@@ -750,14 +753,12 @@ bool V4L2util::SetExtControl(int request, int value, const QString& ctrl_desc,
         return true;
     }
 
-    struct v4l2_ext_control  ctrl;
-    struct v4l2_ext_controls ctrls;
+    struct v4l2_ext_control  ctrl {};
+    struct v4l2_ext_controls ctrls {};
 
-    memset(&ctrl, 0, sizeof(v4l2_ext_control));
     ctrl.id          = request;
     ctrl.value       = value;
 
-    memset(&ctrls, 0, sizeof(v4l2_ext_controls));
     ctrls.count      = 1;
     ctrls.ctrl_class = V4L2_CTRL_CLASS_MPEG;
     ctrls.controls    = &ctrl;
@@ -799,7 +800,7 @@ QString V4L2util::StreamTypeDesc(int value)
 
 int V4L2util::GetStreamType(void) const
 {
-    int type;
+    int type = V4L2_MPEG_STREAM_TYPE_MPEG2_PS;
 
     if (DriverName().startsWith("saa7164"))
     {
@@ -890,8 +891,7 @@ bool V4L2util::SetVideoBitratePeak(int value)
 
 bool V4L2util::SetResolution(uint32_t width, uint32_t height)
 {
-    struct v4l2_format vfmt;
-    memset(&vfmt, 0, sizeof(vfmt));
+    struct v4l2_format vfmt {};
 
     vfmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
@@ -927,9 +927,8 @@ bool V4L2util::SetResolution(uint32_t width, uint32_t height)
 // Audio controls
 bool V4L2util::SetAudioInput(int value)
 {
-    struct v4l2_audio ain;
+    struct v4l2_audio ain {};
 
-    memset(&ain, 0, sizeof(v4l2_audio));
     ain.index = value;
     if (ioctl(m_fd, VIDIOC_ENUMAUDIO, &ain) < 0)
     {
@@ -998,8 +997,7 @@ bool V4L2util::SetAudioCodec(int value)
 bool V4L2util::SetVolume(int volume)
 {
     // Get volume min/max values
-    struct v4l2_queryctrl qctrl;
-    memset(&qctrl, 0 , sizeof(struct v4l2_queryctrl));
+    struct v4l2_queryctrl qctrl {};
     qctrl.id = V4L2_CID_AUDIO_VOLUME;
     if ((ioctl(m_fd, VIDIOC_QUERYCTRL, &qctrl) < 0) ||
         (qctrl.flags & V4L2_CTRL_FLAG_DISABLED))
@@ -1015,7 +1013,7 @@ bool V4L2util::SetVolume(int volume)
     int ctrl_volume = std::min(qctrl.maximum, std::max(qctrl.minimum, value));
 
     // Set recording volume
-    struct v4l2_control ctrl;
+    struct v4l2_control ctrl {};
     ctrl.id = V4L2_CID_AUDIO_VOLUME;
     ctrl.value = ctrl_volume;
 
@@ -1033,9 +1031,8 @@ bool V4L2util::SetVolume(int volume)
 
 bool V4L2util::SetLanguageMode(int mode)
 {
-    struct v4l2_tuner vt;
+    struct v4l2_tuner vt {};
 
-    memset(&vt, 0, sizeof(v4l2_tuner));
     if (ioctl(m_fd, VIDIOC_G_TUNER, &vt) < 0)
     {
         LOG(VB_CHANNEL, LOG_WARNING, LOC +
@@ -1180,9 +1177,8 @@ bool V4L2util::SetAudioBitrateL2(int value)
 // Actions
 bool V4L2util::SetEncoderState(int mode, const QString& desc)
 {
-    struct v4l2_encoder_cmd command;
+    struct v4l2_encoder_cmd command {};
 
-    memset(&command, 0, sizeof(v4l2_encoder_cmd));
     command.cmd   = mode;
     if (ioctl(m_fd, VIDIOC_ENCODER_CMD, &command) != 0 && errno != ENOTTY)
     {
@@ -1225,9 +1221,8 @@ bool V4L2util::OpenVBI(const QString& /*vbi_dev_name*/)
 
 bool V4L2util::SetSlicedVBI(const VBIMode::vbimode_t& vbimode)
 {
-    struct v4l2_format vbifmt;
+    struct v4l2_format vbifmt {};
 
-    memset(&vbifmt, 0, sizeof(v4l2_format));
     vbifmt.type = V4L2_BUF_TYPE_SLICED_VBI_CAPTURE;
     vbifmt.fmt.sliced.service_set |= (VBIMode::PAL_TT == vbimode) ?
                                      V4L2_SLICED_VBI_625 : V4L2_SLICED_VBI_525;

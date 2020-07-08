@@ -1,7 +1,7 @@
 // -*- Mode: c++ -*-
 
-#ifndef _MYTH_THREAD_POOL_H_
-#define _MYTH_THREAD_POOL_H_
+#ifndef MYTH_THREAD_POOL_H
+#define MYTH_THREAD_POOL_H
 
 #include <QString>
 
@@ -20,6 +20,8 @@ class MBASE_PUBLIC MThreadPool
   public:
     explicit MThreadPool(const QString &name);
     ~MThreadPool();
+    MThreadPool(const MThreadPool &) = delete;            // not copyable
+    MThreadPool &operator=(const MThreadPool &) = delete; // not copyable
 
     void Stop(void);
     void DeletePoolThreads(void);
@@ -29,9 +31,9 @@ class MBASE_PUBLIC MThreadPool
     static void ShutdownAllPools(void);
 
     void start(QRunnable *runnable, const QString& debugName, int priority = 0);
-    bool tryStart(QRunnable *runnable, QString debugName);
+    bool tryStart(QRunnable *runnable, const QString& debugName);
 
-    void startReserved(QRunnable *runnable, QString debugName,
+    void startReserved(QRunnable *runnable, const QString& debugName,
                        int waitForAvailMS = 0);
 
     int expiryTimeout(void) const;
@@ -45,17 +47,15 @@ class MBASE_PUBLIC MThreadPool
     void waitForDone(void);
 
   private:
-    MThreadPool(const MThreadPool &) = delete;            // not copyable
-    MThreadPool &operator=(const MThreadPool &) = delete; // not copyable
-    bool TryStartInternal(QRunnable*, const QString&, bool);
-    void NotifyAvailable(MPoolThread*);
-    void NotifyDone(MPoolThread*);
+    bool TryStartInternal(QRunnable *runnable, const QString& debugName, bool reserved);
+    void NotifyAvailable(MPoolThread *thread);
+    void NotifyDone(MPoolThread *thread);
     void ReleaseThread(void);
 
 
     MThreadPoolPrivate *m_priv {nullptr};
 };
 
-#endif // _MYTH_THREAD_POOL_H_
+#endif // MYTH_THREAD_POOL_H
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

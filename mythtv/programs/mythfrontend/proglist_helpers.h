@@ -1,5 +1,7 @@
-#ifndef _PROGLIST_HELPERS_H_
-#define _PROGLIST_HELPERS_H_
+#ifndef PROGLIST_HELPERS_H
+#define PROGLIST_HELPERS_H
+
+#include <utility>
 
 // Qt headers
 #include <QDateTime>
@@ -20,11 +22,12 @@ class PhrasePopup : public MythScreenType
     PhrasePopup(MythScreenStack *parentStack,
                 ProgLister *parent,
                 RecSearchType searchType,
-                const QStringList &list,
-                const QString &currentValue)
+                QStringList list,
+                QString currentValue)
         : MythScreenType(parentStack, "phrasepopup"),
-          m_parent(parent), m_searchType(searchType),  m_list(list),
-          m_currentValue(currentValue) {}
+          m_parent(parent), m_searchType(searchType),
+          m_list(std::move(list)),
+          m_currentValue(std::move(currentValue)) {}
 
     bool Create() override; // MythScreenType
 
@@ -61,11 +64,12 @@ class PowerSearchPopup : public MythScreenType
     PowerSearchPopup(MythScreenStack *parentStack,
                 ProgLister *parent,
                 RecSearchType searchType,
-                const QStringList &list,
-                const QString &currentValue)
+                QStringList list,
+                QString currentValue)
         : MythScreenType(parentStack, "phrasepopup"),
-          m_parent(parent), m_searchType(searchType), m_list(list),
-          m_currentValue(currentValue) {}
+          m_parent(parent), m_searchType(searchType),
+          m_list(std::move(list)),
+          m_currentValue(std::move(currentValue)) {}
 
     bool Create() override; // MythScreenType
 
@@ -126,4 +130,4 @@ class EditPowerSearchPopup : public MythScreenType
     MythUIButton     *m_okButton     {nullptr};
 };
 
-#endif // _PROGLIST_HELPERS_H_
+#endif // PROGLIST_HELPERS_H

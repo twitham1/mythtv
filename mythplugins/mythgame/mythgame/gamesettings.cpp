@@ -6,9 +6,9 @@
 #include "gamesettings.h"
 
 struct GameTypes {
-    QString   nameStr;
-    QString   idStr;
-    QString   extensions;
+    QString   m_nameStr;
+    QString   m_idStr;
+    QString   m_extensions;
 };
 
 #define MAX_GAME_TYPES 12
@@ -33,11 +33,11 @@ QString GetGameTypeName(const QString &GameType)
 {
     QString result = "";
 
-    for (int i = 0; i < MAX_GAME_TYPES; i++)
+    for (const auto & console : GameTypeList)
     {
-        if (GameTypeList[i].idStr == GameType) {
+        if (console.m_idStr == GameType) {
             result = QCoreApplication::translate("(GameTypes)",
-                                                 GameTypeList[i].nameStr.toUtf8());
+                                                 console.m_nameStr.toUtf8());
             break;
         }
     }
@@ -48,10 +48,10 @@ QString GetGameTypeExtensions(const QString &GameType)
 {
     QString result = "";
 
-    for (int i = 0; i < MAX_GAME_TYPES; i++)
+    for (const auto & console : GameTypeList)
     {
-        if (GameTypeList[i].idStr == GameType) {
-            result = GameTypeList[i].extensions;
+        if (console.m_idStr == GameType) {
+            result = console.m_extensions;
             break;
         }
     }
@@ -66,7 +66,7 @@ QString GetGameTypeExtensions(const QString &GameType)
 
 static HostTextEditSetting *GameAllTreeLevels()
 {
-    HostTextEditSetting *gc = new HostTextEditSetting("GameAllTreeLevels");
+    auto *gc = new HostTextEditSetting("GameAllTreeLevels");
     gc->setLabel(TR("Game display order"));
     gc->setValue("system gamename");
     gc->setHelpText(TR("Order in which to sort the "
@@ -79,7 +79,7 @@ static HostTextEditSetting *GameAllTreeLevels()
 
 static HostTextEditSetting *GameFavTreeLevels()
 {
-    HostTextEditSetting *gc = new HostTextEditSetting("GameFavTreeLevels");
+    auto *gc = new HostTextEditSetting("GameFavTreeLevels");
     gc->setLabel(TR("Favorite display order"));
     gc->setValue("gamename");
     gc->setHelpText(TR("Order in which to sort the "
@@ -92,7 +92,7 @@ static HostTextEditSetting *GameFavTreeLevels()
 
 static HostCheckBoxSetting *GameDeepScan()
 {
-    HostCheckBoxSetting *gc = new HostCheckBoxSetting("GameDeepScan");
+    auto *gc = new HostCheckBoxSetting("GameDeepScan");
     gc->setLabel(TR("Indepth Game Scan"));
     gc->setHelpText(
                 TR("Enabling this causes a game scan to "
@@ -106,7 +106,7 @@ static HostCheckBoxSetting *GameDeepScan()
 
 static HostCheckBoxSetting *GameRemovalPrompt()
 {
-    HostCheckBoxSetting *gc = new HostCheckBoxSetting("GameRemovalPrompt");
+    auto *gc = new HostCheckBoxSetting("GameRemovalPrompt");
     gc->setLabel(TR("Prompt for removal of deleted ROM(s)"));
     gc->setHelpText(TR("This enables a prompt for "
                        "removing deleted ROMs from "
@@ -118,7 +118,7 @@ static HostCheckBoxSetting *GameRemovalPrompt()
 
 static HostCheckBoxSetting *GameShowFileNames()
 {
-    HostCheckBoxSetting *gc = new HostCheckBoxSetting("GameShowFileNames");
+    auto *gc = new HostCheckBoxSetting("GameShowFileNames");
     gc->setLabel(TR("Display Files Names in Game "
                     "Tree"));
     gc->setHelpText(TR("Enabling this causes the "
@@ -130,7 +130,7 @@ static HostCheckBoxSetting *GameShowFileNames()
 
 static HostCheckBoxSetting *GameTreeView()
 {
-    HostCheckBoxSetting *gc = new HostCheckBoxSetting("GameTreeView");
+    auto *gc = new HostCheckBoxSetting("GameTreeView");
     gc->setLabel(TR("Hash filenames in display"));
     gc->setValue(0);
     gc->setHelpText(TR("Enable hashing of names in "
@@ -142,7 +142,7 @@ static HostCheckBoxSetting *GameTreeView()
 
 static HostTextEditSetting *GetScreenshotDir()
 {
-    HostTextEditSetting *gc = new HostTextEditSetting("mythgame.screenshotdir");
+    auto *gc = new HostTextEditSetting("mythgame.screenshotdir");
     gc->setLabel(TR("Directory where Game Screenshots "
                     "are stored"));
     gc->setValue(GetConfDir() + "/MythGame/Screenshots");
@@ -154,7 +154,7 @@ static HostTextEditSetting *GetScreenshotDir()
 
 static HostTextEditSetting *GetFanartDir()
 {
-    HostTextEditSetting *gc = new HostTextEditSetting("mythgame.fanartdir");
+    auto *gc = new HostTextEditSetting("mythgame.fanartdir");
     gc->setLabel(TR("Directory where Game Fanart is "
                     "stored"));
     gc->setValue(GetConfDir() + "/MythGame/Fanart");
@@ -166,7 +166,7 @@ static HostTextEditSetting *GetFanartDir()
 
 static HostTextEditSetting *GetBoxartDir()
 {
-    HostTextEditSetting *gc = new HostTextEditSetting("mythgame.boxartdir");
+    auto *gc = new HostTextEditSetting("mythgame.boxartdir");
     gc->setLabel(TR("Directory where Game Boxart is "
                     "stored"));
     gc->setValue(GetConfDir() + "/MythGame/Boxart");
@@ -257,11 +257,11 @@ struct GameType : public MythUIComboBoxSetting
     {
         //: Game type
         setLabel(TR("Type"));
-        for (int i = 0; i < MAX_GAME_TYPES; i++)
+        for (const auto & console : GameTypeList)
         {
             addSelection(QCoreApplication::translate("(GameTypes)",
-                                                     GameTypeList[i].nameStr.toUtf8()),
-                         GameTypeList[i].idStr);
+                                                     console.m_nameStr.toUtf8()),
+                         console.m_idStr);
         }
         setValue(0);
         setHelpText(TR("Type of Game/Emulator. Mostly for informational "
@@ -321,7 +321,7 @@ GamePlayerSetting::GamePlayerSetting(const QString& name, uint id)
     setName(name);
 
     // Pre-set name for new players
-    auto nameChild = new Name(m_id);
+    auto *nameChild = new Name(m_id);
     nameChild->setValue(name);
 
     addChild(nameChild);
@@ -363,7 +363,7 @@ void GamePlayersList::Load()
 {
     clearSettings();
 
-    auto newPlayer = new ButtonStandardSetting(tr("(New Game Player)"));
+    auto *newPlayer = new ButtonStandardSetting(tr("(New Game Player)"));
     addChild(newPlayer);
     connect(newPlayer, &ButtonStandardSetting::clicked,
             this,      &GamePlayersList::NewPlayerDialog);
@@ -381,24 +381,27 @@ void GamePlayersList::Load()
     {
         MythDB::DBError("GamePlayersSetting::Load", query);
     }
-    else while (query.next())
+    else
     {
-        int     id   = query.value(0).toInt();
-        QString name = query.value(1).toString();
-        QString type = query.value(2).toString();
+        while (query.next())
+        {
+            int     id   = query.value(0).toInt();
+            QString name = query.value(1).toString();
+            QString type = query.value(2).toString();
 
-        auto child = new GamePlayerSetting(name, id);
-        addChild(child);
-        child->setLabel(playerDisp.arg(name, GetGameTypeName(type)));
+            auto *child = new GamePlayerSetting(name, id);
+            addChild(child);
+            child->setLabel(playerDisp.arg(name, GetGameTypeName(type)));
+        }
     }
 
     GroupSetting::Load();
 }
 
-void GamePlayersList::NewPlayerDialog()
+void GamePlayersList::NewPlayerDialog() const
 {
     MythScreenStack *stack = GetMythMainWindow()->GetStack("popup stack");
-    auto nameDialog = new MythTextInputDialog(stack, tr("Player Name"));
+    auto *nameDialog = new MythTextInputDialog(stack, tr("Player Name"));
 
     if (nameDialog->Create())
     {
@@ -417,12 +420,14 @@ void GamePlayersList::CreateNewPlayer(const QString& name)
 
     // Database name must be unique
     for (StandardSetting* child : *getSubSettings())
+    {
         if (child->getName() == name)
         {
             LOG(VB_GENERAL, LOG_ERR,
                 QString("Player name %1 is already used").arg(name));
             return;
         }
+    }
 
     addChild(new GamePlayerSetting(name));
 

@@ -3,6 +3,7 @@
 
 // C++
 #include <cstdlib>
+#include <utility>
 #include <vector>
 
 // Qt
@@ -19,9 +20,9 @@ class QWidget;
 class ChannelID : public GroupSetting
 {
   public:
-    ChannelID(const QString& field = "chanid",
-              const QString& table = "channel") :
-        m_field(field), m_table(table)
+    explicit ChannelID(QString  field = "chanid",
+              QString  table = "channel") :
+        m_field(std::move(field)), m_table(std::move(table))
     {
         setVisible(false);
     }
@@ -74,10 +75,11 @@ class ChannelID : public GroupSetting
         }
 
         if (query.size() > 0)
+        {
             while (query.next())
                 if (tmpfloor <= query.value(0).toInt())
                     tmpfloor = query.value(0).toInt() + 1;
-
+        }
         return floor<tmpfloor?tmpfloor:floor;
     };
 
@@ -105,6 +107,8 @@ class ChannelDBStorage : public SimpleDBStorage
 class OnAirGuide;
 class XmltvID;
 class Freqid;
+class TransportID_CO;
+class Frequency_CO;
 
 class MTV_PUBLIC ChannelOptionsCommon: public GroupSetting
 {
@@ -115,13 +119,15 @@ class MTV_PUBLIC ChannelOptionsCommon: public GroupSetting
         uint default_sourceid,  bool add_freqid);
 
   public slots:
-    void onAirGuideChanged(bool);
-    void sourceChanged(const QString&);
+    static void onAirGuideChanged(bool fValue);
+    void sourceChanged(const QString &sourceid);
 
   protected:
-    OnAirGuide *m_onairguide {nullptr};
-    XmltvID    *m_xmltvID    {nullptr};
-    Freqid     *m_freqid     {nullptr};
+    OnAirGuide     *m_onAirGuide  {nullptr};
+    XmltvID        *m_xmltvID     {nullptr};
+    Freqid         *m_freqId      {nullptr};
+    TransportID_CO *m_transportId {nullptr};
+    Frequency_CO   *m_frequency   {nullptr};
 };
 
 class MTV_PUBLIC ChannelOptionsFilters: public GroupSetting
@@ -143,7 +149,7 @@ class MTV_PUBLIC ChannelOptionsRawTS: public GroupSetting
 
     void Load(void) override; // StandardSetting
     void Save(void) override; // StandardSetting
-    virtual void Save(QString /*destination*/) { Save(); }
+    virtual void Save(const QString& /*destination*/) { Save(); }
 
   private:
     const ChannelID &m_cid;

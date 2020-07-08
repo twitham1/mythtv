@@ -25,8 +25,8 @@ class NetworkControlClient : public QObject
 {
     Q_OBJECT
   public:
-    explicit NetworkControlClient(QTcpSocket *);
-   ~NetworkControlClient();
+    explicit NetworkControlClient(QTcpSocket *s);
+   ~NetworkControlClient() override;
 
     QTcpSocket  *getSocket()     { return m_socket; }
     QTextStream *getTextStream() { return m_textStream; }
@@ -46,7 +46,7 @@ class NetworkCommand : public QObject
 {
     Q_OBJECT
   public:
-    NetworkCommand(NetworkControlClient *cli, QString c)
+    NetworkCommand(NetworkControlClient *cli, const QString& c)
     {
         m_command = c.trimmed();
         m_client = cli;
@@ -55,6 +55,8 @@ class NetworkCommand : public QObject
 
     NetworkCommand &operator=(NetworkCommand const &nc)
     {
+        if (this == &nc)
+            return *this;
         m_command = nc.m_command;
         m_client = nc.m_client;
         m_args = m_command.simplified().split(" ");
@@ -96,7 +98,7 @@ class NetworkControl : public ServerPool, public QRunnable
 
   public:
     NetworkControl();
-    ~NetworkControl();
+    ~NetworkControl() override;
 
   private slots:
     void newConnection(QTcpSocket *client);
@@ -112,9 +114,9 @@ class NetworkControl : public ServerPool, public QRunnable
     QString processLiveTV(NetworkCommand *nc);
     QString processPlay(NetworkCommand *nc, int clientID);
     QString processQuery(NetworkCommand *nc);
-    QString processSet(NetworkCommand *nc);
-    QString processMessage(NetworkCommand *nc);
-    QString processNotification(NetworkCommand *nc);
+    static QString processSet(NetworkCommand *nc);
+    static QString processMessage(NetworkCommand *nc);
+    static QString processNotification(NetworkCommand *nc);
     QString processTheme(NetworkCommand *nc);
     QString processHelp(NetworkCommand *nc);
 
@@ -122,36 +124,36 @@ class NetworkControl : public ServerPool, public QRunnable
     void sendReplyToClient(NetworkControlClient *ncc, QString &reply);
     void customEvent(QEvent *e) override; // QObject
 
-    QString listRecordings(const QString& chanid = "", const QString& starttime = "");
-    QString listSchedule(const QString& chanID = "") const;
-    QString listChannels(const uint start, const uint limit) const;
-    QString saveScreenshot(NetworkCommand *nc);
+    static QString listRecordings(const QString& chanid = "", const QString& starttime = "");
+    static QString listSchedule(const QString& chanID = "") ;
+    static QString listChannels(uint start, uint limit) ;
+    static QString saveScreenshot(NetworkCommand *nc);
 
     void processNetworkControlCommand(NetworkCommand *nc);
 
     void deleteClient(NetworkControlClient *ncc);
 
-    QString getWidgetType(MythUIType *type);
+    static QString getWidgetType(MythUIType *type);
 
-    QString prompt             {"# "};
-    bool    gotAnswer          {false};
-    QString answer             {""};
-    QMap <QString, QString> jumpMap;
-    QMap <QString, int> keyMap;
-    QMap <int, QString> keyTextMap;
+    QString m_prompt             {"# "};
+    bool    m_gotAnswer          {false};
+    QString m_answer             {""};
+    QMap <QString, QString> m_jumpMap;
+    QMap <QString, int>     m_keyMap;
+    QMap <int, QString>     m_keyTextMap;
 
-    mutable QMutex  clientLock {QMutex::Recursive};
-    QList<NetworkControlClient*> clients;
+    mutable QMutex  m_clientLock {QMutex::Recursive};
+    QList<NetworkControlClient*> m_clients;
 
-    QList<NetworkCommand*> networkControlCommands; // protected by ncLock
-    QMutex ncLock;
-    QWaitCondition ncCond; // protected by ncLock
+    QList<NetworkCommand*> m_networkControlCommands; // protected by ncLock
+    QMutex m_ncLock;
+    QWaitCondition m_ncCond; // protected by ncLock
 
-    QList<NetworkCommand*> networkControlReplies;
-    QMutex nrLock;
+    QList<NetworkCommand*> m_networkControlReplies;
+    QMutex m_nrLock;
 
-    MThread *commandThread     {nullptr};
-    bool stopCommandThread     {false}; // protected by ncLock
+    MThread *m_commandThread     {nullptr};
+    bool m_stopCommandThread     {false}; // protected by ncLock
 };
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef _Myth_Single_Download_h_
-#define _Myth_Single_Download_h_
+#ifndef MYTH_SINGLE_DOWNLOAD_H
+#define MYTH_SINGLE_DOWNLOAD_H
 
 //#include <QObject>
 #include <QString>
@@ -26,10 +26,10 @@ class MBASE_PUBLIC MythSingleDownload : public QObject
 
   public:
    MythSingleDownload(void) = default;
-   ~MythSingleDownload(void) = default;
+   ~MythSingleDownload(void) override = default;
 
    bool DownloadURL(const QUrl &url, QByteArray *buffer, uint timeout = 30000,
-                    uint redirs = 0, qint64 maxsize = 0);
+                    uint redirs = 0, qint64 maxsize = 0, QString *final_url = nullptr);
    void Cancel(void);
    QString ErrorString(void) const { return m_errorstring; }
    QNetworkReply::NetworkError ErrorCode(void) const { return m_errorcode; }
@@ -50,4 +50,4 @@ class MBASE_PUBLIC MythSingleDownload : public QObject
     qint64                m_maxsize         {0};
 };
 
-#endif
+#endif // MYTH_SINGLE_DOWNLOAD_H

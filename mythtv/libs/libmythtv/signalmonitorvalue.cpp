@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <utility>
+
 using namespace std;
 
 #include "signalmonitorvalue.h"
@@ -32,14 +34,14 @@ void SignalMonitorValue::Init()
     }
 }
 
-SignalMonitorValue::SignalMonitorValue(const QString& _name,
-                                       const QString& _noSpaceName,
+SignalMonitorValue::SignalMonitorValue(QString _name,
+                                       QString _noSpaceName,
                                        int _threshold,
                                        bool _high_threshold,
                                        int _min, int _max,
                                        int _timeout) :
-    m_name(_name),
-    m_noSpaceName(_noSpaceName),
+    m_name(std::move(_name)),
+    m_noSpaceName(std::move(_noSpaceName)),
     m_value(0),
     m_threshold(_threshold),
     m_minVal(_min), m_maxVal(_max), m_timeout(_timeout),
@@ -55,14 +57,14 @@ SignalMonitorValue::SignalMonitorValue(const QString& _name,
 #endif
 }
 
-SignalMonitorValue::SignalMonitorValue(const QString& _name,
-                                       const QString& _noSpaceName,
+SignalMonitorValue::SignalMonitorValue(QString _name,
+                                       QString _noSpaceName,
                                        int _value, int _threshold,
                                        bool _high_threshold,
                                        int _min, int _max,
                                        int _timeout, bool _set) :
-    m_name(_name),
-    m_noSpaceName(_noSpaceName),
+    m_name(std::move(_name)),
+    m_noSpaceName(std::move(_noSpaceName)),
     m_value(_value),
     m_threshold(_threshold),
     m_minVal(_min), m_maxVal(_max), m_timeout(_timeout),
@@ -114,7 +116,11 @@ bool SignalMonitorValue::Set(const QString& _name, const QString& _longString)
         return true;
     }
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList vals = longString.split(" ", QString::SkipEmptyParts);
+#else
+    QStringList vals = longString.split(" ", Qt::SkipEmptyParts);
+#endif
 
     if (8 != vals.size() || "(null)" == vals[0])
         return false;
@@ -132,7 +138,7 @@ bool SignalMonitorValue::Set(const QString& _name, const QString& _longString)
 SignalMonitorValue* SignalMonitorValue::Create(const QString& _name,
                                                const QString& _longString)
 {
-    SignalMonitorValue *smv = new SignalMonitorValue();
+    auto *smv = new SignalMonitorValue();
     if (!smv->Set(_name, _longString))
     {
         delete smv;
@@ -175,23 +181,23 @@ SignalMonitorList SignalMonitorValue::Parse(const QStringList& slist)
 bool SignalMonitorValue::AllGood(const SignalMonitorList& slist)
 {
     bool good = true;
-    SignalMonitorList::const_iterator it = slist.begin();
-    for (; it != slist.end(); ++it)
-        good &= it->IsGood();
+    for (const auto & smv : slist)
+        good &= smv.IsGood();
 #if DEBUG_SIGNAL_MONITOR_VALUE
     if (!good)
     {
         QString msg("AllGood failed on ");
-        it = slist.begin();
-        for (; it != slist.end(); ++it)
-            if (!it->IsGood())
+        for (const auto & smv : slist)
+        {
+            if (!smv.IsGood())
             {
-                msg += it->m_noSpaceName;
+                msg += smv.m_noSpaceName;
                 msg += QString("(%1%2%3) ")
-                           .arg(it->GetValue())
-                           .arg(it->m_highThreshold ? "<" : ">")
-                           .arg(it->GetThreshold());
+                           .arg(smv.GetValue())
+                           .arg(smv.m_highThreshold ? "<" : ">")
+                           .arg(smv.GetThreshold());
             }
+        }
         LOG(VB_GENERAL, LOG_DEBUG, msg);
     }
 #endif
@@ -204,12 +210,12 @@ bool SignalMonitorValue::AllGood(const SignalMonitorList& slist)
  */
 int SignalMonitorValue::MaxWait(const SignalMonitorList& slist)
 {
-    int wait = 0, minWait = 0;
-    SignalMonitorList::const_iterator it = slist.begin();
-    for (; it != slist.end(); ++it)
+    int wait = 0;
+    int minWait = 0;
+    for (const auto & smv : slist)
     {
-        wait = max(wait, it->GetTimeout());
-        minWait = min(minWait, it->GetTimeout());
+        wait = max(wait, smv.GetTimeout());
+        minWait = min(minWait, smv.GetTimeout());
     }
     return (minWait<0) ? -1 : wait;
 }

@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythJobQueueCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
 
@@ -119,9 +119,9 @@ int main(int argc, char *argv[])
 
     jobqueue = new JobQueue(false);
 
-    MythSystemEventHandler *sysEventHandler = new MythSystemEventHandler();
+    auto *sysEventHandler = new MythSystemEventHandler();
 
-    HouseKeeper *housekeeping = new HouseKeeper();
+    auto *housekeeping = new HouseKeeper();
 #ifdef __linux__
  #ifdef CONFIG_BINDINGS_PYTHON
     housekeeping->RegisterTask(new HardwareProfileTask());

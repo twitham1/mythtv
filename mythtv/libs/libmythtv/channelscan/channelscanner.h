@@ -27,8 +27,8 @@
  *
  */
 
-#ifndef _CHANNEL_SCANNER_H_
-#define _CHANNEL_SCANNER_H_
+#ifndef CHANNEL_SCANNER_H
+#define CHANNEL_SCANNER_H
 
 // Qt headers
 #include <QCoreApplication>
@@ -78,6 +78,8 @@ class MTV_PUBLIC ChannelScanner
               bool           do_fta_only,
               bool           do_lcn_only,
               bool           do_complete_only,
+              bool           do_full_channel_search,
+              bool           do_remove_duplicates,
               bool           do_add_full_ts,
               ServiceRequirements service_requirements,
               // stuff needed for particular scans
@@ -143,6 +145,12 @@ class MTV_PUBLIC ChannelScanner
     /// Only complete channels desired post scan?
     bool                     m_completeOnly        {false};
 
+    /// Extended search for old channels post scan?
+    bool                     m_fullSearch          {false};
+
+    /// Remove duplicate transports and channels?
+    bool                     m_removeDuplicates    {false};
+
     /// Add MPTS "full transport stream" channels
     bool                     m_addFullTS           {false};
 
@@ -152,4 +160,4 @@ class MTV_PUBLIC ChannelScanner
     ServiceRequirements      m_serviceRequirements {kRequireAV};
 };
 
-#endif // _CHANNEL_SCANNER_H_
+#endif // CHANNEL_SCANNER_H

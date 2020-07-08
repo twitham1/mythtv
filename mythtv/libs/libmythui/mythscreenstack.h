@@ -19,7 +19,7 @@ class MUI_PUBLIC MythScreenStack : public QObject
   public:
     MythScreenStack(MythMainWindow *parent, const QString &name,
                     bool main = false);
-    virtual ~MythScreenStack();
+    ~MythScreenStack() override;
 
     virtual void AddScreen(MythScreenType *screen, bool allowFade = true);
     virtual void PopScreen(MythScreenType *screen = nullptr, bool allowFade = true,
@@ -38,7 +38,7 @@ class MUI_PUBLIC MythScreenStack : public QObject
 
     QString GetLocation(bool fullPath) const;
 
-    MythPainter *GetPainter(void);
+    static MythPainter *GetPainter(void);
 
   signals:
     void topScreenChanged(MythScreenType *screen);

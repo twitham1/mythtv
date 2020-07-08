@@ -25,9 +25,9 @@ class QUdpSocket;
 class QTimer;
 class AudioOutput;
 class ServerPool;
-class _NetStream;
+class RaopNetStream;
 
-typedef QHash<QString,QString> RawHash;
+using RawHash = QHash<QString,QString>;
 
 struct AudioData
 {
@@ -54,7 +54,7 @@ class MTV_PUBLIC MythRAOPConnection : public QObject
    ~MythRAOPConnection() override;
     bool Init(void);
     QTcpSocket *GetSocket()   { return m_socket;   }
-    int         GetDataPort() { return m_dataPort; }
+    int         GetDataPort() const { return m_dataPort; }
     bool        HasAudio()    { return m_audio;    }
     static QMap<QString,QString> decodeDMAP(const QByteArray &dmap);
     static RSA *LoadKey(void);
@@ -79,12 +79,12 @@ class MTV_PUBLIC MythRAOPConnection : public QObject
     void     ResetAudio(void);
     void     ProcessRequest(const QStringList &header,
                             const QByteArray &content);
-    void     FinishResponse(_NetStream *stream, QTcpSocket *socket,
-			    QString &option, QString &cseq, QString &responseData);
-    void     FinishAuthenticationResponse(_NetStream *stream, QTcpSocket *socket,
+    static void  FinishResponse(RaopNetStream *stream, QTcpSocket *socket,
+                                QString &option, QString &cseq, QString &responseData);
+    void     FinishAuthenticationResponse(RaopNetStream *stream, QTcpSocket *socket,
                                           QString &cseq);
 
-    RawHash  FindTags(const QStringList &lines);
+    static RawHash  FindTags(const QStringList &lines);
     bool     CreateDecoder(void);
     void     DestroyDecoder(void);
     bool     OpenAudioDevice(void);
@@ -96,17 +96,17 @@ class MTV_PUBLIC MythRAOPConnection : public QObject
     // time sync
     void     SendTimeRequest(void);
     void     ProcessTimeResponse(const QByteArray &buf);
-    uint64_t NTPToLocal(uint32_t sec, uint32_t ticks);
+    static uint64_t NTPToLocal(uint32_t sec, uint32_t ticks);
 
     // incoming data packet
-    bool    GetPacketType(const QByteArray &buf, uint8_t &type,
+    static bool GetPacketType(const QByteArray &buf, uint8_t &type,
                           uint16_t &seq, uint64_t &timestamp);
 
     // utility functions
     int64_t     AudioCardLatency(void);
-    QStringList splitLines(const QByteArray &lines);
-    QString     stringFromSeconds(int timeInSeconds);
-    uint64_t    framesToMs(uint64_t frames);
+    static QStringList splitLines(const QByteArray &lines);
+    static QString     stringFromSeconds(int timeInSeconds);
+    uint64_t    framesToMs(uint64_t frames) const;
 
     // notification functions
     void        SendNotification(bool update = false);
@@ -114,7 +114,7 @@ class MTV_PUBLIC MythRAOPConnection : public QObject
     QTimer         *m_watchdogTimer       {nullptr};
     // comms socket
     QTcpSocket     *m_socket              {nullptr};
-    _NetStream     *m_textStream          {nullptr};
+    RaopNetStream  *m_textStream          {nullptr};
     QByteArray      m_hardwareId;
     QStringList     m_incomingHeaders;
     QByteArray      m_incomingContent;
@@ -134,14 +134,14 @@ class MTV_PUBLIC MythRAOPConnection : public QObject
     // incoming audio
     QMap<uint16_t,uint64_t> m_resends;
     // crypto
-    QByteArray      m_AESIV;
-    AES_KEY         m_aesKey;
+    QByteArray      m_aesIV;
+    AES_KEY         m_aesKey              {};
     static RSA     *g_rsa;
     static QString  g_rsaLastError;
     // audio out
     AudioOutput    *m_audio               {nullptr};
     AVCodec        *m_codec               {nullptr};
-    AVCodecContext *m_codeccontext        {nullptr};
+    AVCodecContext *m_codecContext        {nullptr};
     QList<int>      m_audioFormat;
     int             m_channels            {2};
     int             m_sampleSize          {16};
@@ -190,7 +190,7 @@ class MTV_PUBLIC MythRAOPConnection : public QObject
 
     // Notification Center registration Id
     int             m_id;
-    bool            m_firstsend           {false};
+    bool            m_firstSend           {false};
     bool            m_playbackStarted     {false};
 
   private slots:

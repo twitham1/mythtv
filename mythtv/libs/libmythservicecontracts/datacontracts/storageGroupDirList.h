@@ -21,7 +21,7 @@ class SERVICE_PUBLIC StorageGroupDirList : public QObject
 
     Q_CLASSINFO( "StorageGroupDirs", "type=DTC::StorageGroupDir");
 
-    Q_PROPERTY( QVariantList StorageGroupDirs READ StorageGroupDirs DESIGNABLE true )
+    Q_PROPERTY( QVariantList StorageGroupDirs READ StorageGroupDirs )
 
     PROPERTYIMP_RO_REF( QVariantList, StorageGroupDirs );
 
@@ -44,7 +44,7 @@ class SERVICE_PUBLIC StorageGroupDirList : public QObject
             // We must make sure the object added to the QVariantList has
             // a parent of 'this'
 
-            StorageGroupDir *pObject = new StorageGroupDir( this );
+            auto *pObject = new StorageGroupDir( this );
             m_StorageGroupDirs.append( QVariant::fromValue<QObject *>( pObject ));
 
             return pObject;

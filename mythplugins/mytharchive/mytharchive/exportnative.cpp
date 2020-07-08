@@ -131,21 +131,16 @@ void ExportNative::updateSizeBar()
 {
     int64_t size = 0;
 
-    for (int x = 0; x < m_archiveList.size(); x++)
-    {
-        ArchiveItem *a = m_archiveList.at(x);
+    for (const auto *a : qAsConst(m_archiveList))
         size += a->size;
-    }
 
     m_usedSpace = size / 1024 / 1024;
     uint freeSpace = m_archiveDestination.freeSpace / 1024;
 
-    QString tmpSize;
-
     m_sizeBar->SetTotal(freeSpace);
     m_sizeBar->SetUsed(m_usedSpace);
 
-    tmpSize.sprintf("%0d Mb", freeSpace);
+    QString tmpSize = QString("%1 Mb").arg(freeSpace);
 
     if (m_maxsizeText)
         m_maxsizeText->SetText(tmpSize);
@@ -153,7 +148,7 @@ void ExportNative::updateSizeBar()
     if (m_minsizeText)
         m_minsizeText->SetText("0 Mb");
 
-    tmpSize.sprintf("%0d Mb", m_usedSpace);
+    tmpSize = QString("%1 Mb").arg(m_usedSpace);
 
     if (m_usedSpace > freeSpace)
     {
@@ -181,7 +176,7 @@ void ExportNative::updateSizeBar()
 
 void ExportNative::titleChanged(MythUIButtonListItem *item)
 {
-    ArchiveItem *a = item->GetData().value<ArchiveItem *>();
+    auto *a = item->GetData().value<ArchiveItem *>();
     if (!a)
         return;
 
@@ -234,12 +229,10 @@ void ExportNative::updateArchiveList(void)
     }
     else
     {
-        for (int x = 0;  x < m_archiveList.size(); x++)
+        for (auto *a : qAsConst(m_archiveList))
         {
-            ArchiveItem *a = m_archiveList.at(x);
-
-            MythUIButtonListItem* item = new MythUIButtonListItem(m_archiveButtonList, a->title);
-            item->SetData(qVariantFromValue(a));
+            auto* item = new MythUIButtonListItem(m_archiveButtonList, a->title);
+            item->SetData(QVariant::fromValue(a));
         }
 
         m_archiveButtonList->SetItemCurrent(m_archiveButtonList->GetItemFirst());
@@ -266,7 +259,7 @@ void ExportNative::getArchiveListFromDB(void)
     {
         while (query.next())
         {
-            ArchiveItem *item = new ArchiveItem;
+            auto *item = new ArchiveItem;
 
             item->id = query.value(0).toInt();
             item->type = query.value(1).toString();
@@ -318,10 +311,8 @@ void ExportNative::saveConfiguration(void)
                     ":STARTTIME, :SIZE, :FILENAME, :HASCUTLIST, :DURATION, "
                     ":CUTDURATION, :VIDEOWIDTH, :VIDEOHEIGHT, :FILECODEC, "
                     ":VIDEOCODEC, :ENCODERPROFILE);");
-    for (int x = 0; x < m_archiveList.size(); x++)
+    for (const auto * a : qAsConst(m_archiveList))
     {
-        ArchiveItem *a = m_archiveList.at(x);
-
         query.bindValue(":TYPE", a->type);
         query.bindValue(":TITLE", a->title);
         query.bindValue(":SUBTITLE", a->subtitle);
@@ -348,7 +339,7 @@ void ExportNative::ShowMenu()
 {
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    MythDialogBox *menuPopup = new MythDialogBox(tr("Menu"), popupStack, "actionmenu");
+    auto *menuPopup = new MythDialogBox(tr("Menu"), popupStack, "actionmenu");
 
     if (menuPopup->Create())
         popupStack->AddScreen(menuPopup);
@@ -361,7 +352,7 @@ void ExportNative::ShowMenu()
 void ExportNative::removeItem()
 {
     MythUIButtonListItem *item = m_archiveButtonList->GetItemCurrent();
-    ArchiveItem *curItem = item->GetData().value<ArchiveItem *>();
+    auto *curItem = item->GetData().value<ArchiveItem *>();
 
     if (!curItem)
         return;
@@ -389,10 +380,8 @@ void ExportNative::createConfigFile(const QString &filename)
     job.appendChild(media);
 
     // now loop though selected archive items and add them to the xml file
-    for (int x = 0; x < m_archiveList.size(); x++)
+    for (const auto * a : qAsConst(m_archiveList))
     {
-        ArchiveItem *a = m_archiveList.at(x);
-
         QDomElement file = doc.createElement("file");
         file.setAttribute("type", a->type.toLower() );
         file.setAttribute("title", a->title);
@@ -461,7 +450,7 @@ void ExportNative::handleAddRecording()
 {
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    RecordingSelector *selector = new RecordingSelector(mainStack, &m_archiveList);
+    auto *selector = new RecordingSelector(mainStack, &m_archiveList);
 
     connect(selector, SIGNAL(haveResult(bool)),
             this, SLOT(selectorClosed(bool)));
@@ -491,7 +480,7 @@ void ExportNative::handleAddVideo()
 
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
-    VideoSelector *selector = new VideoSelector(mainStack, &m_archiveList);
+    auto *selector = new VideoSelector(mainStack, &m_archiveList);
 
     connect(selector, SIGNAL(haveResult(bool)),
             this, SLOT(selectorClosed(bool)));

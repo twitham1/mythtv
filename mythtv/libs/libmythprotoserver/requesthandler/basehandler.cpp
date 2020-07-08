@@ -19,7 +19,7 @@ bool BaseRequestHandler::HandleAnnounce(MythSocket *socket,
     if (commands.size() != 4)
         return false;
 
-    bool blockShutdown;
+    bool blockShutdown = true;
     if (commands[1] == "Playback")
         blockShutdown = true;
     else if (commands[1] == "Monitor")
@@ -33,7 +33,7 @@ bool BaseRequestHandler::HandleAnnounce(MythSocket *socket,
     bool systemevents = ( (eventlevel == 1) || (eventlevel == 3));
     bool normalevents = ( (eventlevel == 1) || (eventlevel == 2));
 
-    SocketHandler *handler = new SocketHandler(socket, m_parent, hostname);
+    auto *handler = new SocketHandler(socket, m_parent, hostname);
     socket->SetAnnounce(slist);
 
     handler->BlockShutdown(blockShutdown);
@@ -99,23 +99,22 @@ bool BaseRequestHandler::HandleQueryLoad(SocketHandler *sock)
 {
     QStringList strlist;
 
-#ifdef Q_OS_ANDROID
+#if defined(_WIN32) || defined(Q_OS_ANDROID)
     strlist << "ERROR";
-    strlist << "getloadavg() not supported in Android";
-#elif !defined(_WIN32)
-    double loads[3];
-    if (getloadavg(loads,3) == -1)
+    strlist << "getloadavg() not supported";
+#else
+    loadArray loads = getLoadAvgs();
+    if (loads[0] == -1)
     {
         strlist << "ERROR";
         strlist << "getloadavg() failed";
     }
     else
+    {
         strlist << QString::number(loads[0])
                 << QString::number(loads[1])
                 << QString::number(loads[2]);
-#else
-	strlist << "ERROR";
-	strlist << "getloadavg() not supported on Windows";
+    }
 #endif
 
     sock->WriteStringList(strlist);
@@ -130,7 +129,7 @@ bool BaseRequestHandler::HandleQueryLoad(SocketHandler *sock)
 bool BaseRequestHandler::HandleQueryUptime(SocketHandler *sock)
 {
     QStringList strlist;
-    time_t      uptime;
+    time_t      uptime = 0;
 
     if (getUptime(uptime))
         strlist << QString::number(uptime);
@@ -167,7 +166,10 @@ bool BaseRequestHandler::HandleQueryHostname(SocketHandler *sock)
 bool BaseRequestHandler::HandleQueryMemStats(SocketHandler *sock)
 {
     QStringList strlist;
-    int         totalMB, freeMB, totalVM, freeVM;
+    int totalMB = 0;
+    int freeMB  = 0;
+    int totalVM = 0;
+    int freeVM  = 0;
 
     if (getMemStats(totalMB, freeMB, totalVM, freeVM))
     {

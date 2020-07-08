@@ -11,7 +11,7 @@ class ScreenSaverX11 : public QObject, public ScreenSaver
 
   public:
     ScreenSaverX11();
-    ~ScreenSaverX11();
+    ~ScreenSaverX11() override;
 
     void Disable(void) override; // ScreenSaver
     void Restore(void) override; // ScreenSaver
@@ -23,7 +23,7 @@ class ScreenSaverX11 : public QObject, public ScreenSaver
     void resetSlot();
 
   protected:
-    class ScreenSaverX11Private *d {nullptr};
+    class ScreenSaverX11Private *d {nullptr}; // NOLINT(readability-identifier-naming)
 };
 
 #endif // MYTH_SCREENSAVER_X11_H

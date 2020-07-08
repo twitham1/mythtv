@@ -1,11 +1,15 @@
 #ifndef MYTHSCREEN_TYPE_H_
 #define MYTHSCREEN_TYPE_H_
 
+#include <utility>
+
+// Qt headers
+#include <QEvent>
+#include <QSemaphore>
+
+// MythTV headers
 #include "mythuicomposite.h"
 #include "mythuiutils.h"
-
-#include <QSemaphore>
-#include <QEvent>
 
 class ScreenLoadTask;
 class MythScreenStack;
@@ -20,8 +24,8 @@ class MythUIBusyDialog;
 class MUI_PUBLIC ScreenLoadCompletionEvent : public QEvent
 {
   public:
-    explicit ScreenLoadCompletionEvent(const QString &id) :
-        QEvent(kEventType), m_id(id) { }
+    explicit ScreenLoadCompletionEvent(QString id) :
+        QEvent(kEventType), m_id(std::move(id)) { }
 
     QString GetId() { return m_id; }
 
@@ -46,11 +50,11 @@ class MUI_PUBLIC MythScreenType : public MythUIComposite
   public:
     MythScreenType(MythScreenStack *parent, const QString &name,
                    bool fullscreen = true);
-    virtual ~MythScreenType();
+    ~MythScreenType() override;
 
     virtual bool Create(void); // do the actual work of making the screen.
-    bool keyPressEvent(QKeyEvent *) override; // MythUIType
-    bool gestureEvent(MythGestureEvent *) override; // MythUIType
+    bool keyPressEvent(QKeyEvent *event) override; // MythUIType
+    bool gestureEvent(MythGestureEvent *event) override; // MythUIType
     virtual void ShowMenu(void);
 
     void doInit(void);
@@ -74,8 +78,8 @@ class MUI_PUBLIC MythScreenType : public MythUIComposite
     bool IsDeleting(void) const;
     void SetDeleting(bool deleting);
 
-    bool IsLoading(void) { return m_IsLoading; }
-    bool IsLoaded(void) { return m_IsLoaded; }
+    bool IsLoading(void) const { return m_IsLoading; }
+    bool IsLoaded(void) const { return m_IsLoaded; }
 
     MythPainter *GetPainter(void) override; // MythUIType
 
@@ -99,7 +103,7 @@ class MUI_PUBLIC MythScreenType : public MythUIComposite
     virtual void Load(void);   // ONLY to be used for loading data, NO UI WORK or it will segfault
     virtual void Init(void);   // UI work to draw data loaded
 
-    void LoadInBackground(QString message = "");
+    void LoadInBackground(const QString& message = "");
     void ReloadInBackground(void);
 
     void OpenBusyPopup(const QString& message = "");

@@ -1,5 +1,5 @@
-#ifndef _MYTH_DATE_H_
-#define _MYTH_DATE_H_
+#ifndef MYTH_DATE_H
+#define MYTH_DATE_H
 
 #include <QDateTime>
 #include <QString>
@@ -9,7 +9,7 @@
 namespace MythDate
 {
 
-typedef enum Formats
+enum Format
 {
     ISODate        = Qt::ISODate,   ///< Default UTC
     kFilename      = 0x000100,      ///< Default UTC, "yyyyMMddhhmmss"
@@ -27,7 +27,7 @@ typedef enum Formats
     kRFC822        = 0x020000,      ///< HTTP Date format
     kOverrideUTC   = 0x100000,      ///< Present date/time in UTC
     kOverrideLocal = 0x200000,      ///< Present date/time in localtime
-} Format;
+};
 
 /// Returns current Date and Time in UTC.
 /// \param stripped if true milliseconds are stripped
@@ -39,14 +39,10 @@ MBASE_PUBLIC QString current_iso_string(bool stripped = false);
 MBASE_PUBLIC QDateTime as_utc(const QDateTime &dt);
 
 /// Converts kFilename && kISODate formats to QDateTime
-MBASE_PUBLIC QDateTime fromString(const QString&);
+MBASE_PUBLIC QDateTime fromString(const QString &dtstr);
 /// Converts dy in format to QDateTime
 MBASE_PUBLIC QDateTime fromString(const QString &dt, const QString &format);
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-MBASE_PUBLIC QDateTime fromTime_t(uint seconds);
-#else
 MBASE_PUBLIC QDateTime fromSecsSinceEpoch(uint seconds);
-#endif
 /// Returns formatted string representing the time.
 MBASE_PUBLIC QString toString(
     const QDateTime &datetime, uint format = MythDate::kDateTimeFull);
@@ -59,4 +55,4 @@ MBASE_PUBLIC int toSeconds( const QTime &time );
 
 };
 
-#endif // _MYTH_DATE_H_
+#endif // MYTH_DATE_H

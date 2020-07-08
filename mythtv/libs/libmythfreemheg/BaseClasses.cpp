@@ -219,7 +219,7 @@ void MHOctetString::Append(const MHOctetString &str)
 
     int newLen = m_nLength + str.m_nLength;
     // Allocate a new string big enough to contain both and initialised to the first string.
-    unsigned char *p = (unsigned char *)realloc(m_pChars, newLen);
+    auto *p = (unsigned char *)realloc(m_pChars, newLen);
 
     if (p == nullptr)
     {
@@ -292,7 +292,7 @@ void MHObjectRef::Initialise(MHParseNode *p, MHEngine *engine)
     }
     else
     {
-        p->Failure("ObjectRef: Argument is not int or sequence");
+        MHParseNode::Failure("ObjectRef: Argument is not int or sequence");
     }
 }
 
@@ -732,7 +732,7 @@ void MHParameter::Initialise(MHParseNode *p, MHEngine *engine)
             m_ContentRefVal.Initialise(p->GetArgN(0), engine);
             break;
         default:
-            p->Failure("Expected generic");
+            MHParseNode::Failure("Expected generic");
     }
 }
 

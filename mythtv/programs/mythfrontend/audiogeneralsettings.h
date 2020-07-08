@@ -1,10 +1,14 @@
 #ifndef MYTHAUDIOSETTINGS_H
 #define MYTHAUDIOSETTINGS_H
 
-#include <QStringList>
-#include <QObject>
-#include <QMutex>
+#include <utility>
 
+// Qt headers
+#include <QMutex>
+#include <QObject>
+#include <QStringList>
+
+// MythTV headers
 #include "mythuistatetype.h"
 #include "mythscreentype.h"
 #include "mythdialogbox.h"
@@ -19,6 +23,8 @@ class AudioTest;
 
 class AudioConfigScreen : public StandardSettingDialog
 {
+    Q_OBJECT
+
   public:
     AudioConfigScreen(MythScreenStack *parent, const char *name,
                       GroupSetting *groupSetting);
@@ -35,15 +41,15 @@ class AudioConfigSettings : public GroupSetting
     AudioConfigSettings();
     void Load() override; // StandardSetting
 
-    typedef QMap<QString,AudioOutput::AudioDeviceConfig> ADCMap;
+    using ADCMap = QMap<QString,AudioOutput::AudioDeviceConfig>;
 
-    ADCMap &AudioDeviceMap(void) { return audiodevs; };
-    AudioOutput::ADCVect &AudioDeviceVect(void) { return devices; };
+    ADCMap &AudioDeviceMap(void) { return m_audioDevs; }
+    AudioOutput::ADCVect &AudioDeviceVect(void) { return m_devices; }
 
     void CheckConfiguration(void);
 
   private slots:
-    void UpdateVisibility(StandardSetting *);
+    void UpdateVisibility(StandardSetting */*setting*/);
     AudioOutputSettings UpdateCapabilities(bool restore = true,
                                            bool AC3 = false);
     AudioOutputSettings UpdateCapabilitiesAC3(void);
@@ -54,65 +60,65 @@ class AudioConfigSettings : public GroupSetting
     void setMPCMEnabled(bool flag);
 
     AudioDeviceComboBox *OutputDevice();
-    HostComboBoxSetting *MaxAudioChannels();
-    HostCheckBoxSetting *AudioUpmix();
-    HostComboBoxSetting *AudioUpmixType();
-    HostCheckBoxSetting *AC3PassThrough();
-    HostCheckBoxSetting *DTSPassThrough();
-    HostCheckBoxSetting *EAC3PassThrough();
-    HostCheckBoxSetting *TrueHDPassThrough();
-    HostCheckBoxSetting *DTSHDPassThrough();
-    HostCheckBoxSetting *MythControlsVolume();
-    HostComboBoxSetting *MixerDevice();
-    HostComboBoxSetting *MixerControl();
-    HostSpinBoxSetting  *MixerVolume();
-    HostSpinBoxSetting  *PCMVolume();
+    static HostComboBoxSetting *MaxAudioChannels();
+    static HostCheckBoxSetting *AudioUpmix();
+    static HostComboBoxSetting *AudioUpmixType();
+    static HostCheckBoxSetting *AC3PassThrough();
+    static HostCheckBoxSetting *DTSPassThrough();
+    static HostCheckBoxSetting *EAC3PassThrough();
+    static HostCheckBoxSetting *TrueHDPassThrough();
+    static HostCheckBoxSetting *DTSHDPassThrough();
+    static HostCheckBoxSetting *MythControlsVolume();
+    static HostComboBoxSetting *MixerDevice();
+    static HostComboBoxSetting *MixerControl();
+    static HostSpinBoxSetting  *MixerVolume();
+    static HostSpinBoxSetting  *PCMVolume();
 
     //advanced setting
-    HostCheckBoxSetting *MPCM();
-    HostCheckBoxSetting *SRCQualityOverride();
-    HostComboBoxSetting *SRCQuality();
-    HostCheckBoxSetting *Audio48kOverride();
-    HostCheckBoxSetting *PassThroughOverride();
-    HostComboBoxSetting *PassThroughOutputDevice();
-    HostCheckBoxSetting *SPDIFRateOverride();
-    HostCheckBoxSetting *HBRPassthrough();
+    static HostCheckBoxSetting *MPCM();
+    static HostCheckBoxSetting *SRCQualityOverride();
+    static HostComboBoxSetting *SRCQuality();
+    static HostCheckBoxSetting *Audio48kOverride();
+    static HostCheckBoxSetting *PassThroughOverride();
+    static HostComboBoxSetting *PassThroughOutputDevice();
+    static HostCheckBoxSetting *SPDIFRateOverride();
+    static HostCheckBoxSetting *HBRPassthrough();
 
     bool                CheckPassthrough();
 
-    AudioDeviceComboBox *m_OutputDevice              {nullptr};
-    HostComboBoxSetting *m_MaxAudioChannels          {nullptr};
-    HostCheckBoxSetting *m_AudioUpmix                {nullptr};
-    HostComboBoxSetting *m_AudioUpmixType            {nullptr};
+    AudioDeviceComboBox *m_outputDevice              {nullptr};
+    HostComboBoxSetting *m_maxAudioChannels          {nullptr};
+    HostCheckBoxSetting *m_audioUpmix                {nullptr};
+    HostComboBoxSetting *m_audioUpmixType            {nullptr};
 
     // digital settings
     GroupSetting        *m_triggerDigital            {nullptr};
-    HostCheckBoxSetting *m_AC3PassThrough            {nullptr};
-    HostCheckBoxSetting *m_DTSPassThrough            {nullptr};
-    HostCheckBoxSetting *m_EAC3PassThrough           {nullptr};
-    HostCheckBoxSetting *m_TrueHDPassThrough         {nullptr};
-    HostCheckBoxSetting *m_DTSHDPassThrough          {nullptr};
+    HostCheckBoxSetting *m_ac3PassThrough            {nullptr};
+    HostCheckBoxSetting *m_dtsPassThrough            {nullptr};
+    HostCheckBoxSetting *m_eac3PassThrough           {nullptr};
+    HostCheckBoxSetting *m_trueHDPassThrough         {nullptr};
+    HostCheckBoxSetting *m_dtsHDPassThrough          {nullptr};
     //advanced setting
-    HostCheckBoxSetting *m_MPCM                      {nullptr};
-    HostCheckBoxSetting *m_PassThroughOverride       {nullptr};
-    HostComboBoxSetting *m_PassThroughDeviceOverride {nullptr};
+    HostCheckBoxSetting *m_mpcm                      {nullptr};
+    HostCheckBoxSetting *m_passThroughOverride       {nullptr};
+    HostComboBoxSetting *m_passThroughDeviceOverride {nullptr};
 
     AudioTest           *m_audioTest                 {nullptr};
 
-    ADCMap               audiodevs;
-    AudioOutput::ADCVect devices;
-    QMutex               slotlock;
+    ADCMap               m_audioDevs;
+    AudioOutput::ADCVect m_devices;
+    QMutex               m_slotLock;
 
-    int                  m_maxspeakers               {0};
+    int                  m_maxSpeakers               {0};
     QString              m_lastAudioDevice;
-    static const char   *MixerControlControls[];
+    static const char   *kMixerControlControls[];
 };
 
 class AudioDeviceComboBox : public HostComboBoxSetting
 {
     Q_OBJECT
   public:
-    explicit AudioDeviceComboBox(AudioConfigSettings*);
+    explicit AudioDeviceComboBox(AudioConfigSettings *parent);
     void AudioRescan();
 
     void edit(MythScreenType * screen) override; // MythUIComboBoxSetting
@@ -127,9 +133,8 @@ class AudioDeviceComboBox : public HostComboBoxSetting
 class ChannelChangedEvent : public QEvent
 {
   public:
-    ChannelChangedEvent(const QString& channame, bool fulltest) :
-        QEvent(kEventType), m_channel(channame), m_fulltest(fulltest) {}
-    ~ChannelChangedEvent() = default;
+    ChannelChangedEvent(QString  channame, bool fulltest);
+    ~ChannelChangedEvent() override = default;
 
     QString m_channel;
     bool    m_fulltest;
@@ -139,13 +144,13 @@ class ChannelChangedEvent : public QEvent
 
 class AudioTestThread : public MThread
 {
-    Q_DECLARE_TR_FUNCTIONS(AudioTestThread);
+    Q_DECLARE_TR_FUNCTIONS(AudioTestThread)
 
   public:
 
     AudioTestThread(QObject *parent, QString main, QString passthrough,
                     int channels, AudioOutputSettings &settings, bool hd);
-    ~AudioTestThread();
+    ~AudioTestThread() override;
 
     void cancel();
     QString result();
@@ -172,7 +177,7 @@ class AudioTest : public GroupSetting
     Q_OBJECT
   public:
     AudioTest();
-    ~AudioTest();
+    ~AudioTest() override;
     void UpdateCapabilities(const QString &main, const QString &passthrough,
                             int channels, const AudioOutputSettings &settings);
     bool event(QEvent *event) override; // QObject

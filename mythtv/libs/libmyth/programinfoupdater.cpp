@@ -7,8 +7,6 @@
 
 #include <unistd.h> // for usleep()
 
-using std::vector;
-
 void ProgramInfoUpdater::insert(
     uint     recordedid, PIAction action, uint64_t filesize)
 {
@@ -42,7 +40,7 @@ void ProgramInfoUpdater::insert(
 
 void ProgramInfoUpdater::run(void)
 {
-    bool workDone;
+    bool workDone = false;
 
     do {
         workDone = false;
@@ -55,15 +53,14 @@ void ProgramInfoUpdater::run(void)
         m_lock.lock();
 
         // send adds and deletes in the order they were queued
-        vector<PIKeyAction>::iterator ita = m_needsAddDelete.begin();
-        for (; ita != m_needsAddDelete.end(); ++ita)
+        for (auto & pi : m_needsAddDelete)
         {
-            if (kPIAdd != (*ita).m_action && kPIDelete != (*ita).m_action)
+            if (kPIAdd != pi.m_action && kPIDelete != pi.m_action)
                 continue;
 
-            QString type = (kPIAdd == (*ita).m_action) ? "ADD" : "DELETE";
+            QString type = (kPIAdd == pi.m_action) ? "ADD" : "DELETE";
             QString msg = QString("RECORDING_LIST_CHANGE %1 %2")
-                .arg(type).arg((*ita).m_recordedid);
+                .arg(type).arg(pi.m_recordedid);
 
             workDone = true;
             gCoreContext->SendMessage(msg);
@@ -72,8 +69,8 @@ void ProgramInfoUpdater::run(void)
 
         // Send updates in any old order, we just need
         // one per updated ProgramInfo.
-        QHash<uint,PIKeyData>::iterator itu = m_needsUpdate.begin();
-        for (; itu != m_needsUpdate.end(); ++itu)
+        // NOLINTNEXTLINE(modernize-loop-convert)
+        for (auto itu = m_needsUpdate.begin(); itu != m_needsUpdate.end(); ++itu)
         {
             QString msg;
 

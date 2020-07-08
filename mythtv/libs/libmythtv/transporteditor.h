@@ -29,15 +29,16 @@
  *
  */
 
-#ifndef _TRANSPORT_EDITOR_H_
-#define _TRANSPORT_EDITOR_H_
+#ifndef TRANSPORT_EDITOR_H
+#define TRANSPORT_EDITOR_H
 
 #include <QObject>
 
 #include "mythtvexp.h"
 #include "standardsettings.h"
+#include "cardutil.h"
 
-class VideoSourceSelector;
+class VideoSourceShow;
 class MultiplexID;
 
 /*
@@ -75,20 +76,20 @@ class MTV_PUBLIC TransportListEditor : public GroupSetting
     void SetSourceID(uint _sourceid);
 
   public slots:
-    void SetSourceID(const QString &_sourceid);
+    void SetSourceID(const QString &name);
     void Menu(TransportSetting *transport);
     void NewTransport(void);
 
   private:
-    ~TransportListEditor() = default;
+    ~TransportListEditor() override = default;
     void Delete(TransportSetting *transport);
 
   private:
-    VideoSourceSelector *m_videosource {nullptr};
+    VideoSourceShow *m_videosource {nullptr};
     QVector<StandardSetting*> m_list;
-    uint m_sourceid;
-    uint m_cardtype;
+    uint m_sourceid  {0};
+    uint m_cardtype  {CardUtil::ERROR_PROBE};
     bool m_isLoading {false};
 };
 
-#endif // _TRANSPORT_EDITOR_H_
+#endif // TRANSPORT_EDITOR_H

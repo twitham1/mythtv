@@ -19,15 +19,15 @@ struct AVFormatContext;
 class META_PUBLIC MetaIOAVFComment : public MetaIO
 {
 public:
-    MetaIOAVFComment(void) : MetaIO() {}
-    virtual ~MetaIOAVFComment(void) = default;
+    MetaIOAVFComment(void) = default;
+    ~MetaIOAVFComment(void) override = default;
 
     bool write(const QString &filename, MusicMetadata* mdata) override; // MetaIO
     MusicMetadata* read(const QString &filename) override; // MetaIO
 
 private:
     int getTrackLength(const QString &filename) override; // MetaIO
-    int getTrackLength(AVFormatContext* pContext);
+    static int getTrackLength(AVFormatContext* pContext);
 };
 
 #endif

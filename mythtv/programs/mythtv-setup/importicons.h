@@ -31,8 +31,8 @@ class ImportIconsWizard : public MythScreenType
 
   public:
     ImportIconsWizard(MythScreenStack *parent, bool fRefresh,
-                      const QString &channelname = "");
-   ~ImportIconsWizard();
+                      QString channelname = "");
+   ~ImportIconsWizard() override;
 
     bool Create(void) override; // MythScreenType
     void Load(void) override; // MythScreenType
@@ -70,9 +70,9 @@ class ImportIconsWizard : public MythScreenType
         QString strNameCSV;          //!< name (csv form)
     };
     //! List of CSV entries
-    typedef QList<CSVEntry> ListEntries;
+    using ListEntries = QList<CSVEntry>;
     //! iterator over list of CSV entries
-    typedef QList<CSVEntry>::Iterator ListEntriesIter;
+    using ListEntriesIter = QList<CSVEntry>::Iterator;
 
     ListEntries m_listEntries;       //!< list of TV channels to search for
     ListEntries m_missingEntries;    //!< list of TV channels with no unique icon
@@ -80,28 +80,28 @@ class ImportIconsWizard : public MythScreenType
     ListEntriesIter m_missingIter;
 
     //! List of SearchEntry entries
-    typedef QList<SearchEntry> ListSearchEntries;
+    using ListSearchEntries = QList<SearchEntry>;
     //! iterator over list of SearchEntry entries
-    typedef QList<SearchEntry>::Iterator ListSearchEntriesIter;
+    using ListSearchEntriesIter = QList<SearchEntry>::Iterator;
 
     /*! \brief changes a string into csv format
      * \param str the string to change
      * \return the actual string
      */
-    QString escape_csv(const QString& str);
+    static QString escape_csv(const QString& str);
 
     /*! \brief extracts the csv values out of a string
      * \param strLine the string to work on
      * \return the actual QStringList
      */
-    QStringList extract_csv(const QString& strLine);
+    static QStringList extract_csv(const QString& strLine);
 
     /*! \brief use the equivalent of wget to fetch the POST command
      * \param url the url to send this to
      * \param strParam the string to send
      * \return the actual string
      */
-    QString wget(QUrl& url,const QString& strParam);
+    static QString wget(QUrl& url,const QString& strParam);
 
     /*! \brief looks up the string to determine the caller/xmltvid
      * \param strParam the string to work on
@@ -147,7 +147,7 @@ class ImportIconsWizard : public MythScreenType
   protected slots:
     void enableControls(dialogState state=STATE_NORMAL);         //!< enable/disable the controls
     void manualSearch();           //!< process the manual search
-    void menuSelection(MythUIButtonListItem *);//!< process the icon selection
+    void menuSelection(MythUIButtonListItem *item);//!< process the icon selection
     void skip();                   //!< skip this icon
     void askSubmit(const QString& strParam);
     void Close() override; // MythScreenType

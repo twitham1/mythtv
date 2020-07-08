@@ -18,7 +18,7 @@
 // Libmyth
 #include <mythcontext.h>
 
-const QString MetaIO::ValidFileExtensions(".mp3|.mp2|.ogg|.oga|.flac|.wma|.wav|.ac3|.oma|.omg|"
+const QString MetaIO::kValidFileExtensions(".mp3|.mp2|.ogg|.oga|.flac|.wma|.wav|.ac3|.oma|.omg|"
                                           ".atp|.ra|.dts|.aac|.m4a|.aa3|.tta|.mka|.aiff|.swa|.wv");
 /*!
  * \brief Constructor
@@ -26,7 +26,6 @@ const QString MetaIO::ValidFileExtensions(".mp3|.mp2|.ogg|.oga|.flac|.wma|.wav|.
 MetaIO::MetaIO()
 {
     m_filenameFormat = gCoreContext->GetSetting("NonID3FileNameFormat").toUpper();
-    memset(&m_fileinfo, 0, sizeof(m_fileinfo));
 }
 
 // static
@@ -35,7 +34,7 @@ MetaIO* MetaIO::createTagger(const QString& filename)
     QFileInfo fi(filename);
     QString extension = fi.suffix().toLower();
 
-    if (extension.isEmpty() || !MetaIO::ValidFileExtensions.contains(extension))
+    if (extension.isEmpty() || !MetaIO::kValidFileExtensions.contains(extension))
     {
         LOG(VB_FILE, LOG_WARNING, QString("MetaIO: unknown extension: '%1'").arg(extension));
         return nullptr;
@@ -47,7 +46,7 @@ MetaIO* MetaIO::createTagger(const QString& filename)
         return new MetaIOOggVorbis;
     if (extension == "flac")
     {
-        MetaIOFLACVorbis *tagger = new MetaIOFLACVorbis;
+        auto *tagger = new MetaIOFLACVorbis;
         if (tagger->TagExists(filename))
             return tagger;
         delete tagger;
@@ -168,16 +167,18 @@ void MetaIO::readFromFilename(const QString &filename,
 
 MusicMetadata* MetaIO::readFromFilename(const QString &filename, bool blnLength)
 {
-    QString artist, album, title, genre;
-    int tracknum = 0, length = 0;
+    QString artist;
+    QString album;
+    QString title;
+    QString genre;
+    int tracknum = 0;
 
     readFromFilename(filename, artist, album, title, genre, tracknum);
 
-    if (blnLength)
-        length = getTrackLength(filename);
+    int length = (blnLength) ? getTrackLength(filename) : 0;
 
-    MusicMetadata *retdata = new MusicMetadata(filename, artist, "", album,
-                                               title, genre, 0, tracknum, length);
+    auto *retdata = new MusicMetadata(filename, artist, "", album, title, genre,
+                                      0, tracknum, length);
 
     return retdata;
 }
@@ -189,7 +190,10 @@ MusicMetadata* MetaIO::readFromFilename(const QString &filename, bool blnLength)
 */
 void MetaIO::readFromFilename(MusicMetadata* metadata)
 {
-    QString artist, album, title, genre;
+    QString artist;
+    QString album;
+    QString title;
+    QString genre;
     int tracknum = 0;
 
     const QString filename = metadata->Filename(false);
@@ -226,10 +230,7 @@ void MetaIO::saveTimeStamps(void)
 
 void MetaIO::restoreTimeStamps(void)
 {
-    struct utimbuf new_times;
-
-    new_times.actime = m_fileinfo.st_atime;
-    new_times.modtime = m_fileinfo.st_mtime;
+    struct utimbuf new_times {m_fileinfo.st_atime, m_fileinfo.st_mtime};
 
     if (utime(m_filename.toLocal8Bit().constData(), &new_times) < 0)
     {

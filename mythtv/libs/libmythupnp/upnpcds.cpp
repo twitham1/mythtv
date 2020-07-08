@@ -41,13 +41,12 @@ void UPnpCDSExtensionResults::Add( CDSObject *pObject )
 //
 /////////////////////////////////////////////////////////////////////////////
 
-void UPnpCDSExtensionResults::Add( CDSObjects objects )
+void UPnpCDSExtensionResults::Add( const CDSObjects& objects )
 {
-    CDSObjects::iterator it;
-    for (it = objects.begin(); it != objects.end(); ++it)
+    for (auto *const object : qAsConst(objects))
     {
-        (*it)->IncrRef();
-        m_List.append( *it );
+        object->IncrRef();
+        m_List.append( object );
     }
 }
 
@@ -60,9 +59,8 @@ QString UPnpCDSExtensionResults::GetResultXML(FilterMap &filter,
 {
     QString sXML;
 
-    CDSObjects::const_iterator it = m_List.begin();
-    for (; it != m_List.end(); ++it)
-        sXML += (*it)->toXml(filter, ignoreChildren);
+    for (auto *item : qAsConst(m_List))
+        sXML += item->toXml(filter, ignoreChildren);
 
     return sXML;
 }
@@ -299,7 +297,7 @@ static UPnpCDSClientException clientExceptions[] = {
     // Sony Blu-ray players
     { CDS_ClientSonyDB,
       "X-AV-Client-Info",
-      "cn=\"Sony Corporation\"; mn=\"Blu-ray Disc Player\"" },
+      R"(cn="Sony Corporation"; mn="Blu-ray Disc Player")" },
 };
 static uint clientExceptionCount = sizeof(clientExceptions) /
                                    sizeof(clientExceptions[0]);
@@ -574,8 +572,13 @@ void UPnpCDS::HandleSearch( HTTPRequest *pRequest )
     QRegExp  rMatch( "\\b(or|and)\\b" );
     rMatch.setCaseSensitivity(Qt::CaseInsensitive);
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     request.m_sSearchList  = request.m_sSearchCriteria.split(
         rMatch, QString::SkipEmptyParts);
+#else
+    request.m_sSearchList  = request.m_sSearchCriteria.split(
+        rMatch, Qt::SkipEmptyParts);
+#endif
     request.m_sSearchClass = "object";  // Default to all objects.
 
     // ----------------------------------------------------------------------
@@ -589,7 +592,11 @@ void UPnpCDS::HandleSearch( HTTPRequest *pRequest )
     {
         if ((*it).contains("upnp:class derivedfrom", Qt::CaseInsensitive))
         {
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
             QStringList sParts = (*it).split(' ', QString::SkipEmptyParts);
+#else
+            QStringList sParts = (*it).split(' ', Qt::SkipEmptyParts);
+#endif
 
             if (sParts.count() > 2)
             {
@@ -740,7 +747,7 @@ void UPnpCDS::HandleGetSystemUpdateID( HTTPRequest *pRequest )
         QString("UPnpCDS::ProcessRequest : %1 : %2")
             .arg(pRequest->m_sBaseUrl) .arg(pRequest->m_sMethod));
 
-    uint16_t nId = GetValue<uint16_t>("SystemUpdateID");
+    auto nId = GetValue<uint16_t>("SystemUpdateID");
 
     list.push_back(NameValue("Id", nId));
 
@@ -773,7 +780,7 @@ void UPnpCDS::HandleGetServiceResetToken(HTTPRequest* pRequest)
         QString("UPnpCDS::ProcessRequest : %1 : %2")
             .arg(pRequest->m_sBaseUrl) .arg(pRequest->m_sMethod));
 
-    QString sToken = GetValue<QString>("ServiceResetToken");
+    auto sToken = GetValue<QString>("ServiceResetToken");
 
     list.push_back(NameValue("ResetToken", sToken));
 
@@ -838,7 +845,7 @@ UPnpCDSExtensionResults *UPnpCDSExtension::Browse( UPnpCDSRequest *pRequest )
     // Process based on location in hierarchy
     // ----------------------------------------------------------------------
 
-    UPnpCDSExtensionResults *pResults = new UPnpCDSExtensionResults();
+    auto *pResults = new UPnpCDSExtensionResults();
 
     if (pResults != nullptr)
     {
@@ -917,7 +924,7 @@ UPnpCDSExtensionResults *UPnpCDSExtension::Search( UPnpCDSRequest *pRequest )
         return nullptr;
     }
 
-    UPnpCDSExtensionResults *pResults = new UPnpCDSExtensionResults();
+    auto *pResults = new UPnpCDSExtensionResults();
 
 //    CreateItems( pRequest, pResults, 0, "", false );
 
@@ -960,8 +967,9 @@ QString UPnpCDSExtension::RemoveToken( const QString &sToken,
  *
  */
 bool UPnpCDSExtension::LoadMetadata(const UPnpCDSRequest* /*pRequest*/,
-                                     UPnpCDSExtensionResults* /*pResults*/,
-                                     IDTokenMap /*tokens*/, QString /*currentToken*/)
+                                    UPnpCDSExtensionResults* /*pResults*/,
+                                    const IDTokenMap& /*tokens*/,
+                                    const QString& /*currentToken*/)
 {
     return false;
 }
@@ -982,7 +990,8 @@ bool UPnpCDSExtension::LoadMetadata(const UPnpCDSRequest* /*pRequest*/,
  */
 bool UPnpCDSExtension::LoadChildren(const UPnpCDSRequest* /*pRequest*/,
                                     UPnpCDSExtensionResults* /*pResults*/,
-                                    IDTokenMap /*tokens*/, QString /*currentToken*/)
+                                    const IDTokenMap& /*tokens*/,
+                                    const QString& /*currentToken*/)
 {
     return false;
 }
@@ -1001,7 +1010,7 @@ bool UPnpCDSExtension::LoadChildren(const UPnpCDSRequest* /*pRequest*/,
  *
  *      Video/Directory=45/Directory=63/Directory=82
  */
-IDTokenMap UPnpCDSExtension::TokenizeIDString(const QString& Id) const
+IDTokenMap UPnpCDSExtension::TokenizeIDString(const QString& Id)
 {
     IDTokenMap tokenMap;
 
@@ -1037,7 +1046,7 @@ IDTokenMap UPnpCDSExtension::TokenizeIDString(const QString& Id) const
  *
  *      Video/Directory=45/Directory=63/Directory=82
  */
-IDToken UPnpCDSExtension::GetCurrentToken(const QString& Id) const
+IDToken UPnpCDSExtension::GetCurrentToken(const QString& Id)
 {
     QStringList tokens = Id.split('/');
     QString current = tokens.last();
@@ -1120,9 +1129,11 @@ bool UPnPShortcutFeature::AddShortCut(ShortCutType type,
     if (!m_shortcuts.contains(type))
         m_shortcuts.insert(type, objectID);
     else
+    {
         LOG(VB_GENERAL, LOG_ERR, QString("UPnPCDSShortcuts::AddShortCut(): "
                                          "Attempted to register duplicate "
                                          "shortcut").arg(TypeToName(type)));
+    }
 
     return false;
 }
@@ -1223,9 +1234,6 @@ QString UPnPShortcutFeature::TypeToName(ShortCutType type)
           str = "VIDEOS_ALL";
           break;
        case VIDEOS_FOLDER_STRUCTURE :
-          str = "VIDEOS_FOLDER_STRUCTURE";
-          break;
-
        case FOLDER_STRUCTURE :
           str = "VIDEOS_FOLDER_STRUCTURE";
           break;

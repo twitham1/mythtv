@@ -96,14 +96,12 @@ static uint insert_dtv_multiplex(
         // DVB specific
         transport_id,  network_id, polarity);
 
-    LOG(VB_CHANSCAN, LOG_INFO, QString(
-                "insert_dtv_multiplex(db_source_id: %1, sistandard: '%2', "
-                "frequency: %3, modulation: %4, transport_id: %5, "
-                "network_id: %6, polarity: %7...) mplexid:%8")
-            .arg(db_source_id).arg(sistandard)
-            .arg(frequency).arg(modulation)
-            .arg(transport_id).arg(network_id)
-            .arg(polarity).arg(mplex));
+    LOG(VB_CHANSCAN, LOG_INFO, "insert_dtv_multiplex(" +
+        QString("dbid:%1 std:'%2' ").arg(db_source_id).arg(sistandard) +
+        QString("freq:%1 mod:%2 ").arg(frequency).arg(modulation) +
+        QString("tid:%1 nid:%2 ").arg(transport_id).arg(network_id) +
+        QString("pol:%1 msys:%2 ...)").arg(QChar(polarity)).arg(mod_sys) +
+        QString("mplexid:%1").arg(mplex));
 
     bool isDVB = (sistandard.toLower() == "dvb");
 
@@ -207,14 +205,14 @@ static uint insert_dtv_multiplex(
         if (isDVB)
         {
             query.bindValue(":TRANSPORTID",   transport_id);
-            query.bindValue(":NETWORKID",    network_id);
+            query.bindValue(":NETWORKID",     network_id);
             query.bindValue(":WHEREPOLARITY", QString(polarity));
         }
         else
         {
             query.bindValue(":FREQUENCY2",    QString::number(frequency));
             if (transport_id)
-                query.bindValue(":TRANSPORTID", transport_id);
+                query.bindValue(":TRANSPORTID",   transport_id);
         }
     }
     else
@@ -222,7 +220,7 @@ static uint insert_dtv_multiplex(
         if (transport_id || isDVB)
             query.bindValue(":TRANSPORTID",   transport_id);
         if (isDVB)
-            query.bindValue(":NETWORKID",    network_id);
+            query.bindValue(":NETWORKID",     network_id);
     }
 
     if (!modulation.isNull())
@@ -271,7 +269,7 @@ static uint insert_dtv_multiplex(
         transport_id,  network_id, polarity);
 
     LOG(VB_CHANSCAN, LOG_INFO, QString("insert_dtv_multiplex -- ") +
-            QString("inserted %1").arg(mplex));
+            QString("inserted mplexid %1").arg(mplex));
 
     return mplex;
 }
@@ -294,7 +292,8 @@ static void handle_transport_desc(vector<uint> &muxes,
         {
             QString dummy_mod;
             QString dummy_sistd;
-            uint dummy_tsid, dummy_netid;
+            uint dummy_tsid = 0;
+            uint dummy_netid = 0;
             ChannelUtil::GetTuningParams(mux, dummy_mod, freq,
                                          dummy_tsid, dummy_netid, dummy_sistd);
         }
@@ -329,7 +328,7 @@ static void handle_transport_desc(vector<uint> &muxes,
 
         uint mux = ChannelUtil::CreateMultiplex(
             sourceid,             "dvb",
-            cd.FrequencyHz(),     cd.ModulationString(),
+            cd.FrequencykHz(),    cd.ModulationString(),
             // DVB specific
             tsid,                 netid,
             cd.SymbolRateHz(),    -1,
@@ -369,13 +368,13 @@ static void handle_transport_desc(vector<uint> &muxes,
     }
 }
 
-uint ChannelUtil::CreateMultiplex(int  sourceid,      QString sistandard,
-                                  uint64_t frequency, QString modulation,
-                                  int  transport_id,  int     network_id)
+uint ChannelUtil::CreateMultiplex(int      sourceid,     const QString& sistandard,
+                                  uint64_t frequency,    const QString& modulation,
+                                  int      transport_id, int            network_id)
 {
     return CreateMultiplex(
-        sourceid,           std::move(sistandard),
-        frequency,          std::move(modulation),
+        sourceid,           sistandard,
+        frequency,          modulation,
         transport_id,       network_id,
         -1,                 -1,
         -1,                 -1,
@@ -387,30 +386,30 @@ uint ChannelUtil::CreateMultiplex(int  sourceid,      QString sistandard,
 }
 
 uint ChannelUtil::CreateMultiplex(
-    int         sourceid,     QString     sistandard,
-    uint64_t    freq,         QString     modulation,
+    int            sourceid,     const QString& sistandard,
+    uint64_t       freq,         const QString& modulation,
     // DVB specific
-    int         transport_id, int         network_id,
-    int         symbol_rate,  signed char bandwidth,
-    signed char polarity,     signed char inversion,
-    signed char trans_mode,
-    QString     inner_FEC,    QString     constellation,
-    signed char hierarchy,    QString     hp_code_rate,
-    QString     lp_code_rate, QString     guard_interval,
-    QString     mod_sys,      QString     rolloff)
+    int            transport_id, int            network_id,
+    int            symbol_rate,  signed char    bandwidth,
+    signed char    polarity,     signed char    inversion,
+    signed char    trans_mode,
+    const QString& inner_FEC,    const QString& constellation,
+    signed char    hierarchy,    const QString& hp_code_rate,
+    const QString& lp_code_rate, const QString& guard_interval,
+    const QString& mod_sys,      const QString& rolloff)
 {
     return insert_dtv_multiplex(
-        sourceid,           std::move(sistandard),
-        freq,               std::move(modulation),
+        sourceid,           sistandard,
+        freq,               modulation,
         // DVB specific
         transport_id,       network_id,
         symbol_rate,        bandwidth,
         polarity,           inversion,
         trans_mode,
-        std::move(inner_FEC),    std::move(constellation),
-        hierarchy,               std::move(hp_code_rate),
-        std::move(lp_code_rate), std::move(guard_interval),
-        std::move(mod_sys),      std::move(rolloff));
+        inner_FEC,          constellation,
+        hierarchy,          hp_code_rate,
+        lp_code_rate,       guard_interval,
+        mod_sys,            rolloff);
 }
 
 uint ChannelUtil::CreateMultiplex(uint sourceid, const DTVMultiplex &mux,
@@ -421,13 +420,13 @@ uint ChannelUtil::CreateMultiplex(uint sourceid, const DTVMultiplex &mux,
         mux.m_frequency,                     mux.m_modulation.toString(),
         // DVB specific
         transport_id,                        network_id,
-        mux.m_symbolrate,                    mux.m_bandwidth.toChar().toLatin1(),
+        mux.m_symbolRate,                    mux.m_bandwidth.toChar().toLatin1(),
         mux.m_polarity.toChar().toLatin1(),  mux.m_inversion.toChar().toLatin1(),
-        mux.m_trans_mode.toChar().toLatin1(),
+        mux.m_transMode.toChar().toLatin1(),
         mux.m_fec.toString(),                mux.m_modulation.toString(),
-        mux.m_hierarchy.toChar().toLatin1(), mux.m_hp_code_rate.toString(),
-        mux.m_lp_code_rate.toString(),       mux.m_guard_interval.toString(),
-        mux.m_mod_sys.toString(),            mux.m_rolloff.toString());
+        mux.m_hierarchy.toChar().toLatin1(), mux.m_hpCodeRate.toString(),
+        mux.m_lpCodeRate.toString(),         mux.m_guardInterval.toString(),
+        mux.m_modSys.toString(),             mux.m_rolloff.toString());
 }
 
 
@@ -450,9 +449,9 @@ vector<uint> ChannelUtil::CreateMultiplexes(
 
         uint tsid  = nit->TSID(i);
         uint netid = nit->OriginalNetworkID(i);
-        for (size_t j = 0; j < list.size(); ++j)
+        for (const auto *j : list)
         {
-            const MPEGDescriptor desc(list[j]);
+            const MPEGDescriptor desc(j);
             handle_transport_desc(muxes, desc, sourceid, tsid, netid);
         }
     }
@@ -466,7 +465,8 @@ uint ChannelUtil::GetMplexID(uint sourceid, const QString &channum)
     query.prepare(
         "SELECT mplexid "
         "FROM channel "
-        "WHERE sourceid  = :SOURCEID  AND "
+        "WHERE deleted   IS NULL AND "
+        "      sourceid  = :SOURCEID  AND "
         "      channum   = :CHANNUM");
 
     query.bindValue(":SOURCEID",  sourceid);
@@ -604,7 +604,7 @@ uint ChannelUtil::GetMplexID(uint chanid)
  *  \return mplexid on success, -1 on failure.
  */
 
-// current_mplexid always exists in scanner, see ScanTranport()
+// current_mplexid always exists in scanner, see ScanTransport()
 //
 int ChannelUtil::GetBetterMplexID(int current_mplexid,
                                   int transport_id,
@@ -614,7 +614,8 @@ int ChannelUtil::GetBetterMplexID(int current_mplexid,
         QString("GetBetterMplexID(mplexId %1, tId %2, netId %3)")
             .arg(current_mplexid).arg(transport_id).arg(network_id));
 
-    int q_networkid = 0, q_transportid = 0;
+    int q_networkid = 0;
+    int q_transportid = 0;
     MSqlQuery query(MSqlQuery::InitCon());
 
     query.prepare("SELECT networkid, transportid "
@@ -664,7 +665,7 @@ int ChannelUtil::GetBetterMplexID(int current_mplexid,
     }
 
     // We have a partial match, so we try to do better...
-    QString theQueries[2] =
+    std::array<QString,2> theQueries
     {
         QString("SELECT a.mplexid "
                 "FROM dtv_multiplex a, dtv_multiplex b "
@@ -870,7 +871,8 @@ bool ChannelUtil::GetCachedPids(uint chanid,
 
     while (query.next())
     {
-        int pid = query.value(0).toInt(), tid = query.value(1).toInt();
+        int pid = query.value(0).toInt();
+        int tid = query.value(1).toInt();
         if ((pid >= 0) && (tid >= 0))
             pid_cache.push_back(pid_cache_item_t(pid, tid));
     }
@@ -895,9 +897,11 @@ bool ChannelUtil::SaveCachedPids(uint chanid,
     if (delete_all)
         query.prepare("DELETE FROM pidcache WHERE chanid = :CHANID");
     else
+    {
         query.prepare(
             "DELETE FROM pidcache "
             "WHERE chanid = :CHANID AND tableid < 65536");
+    }
 
     query.bindValue(":CHANID", chanid);
 
@@ -919,19 +923,18 @@ bool ChannelUtil::SaveCachedPids(uint chanid,
     query.bindValue(":CHANID", chanid);
 
     bool ok = true;
-    pid_cache_t::const_iterator ito = old_cache.begin();
-    pid_cache_t::const_iterator itn = pid_cache.begin();
-    for (; itn != pid_cache.end(); ++itn)
+    auto ito = old_cache.begin();
+    for (auto itn : pid_cache)
     {
         // if old pid smaller than current new pid, skip this old pid
-        for (; ito != old_cache.end() && ito->GetPID() < itn->GetPID(); ++ito);
+        for (; ito != old_cache.end() && ito->GetPID() < itn.GetPID(); ++ito);
 
         // if already in DB, skip DB insert
-        if (ito != old_cache.end() && ito->GetPID() == itn->GetPID())
+        if (ito != old_cache.end() && ito->GetPID() == itn.GetPID())
             continue;
 
-        query.bindValue(":PID",     itn->GetPID());
-        query.bindValue(":TABLEID", itn->GetComposite());
+        query.bindValue(":PID",     itn.GetPID());
+        query.bindValue(":TABLEID", itn.GetComposite());
 
         if (!query.exec())
         {
@@ -955,7 +958,8 @@ QString ChannelUtil::GetChannelValueStr(const QString &channel_field,
         QString(
             "SELECT channel.%1 "
             "FROM channel "
-            "WHERE channum  = :CHANNUM AND "
+            "WHERE deleted  IS NULL AND "
+            "      channum  = :CHANNUM AND "
             "      sourceid = :SOURCEID")
         .arg(channel_field));
 
@@ -1059,7 +1063,8 @@ static QStringList get_valid_recorder_list(const QString &channum)
         "SELECT capturecard.cardid "
         "FROM channel "
         "LEFT JOIN capturecard ON channel.sourceid = capturecard.sourceid "
-        "WHERE channel.channum = :CHANNUM AND "
+        "WHERE channel.deleted IS NULL AND "
+        "      channel.channum = :CHANNUM AND "
         "      capturecard.livetvorder > 0 "
         "ORDER BY capturecard.livetvorder, capturecard.cardid");
     query.bindValue(":CHANNUM", channum);
@@ -1103,7 +1108,8 @@ vector<uint> ChannelUtil::GetConflicting(const QString &channum, uint sourceid)
     {
         query.prepare(
             "SELECT chanid from channel "
-            "WHERE sourceid = :SOURCEID AND "
+            "WHERE deleted  IS NULL AND "
+            "      sourceid = :SOURCEID AND "
             "      channum  = :CHANNUM");
         query.bindValue(":SOURCEID", sourceid);
     }
@@ -1111,7 +1117,8 @@ vector<uint> ChannelUtil::GetConflicting(const QString &channum, uint sourceid)
     {
         query.prepare(
             "SELECT chanid from channel "
-            "WHERE channum = :CHANNUM");
+            "WHERE deleted IS NULL AND "
+            "      channum = :CHANNUM");
     }
 
     query.bindValue(":CHANNUM",  channum);
@@ -1166,35 +1173,36 @@ bool ChannelUtil::SetChannelValue(const QString &field_name,
 /** Returns the DVB default authority for the chanid given. */
 QString ChannelUtil::GetDefaultAuthority(uint chanid)
 {
-    static QReadWriteLock channel_default_authority_map_lock;
-    static QMap<uint,QString> channel_default_authority_map;
-    static bool run_init = true;
+    static QReadWriteLock s_channelDefaultAuthorityMapLock;
+    static QMap<uint,QString> s_channelDefaultAuthorityMap;
+    static bool s_runInit = true;
 
-    channel_default_authority_map_lock.lockForRead();
+    s_channelDefaultAuthorityMapLock.lockForRead();
 
-    if (run_init)
+    if (s_runInit)
     {
-        channel_default_authority_map_lock.unlock();
-        channel_default_authority_map_lock.lockForWrite();
-        if (run_init)
+        s_channelDefaultAuthorityMapLock.unlock();
+        s_channelDefaultAuthorityMapLock.lockForWrite();
+        if (s_runInit)
         {
             MSqlQuery query(MSqlQuery::InitCon());
             query.prepare(
                 "SELECT chanid, m.default_authority "
                 "FROM channel c "
                 "LEFT JOIN dtv_multiplex m "
-                "ON (c.mplexid = m.mplexid)");
+                "ON (c.mplexid = m.mplexid) "
+                "WHERE deleted IS NULL");
             if (query.exec())
             {
                 while (query.next())
                 {
                     if (!query.value(1).toString().isEmpty())
                     {
-                        channel_default_authority_map[query.value(0).toUInt()] =
+                        s_channelDefaultAuthorityMap[query.value(0).toUInt()] =
                             query.value(1).toString();
                     }
                 }
-                run_init = false;
+                s_runInit = false;
             }
             else
             {
@@ -1203,18 +1211,19 @@ QString ChannelUtil::GetDefaultAuthority(uint chanid)
 
             query.prepare(
                 "SELECT chanid, default_authority "
-                "FROM channel");
+                "FROM channel "
+                "WHERE deleted IS NULL");
             if (query.exec())
             {
                 while (query.next())
                 {
                     if (!query.value(1).toString().isEmpty())
                     {
-                        channel_default_authority_map[query.value(0).toUInt()] =
+                        s_channelDefaultAuthorityMap[query.value(0).toUInt()] =
                             query.value(1).toString();
                     }
                 }
-                run_init = false;
+                s_runInit = false;
             }
             else
             {
@@ -1224,60 +1233,60 @@ QString ChannelUtil::GetDefaultAuthority(uint chanid)
         }
     }
 
-    QMap<uint,QString>::iterator it = channel_default_authority_map.find(chanid);
+    QMap<uint,QString>::iterator it = s_channelDefaultAuthorityMap.find(chanid);
     QString ret;
-    if (it != channel_default_authority_map.end())
+    if (it != s_channelDefaultAuthorityMap.end())
         ret = *it;
-    channel_default_authority_map_lock.unlock();
+    s_channelDefaultAuthorityMapLock.unlock();
 
     return ret;
 }
 
 QString ChannelUtil::GetIcon(uint chanid)
 {
-    static QReadWriteLock channel_icon_map_lock;
-    static QHash<uint,QString> channel_icon_map;
-    static bool run_init = true;
+    static QReadWriteLock s_channelIconMapLock;
+    static QHash<uint,QString> s_channelIconMap;
+    static bool s_runInit = true;
 
-    channel_icon_map_lock.lockForRead();
+    s_channelIconMapLock.lockForRead();
 
-    QString ret(channel_icon_map.value(chanid, "_cold_"));
+    QString ret(s_channelIconMap.value(chanid, "_cold_"));
 
-    channel_icon_map_lock.unlock();
+    s_channelIconMapLock.unlock();
 
     if (ret != "_cold_")
         return ret;
 
-    channel_icon_map_lock.lockForWrite();
+    s_channelIconMapLock.lockForWrite();
 
     MSqlQuery query(MSqlQuery::InitCon());
     QString iconquery = "SELECT chanid, icon FROM channel";
 
-    if (run_init)
-        iconquery += " WHERE visible = 1";
+    if (s_runInit)
+        iconquery += " WHERE visible > 0";
     else
         iconquery += " WHERE chanid = :CHANID";
 
     query.prepare(iconquery);
 
-    if (!run_init)
+    if (!s_runInit)
         query.bindValue(":CHANID", chanid);
 
     if (query.exec())
     {
-        if (run_init)
+        if (s_runInit)
         {
-            channel_icon_map.reserve(query.size());
+            s_channelIconMap.reserve(query.size());
             while (query.next())
             {
-                channel_icon_map[query.value(0).toUInt()] =
+                s_channelIconMap[query.value(0).toUInt()] =
                     query.value(1).toString();
             }
-            run_init = false;
+            s_runInit = false;
         }
         else
         {
-            channel_icon_map[chanid] = (query.next()) ?
+            s_channelIconMap[chanid] = (query.next()) ?
                 query.value(1).toString() : "";
         }
     }
@@ -1286,9 +1295,9 @@ QString ChannelUtil::GetIcon(uint chanid)
         MythDB::DBError("GetIcon", query);
     }
 
-    ret = channel_icon_map.value(chanid, "");
+    ret = s_channelIconMap.value(chanid, "");
 
-    channel_icon_map_lock.unlock();
+    s_channelIconMapLock.unlock();
 
     return ret;
 }
@@ -1321,7 +1330,8 @@ int ChannelUtil::GetChanID(int mplexid,       int service_transport_id,
 
     // find a proper ATSC channel
     query.prepare("SELECT chanid FROM channel,dtv_multiplex "
-                  "WHERE channel.sourceid          = :SOURCEID AND "
+                  "WHERE channel.deleted           IS NULL AND "
+                  "      channel.sourceid          = :SOURCEID AND "
                   "      atsc_major_chan           = :MAJORCHAN AND "
                   "      atsc_minor_chan           = :MINORCHAN AND "
                   "      dtv_multiplex.transportid = :TRANSPORTID AND "
@@ -1341,7 +1351,8 @@ int ChannelUtil::GetChanID(int mplexid,       int service_transport_id,
     // Find manually inserted/edited channels in order of scariness.
     // find renamed channel, where atsc is valid
     query.prepare("SELECT chanid FROM channel "
-                  "WHERE sourceid = :SOURCEID AND "
+                  "WHERE deleted IS NULL AND "
+                  "sourceid = :SOURCEID AND "
                   "atsc_major_chan = :MAJORCHAN AND "
                   "atsc_minor_chan = :MINORCHAN");
 
@@ -1354,7 +1365,8 @@ int ChannelUtil::GetChanID(int mplexid,       int service_transport_id,
 
         // find based on mpeg program number and mplexid alone
     query.prepare("SELECT chanid FROM channel "
-                  "WHERE sourceid = :SOURCEID AND "
+                  "WHERE deleted IS NULL AND "
+                  "sourceid = :SOURCEID AND "
                   "serviceID = :SERVICEID AND "
                   "mplexid = :MPLEXID");
 
@@ -1373,7 +1385,8 @@ uint ChannelUtil::FindChannel(uint sourceid, const QString &freqid)
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare("SELECT chanid "
                   "FROM channel "
-                  "WHERE sourceid = :SOURCEID AND "
+                  "WHERE deleted  IS NULL AND "
+                  "      sourceid = :SOURCEID AND "
                   "      freqid   = :FREQID");
 
     query.bindValue(":SOURCEID", sourceid);
@@ -1476,13 +1489,13 @@ bool ChannelUtil::CreateChannel(uint db_mplexid,
                                 uint atsc_major_channel,
                                 uint atsc_minor_channel,
                                 bool use_on_air_guide,
-                                bool hidden,
-                                bool hidden_in_guide,
+                                ChannelVisibleType visible,
                                 const QString &freqid,
-                                QString icon,
+                                const QString& icon,
                                 QString format,
-                                QString xmltvid,
-                                QString default_authority)
+                                const QString& xmltvid,
+                                const QString& default_authority,
+                                uint service_type)
 {
     MSqlQuery query(MSqlQuery::InitCon());
 
@@ -1498,7 +1511,8 @@ bool ChannelUtil::CreateChannel(uint db_mplexid,
     qstr +=
         "   atsc_major_chan,           atsc_minor_chan,   "
         "   useonairguide, visible,    tvformat,          "
-        "   icon,          xmltvid,    default_authority) "
+        "   icon,          xmltvid,    default_authority, "
+        "   service_type) "
         "VALUES "
         "  (:CHANID,       :CHANNUM,   :SOURCEID,         "
         "   :CALLSIGN,     :NAME,      :SERVICEID,        ";
@@ -1507,7 +1521,8 @@ bool ChannelUtil::CreateChannel(uint db_mplexid,
     qstr +=
         "   :MAJORCHAN,                :MINORCHAN,        "
         "   :USEOAG,       :VISIBLE,   :TVFORMAT,         "
-        "   :ICON,         :XMLTVID,   :AUTHORITY)        ";
+        "   :ICON,         :XMLTVID,   :AUTHORITY,        "
+        "   :SERVICETYPE )        ";
 
     query.prepare(qstr);
 
@@ -1524,17 +1539,17 @@ bool ChannelUtil::CreateChannel(uint db_mplexid,
     query.bindValue(":MAJORCHAN", atsc_major_channel);
     query.bindValue(":MINORCHAN", atsc_minor_channel);
     query.bindValue(":USEOAG",    use_on_air_guide);
-    query.bindValue(":VISIBLE",   !hidden);
-    (void) hidden_in_guide; // MythTV can't hide the channel in just the guide.
+    query.bindValue(":VISIBLE",   visible);
 
     if (!freqid.isEmpty())
         query.bindValue(":FREQID",    freqid);
 
     QString tvformat = (atsc_minor_channel > 0) ? "ATSC" : std::move(format);
-    query.bindValueNoNull(":TVFORMAT", tvformat);
-    query.bindValueNoNull(":ICON", icon);
-    query.bindValueNoNull(":XMLTVID", xmltvid);
-    query.bindValueNoNull(":AUTHORITY", default_authority);
+    query.bindValueNoNull(":TVFORMAT",    tvformat);
+    query.bindValueNoNull(":ICON",        icon);
+    query.bindValueNoNull(":XMLTVID",     xmltvid);
+    query.bindValueNoNull(":AUTHORITY",   default_authority);
+    query.bindValue      (":SERVICETYPE", service_type);
 
     if (!query.exec() || !query.isActive())
     {
@@ -1554,13 +1569,13 @@ bool ChannelUtil::UpdateChannel(uint db_mplexid,
                                 uint atsc_major_channel,
                                 uint atsc_minor_channel,
                                 bool use_on_air_guide,
-                                bool hidden,
-                                bool hidden_in_guide,
+                                ChannelVisibleType visible,
                                 const QString& freqid,
                                 const QString& icon,
                                 QString format,
                                 const QString& xmltvid,
-                                const QString& default_authority)
+                                const QString& default_authority,
+                                uint service_type)
 {
     if (!channel_id)
         return false;
@@ -1574,7 +1589,7 @@ bool ChannelUtil::UpdateChannel(uint db_mplexid,
         "    atsc_major_chan = :MAJORCHAN, atsc_minor_chan = :MINORCHAN, "
         "    callsign        = :CALLSIGN,  name            = :NAME,      "
         "    sourceid        = :SOURCEID,  useonairguide   = :USEOAG,    "
-        "    visible         = :VISIBLE "
+        "    visible         = :VISIBLE,   service_type    = :SERVICETYPE "
         "WHERE chanid=:CHANID")
         .arg((!set_channum)       ? "" : "channum  = :CHANNUM,  ")
         .arg((freqid.isEmpty())   ? "" : "freqid   = :FREQID,   ")
@@ -1596,14 +1611,13 @@ bool ChannelUtil::UpdateChannel(uint db_mplexid,
     query.bindValueNoNull(":CALLSIGN",  callsign);
     query.bindValueNoNull(":NAME",      service_name);
 
-    query.bindValue(":MPLEXID",   db_mplexid);
-
-    query.bindValue(":SERVICEID", service_id);
-    query.bindValue(":MAJORCHAN", atsc_major_channel);
-    query.bindValue(":MINORCHAN", atsc_minor_channel);
-    query.bindValue(":USEOAG",    use_on_air_guide);
-    query.bindValue(":VISIBLE",   !hidden);
-    (void) hidden_in_guide; // MythTV can't hide the channel in just the guide.
+    query.bindValue(":MPLEXID",     db_mplexid);
+    query.bindValue(":SERVICEID",   service_id);
+    query.bindValue(":MAJORCHAN",   atsc_major_channel);
+    query.bindValue(":MINORCHAN",   atsc_minor_channel);
+    query.bindValue(":USEOAG",      use_on_air_guide);
+    query.bindValue(":VISIBLE",     visible);
+    query.bindValue(":SERVICETYPE", service_type);
 
     if (!freqid.isEmpty())
         query.bindValue(":FREQID",    freqid);
@@ -1626,6 +1640,32 @@ bool ChannelUtil::UpdateChannel(uint db_mplexid,
     return true;
 }
 
+void ChannelUtil::UpdateChannelNumberFromDB(ChannelInsertInfo &chan)
+{
+    MSqlQuery query(MSqlQuery::InitCon());
+    query.prepare(
+        "SELECT channum "
+        "FROM channel "
+        "WHERE chanid = :ID");
+    query.bindValue(":ID", chan.m_channelId);
+
+    if (!query.exec())
+    {
+        MythDB::DBError("UpdateChannelNumberFromDB", query);
+        return;
+    }
+
+    if (query.next())
+    {
+        QString channum = query.value(0).toString();
+
+        if (!channum.isEmpty())
+        {
+            chan.m_chanNum = channum;
+        }
+    }
+}
+
 void ChannelUtil::UpdateInsertInfoFromDB(ChannelInsertInfo &chan)
 {
     MSqlQuery query(MSqlQuery::InitCon());
@@ -1633,7 +1673,7 @@ void ChannelUtil::UpdateInsertInfoFromDB(ChannelInsertInfo &chan)
         "SELECT xmltvid, useonairguide, visible "
         "FROM channel "
         "WHERE chanid = :ID");
-    query.bindValue(":ID", chan.m_channel_id);
+    query.bindValue(":ID", chan.m_channelId);
 
     if (!query.exec())
     {
@@ -1645,19 +1685,23 @@ void ChannelUtil::UpdateInsertInfoFromDB(ChannelInsertInfo &chan)
     {
         QString xmltvid = query.value(0).toString();
         bool useeit     = query.value(1).toBool();
-        bool visible    = query.value(2).toBool();
+        ChannelVisibleType visible =
+            static_cast<ChannelVisibleType>(query.value(2).toInt());
 
         if (!xmltvid.isEmpty())
         {
             if (useeit)
+            {
                 LOG(VB_GENERAL, LOG_ERR,
                     "Using EIT and xmltv for the same channel "
-                    "is a unsupported configuration.");
-            chan.m_xmltvid = xmltvid;
-            chan.m_use_on_air_guide = useeit;
+                    "is an unsupported configuration.");
+            }
+            chan.m_xmltvId = xmltvid;
         }
-
-        chan.m_hidden = !visible;
+        chan.m_useOnAirGuide = useeit;
+        chan.m_hidden = (visible == kChannelNotVisible ||
+                         visible == kChannelNeverVisible);
+        chan.m_visible = visible;
     }
 }
 
@@ -1723,7 +1767,8 @@ bool ChannelUtil::DeleteChannel(uint channel_id)
 {
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare(
-        "DELETE FROM channel "
+        "UPDATE channel "
+        "SET deleted = NOW() "
         "WHERE chanid = :ID");
     query.bindValue(":ID", channel_id);
 
@@ -1747,7 +1792,7 @@ bool ChannelUtil::DeleteChannel(uint channel_id)
     return true;
 }
 
-bool ChannelUtil::SetVisible(uint channel_id, bool visible)
+bool ChannelUtil::SetVisible(uint channel_id, ChannelVisibleType visible)
 {
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare(
@@ -1816,7 +1861,8 @@ bool ChannelUtil::GetATSCChannel(uint sourceid, const QString &channum,
     query.prepare(
         "SELECT atsc_major_chan, atsc_minor_chan "
         "FROM channel "
-        "WHERE channum  = :CHANNUM AND "
+        "WHERE deleted  IS NULL AND "
+        "      channum  = :CHANNUM AND "
         "      sourceid = :SOURCEID");
 
     query.bindValue(":SOURCEID", sourceid);
@@ -1867,10 +1913,11 @@ bool ChannelUtil::GetChannelData(
         "       atsc_major_chan, atsc_minor_chan, serviceid, "
         "       chanid,  visible "
         "FROM channel, videosource "
-        "WHERE videosource.sourceid = channel.sourceid AND "
+        "WHERE channel.deleted      IS NULL            AND "
+        "      videosource.sourceid = channel.sourceid AND "
         "      channum              = :CHANNUM         AND "
         "      channel.sourceid     = :SOURCEID "
-        "ORDER BY channel.visible DESC, channel.chanid ");
+        "ORDER BY channel.visible > 0 DESC, channel.chanid ");
     query.bindValue(":CHANNUM",  channum);
     query.bindValue(":SOURCEID", sourceid);
 
@@ -1946,9 +1993,11 @@ IPTVTuningData ChannelUtil::GetIPTVTuningData(uint chanid)
         return IPTVTuningData();
     }
 
-    QString data_url, fec_url0, fec_url1;
+    QString data_url;
+    QString fec_url0;
+    QString fec_url1;
     IPTVTuningData::FECType fec_type = IPTVTuningData::kNone;
-    uint bitrate[3] = { 0, 0, 0, };
+    std::array<uint,3> bitrate { 0, 0, 0, };
     while (query.next())
     {
         IPTVTuningData::IPTVType type = (IPTVTuningData::IPTVType)
@@ -2024,27 +2073,17 @@ ChannelInfoList ChannelUtil::GetChannelsInternal(
         " %1  JOIN capturecard  ON capturecard.sourceid = channel.sourceid ")
         .arg((include_disconnected) ? "LEFT" : "");
 
-    QString cond = " WHERE ";
+    qstr += "WHERE deleted IS NULL ";
 
     if (sourceid)
-    {
-        qstr += QString("WHERE channel.sourceid='%1' ").arg(sourceid);
-        cond = " AND ";
-    }
+        qstr += QString("AND channel.sourceid='%1' ").arg(sourceid);
 
     // Select only channels from the specified channel group
     if (channel_groupid > 0)
-    {
-        qstr += QString("%1 channelgroup.grpid = '%2' ")
-            .arg(cond).arg(channel_groupid);
-        cond = " AND ";
-    }
+        qstr += QString("AND channelgroup.grpid = '%1' ").arg(channel_groupid);
 
     if (visible_only)
-    {
-        qstr += QString("%1 visible=1 ").arg(cond);
-        cond = " AND ";
-    }
+        qstr += QString("AND visible > 0 ");
 
     qstr += " GROUP BY chanid";
 
@@ -2070,12 +2109,13 @@ ChannelInfoList ChannelUtil::GetChannelsInternal(
             query.value(3).toUInt(),                      /* ATSC major */
             query.value(4).toUInt(),                      /* ATSC minor */
             query.value(7).toUInt(),                      /* mplexid    */
-            query.value(8).toBool(),                      /* visible    */
+            static_cast<ChannelVisibleType>(query.value(8).toInt()),
+                                                          /* visible    */
             query.value(5).toString(),                    /* name       */
             query.value(6).toString(),                    /* icon       */
             query.value(9).toUInt());                     /* sourceid   */
 
-        chan.m_xmltvid = query.value(12).toString();      /* xmltvid    */
+        chan.m_xmltvId = query.value(12).toString();      /* xmltvid    */
 
         QStringList inputIDs = query.value(11).toString().split(",");
         QString inputid;
@@ -2098,23 +2138,19 @@ vector<uint> ChannelUtil::GetChanIDs(int sourceid, bool onlyVisible)
 {
     MSqlQuery query(MSqlQuery::InitCon());
 
-    QString select = "SELECT chanid FROM channel ";
+    QString select = "SELECT chanid FROM channel WHERE deleted IS NULL ";
     // Yes, this a little ugly
     if (onlyVisible || sourceid > 0)
     {
-        select += "WHERE ";
         if (onlyVisible)
-            select += "visible = 1 ";
+            select += "AND visible > 0 ";
         if (sourceid > 0)
-        {
-            if (onlyVisible)
-                select += "AND ";
-            select += "sourceid=" + QString::number(sourceid);
-        }
+            select += "AND sourceid=" + QString::number(sourceid);
     }
 
     vector<uint> list;
-    if (!query.exec(select))
+    query.prepare(select);
+    if (!query.exec())
     {
         MythDB::DBError("SourceUtil::GetChanIDs()", query);
         return list;
@@ -2128,42 +2164,47 @@ vector<uint> ChannelUtil::GetChanIDs(int sourceid, bool onlyVisible)
 
 inline bool lt_callsign(const ChannelInfo &a, const ChannelInfo &b)
 {
-    return naturalCompare(a.m_callsign, b.m_callsign) < 0;
+    return naturalCompare(a.m_callSign, b.m_callSign) < 0;
 }
 
 inline bool lt_smart(const ChannelInfo &a, const ChannelInfo &b)
 {
-    static QMutex sepExprLock;
-    static const QRegExp sepExpr(ChannelUtil::kATSCSeparators);
+    static QMutex s_sepExprLock;
+    static const QRegExp kSepExpr(ChannelUtil::kATSCSeparators);
 
-    bool isIntA, isIntB;
-    int a_int   = a.m_channum.toUInt(&isIntA);
-    int b_int   = b.m_channum.toUInt(&isIntB);
-    int a_major = a.m_atsc_major_chan;
-    int b_major = b.m_atsc_major_chan;
-    int a_minor = a.m_atsc_minor_chan;
-    int b_minor = b.m_atsc_minor_chan;
+    bool isIntA = false;
+    bool isIntB = false;
+    int a_int   = a.m_chanNum.toUInt(&isIntA);
+    int b_int   = b.m_chanNum.toUInt(&isIntB);
+    int a_major = a.m_atscMajorChan;
+    int b_major = b.m_atscMajorChan;
+    int a_minor = a.m_atscMinorChan;
+    int b_minor = b.m_atscMinorChan;
 
     // Extract minor and major numbers from channum..
-    bool tmp1, tmp2;
-    int idxA, idxB;
+    int idxA = 0;
+    int idxB = 0;
     {
-        QMutexLocker locker(&sepExprLock);
-        idxA = a.m_channum.indexOf(sepExpr);
-        idxB = b.m_channum.indexOf(sepExpr);
+        QMutexLocker locker(&s_sepExprLock);
+        idxA = a.m_chanNum.indexOf(kSepExpr);
+        idxB = b.m_chanNum.indexOf(kSepExpr);
     }
     if (idxA >= 0)
     {
-        int major = a.m_channum.left(idxA).toUInt(&tmp1);
-        int minor = a.m_channum.mid(idxA+1).toUInt(&tmp2);
+        bool tmp1 = false;
+        bool tmp2 = false;
+        int major = a.m_chanNum.left(idxA).toUInt(&tmp1);
+        int minor = a.m_chanNum.mid(idxA+1).toUInt(&tmp2);
         if (tmp1 && tmp2)
             (a_major = major), (a_minor = minor), (isIntA = false);
     }
 
     if (idxB >= 0)
     {
-        int major = b.m_channum.left(idxB).toUInt(&tmp1);
-        int minor = b.m_channum.mid(idxB+1).toUInt(&tmp2);
+        bool tmp1 = false;
+        bool tmp2 = false;
+        int major = b.m_chanNum.left(idxB).toUInt(&tmp1);
+        int minor = b.m_chanNum.mid(idxB+1).toUInt(&tmp2);
         if (tmp1 && tmp2)
             (b_major = major), (b_minor = minor), (isIntB = false);
     }
@@ -2188,7 +2229,7 @@ inline bool lt_smart(const ChannelInfo &a, const ChannelInfo &b)
     {
         int a_maj = (!a_minor && isIntA) ? a_int : a_major;
         int b_maj = (!b_minor && isIntB) ? b_int : b_major;
-        int cmp;
+        int cmp = 0;
         if ((cmp = a_maj - b_maj))
             return cmp < 0;
 
@@ -2211,7 +2252,7 @@ inline bool lt_smart(const ChannelInfo &a, const ChannelInfo &b)
     else
     {
         // neither of channels have a numeric channum
-        int cmp = naturalCompare(a.m_channum, b.m_channum);
+        int cmp = naturalCompare(a.m_chanNum, b.m_chanNum);
         if (cmp)
             return cmp < 0;
     }
@@ -2225,9 +2266,9 @@ uint ChannelUtil::GetChannelCount(int sourceid)
     QString   select;
 
 
-    select = "SELECT chanid FROM channel";
+    select = "SELECT chanid FROM channel WHERE deleted IS NULL ";
     if (sourceid >= 0)
-        select += " WHERE sourceid=" + QString::number(sourceid);
+        select += "AND sourceid=" + QString::number(sourceid);
     select += ';';
 
     query.prepare(select);
@@ -2275,7 +2316,7 @@ int ChannelUtil::GetNearestChannel(const ChannelInfoList &list,
                                    const QString &channum)
 {
     ChannelInfo target;
-    target.m_channum = channum;
+    target.m_chanNum = channum;
     int b = -1; // index of best seen so far
     for (int i = 0; i < (int)list.size(); ++i)
     {
@@ -2304,8 +2345,7 @@ uint ChannelUtil::GetNextChannel(
     bool              skip_non_visible,
     bool              skip_same_channum_and_callsign)
 {
-    ChannelInfoList::const_iterator it =
-        find(sorted.begin(), sorted.end(), old_chanid);
+    auto it = find(sorted.cbegin(), sorted.cend(), old_chanid);
 
     if (it == sorted.end())
         it = sorted.begin(); // not in list, pretend we are on first channel
@@ -2313,7 +2353,7 @@ uint ChannelUtil::GetNextChannel(
     if (it == sorted.end())
         return 0; // no channels..
 
-    ChannelInfoList::const_iterator start = it;
+    auto start = it;
 
     if (CHANNEL_DIRECTION_DOWN == direction)
     {
@@ -2322,7 +2362,7 @@ uint ChannelUtil::GetNextChannel(
             if (it == sorted.begin())
             {
                 it = find(sorted.begin(), sorted.end(),
-                          sorted.rbegin()->m_chanid);
+                          sorted.rbegin()->m_chanId);
                 if (it == sorted.end())
                 {
                     --it;
@@ -2332,14 +2372,14 @@ uint ChannelUtil::GetNextChannel(
                 --it;
         }
         while ((it != start) &&
-               ((skip_non_visible && !it->m_visible) ||
+               ((skip_non_visible && it->m_visible < kChannelVisible) ||
                 (skip_same_channum_and_callsign &&
-                 it->m_channum  == start->m_channum &&
-                 it->m_callsign == start->m_callsign) ||
-                (mplexid_restriction &&
-                 (mplexid_restriction != it->m_mplexid)) ||
-                (chanid_restriction &&
-                 (chanid_restriction != it->m_chanid))));
+                 it->m_chanNum  == start->m_chanNum &&
+                 it->m_callSign == start->m_callSign) ||
+                ((mplexid_restriction != 0U) &&
+                 (mplexid_restriction != it->m_mplexId)) ||
+                ((chanid_restriction != 0U) &&
+                 (chanid_restriction != it->m_chanId))));
     }
     else if ((CHANNEL_DIRECTION_UP == direction) ||
              (CHANNEL_DIRECTION_FAVORITE == direction))
@@ -2351,17 +2391,17 @@ uint ChannelUtil::GetNextChannel(
                 it = sorted.begin();
         }
         while ((it != start) &&
-               ((skip_non_visible && !it->m_visible) ||
+               ((skip_non_visible && it->m_visible < kChannelVisible) ||
                 (skip_same_channum_and_callsign &&
-                 it->m_channum  == start->m_channum &&
-                 it->m_callsign == start->m_callsign) ||
-                (mplexid_restriction &&
-                 (mplexid_restriction != it->m_mplexid)) ||
-                (chanid_restriction &&
-                 (chanid_restriction != it->m_chanid))));
+                 it->m_chanNum  == start->m_chanNum &&
+                 it->m_callSign == start->m_callSign) ||
+                ((mplexid_restriction != 0U) &&
+                 (mplexid_restriction != it->m_mplexId)) ||
+                ((chanid_restriction != 0U) &&
+                 (chanid_restriction != it->m_chanId))));
     }
 
-    return it->m_chanid;
+    return it->m_chanId;
 }
 
 ChannelInfoList ChannelUtil::LoadChannels(uint startIndex, uint count,
@@ -2373,7 +2413,8 @@ ChannelInfoList ChannelUtil::LoadChannels(uint startIndex, uint count,
                                           uint channelGroupID,
                                           bool liveTVOnly,
                                           const QString& callsign,
-                                          const QString& channum)
+                                          const QString& channum,
+                                          bool ignoreUntunable)
 {
     ChannelInfoList channelList;
 
@@ -2392,24 +2433,23 @@ ChannelInfoList ChannelUtil::LoadChannels(uint startIndex, uint count,
                   "             ORDER BY livetvorder), " // Creates a CSV list of inputids for this channel
                   "MIN(livetvorder) livetvorder "
                   "FROM channel "
-                  "LEFT JOIN channelgroup ON channel.chanid = channelgroup.chanid "
-                  "LEFT JOIN capturecard  ON capturecard.sourceid = channel.sourceid ";
+                  "LEFT JOIN channelgroup ON channel.chanid = channelgroup.chanid ";
 
-    QStringList cond;
+    sql += QString("%1 JOIN capturecard ON capturecard.sourceid = channel.sourceid ")
+                   .arg(ignoreUntunable ? "INNER" : "LEFT");
+
+    sql += "WHERE channel.deleted IS NULL ";
     if (ignoreHidden)
-        cond << "channel.visible = :VISIBLE ";
+        sql += "AND channel.visible > 0 ";
 
     if (channelGroupID > 0)
-        cond << "channelgroup.grpid = :CHANGROUPID ";
+        sql += "AND channelgroup.grpid = :CHANGROUPID ";
 
     if (sourceID > 0)
-        cond << "channel.sourceid = :SOURCEID ";
+        sql += "AND channel.sourceid = :SOURCEID ";
 
     if (liveTVOnly)
-        cond << "capturecard.livetvorder > 0 ";
-
-    if (!cond.isEmpty())
-        sql += QString("WHERE %1").arg(cond.join("AND "));
+        sql += "AND capturecard.livetvorder > 0 ";
 
     if (groupBy == kChanGroupByCallsign)
         sql += "GROUP BY channel.callsign ";
@@ -2447,9 +2487,6 @@ ChannelInfoList ChannelUtil::LoadChannels(uint startIndex, uint count,
 
     query.prepare(sql);
 
-    if (ignoreHidden)
-        query.bindValue(":VISIBLE", 1);
-
     if (channelGroupID > 0)
         query.bindValue(":CHANGROUPID", channelGroupID);
 
@@ -2478,34 +2515,35 @@ ChannelInfoList ChannelUtil::LoadChannels(uint startIndex, uint count,
     while (query.next())
     {
         ChannelInfo channelInfo;
-        channelInfo.m_channum           = query.value(0).toString();
-        channelInfo.m_freqid            = query.value(1).toString();
-        channelInfo.m_sourceid          = query.value(2).toUInt();
-        channelInfo.m_callsign          = query.value(3).toString();
+        channelInfo.m_chanNum           = query.value(0).toString();
+        channelInfo.m_freqId            = query.value(1).toString();
+        channelInfo.m_sourceId          = query.value(2).toUInt();
+        channelInfo.m_callSign          = query.value(3).toString();
         channelInfo.m_name              = query.value(4).toString();
         channelInfo.m_icon              = query.value(5).toString();
-        channelInfo.m_finetune          = query.value(6).toInt();
-        channelInfo.m_videofilters      = query.value(7).toString();
-        channelInfo.m_xmltvid           = query.value(8).toString();
-        channelInfo.m_recpriority       = query.value(9).toInt();
+        channelInfo.m_fineTune          = query.value(6).toInt();
+        channelInfo.m_videoFilters      = query.value(7).toString();
+        channelInfo.m_xmltvId           = query.value(8).toString();
+        channelInfo.m_recPriority       = query.value(9).toInt();
         channelInfo.m_contrast          = query.value(10).toUInt();
         channelInfo.m_brightness        = query.value(11).toUInt();
         channelInfo.m_colour            = query.value(12).toUInt();
         channelInfo.m_hue               = query.value(13).toUInt();
-        channelInfo.m_tvformat          = query.value(14).toString();
-        channelInfo.m_visible           = query.value(15).toBool();
-        channelInfo.m_outputfilters     = query.value(16).toString();
-        channelInfo.m_useonairguide     = query.value(17).toBool();
-        channelInfo.m_mplexid           = query.value(18).toUInt();
-        channelInfo.m_serviceid         = query.value(19).toUInt();
-        channelInfo.m_atsc_major_chan   = query.value(20).toUInt();
-        channelInfo.m_atsc_minor_chan   = query.value(21).toUInt();
-        channelInfo.m_last_record       = query.value(22).toDateTime();
-        channelInfo.m_default_authority = query.value(23).toString();
-        channelInfo.m_commmethod        = query.value(24).toUInt();
-        channelInfo.m_tmoffset          = query.value(25).toUInt();
-        channelInfo.m_iptvid            = query.value(26).toUInt();
-        channelInfo.m_chanid            = query.value(27).toUInt();
+        channelInfo.m_tvFormat          = query.value(14).toString();
+        channelInfo.m_visible           =
+            static_cast<ChannelVisibleType>(query.value(15).toInt());
+        channelInfo.m_outputFilters     = query.value(16).toString();
+        channelInfo.m_useOnAirGuide     = query.value(17).toBool();
+        channelInfo.m_mplexId           = query.value(18).toUInt();
+        channelInfo.m_serviceId         = query.value(19).toUInt();
+        channelInfo.m_atscMajorChan     = query.value(20).toUInt();
+        channelInfo.m_atscMinorChan     = query.value(21).toUInt();
+        channelInfo.m_lastRecord        = query.value(22).toDateTime();
+        channelInfo.m_defaultAuthority  = query.value(23).toString();
+        channelInfo.m_commMethod        = query.value(24).toUInt();
+        channelInfo.m_tmOffset          = query.value(25).toUInt();
+        channelInfo.m_iptvId            = query.value(26).toUInt();
+        channelInfo.m_chanId            = query.value(27).toUInt();
 
         QStringList groupIDs = query.value(28).toString().split(",");
         QString groupid;

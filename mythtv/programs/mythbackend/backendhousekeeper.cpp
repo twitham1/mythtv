@@ -115,6 +115,7 @@ bool CleanupTask::DoRun(void)
     CleanupInUsePrograms();
     CleanupOrphanedLiveTV();
     CleanupRecordedTables();
+    CleanupChannelTables();
     CleanupProgramListings();
     return true;
 }
@@ -160,12 +161,15 @@ void CleanupTask::CleanupOrphanedLiveTV(void)
         return;
     }
 
-    QString msg, keepChains;
+    QString msg;
+    QString keepChains;
     while (query.next())
+    {
         if (keepChains.isEmpty())
             keepChains = "'" + query.value(0).toString() + "'";
         else
             keepChains += ", '" + query.value(0).toString() + "'";
+    }
 
     if (keepChains.isEmpty())
         msg = "DELETE FROM tvchain WHERE endtime < now();";
@@ -277,6 +281,36 @@ void CleanupTask::CleanupRecordedTables(void)
                                 "(deleting temporary table)", query);
 }
 
+void CleanupTask::CleanupChannelTables(void)
+{
+    MSqlQuery query(MSqlQuery::InitCon());
+    MSqlQuery deleteQuery(MSqlQuery::InitCon());
+
+    query.prepare(QString("DELETE channel "
+                          "FROM channel "
+                          "LEFT JOIN recorded r "
+                          "    ON r.chanid = channel.chanid "
+                          "LEFT JOIN oldrecorded o "
+                          "    ON o.chanid = channel.chanid "
+                          "WHERE channel.deleted IS NOT NULL "
+                          "      AND channel.deleted < "
+                          "          DATE_SUB(NOW(), INTERVAL 1 DAY) "
+                          "      AND r.chanid IS NULL "
+                          "      AND o.chanid IS NULL"));
+    if (!query.exec())
+        MythDB::DBError("CleanupTask::CleanupChannelTables "
+                        "(channel table)", query);
+
+    query.prepare(QString("DELETE dtv_multiplex "
+                          "FROM dtv_multiplex "
+                          "LEFT JOIN channel c "
+                          "    ON c.mplexid = dtv_multiplex.mplexid "
+                          "WHERE c.chanid IS NULL"));
+    if (!query.exec())
+        MythDB::DBError("CleanupTask::CleanupChannelTables "
+                        "(dtv_multiplex table)", query);
+}
+
 void CleanupTask::CleanupProgramListings(void)
 {
     MSqlQuery query(MSqlQuery::InitCon());
@@ -364,7 +398,7 @@ void CleanupTask::CleanupProgramListings(void)
         MythDB::DBError("HouseKeeper Cleaning Program Listings", query);
 }
 
-bool ThemeUpdateTask::DoCheckRun(QDateTime now)
+bool ThemeUpdateTask::DoCheckRun(const QDateTime& now)
 {
     return gCoreContext->GetBoolSetting("ThemeUpdateNofications", true) &&
             PeriodicHouseKeeperTask::DoCheckRun(now);
@@ -467,9 +501,8 @@ void ThemeUpdateTask::Terminate(void)
     m_running = false;
 }
 
-RadioStreamUpdateTask::RadioStreamUpdateTask(void) : DailyHouseKeeperTask("UpdateRadioStreams",
-                                                       kHKGlobal, kHKRunOnStartup),
-    m_msMU(nullptr)
+RadioStreamUpdateTask::RadioStreamUpdateTask(void)
+    : DailyHouseKeeperTask("UpdateRadioStreams", kHKGlobal, kHKRunOnStartup)
 {
 }
 
@@ -517,7 +550,7 @@ RadioStreamUpdateTask::~RadioStreamUpdateTask(void)
     m_msMU = nullptr;
 }
 
-bool RadioStreamUpdateTask::DoCheckRun(QDateTime now)
+bool RadioStreamUpdateTask::DoCheckRun(const QDateTime& now)
 {
     // we are only interested in the global setting so remove any local host setting just in case
     GetMythDB()->ClearSetting("MusicStreamListModified");
@@ -534,9 +567,8 @@ void RadioStreamUpdateTask::Terminate(void)
         m_msMU->Term(true);
 }
 
-ArtworkTask::ArtworkTask(void) : DailyHouseKeeperTask("RecordedArtworkUpdate",
-                                         kHKGlobal, kHKRunOnStartup),
-    m_msMML(nullptr)
+ArtworkTask::ArtworkTask(void)
+    : DailyHouseKeeperTask("RecordedArtworkUpdate", kHKGlobal, kHKRunOnStartup)
 {
 }
 
@@ -583,7 +615,7 @@ ArtworkTask::~ArtworkTask(void)
     m_msMML = nullptr;
 }
 
-bool ArtworkTask::DoCheckRun(QDateTime now)
+bool ArtworkTask::DoCheckRun(const QDateTime& now)
 {
     return gCoreContext->GetBoolSetting("DailyArtworkUpdates", false) &&
             PeriodicHouseKeeperTask::DoCheckRun(now);
@@ -603,7 +635,7 @@ bool JobQueueRecoverTask::DoRun(void)
 }
 
 MythFillDatabaseTask::MythFillDatabaseTask(void) :
-    DailyHouseKeeperTask("MythFillDB"), m_msMFD(nullptr)
+    DailyHouseKeeperTask("MythFillDB")
 {
     SetHourWindowFromDB();
 }
@@ -653,7 +685,7 @@ bool MythFillDatabaseTask::UseSuggestedTime(void)
     return gCoreContext->GetBoolSetting("MythFillGrabberSuggestsTime", true);
 }
 
-bool MythFillDatabaseTask::DoCheckRun(QDateTime now)
+bool MythFillDatabaseTask::DoCheckRun(const QDateTime& now)
 {
     if (!gCoreContext->GetBoolSetting("MythFillEnabled", true))
     {

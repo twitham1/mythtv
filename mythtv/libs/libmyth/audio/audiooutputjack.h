@@ -44,27 +44,27 @@ class AudioOutputJACK : public AudioOutputBase
 
     // Our various callback functions
     inline int JackCallback(jack_nframes_t nframes);
-    static int _JackCallback(jack_nframes_t nframes, void *arg);
+    static int JackCallbackHelper(jack_nframes_t nframes, void *arg);
     inline int JackXRunCallback();
-    static int _JackXRunCallback(void *arg);
+    static int JackXRunCallbackHelper(void *arg);
     inline int JackGraphOrderCallback();
-    static int _JackGraphOrderCallback(void *arg);
+    static int JackGraphOrderCallbackHelper(void *arg);
 
-    jack_client_t* _jack_client_open(void);
-    const char** _jack_get_ports(void);
-    bool _jack_connect_ports(const char** /*matching_ports*/);
-    inline void _jack_client_close(jack_client_t **client);
+    static jack_client_t* JackClientOpen(void);
+    const char** JackGetPorts(void);
+    bool JackConnectPorts(const char** /*matching_ports*/);
+    inline void JackClientClose(jack_client_t **client);
 
     void DeinterleaveAudio(const float *aubuf, float **bufs,
                            int nframes, const int* channel_volumes);
 
-    jack_port_t   *m_ports[JACK_CHANNELS_MAX];
-    int            m_chan_volumes[JACK_CHANNELS_MAX];
+    jack_port_t   *m_ports[JACK_CHANNELS_MAX]       {};
+    int            m_chanVolumes[JACK_CHANNELS_MAX] {};
     jack_client_t *m_client       {nullptr};
-    jack_client_t *m_stale_client {nullptr};
-    int            m_jack_latency {0};
-    int            m_jack_xruns   {0};
-    unsigned char *m_aubuf        {nullptr};
+    jack_client_t *m_staleClient  {nullptr};
+    int            m_jackLatency  {0};
+    int            m_jackXruns    {0};
+    unsigned char *m_auBuf        {nullptr};
 
 
 };

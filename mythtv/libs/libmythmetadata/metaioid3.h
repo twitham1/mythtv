@@ -33,8 +33,8 @@ using TagLib::ID3v2::AttachedPictureFrame;
 class META_PUBLIC MetaIOID3 : public MetaIOTagLib
 {
   public:
-    MetaIOID3(void) : MetaIOTagLib() {}
-    virtual ~MetaIOID3(void) { CloseFile(); }
+    MetaIOID3(void) = default;
+    ~MetaIOID3(void) override { CloseFile(); }
 
     bool write(const QString &filename, MusicMetadata* mdata) override; // MetaIOTagLib
     bool writeVolatileMetadata(const QString &filename, MusicMetadata* mdata) override; // MetaIO
@@ -61,22 +61,22 @@ class META_PUBLIC MetaIOID3 : public MetaIOTagLib
     TagLib::ID3v2::Tag* GetID3v2Tag(bool create = false);
     TagLib::ID3v1::Tag* GetID3v1Tag(bool create = false);
 
-    bool writePlayCount(TagLib::ID3v2::Tag *tag, int playcount);
-    bool writeRating(TagLib::ID3v2::Tag *tag, int rating);
-    bool writeLastPlay(TagLib::ID3v2::Tag *tag, QDateTime lastPlay);
+    static bool writePlayCount(TagLib::ID3v2::Tag *tag, int playcount);
+    static bool writeRating(TagLib::ID3v2::Tag *tag, int rating);
+    static bool writeLastPlay(TagLib::ID3v2::Tag *tag, QDateTime lastPlay);
 
-    AlbumArtList readAlbumArt(TagLib::ID3v2::Tag *tag);
-    UserTextIdentificationFrame* find(TagLib::ID3v2::Tag *tag,
+    static AlbumArtList readAlbumArt(TagLib::ID3v2::Tag *tag);
+    static UserTextIdentificationFrame* find(TagLib::ID3v2::Tag *tag,
                                       const String &description);
-    PopularimeterFrame* findPOPM(TagLib::ID3v2::Tag *tag, const String &email);
-    AttachedPictureFrame* findAPIC(TagLib::ID3v2::Tag *tag,
+    static PopularimeterFrame* findPOPM(TagLib::ID3v2::Tag *tag, const String &email);
+    static AttachedPictureFrame* findAPIC(TagLib::ID3v2::Tag *tag,
                                    const AttachedPictureFrame::Type &type,
                                    const String &description = String::null);
-    QString getExtFromMimeType(const QString &mimeType);
+    static QString getExtFromMimeType(const QString &mimeType);
 
     TagLib::File *m_file {nullptr};
 
-    typedef enum { kMPEG, kFLAC } TagType;
+    enum TagType { kMPEG, kFLAC };
     TagType m_fileType {kMPEG};
 };
 

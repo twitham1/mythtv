@@ -26,21 +26,21 @@ class pid_cache_item_t
   public:
     pid_cache_item_t() = default;
     pid_cache_item_t(uint pid, uint sid_tid) :
-        m_pid(pid), m_sid_tid(sid_tid) {}
+        m_pid(pid), m_sidTid(sid_tid) {}
     uint GetPID(void) const { return m_pid; }
     uint GetStreamID(void) const
-        { return (m_sid_tid&0x100) ? GetID() : 0; }
+        { return (m_sidTid&0x100) ? GetID() : 0; }
     uint GetTableID(void) const
-        { return (m_sid_tid&0x100) ? 0 : GetID(); }
-    uint GetID(void) const { return m_sid_tid & 0xff; }
-    bool IsPCRPID(void) const { return ( m_sid_tid&0x200 ) != 0; }
-    bool IsPermanent(void) const { return ( m_sid_tid&0x10000 ) != 0; }
-    uint GetComposite(void) const { return m_sid_tid; }
+        { return (m_sidTid&0x100) ? 0 : GetID(); }
+    uint GetID(void) const { return m_sidTid & 0xff; }
+    bool IsPCRPID(void) const { return ( m_sidTid&0x200 ) != 0; }
+    bool IsPermanent(void) const { return ( m_sidTid&0x10000 ) != 0; }
+    uint GetComposite(void) const { return m_sidTid; }
   private:
     uint m_pid     {0};
-    uint m_sid_tid {0};
+    uint m_sidTid  {0};
 };
-typedef vector<pid_cache_item_t> pid_cache_t;
+using pid_cache_t = vector<pid_cache_item_t>;
 
 /** \class ChannelUtil
  *  \brief Collection of helper utilities for channel DB use
@@ -53,24 +53,24 @@ class MTV_PUBLIC ChannelUtil
     // Multiplex Stuff
 
     static uint    CreateMultiplex(
-        int  sourceid,          QString sistandard,
-        uint64_t frequency,     QString modulation,
+        int  sourceid,          const QString& sistandard,
+        uint64_t frequency,     const QString& modulation,
         int  transport_id = -1, int     network_id = -1);
 
     static uint    CreateMultiplex(
-        int         sourceid,     QString     sistandard,
-        uint64_t    frequency,    QString     modulation,
+        int            sourceid,     const QString& sistandard,
+        uint64_t       frequency,    const QString& modulation,
         // DVB specific
-        int         transport_id, int         network_id,
-        int         symbol_rate,  signed char bandwidth,
-        signed char polarity,     signed char inversion,
-        signed char trans_mode,
-        QString     inner_FEC,    QString     constellation,
-        signed char hierarchy,    QString     hp_code_rate,
-        QString     lp_code_rate, QString     guard_interval,
-        QString     mod_sys,      QString     rolloff);
+        int            transport_id, int            network_id,
+        int            symbol_rate,  signed char    bandwidth,
+        signed char    polarity,     signed char    inversion,
+        signed char    trans_mode,
+        const QString& inner_FEC,    const QString& constellation,
+        signed char    hierarchy,    const QString& hp_code_rate,
+        const QString& lp_code_rate, const QString& guard_interval,
+        const QString& mod_sys,      const QString& rolloff);
 
-    static uint    CreateMultiplex(uint sourceid, const DTVMultiplex&,
+    static uint    CreateMultiplex(uint sourceid, const DTVMultiplex &mux,
                                    int transport_id, int network_id);
 
     static vector<uint> CreateMultiplexes(
@@ -96,7 +96,12 @@ class MTV_PUBLIC ChannelUtil
     static bool    GetATSCChannel(uint sourceid, const QString &channum,
                                   uint &major,   uint          &minor);
     static bool    IsATSCChannel(uint sourceid, const QString &channum)
-        { uint m1, m2; GetATSCChannel(sourceid, channum, m1,m2); return m2; }
+        {
+            uint m1 = 0;
+            uint m2 = 0;
+            GetATSCChannel(sourceid, channum, m1,m2);
+            return m2 != 0U;
+        }
 
     // Channel/Service Stuff
     static int     CreateChanID(uint sourceid, const QString &chan_num);
@@ -111,13 +116,13 @@ class MTV_PUBLIC ChannelUtil
                                  uint atsc_major_channel,
                                  uint atsc_minor_channel,
                                  bool use_on_air_guide,
-                                 bool hidden,
-                                 bool hidden_in_guide,
+                                 ChannelVisibleType visible,
                                  const QString &freqid,
-                                 QString icon    = QString(),
+                                 const QString& icon    = QString(),
                                  QString format  = "Default",
-                                 QString xmltvid = QString(),
-                                 QString default_authority = QString());
+                                 const QString& xmltvid = QString(),
+                                 const QString& default_authority = QString(),
+                                 uint service_type = 0);
 
     static bool    UpdateChannel(uint db_mplexid,
                                  uint source_id,
@@ -129,13 +134,13 @@ class MTV_PUBLIC ChannelUtil
                                  uint atsc_major_channel,
                                  uint atsc_minor_channel,
                                  bool use_on_air_guide,
-                                 bool hidden,
-                                 bool hidden_in_guide,
+                                 ChannelVisibleType visible,
                                  const QString& freqid  = QString(),
                                  const QString& icon    = QString(),
                                  QString format  = QString(),
                                  const QString& xmltvid = QString(),
-                                 const QString& default_authority = QString());
+                                 const QString& default_authority = QString(),
+                                 uint service_type = 0);
 
     static bool    CreateIPTVTuningData(
         uint channel_id, const IPTVTuningData &tuning)
@@ -147,10 +152,11 @@ class MTV_PUBLIC ChannelUtil
         uint channel_id, const IPTVTuningData &tuning);
 
     static void    UpdateInsertInfoFromDB(ChannelInsertInfo &chan);
+    static void    UpdateChannelNumberFromDB(ChannelInsertInfo &chan);
 
     static bool    DeleteChannel(uint channel_id);
 
-    static bool    SetVisible(uint channel_id, bool visible);
+    static bool    SetVisible(uint channel_id, ChannelVisibleType visible);
 
     static bool    SetServiceVersion(int mplexid, int version);
 
@@ -225,7 +231,8 @@ class MTV_PUBLIC ChannelUtil
                                         uint channelGroupID = 0,
                                         bool liveTVOnly = false,
                                         const QString& callsign = "",
-                                        const QString& channum = "");
+                                        const QString& channum = "",
+                                        bool ignoreUntunable = true);
 
     /**
      * \deprecated Use LoadChannels instead

@@ -73,7 +73,7 @@ VorbisEncoder::VorbisEncoder(const QString &outfile, int qualitylevel,
     ogg_stream_packetin(&m_os, &header_comments);
     ogg_stream_packetin(&m_os, &header_codebooks);
 
-    int result;
+    int result = 0;
     while ((result = ogg_stream_flush(&m_os, &m_og)))
     {
         if (!result || !m_out)
@@ -104,7 +104,7 @@ VorbisEncoder::~VorbisEncoder()
 int VorbisEncoder::addSamples(int16_t * bytes, unsigned int length)
 {
     long realsamples = 0;
-    signed char *chars = (signed char *)bytes;
+    auto *chars = (signed char *)bytes;
 
     realsamples = length / 4;
 
@@ -131,7 +131,7 @@ int VorbisEncoder::addSamples(int16_t * bytes, unsigned int length)
         while (vorbis_bitrate_flushpacket(&m_vd, &m_op))
         {
             ogg_stream_packetin(&m_os, &m_op);
-            m_packetsdone++;
+            m_packetsDone++;
 
             int eos = 0;
             while (!eos)
@@ -147,7 +147,7 @@ int VorbisEncoder::addSamples(int16_t * bytes, unsigned int length)
                         QString("Failed to write ogg data. Aborting."));
                     return EENCODEERROR;
                 }
-                m_bytes_written += ret;
+                m_bytesWritten += ret;
 
                 if (ogg_page_eos(&m_og))
                     eos = 1;

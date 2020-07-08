@@ -34,7 +34,7 @@ class MUI_PUBLIC MythUIText : public MythUIType, public StorageUser
     MythUIText(const QString &text, const MythFontProperties &font,
                QRect displayRect, QRect altDisplayRect,
                MythUIType *parent, const QString &name);
-    ~MythUIText();
+    ~MythUIText() override;
 
     void Reset(void) override; // MythUIType
     void ResetMap(const InfoMap &map);
@@ -62,7 +62,7 @@ class MUI_PUBLIC MythUIText : public MythUIType, public StorageUser
     QString GetDBValue(void) const override // StorageUser
         { return GetText(); }
 
-    void SetFontState(const QString&);
+    void SetFontState(const QString &state);
     void SetJustification(int just);
 
   protected:
@@ -81,7 +81,7 @@ class MUI_PUBLIC MythUIText : public MythUIType, public StorageUser
     void CycleColor(const QColor& startColor, const QColor& endColor, int numSteps);
     void StopCycling();
 
-    int GetJustification(void);
+    int GetJustification(void) const;
     void SetCutDown(Qt::TextElideMode mode);
     Qt::TextElideMode GetCutDown(void) const { return m_Cutdown; }
     void SetMultiLine(bool multiline);

@@ -7,12 +7,14 @@ using namespace std;
 #include <QString>
 #include <QSqlError>
 #include "dbcheck.h"
+#include "mythdbcheck.h"
 
 #include "mythversion.h"
 #include "dbutil.h"
 #include "mythcorecontext.h"
 #include "schemawizard.h"
 #include "mythdb.h"
+#include "mythdbcheck.h"
 #include "mythlogging.h"
 #include "videodbcheck.h" // for 1267
 #include "compat.h"
@@ -20,6 +22,7 @@ using namespace std;
 #include "recordingprofile.h"
 #include "recordinginfo.h"
 #include "cardutil.h"
+#include "videodisplayprofile.h"
 
 // TODO convert all dates to UTC
 
@@ -27,9 +30,6 @@ using namespace std;
 
 const QString currentDatabaseVersion = MYTH_DATABASE_VERSION;
 
-static bool UpdateDBVersionNumber(const QString &newnumber, QString &dbver);
-static bool performActualUpdate(
-    const char **updates, const char *version, QString &dbver);
 static bool doUpgradeTVDatabaseSchema(void);
 
 #if CONFIG_SYSTEMD_NOTIFY
@@ -345,115 +345,6 @@ The duplicate field is used to indicate if this record should be used
 to check for duplicates in the BUSQ
  */
 
-/** \fn UpdateDBVersionNumber(const QString&, QString&)
- *  \brief Updates the schema version stored in the database.
- *
- *   Updates "DBSchemaVer" property in the settings table.
- *  \param newnumber New schema version.
- *  \param dbver the database version at the end of the function is returned
- *               in this parameter, if things go well this will be 'newnumber'.
- */
-static bool UpdateDBVersionNumber(const QString &newnumber, QString &dbver)
-{
-    // delete old schema version
-    MSqlQuery query(MSqlQuery::InitCon());
-
-    QString thequery = "DELETE FROM settings WHERE value='DBSchemaVer';";
-    query.prepare(thequery);
-
-    if (!query.exec())
-    {
-        QString msg =
-            QString("DB Error (Deleting old DB version number): \n"
-                    "Query was: %1 \nError was: %2 \nnew version: %3")
-            .arg(thequery)
-            .arg(MythDB::DBErrorMessage(query.lastError()))
-            .arg(newnumber);
-        LOG(VB_GENERAL, LOG_ERR, msg);
-        return false;
-    }
-
-    // set new schema version
-    thequery = QString("INSERT INTO settings (value, data, hostname) "
-                       "VALUES ('DBSchemaVer', %1, NULL);").arg(newnumber);
-    query.prepare(thequery);
-
-    if (!query.exec())
-    {
-        QString msg =
-            QString("DB Error (Setting new DB version number): \n"
-                    "Query was: %1 \nError was: %2 \nnew version: %3")
-            .arg(thequery)
-            .arg(MythDB::DBErrorMessage(query.lastError()))
-            .arg(newnumber);
-        LOG(VB_GENERAL, LOG_ERR, msg);
-        return false;
-    }
-
-    dbver = newnumber;
-
-    return true;
-}
-
-/** \fn performUpdateSeries(const char **)
- *  \brief Runs a number of SQL commands.
- *
- *  \param updates  array of SQL commands to issue, terminated by a NULL string.
- *  \return true on success, false on failure
- */
-static bool performUpdateSeries(const char **updates)
-{
-    MSqlQuery query(MSqlQuery::InitCon());
-
-    int counter = 0;
-    const char *thequery = updates[counter];
-
-    while (thequery != nullptr)
-    {
-        if ((strlen(thequery) != 0U) && !query.exec(thequery))
-        {
-            QString msg =
-                QString("DB Error (Performing database upgrade): \n"
-                        "Query was: %1 \nError was: %2")
-                .arg(thequery)
-                .arg(MythDB::DBErrorMessage(query.lastError()));
-            LOG(VB_GENERAL, LOG_ERR, msg);
-            return false;
-        }
-
-        counter++;
-        thequery = updates[counter];
-    }
-
-    return true;
-}
-
-/** \fn performActualUpdate(const char **, const char*, QString&)
- *  \brief Runs a number of SQL commands, and updates the schema version.
- *
- *  \param updates  array of SQL commands to issue, terminated by a NULL string.
- *  \param version  version we are updating db to.
- *  \param dbver    the database version at the end of the function is returned
- *                  in this parameter, if things go well this will be 'version'.
- *  \return true on success, false on failure
- */
-static bool performActualUpdate(
-    const char **updates, const char *version, QString &dbver)
-{
-    MSqlQuery query(MSqlQuery::InitCon());
-
-    LOG(VB_GENERAL, LOG_CRIT, QString("Upgrading to MythTV schema version ") +
-            version);
-
-    if (!performUpdateSeries(updates))
-        return false;
-
-    if (!UpdateDBVersionNumber(version, dbver))
-        return false;
-
-    return true;
-}
-
 /**
  *  \brief Called from outside dbcheck.cpp to update the schema.
  *
@@ -587,7 +478,7 @@ static bool doUpgradeTVDatabaseSchema(void)
         MSqlQuery query(MSqlQuery::InitCon());
         if (!query.exec(QString("ALTER DATABASE %1 DEFAULT "
                                 "CHARACTER SET utf8 COLLATE utf8_general_ci;")
-                        .arg(gCoreContext->GetDatabaseParams().dbName)))
+                        .arg(gCoreContext->GetDatabaseParams().m_dbName)))
         {
             MythDB::DBError("UpgradeTVDatabaseSchema -- alter charset", query);
         }
@@ -618,63 +509,63 @@ static bool doUpgradeTVDatabaseSchema(void)
 
     if (dbver == "1244")
     {
-       const char *updates[] = {
+       DBUpdates updates {
 "ALTER TABLE cardinput DROP COLUMN freetoaironly;",
-"ALTER TABLE cardinput DROP COLUMN radioservices;",
-nullptr
+"ALTER TABLE cardinput DROP COLUMN radioservices;"
 };
-        if (!performActualUpdate(updates, "1245", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1245", dbver))
             return false;
     }
 
     if (dbver == "1245")
     {
-       const char *updates[] = {
+       DBUpdates updates {
 "DELETE FROM capturecard WHERE cardtype = 'DBOX2';",
 "DELETE FROM profilegroups WHERE cardtype = 'DBOX2';",
 "ALTER TABLE capturecard DROP COLUMN dbox2_port;",
 "ALTER TABLE capturecard DROP COLUMN dbox2_httpport;",
-"ALTER TABLE capturecard DROP COLUMN dbox2_host;",
-nullptr
+"ALTER TABLE capturecard DROP COLUMN dbox2_host;"
 };
-       if (!performActualUpdate(updates, "1246", dbver))
+       if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                updates, "1246", dbver))
             return false;
     }
 
     if (dbver == "1246")
     {
-       const char *updates[] = {
+       DBUpdates updates {
 "ALTER TABLE recorded ADD COLUMN bookmarkupdate timestamp default 0 NOT NULL",
 "UPDATE recorded SET bookmarkupdate = lastmodified+1 WHERE bookmark = 1",
-"UPDATE recorded SET bookmarkupdate = lastmodified WHERE bookmark = 0",
-nullptr
+"UPDATE recorded SET bookmarkupdate = lastmodified WHERE bookmark = 0"
 };
-       if (!performActualUpdate(updates, "1247", dbver))
+       if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                updates, "1247", dbver))
             return false;
     }
 
     if (dbver == "1247")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "INSERT INTO profilegroups SET name = \"Import Recorder\", cardtype = 'IMPORT', is_default = 1;",
 "INSERT INTO recordingprofiles SET name = \"Default\", profilegroup = 14;",
 "INSERT INTO recordingprofiles SET name = \"Live TV\", profilegroup = 14;",
 "INSERT INTO recordingprofiles SET name = \"High Quality\", profilegroup = 14;",
-"INSERT INTO recordingprofiles SET name = \"Low Quality\", profilegroup = 14;",
-nullptr
+"INSERT INTO recordingprofiles SET name = \"Low Quality\", profilegroup = 14;"
 };
-        if (!performActualUpdate(updates, "1248", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1248", dbver))
             return false;
     }
 
     if (dbver == "1248")
     {
-       const char *updates[] = {
+       DBUpdates updates {
 "DELETE FROM keybindings WHERE action = 'CUSTOMEDIT' "
-   "AND context = 'TV Frontend' AND keylist = 'E';",
-nullptr
+   "AND context = 'TV Frontend' AND keylist = 'E';"
 };
-        if (!performActualUpdate(updates, "1249", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1249", dbver))
             return false;
     }
 
@@ -759,17 +650,17 @@ nullptr
             }
         }
 
-        if (!UpdateDBVersionNumber("1250", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1250", dbver))
             return false;
     }
 
     if (dbver == "1250")
     {
-       const char *updates[] = {
-"UPDATE recorded SET bookmark = 1 WHERE bookmark != 0;",
-nullptr
+        DBUpdates updates {
+"UPDATE recorded SET bookmark = 1 WHERE bookmark != 0;"
 };
-        if (!performActualUpdate(updates, "1251", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1251", dbver))
             return false;
     }
 
@@ -798,15 +689,17 @@ nullptr
                                    " DROP INDEX recgroup");
 
                     if (!update.exec())
+                    {
                          MythDB::DBError("Unable to drop duplicate index on "
                                          "recgrouppassword. Ignoring.",
                                          update);
+                    }
                     break;
                 }
             }
         }
 
-        if (!UpdateDBVersionNumber("1252", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1252", dbver))
             return false;
     }
 
@@ -867,7 +760,7 @@ nullptr
             }
         }
 
-        if (!UpdateDBVersionNumber("1253", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1253", dbver))
             return false;
     }
 
@@ -878,57 +771,57 @@ nullptr
             // User has previously applied patch from ticket #7486.
             LOG(VB_GENERAL, LOG_CRIT,
                 "Upgrading to MythTV schema version 1254");
-            if (!UpdateDBVersionNumber("1254", dbver))
+            if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1254", dbver))
                 return false;
         }
         else
         {
-            const char *updates[] = {
-                "ALTER TABLE videosource ADD dvb_nit_id INT(6) DEFAULT -1;",
-                nullptr
+            DBUpdates updates {
+                "ALTER TABLE videosource ADD dvb_nit_id INT(6) DEFAULT -1;"
             };
-            if (!performActualUpdate(updates, "1254", dbver))
+            if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                     updates, "1254", dbver))
                 return false;
         }
     }
 
     if (dbver == "1254")
     {
-       const char *updates[] = {
-"ALTER TABLE cardinput DROP COLUMN shareable;",
-nullptr
+       DBUpdates updates {
+"ALTER TABLE cardinput DROP COLUMN shareable;"
 };
-        if (!performActualUpdate(updates, "1255", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1255", dbver))
             return false;
     }
 
     if (dbver == "1255")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "INSERT INTO keybindings (SELECT 'Main Menu', 'EXIT', 'System Exit', "
     "(CASE data WHEN '1' THEN 'Ctrl+Esc' WHEN '2' THEN 'Meta+Esc' "
     "WHEN '3' THEN 'Alt+Esc' WHEN '4' THEN 'Esc' ELSE '' END), hostname "
     "FROM settings WHERE value = 'AllowQuitShutdown' GROUP BY hostname) "
-    "ON DUPLICATE KEY UPDATE keylist = VALUES(keylist);",
-nullptr
+    "ON DUPLICATE KEY UPDATE keylist = VALUES(keylist);"
 };
-        if (!performActualUpdate(updates, "1256", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1256", dbver))
             return false;
     }
 
     if (dbver == "1256")
     {
-        const char *updates[] = {
-"ALTER TABLE record DROP COLUMN tsdefault;",
-nullptr
+        DBUpdates updates {
+"ALTER TABLE record DROP COLUMN tsdefault;"
 };
-        if (!performActualUpdate(updates, "1257", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1257", dbver))
             return false;
     }
 
     if (dbver == "1257")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "CREATE TABLE internetcontent "
 "( name VARCHAR(255) NOT NULL,"
 "  thumbnail VARCHAR(255),"
@@ -971,10 +864,10 @@ nullptr
 "  podcast BOOL NOT NULL,"
 "  downloadable BOOL NOT NULL,"
 "  customhtml BOOL NOT NULL,"
-"  countries VARCHAR(255) NOT NULL) ENGINE=MyISAM DEFAULT CHARSET=utf8;",
-nullptr
+"  countries VARCHAR(255) NOT NULL) ENGINE=MyISAM DEFAULT CHARSET=utf8;"
 };
-        if (!performActualUpdate(updates, "1258", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1258", dbver))
             return false;
     }
 
@@ -1057,7 +950,7 @@ nullptr
             }
         }
 
-        if (!UpdateDBVersionNumber("1259", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1259", dbver))
             return false;
     }
 
@@ -1145,7 +1038,7 @@ nullptr
             }
         }
 
-        if (!UpdateDBVersionNumber("1260", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1260", dbver))
             return false;
     }
 
@@ -1155,29 +1048,29 @@ nullptr
         {
             LOG(VB_GENERAL, LOG_CRIT,
                 "Upgrading to MythTV schema version 1261");
-            if (!UpdateDBVersionNumber("1261", dbver))
+            if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1261", dbver))
                 return false;
         }
         else
         {
 
-            const char *updates[] = {
+            DBUpdates updates {
 "UPDATE recorded SET programid=CONCAT(SUBSTRING(programid, 1, 2), '00', "
 "       SUBSTRING(programid, 3)) WHERE length(programid) = 12;",
 "UPDATE oldrecorded SET programid=CONCAT(SUBSTRING(programid, 1, 2), '00', "
 "       SUBSTRING(programid, 3)) WHERE length(programid) = 12;",
 "UPDATE program SET programid=CONCAT(SUBSTRING(programid, 1, 2), '00', "
-"       SUBSTRING(programid, 3)) WHERE length(programid) = 12;",
-nullptr
+"       SUBSTRING(programid, 3)) WHERE length(programid) = 12;"
 };
-            if (!performActualUpdate(updates, "1261", dbver))
+            if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                     updates, "1261", dbver))
                 return false;
         }
     }
 
     if (dbver == "1261")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "UPDATE program SET description = '' WHERE description IS NULL;",
 "UPDATE record SET description = '' WHERE description IS NULL;",
 "UPDATE recorded SET description = '' WHERE description IS NULL;",
@@ -1188,6 +1081,7 @@ nullptr
 "UPDATE powerpriority SET selectclause = '' WHERE selectclause IS NULL;",
 "UPDATE customexample SET fromclause = '' WHERE fromclause IS NULL;",
 "UPDATE customexample SET whereclause = '' WHERE whereclause IS NULL;",
+// NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 "ALTER TABLE program MODIFY COLUMN description VARCHAR(16000) "
 "    NOT NULL default '';",
 "ALTER TABLE record MODIFY COLUMN description VARCHAR(16000) "
@@ -1207,40 +1101,41 @@ nullptr
 "ALTER TABLE customexample MODIFY COLUMN fromclause VARCHAR(10000) "
 "    NOT NULL default '';",
 "ALTER TABLE customexample MODIFY COLUMN whereclause VARCHAR(10000) "
-"    NOT NULL default '';",
-nullptr
+"    NOT NULL default '';"
 };
-        if (!performActualUpdate(updates, "1262", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1262", dbver))
             return false;
     }
 
     if (dbver == "1262")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "INSERT INTO recgrouppassword (recgroup, password) SELECT 'All Programs',data FROM settings WHERE value='AllRecGroupPassword' LIMIT 1;",
-"DELETE FROM settings WHERE value='AllRecGroupPassword';",
-nullptr
+"DELETE FROM settings WHERE value='AllRecGroupPassword';"
 };
-        if (!performActualUpdate(updates, "1263", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1263", dbver))
             return false;
     }
 
     if (dbver == "1263")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "UPDATE settings SET hostname = NULL WHERE value='ISO639Language0' AND data != 'aar' AND hostname IS NOT NULL LIMIT 1;",
 "UPDATE settings SET hostname = NULL WHERE value='ISO639Language1' AND data != 'aar' AND hostname IS NOT NULL LIMIT 1;",
 "DELETE FROM settings WHERE value='ISO639Language0' AND hostname IS NOT NULL;",
-"DELETE FROM settings WHERE value='ISO639Language1' AND hostname IS NOT NULL;",
-nullptr
+"DELETE FROM settings WHERE value='ISO639Language1' AND hostname IS NOT NULL;"
 };
-        if (!performActualUpdate(updates, "1264", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1264", dbver))
             return false;
     }
 
     if (dbver == "1264")
     {
-        const char *updates[] = {
+        DBUpdates updates {
+// NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 "DELETE FROM displayprofiles WHERE profilegroupid IN "
 "  (SELECT profilegroupid FROM displayprofilegroups "
 "    WHERE name IN ('CPU++', 'CPU+', 'CPU--'))",
@@ -1250,16 +1145,16 @@ nullptr
 "UPDATE displayprofiles SET data = 'ffmpeg' WHERE data = 'libmpeg2'",
 "UPDATE displayprofiles SET data = 'ffmpeg' WHERE data = 'xvmc'",
 "UPDATE displayprofiles SET data = 'xv-blit' WHERE data = 'xvmc-blit'",
-"UPDATE displayprofiles SET data = 'softblend' WHERE data = 'ia44blend'",
-nullptr
+"UPDATE displayprofiles SET data = 'softblend' WHERE data = 'ia44blend'"
 };
-        if (!performActualUpdate(updates, "1265", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1265", dbver))
             return false;
     }
 
     if (dbver == "1265")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE dtv_multiplex MODIFY COLUMN updatetimestamp "
 "  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;",
 "ALTER TABLE dvdbookmark MODIFY COLUMN `timestamp` "
@@ -1267,10 +1162,10 @@ nullptr
 "ALTER TABLE jobqueue MODIFY COLUMN statustime "
 "  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;",
 "ALTER TABLE recorded MODIFY COLUMN lastmodified "
-"  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;",
-nullptr
+"  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;"
 };
-        if (!performActualUpdate(updates, "1266", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1266", dbver))
             return false;
     }
 
@@ -1279,40 +1174,41 @@ nullptr
         if (!doUpgradeVideoDatabaseSchema())
             return false;
 
-        const char *updates[] = {
-"DELETE FROM settings WHERE value = 'mythvideo.DBSchemaVer'",
-nullptr
+        DBUpdates updates {
+"DELETE FROM settings WHERE value = 'mythvideo.DBSchemaVer'"
 };
-        if (!performActualUpdate(updates, "1267", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1267", dbver))
             return false;
     }
 
     if (dbver == "1267")
     {
-        const char *updates[] = {
-"ALTER TABLE channel MODIFY xmltvid VARCHAR(255) NOT NULL DEFAULT '';",
-nullptr
+        DBUpdates updates {
+"ALTER TABLE channel MODIFY xmltvid VARCHAR(255) NOT NULL DEFAULT '';"
 };
-        if (!performActualUpdate(updates, "1268", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1268", dbver))
             return false;
     }
 
     if (dbver == "1268")
     {
 
-        const char *updates[] = {
-"DELETE FROM keybindings WHERE action='PREVSOURCE' AND keylist='Ctrl+Y';",
-nullptr
+        DBUpdates updates {
+"DELETE FROM keybindings WHERE action='PREVSOURCE' AND keylist='Ctrl+Y';"
 };
-        if (!performActualUpdate(updates, "1269", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1269", dbver))
             return false;
     }
 
     if (dbver == "1269")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "DELETE FROM profilegroups WHERE id >= 15;",
 "DELETE FROM recordingprofiles WHERE profilegroup >= 15;",
+// NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 "INSERT INTO profilegroups SET id = '15', name = 'ASI Recorder (DVEO)',"
 " cardtype = 'ASI', is_default = 1;",
 "INSERT INTO recordingprofiles SET name = \"Default\", profilegroup = 15;",
@@ -1324,27 +1220,27 @@ nullptr
 "INSERT INTO recordingprofiles SET name = \"Default\", profilegroup = 16;",
 "INSERT INTO recordingprofiles SET name = \"Live TV\", profilegroup = 16;",
 "INSERT INTO recordingprofiles SET name = \"High Quality\", profilegroup = 16;",
-"INSERT INTO recordingprofiles SET name = \"Low Quality\", profilegroup = 16;",
-nullptr
+"INSERT INTO recordingprofiles SET name = \"Low Quality\", profilegroup = 16;"
 };
-        if (!performActualUpdate(updates, "1270", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1270", dbver))
             return false;
     }
 
     if (dbver == "1270")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE oldrecorded ADD future TINYINT(1) NOT NULL DEFAULT 0;",
-"UPDATE oldrecorded SET future=0;",
-nullptr
+"UPDATE oldrecorded SET future=0;"
 };
-        if (!performActualUpdate(updates, "1271", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1271", dbver))
             return false;
     }
 
     if (dbver == "1271")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE recordmatch MODIFY recordid INT UNSIGNED NOT NULL;",
 "ALTER TABLE recordmatch MODIFY chanid INT UNSIGNED NOT NULL;",
 "ALTER TABLE recordmatch MODIFY starttime DATETIME NOT NULL;",
@@ -1352,43 +1248,44 @@ nullptr
 "ALTER TABLE recordmatch ADD INDEX (starttime, chanid);",
 "ALTER TABLE oldrecorded MODIFY generic TINYINT(1) NOT NULL;",
 "ALTER TABLE oldrecorded ADD INDEX (future);",
-"ALTER TABLE oldrecorded ADD INDEX (starttime, chanid);",
-nullptr
+"ALTER TABLE oldrecorded ADD INDEX (starttime, chanid);"
 };
-        if (!performActualUpdate(updates, "1272", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1272", dbver))
             return false;
     }
 
     if (dbver == "1272")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "DROP INDEX starttime ON recordmatch;",
 "DROP INDEX starttime ON oldrecorded;",
 "ALTER TABLE recordmatch ADD INDEX (chanid, starttime, manualid);",
-"ALTER TABLE oldrecorded ADD INDEX (chanid, starttime);",
-nullptr
+"ALTER TABLE oldrecorded ADD INDEX (chanid, starttime);"
 };
-        if (!performActualUpdate(updates, "1273", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1273", dbver))
             return false;
     }
 
     if (dbver == "1273")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE internetcontent MODIFY COLUMN updated "
 "  DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00';",
 "ALTER TABLE internetcontentarticles MODIFY COLUMN `date` "
-"  DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00';",
-nullptr
+"  DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00';"
 };
 
-        if (!performActualUpdate(updates, "1274", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1274", dbver))
             return false;
     }
 
     if (dbver == "1274")
     {
-        const char *updates[] = {
+        DBUpdates updates {
+// NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 "UPDATE cardinput SET tunechan=NULL"
 "  WHERE inputname='DVBInput' OR inputname='MPEG2TS';"
 "UPDATE dtv_multiplex SET symbolrate = NULL"
@@ -1412,16 +1309,16 @@ nullptr
 "UPDATE dtv_multiplex SET modulation='qam_128'"
 "  WHERE modulation LIKE '%qam128%';",
 "UPDATE dtv_multiplex SET modulation='qam_256'"
-"  WHERE modulation LIKE '%qam256%';",
-nullptr
+"  WHERE modulation LIKE '%qam256%';"
 };
-        if (!performActualUpdate(updates, "1275", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1275", dbver))
             return false;
     }
 
     if (dbver == "1275")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "DROP TABLE IF EXISTS `logging`;",
 "CREATE TABLE `logging` ( "
 "  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT, "
@@ -1436,22 +1333,23 @@ nullptr
 "  KEY `host` (`host`,`application`,`pid`,`msgtime`), "
 "  KEY `msgtime` (`msgtime`), "
 "  KEY `level` (`level`) "
-") ENGINE=MyISAM DEFAULT CHARSET=utf8; ",
-nullptr
+") ENGINE=MyISAM DEFAULT CHARSET=utf8; "
 };
-        if (!performActualUpdate(updates, "1276", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1276", dbver))
             return false;
     }
 
     if (dbver == "1276")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE record ADD COLUMN filter INT UNSIGNED NOT NULL DEFAULT 0;",
 "CREATE TABLE IF NOT EXISTS recordfilter ("
 "    filterid INT UNSIGNED NOT NULL PRIMARY KEY,"
 "    description VARCHAR(64) DEFAULT NULL,"
 "    clause VARCHAR(256) DEFAULT NULL,"
 "    newruledefault TINYINT(1) DEFAULT 0) ENGINE=MyISAM DEFAULT CHARSET=utf8;",
+// NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 "INSERT INTO recordfilter (filterid, description, clause, newruledefault) "
 "    VALUES (0, 'New episode', 'program.previouslyshown = 0', 0);",
 "INSERT INTO recordfilter (filterid, description, clause, newruledefault) "
@@ -1463,17 +1361,18 @@ nullptr
 "INSERT INTO recordfilter (filterid, description, clause, newruledefault) "
 "    VALUES (4, 'Commercial free', 'channel.commmethod = -2', 0);",
 "INSERT INTO recordfilter (filterid, description, clause, newruledefault) "
-"    VALUES (5, 'High definition', 'program.hdtv > 0', 0);",
-nullptr
+"    VALUES (5, 'High definition', 'program.hdtv > 0', 0);"
 };
 
-        if (!performActualUpdate(updates, "1277", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1277", dbver))
             return false;
     }
 
     if (dbver == "1277")
     {
-        const char *updates[] = {
+        DBUpdates updates {
+// NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 "ALTER TABLE record ADD autometadata TINYINT(1) NOT NULL DEFAULT "
 "    0 AFTER autouserjob4;",
 "ALTER TABLE record ADD inetref VARCHAR(40) NOT NULL AFTER programid;",
@@ -1484,26 +1383,26 @@ nullptr
 "ALTER TABLE recorded ADD episode SMALLINT(5) NOT NULL AFTER season;",
 "ALTER TABLE oldrecorded ADD inetref VARCHAR(40) NOT NULL AFTER programid;",
 "ALTER TABLE oldrecorded ADD season SMALLINT(5) NOT NULL AFTER description;",
-"ALTER TABLE oldrecorded ADD episode SMALLINT(5) NOT NULL AFTER season;",
-nullptr
+"ALTER TABLE oldrecorded ADD episode SMALLINT(5) NOT NULL AFTER season;"
 };
-        if (!performActualUpdate(updates, "1278", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1278", dbver))
             return false;
     }
 
     if (dbver == "1278")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "CREATE TABLE recordedartwork ( "
 "    inetref VARCHAR(255) NOT NULL, "
 "    season SMALLINT(5) NOT NULL, "
 "    host TEXT NOT NULL, "
 "    coverart TEXT NOT NULL, "
 "    fanart TEXT NOT NULL, "
-"    banner TEXT NOT NULL) ENGINE=MyISAM DEFAULT CHARSET=utf8;",
-nullptr
+"    banner TEXT NOT NULL) ENGINE=MyISAM DEFAULT CHARSET=utf8;"
 };
-        if (!performActualUpdate(updates, "1279", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1279", dbver))
             return false;
     }
 
@@ -1566,94 +1465,96 @@ nullptr
             }
         }
 
-        if (!UpdateDBVersionNumber("1280", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1280", dbver))
             return false;
     }
 
     if (dbver == "1280")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE program ADD INDEX (subtitle);",
 "ALTER TABLE program ADD INDEX (description(255));",
 "ALTER TABLE oldrecorded ADD INDEX (subtitle);",
-"ALTER TABLE oldrecorded ADD INDEX (description(255));",
-nullptr
+"ALTER TABLE oldrecorded ADD INDEX (description(255));"
 };
-        if (!performActualUpdate(updates, "1281", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1281", dbver))
             return false;
     }
 
     if (dbver == "1281")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE cardinput ADD changer_device VARCHAR(128) "
 "AFTER externalcommand;",
 "ALTER TABLE cardinput ADD changer_model VARCHAR(128) "
-"AFTER changer_device;",
-nullptr
+"AFTER changer_device;"
 };
-        if (!performActualUpdate(updates, "1282", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1282", dbver))
             return false;
     }
 
     if (dbver == "1282")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "UPDATE settings"
 "   SET data = SUBSTR(data, INSTR(data, 'share/mythtv/metadata')+13)"
 " WHERE value "
 "    IN ('TelevisionGrabber', "
 "        'MovieGrabber', "
-"        'mythgame.MetadataGrabber');",
-nullptr
+"        'mythgame.MetadataGrabber');"
 };
 
-        if (!performActualUpdate(updates, "1283", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1283", dbver))
             return false;
     }
 
     if (dbver == "1283")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "UPDATE record SET filter = filter | 1 WHERE record.dupin & 0x20",
 "UPDATE record SET filter = filter | 2 WHERE record.dupin & 0x40",
 "UPDATE record SET filter = filter | 5 WHERE record.dupin & 0x80",
 "UPDATE record SET dupin = dupin & ~0xe0",
+// NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 "INSERT INTO recordfilter (filterid, description, clause, newruledefault) "
-"    VALUES (6, 'This Episode', '(program.programid <> '''' AND program.programid = RECTABLE.programid) OR (program.programid = '''' AND program.subtitle = RECTABLE.subtitle AND program.description = RECTABLE.description)', 0);",
-nullptr
+"    VALUES (6, 'This Episode', '(program.programid <> '''' AND program.programid = RECTABLE.programid) OR (program.programid = '''' AND program.subtitle = RECTABLE.subtitle AND program.description = RECTABLE.description)', 0);"
 };
 
-        if (!performActualUpdate(updates, "1284", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1284", dbver))
             return false;
     }
 
     if (dbver == "1284")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "REPLACE INTO recordfilter (filterid, description, clause, newruledefault) "
-"    VALUES (6, 'This Episode', '(RECTABLE.programid <> '''' AND program.programid = RECTABLE.programid) OR (RECTABLE.programid = '''' AND program.subtitle = RECTABLE.subtitle AND program.description = RECTABLE.description)', 0);",
-nullptr
+"    VALUES (6, 'This Episode', '(RECTABLE.programid <> '''' AND program.programid = RECTABLE.programid) OR (RECTABLE.programid = '''' AND program.subtitle = RECTABLE.subtitle AND program.description = RECTABLE.description)', 0);"
 };
 
-        if (!performActualUpdate(updates, "1285", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1285", dbver))
             return false;
     }
 
     if (dbver == "1285")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "DELETE FROM profilegroups WHERE id >= 17;",
 "DELETE FROM recordingprofiles WHERE profilegroup >= 17;",
+// NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 "INSERT INTO profilegroups SET id = '17', name = 'Ceton Recorder',"
 " cardtype = 'CETON', is_default = 1;",
 "INSERT INTO recordingprofiles SET name = \"Default\", profilegroup = 17;",
 "INSERT INTO recordingprofiles SET name = \"Live TV\", profilegroup = 17;",
 "INSERT INTO recordingprofiles SET name = \"High Quality\", profilegroup = 17;",
-"INSERT INTO recordingprofiles SET name = \"Low Quality\", profilegroup = 17;",
-nullptr
+"INSERT INTO recordingprofiles SET name = \"Low Quality\", profilegroup = 17;"
 };
-        if (!performActualUpdate(updates, "1286", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1286", dbver))
             return false;
     }
 
@@ -1700,13 +1601,13 @@ nullptr
             }
         }
 
-        if (!UpdateDBVersionNumber("1287", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1287", dbver))
             return false;
     }
 
     if (dbver == "1287")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "CREATE TABLE IF NOT EXISTS livestream ( "
 "    id INT UNSIGNED AUTO_INCREMENT NOT NULL PRIMARY KEY, "
 "    width INT UNSIGNED NOT NULL, "
@@ -1733,43 +1634,43 @@ nullptr
 "    sourceheight INT UNSIGNED NOT NULL DEFAULT 0, "
 "    outdir VARCHAR(256) NOT NULL, "
 "    outbase VARCHAR(128) NOT NULL "
-") ENGINE=MyISAM DEFAULT CHARSET=utf8; ",
-nullptr
+") ENGINE=MyISAM DEFAULT CHARSET=utf8; "
 };
 
-        if (!performActualUpdate(updates, "1288", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1288", dbver))
             return false;
     }
 
     if (dbver == "1288")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE recordedprogram CHANGE COLUMN videoprop videoprop "
-"    SET('HDTV', 'WIDESCREEN', 'AVC', '720', '1080', 'DAMAGED') NOT NULL; ",
-nullptr
+"    SET('HDTV', 'WIDESCREEN', 'AVC', '720', '1080', 'DAMAGED') NOT NULL; "
 };
-        if (!performActualUpdate(updates, "1289", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1289", dbver))
             return false;
     }
 
     if (dbver == "1289")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "DROP TABLE IF EXISTS netvisionrssitems;",
 "DROP TABLE IF EXISTS netvisionsearchgrabbers;",
 "DROP TABLE IF EXISTS netvisionsites;",
 "DROP TABLE IF EXISTS netvisiontreegrabbers;",
-"DROP TABLE IF EXISTS netvisiontreeitems;",
-nullptr
+"DROP TABLE IF EXISTS netvisiontreeitems;"
 };
 
-        if (!performActualUpdate(updates, "1290", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1290", dbver))
             return false;
     }
 
     if (dbver == "1290")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE logging "
 " ALTER COLUMN host SET DEFAULT '', "
 " ALTER COLUMN application SET DEFAULT '', "
@@ -1780,36 +1681,35 @@ nullptr
 " ADD COLUMN tid INT(11) NOT NULL DEFAULT '0' AFTER pid, "
 " ADD COLUMN filename VARCHAR(255) NOT NULL DEFAULT '' AFTER thread, "
 " ADD COLUMN line INT(11) NOT NULL DEFAULT '0' AFTER filename, "
-" ADD COLUMN function VARCHAR(255) NOT NULL DEFAULT '' AFTER line;",
-nullptr
+" ADD COLUMN function VARCHAR(255) NOT NULL DEFAULT '' AFTER line;"
 };
 
-        if (!performActualUpdate(updates, "1291", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1291", dbver))
             return false;
     }
 
     if (dbver == "1291")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "UPDATE recorded r, recordedprogram rp SET r.duplicate=0 "
 "   WHERE r.chanid=rp.chanid AND r.progstart=rp.starttime AND "
-"      FIND_IN_SET('DAMAGED', rp.videoprop);",
-nullptr
+"      FIND_IN_SET('DAMAGED', rp.videoprop);"
 };
 
-        if (!performActualUpdate(updates, "1292", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1292", dbver))
             return false;
     }
 
     if (dbver == "1292")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE cardinput "
 "  ADD COLUMN schedorder INT(10) UNSIGNED NOT NULL DEFAULT '0', "
 "  ADD COLUMN livetvorder INT(10) UNSIGNED NOT NULL DEFAULT '0';",
 "UPDATE cardinput SET schedorder = cardinputid;",
-"UPDATE cardinput SET livetvorder = cardid;",
-nullptr
+"UPDATE cardinput SET livetvorder = cardid;"
 };
 
         if (gCoreContext->GetBoolSetting("LastFreeCard", false))
@@ -1819,30 +1719,32 @@ nullptr
                 "  (SELECT MAX(cardid) FROM capturecard) - cardid + 1;";
         }
 
-        if (!performActualUpdate(updates, "1293", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1293", dbver))
             return false;
     }
 
     if (dbver == "1293")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "TRUNCATE TABLE recordmatch",
 "ALTER TABLE recordmatch DROP INDEX recordid",
 "ALTER TABLE recordmatch ADD UNIQUE INDEX (recordid, chanid, starttime)",
 "UPDATE recordfilter SET description='Prime time' WHERE filterid=3",
 "UPDATE recordfilter SET description='This episode' WHERE filterid=6",
+// NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 "REPLACE INTO recordfilter (filterid, description, clause, newruledefault) "
-"    VALUES (7, 'This series', '(RECTABLE.seriesid <> '''' AND program.seriesid = RECTABLE.seriesid)', 0);",
-nullptr
+"    VALUES (7, 'This series', '(RECTABLE.seriesid <> '''' AND program.seriesid = RECTABLE.seriesid)', 0);"
 };
 
-        if (!performActualUpdate(updates, "1294", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1294", dbver))
             return false;
     }
 
     if (dbver == "1294")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "CREATE TABLE videocollection ("
 "  intid int(10) unsigned NOT NULL AUTO_INCREMENT,"
 "  title varchar(256) NOT NULL,"
@@ -1876,11 +1778,11 @@ nullptr
 "ALTER TABLE videometadata ADD playcount int(10) NOT NULL DEFAULT '0' AFTER length;",
 "ALTER TABLE videometadata ADD contenttype set('MOVIE', 'TELEVISION', 'ADULT', 'MUSICVIDEO', 'HOMEVIDEO') NOT NULL default ''",
 "UPDATE videometadata SET contenttype = 'MOVIE';",
-"UPDATE videometadata SET contenttype = 'TELEVISION' WHERE season > 0 OR episode > 0;",
-nullptr
+"UPDATE videometadata SET contenttype = 'TELEVISION' WHERE season > 0 OR episode > 0;"
 };
 
-        if (!performActualUpdate(updates, "1295", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1295", dbver))
             return false;
     }
 
@@ -1898,7 +1800,8 @@ nullptr
             return false;
         }
 
-        MSqlQuery update(MSqlQuery::InitCon()), insert(MSqlQuery::InitCon());
+        MSqlQuery update(MSqlQuery::InitCon());
+        MSqlQuery insert(MSqlQuery::InitCon());
         update.prepare("UPDATE settings "
                           "SET data=:IP4ADDY "
                        "WHERE value='BackendServerIP' "
@@ -1944,34 +1847,34 @@ nullptr
 
         }
 
-        if (!UpdateDBVersionNumber("1296", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1296", dbver))
             return false;
     }
 
     if (dbver == "1296")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE videocollection CHANGE inetref collectionref "
 "VARCHAR(128) CHARACTER SET utf8 COLLATE utf8_general_ci "
 "NOT NULL",
-"ALTER TABLE videocollection CHANGE genre genre VARCHAR(128) NULL DEFAULT ''",
-nullptr
+"ALTER TABLE videocollection CHANGE genre genre VARCHAR(128) NULL DEFAULT ''"
 };
 
-        if (!performActualUpdate(updates, "1297", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1297", dbver))
             return false;
     }
 
     if (dbver == "1297")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE videometadata CHANGE collectionref collectionref INT(10) "
 "NOT NULL DEFAULT -1",
-"UPDATE videometadata SET collectionref = '-1'",
-nullptr
+"UPDATE videometadata SET collectionref = '-1'"
 };
 
-        if (!performActualUpdate(updates, "1298", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1298", dbver))
             return false;
     }
 
@@ -2007,25 +1910,25 @@ nullptr
             return false;
         }
 
-        if (!UpdateDBVersionNumber("1299", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1299", dbver))
             return false;
     }
 
     if (dbver == "1299")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE recordmatch ADD COLUMN findid INT NOT NULL DEFAULT 0",
-"ALTER TABLE recordmatch ADD INDEX (recordid, findid)",
-nullptr
+"ALTER TABLE recordmatch ADD INDEX (recordid, findid)"
 };
 
-        if (!performActualUpdate(updates, "1300", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1300", dbver))
             return false;
     }
 
     if (dbver == "1300")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE channel ADD COLUMN iptvid SMALLINT(6) UNSIGNED;",
 "CREATE TABLE iptv_channel ("
 "  iptvid SMALLINT(6) UNSIGNED NOT NULL auto_increment,"
@@ -2037,11 +1940,11 @@ nullptr
 "           'smpte2022-1','smpte2022-2'),"
 "  bitrate INT(10) UNSIGNED NOT NULL,"
 "  PRIMARY KEY (iptvid)"
-") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
-nullptr
+") ENGINE=MyISAM DEFAULT CHARSET=utf8;"
 };
 
-        if (!performActualUpdate(updates, "1301", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1301", dbver))
             return false;
     }
 
@@ -2070,7 +1973,7 @@ nullptr
             gCoreContext->GetBoolSetting("AutoTranscode", false);
         record.m_transcoder =
             gCoreContext->GetNumSetting(
-                "DefaultTranscoder", static_cast<int>(RecordingProfile::TranscoderAutodetect));
+                "DefaultTranscoder", static_cast<int>(RecordingProfile::kTranscoderAutodetect));
         record.m_autoUserJob1 =
             gCoreContext->GetBoolSetting("AutoRunUserJob1", false);
         record.m_autoUserJob2 =
@@ -2083,7 +1986,7 @@ nullptr
             gCoreContext->GetBoolSetting("AutoMetadataLookup", true);
         record.Save(false);
 
-        if (!UpdateDBVersionNumber("1302", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1302", dbver))
             return false;
     }
 
@@ -2097,7 +2000,7 @@ nullptr
         QList<QByteArray> updates_ba;
 
         // Convert DATE and TIME in record into DATETIME
-        const char *pre_sql[] = {
+        const std::array<const std::string,2> pre_sql {
             "CREATE TEMPORARY TABLE recordupdate ("
             "recid INT, starttime DATETIME, endtime DATETIME)",
             "INSERT INTO recordupdate (recid, starttime, endtime) "
@@ -2105,22 +2008,22 @@ nullptr
             "       CONCAT(startdate, ' ', starttime), "
             "       CONCAT(enddate, ' ', endtime) FROM record",
         };
-        for (size_t i = 0; i < sizeof(pre_sql)/sizeof(char*); i++)
-            updates_ba.push_back(QByteArray(pre_sql[i]));
+        for (const auto & pre : pre_sql)
+            updates_ba.push_back(QByteArray::fromStdString(pre));
 
         // Convert various DATETIME fields from local time to UTC
         if (0 != utc_offset)
         {
-            const char *with_endtime[] = {
+            const std::array<const std::string,4> with_endtime {
                 "program", "recorded", "oldrecorded", "recordupdate",
             };
-            const char *without_endtime[] = {
+            const std::array<const std::string,4> without_endtime {
                 "programgenres", "programrating", "credits",
                 "jobqueue",
             };
             QString order = (utc_offset > 0) ? "-starttime" : "starttime";
 
-            for (size_t i = 0; i < sizeof(with_endtime)/sizeof(char*); i++)
+            for (const auto & field : with_endtime)
             {
                 updates_ba.push_back(
                          QString("UPDATE %1 "
@@ -2129,18 +2032,18 @@ nullptr
                                  "    endtime   = "
                                  "    CONVERT_TZ(endtime, 'SYSTEM', 'Etc/UTC') "
                                  "ORDER BY %4")
-                         .arg(with_endtime[i])
+                         .arg(QString::fromStdString(field))
                          .arg(order).toLocal8Bit());
             }
 
-            for (size_t i = 0; i < sizeof(without_endtime)/sizeof(char*); i++)
+            for (const auto & field : without_endtime)
             {
                 updates_ba.push_back(
                           QString("UPDATE %1 "
                                   "SET starttime = "
                                   "    CONVERT_TZ(starttime, 'SYSTEM', 'Etc/UTC') "
                                   "ORDER BY %3")
-                          .arg(without_endtime[i]).arg(order)
+                          .arg(QString::fromStdString(field)).arg(order)
                           .toLocal8Bit());
             }
 
@@ -2162,7 +2065,7 @@ nullptr
         }
 
         // Convert DATETIME back to separate DATE and TIME in record table
-        const char *post_sql[] = {
+        const std::array<const std::string,2> post_sql {
             "UPDATE record, recordupdate "
             "SET record.startdate = DATE(recordupdate.starttime), "
             "    record.starttime = TIME(recordupdate.starttime), "
@@ -2176,18 +2079,17 @@ nullptr
             "DROP TABLE recordupdate",
         };
 
-        for (size_t i = 0; i < sizeof(post_sql)/sizeof(char*); i++)
-            updates_ba.push_back(QByteArray(post_sql[i]));
+        for (const auto & post : post_sql)
+            updates_ba.push_back(QByteArray::fromStdString(post));
 
         // Convert update ByteArrays to NULL terminated char**
-        QList<QByteArray>::const_iterator it = updates_ba.begin();
-        vector<const char*> updates;
-        for (; it != updates_ba.end(); ++it)
-            updates.push_back((*it).constData());
-        updates.push_back(nullptr);
+        DBUpdates updates;
+        for (const auto & item : updates_ba)
+            updates.push_back(item.constData());
 
         // do the actual update
-        if (!performActualUpdate(&updates[0], "1303", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1303", dbver))
             return false;
     }
 
@@ -2203,44 +2105,43 @@ nullptr
         // Convert various DATETIME fields from local time to UTC
         if (0 != utc_offset)
         {
-            const char *with_endtime[] = {
+            const std::array<const std::string,1> with_endtime = {
                 "recordedprogram",
             };
-            const char *without_endtime[] = {
+            const std::array<const std::string,4> without_endtime = {
                 "recordedseek", "recordedmarkup", "recordedrating",
                 "recordedcredits",
             };
             QString order = (utc_offset > 0) ? "-starttime" : "starttime";
 
-            for (size_t i = 0; i < sizeof(with_endtime)/sizeof(char*); i++)
+            for (const auto & field : with_endtime)
             {
                 updates_ba.push_back(
                      QString("UPDATE %1 "
                      "SET starttime = CONVERT_TZ(starttime, 'SYSTEM', 'Etc/UTC'), "
                      "    endtime   = CONVERT_TZ(endtime, 'SYSTEM', 'Etc/UTC') "
                      "ORDER BY %4")
-                     .arg(with_endtime[i]).arg(order).toLocal8Bit());
+                     .arg(QString::fromStdString(field)).arg(order).toLocal8Bit());
             }
 
-            for (size_t i = 0; i < sizeof(without_endtime)/sizeof(char*); i++)
+            for (const auto & field : without_endtime)
             {
                 updates_ba.push_back(
                       QString("UPDATE %1 "
                       "SET starttime = CONVERT_TZ(starttime, 'SYSTEM', 'Etc/UTC') "
                       "ORDER BY %3")
-                      .arg(without_endtime[i]).arg(order).toLocal8Bit());
+                      .arg(QString::fromStdString(field)).arg(order).toLocal8Bit());
             }
         }
 
         // Convert update ByteArrays to NULL terminated char**
-        QList<QByteArray>::const_iterator it = updates_ba.begin();
-        vector<const char*> updates;
-        for (; it != updates_ba.end(); ++it)
-            updates.push_back((*it).constData());
-        updates.push_back(nullptr);
+        DBUpdates updates;
+        for (const auto & item : updates_ba)
+            updates.push_back(item.constData());
 
         // do the actual update
-        if (!performActualUpdate(&updates[0], "1304", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1304", dbver))
             return false;
     }
 
@@ -2267,13 +2168,12 @@ nullptr
                              .toLocal8Bit());
 
         // Convert update ByteArrays to NULL terminated char**
-        QList<QByteArray>::const_iterator it = updates_ba.begin();
-        vector<const char*> updates;
-        for (; it != updates_ba.end(); ++it)
-            updates.push_back((*it).constData());
-        updates.push_back(nullptr);
+        DBUpdates updates;
+        for (const auto & item : updates_ba)
+            updates.push_back(item.constData());
 
-        if (!performActualUpdate(&updates[0], "1305", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1305", dbver))
             return false;
     }
 
@@ -2296,13 +2196,12 @@ nullptr
 "                    'Etc/UTC', 'SYSTEM')) ").toLocal8Bit());
 
         // Convert update ByteArrays to NULL terminated char**
-        QList<QByteArray>::const_iterator it = updates_ba.begin();
-        vector<const char*> updates;
-        for (; it != updates_ba.end(); ++it)
-            updates.push_back((*it).constData());
-        updates.push_back(nullptr);
+        DBUpdates updates;
+        for (const auto & item : updates_ba)
+            updates.push_back(item.constData());
 
-        if (!performActualUpdate(&updates[0], "1306", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1306", dbver))
             return false;
     }
 
@@ -2311,7 +2210,7 @@ nullptr
         // staging temporary tables to use with rewritten file scanner
         // due to be replaced by finalized RecordedFile changes
 
-        const char *updates[] = {
+        DBUpdates updates {
 "CREATE TABLE scannerfile ("
 "  `fileid`         BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,"
 "  `filesize`       BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,"
@@ -2332,32 +2231,33 @@ nullptr
 "  `videoid`        INT(10) UNSIGNED NOT NULL,"
 "  `order`          SMALLINT UNSIGNED NOT NULL DEFAULT 1,"
 "  PRIMARY KEY `part` (`videoid`, `order`)"
-") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
-nullptr
+") ENGINE=MyISAM DEFAULT CHARSET=utf8;"
 };
 
 // removed "UNIQUE KEY path (`storagegroup`, `hostname`, `filename`)" from
 // scannerpath as a quick fix for key length constraints
 
-        if (!performActualUpdate(updates, "1307", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1307", dbver))
             return false;
     }
 
     if (dbver == "1307")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE channel MODIFY COLUMN icon varchar(255) NOT NULL DEFAULT '';",
-"UPDATE channel SET icon='' WHERE icon='none';",
-nullptr
+"UPDATE channel SET icon='' WHERE icon='none';"
 };
-        if (!performActualUpdate(updates, "1308", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1308", dbver))
             return false;
     }
 
     if (dbver == "1308")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 // Add this time filter
+// NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 "REPLACE INTO recordfilter (filterid, description, clause, newruledefault) "
 "  VALUES (8, 'This time', 'ABS(TIMESTAMPDIFF(MINUTE, CONVERT_TZ("
 "  ADDTIME(RECTABLE.startdate, RECTABLE.starttime), ''Etc/UTC'', ''SYSTEM''), "
@@ -2386,30 +2286,30 @@ nullptr
 // Convert old, find daily to new, find daily
 "UPDATE record SET type = 2 WHERE type = 9",
 // Convert old, find weekly to new, find weekly
-"UPDATE record SET type = 5 WHERE type = 10",
-nullptr
+"UPDATE record SET type = 5 WHERE type = 10"
 };
-        if (!performActualUpdate(updates, "1309", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1309", dbver))
             return false;
     }
 
     if (dbver == "1309")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 // Add this channel filter
 "REPLACE INTO recordfilter (filterid, description, clause, newruledefault) "
 "  VALUES (10, 'This channel', 'channel.callsign = RECTABLE.station', 0)",
 // Convert old, Channel rules to All with channel filter
-"UPDATE record SET type = 4, filter = filter|1024 WHERE type = 3",
-nullptr
+"UPDATE record SET type = 4, filter = filter|1024 WHERE type = 3"
 };
-        if (!performActualUpdate(updates, "1310", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1310", dbver))
             return false;
     }
 
     if (dbver == "1310")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 // Move old table temporarily
 "RENAME TABLE `housekeeping` TO `oldhousekeeping`;",
 // Create new table in its place
@@ -2428,17 +2328,17 @@ nullptr
 "          `lastrun`"
 "     FROM `oldhousekeeping`;",
 // Delete old data
-"DROP TABLE `oldhousekeeping`;",
-nullptr
+"DROP TABLE `oldhousekeeping`;"
 };
 
-        if (!performActualUpdate(updates, "1311", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1311", dbver))
             return false;
     }
 
     if (dbver == "1311")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 // Create a global enable/disable instead of one per-host
 // Any hosts previously running it mean all hosts do now
 "INSERT INTO `settings` (`value`, `hostname`, `data`)"
@@ -2456,22 +2356,22 @@ nullptr
 "     FROM `settings`"
 "    WHERE `value` = 'HardwareProfileLastUpdated';",
 // Clear out old settings
-"DELETE FROM `settings` WHERE `value` = 'HardwareProfileLastUpdated';",
-nullptr
+"DELETE FROM `settings` WHERE `value` = 'HardwareProfileLastUpdated';"
 };
-        if (!performActualUpdate(updates, "1312", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1312", dbver))
             return false;
     }
 
     if (dbver == "1312")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 // DVD bookmark updates
 "DELETE FROM `dvdbookmark` WHERE `framenum` = 0;",
-"ALTER TABLE dvdbookmark ADD COLUMN dvdstate varchar(1024) NOT NULL DEFAULT '';",
-nullptr
+"ALTER TABLE dvdbookmark ADD COLUMN dvdstate varchar(1024) NOT NULL DEFAULT '';"
 };
-        if (!performActualUpdate(updates, "1313", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1313", dbver))
             return false;
     }
 
@@ -2479,7 +2379,8 @@ nullptr
     {
         // Make sure channel timeouts are long enough.  No actual
         // schema change.
-        const char *updates[] = {
+        DBUpdates updates {
+            // NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
             "UPDATE capturecard SET channel_timeout = 3000 WHERE "
             "cardtype = \"DVB\" AND channel_timeout < 3000;",
             "UPDATE capturecard SET channel_timeout = 30000 WHERE "
@@ -2491,10 +2392,10 @@ nullptr
             "UPDATE capturecard SET channel_timeout = 15000 WHERE "
             "cardtype = \"HDPVR\" AND channel_timeout < 15000;",
             "UPDATE capturecard SET channel_timeout = 12000 WHERE "
-            "cardtype = \"MPEG\" AND channel_timeout < 12000;",
-            nullptr
+            "cardtype = \"MPEG\" AND channel_timeout < 12000;"
         };
-        if (!performActualUpdate(updates, "1314", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1314", dbver))
             return false;
     }
 
@@ -2502,29 +2403,29 @@ nullptr
     {
         // Migrate users from tmdb.py to tmdb3.py
         // The web interface tmdb.py uses will be shut down 2013-09-15
-        const char *updates[] = {
+        DBUpdates updates {
             "UPDATE settings SET data=REPLACE(data, 'tmdb.py', 'tmdb3.py') "
-             "WHERE value='MovieGrabber'",
-            nullptr
+             "WHERE value='MovieGrabber'"
         };
-        if (!performActualUpdate(updates, "1315", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1315", dbver))
             return false;
     }
 
     if (dbver == "1315")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 "ALTER TABLE program ADD INDEX title_subtitle_start (title, subtitle, starttime);",
-"ALTER TABLE program DROP INDEX title;",
-nullptr
+"ALTER TABLE program DROP INDEX title;"
 };
-        if (!performActualUpdate(updates, "1316", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1316", dbver))
             return false;
     }
 
     if (dbver == "1316")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 // adjust programid type in various tables to match the program table
 "ALTER TABLE oldrecorded CHANGE COLUMN programid programid varchar(64);",
 "ALTER TABLE oldrecorded CHANGE COLUMN seriesid seriesid varchar(64);",
@@ -2533,16 +2434,16 @@ nullptr
 "ALTER TABLE recorded CHANGE COLUMN programid programid varchar(64);",
 "ALTER TABLE recorded CHANGE COLUMN seriesid seriesid varchar(64);",
 "ALTER TABLE recordedprogram CHANGE COLUMN programid programid varchar(64);",
-"ALTER TABLE recordedprogram CHANGE COLUMN seriesid seriesid varchar(64);",
-nullptr
+"ALTER TABLE recordedprogram CHANGE COLUMN seriesid seriesid varchar(64);"
 };
-        if (!performActualUpdate(updates, "1317", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1317", dbver))
             return false;
     }
 
     if (dbver == "1317")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "CREATE TABLE IF NOT EXISTS gallery_directories ("
             "  dir_id       INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,"
             "  filename     VARCHAR(255) NOT NULL,"
@@ -2574,48 +2475,48 @@ nullptr
             "INSERT INTO settings VALUES ('ImageShowHiddenFiles', 0, NULL);",
             "INSERT INTO settings VALUES ('ImageSlideShowTime', 3500, NULL);",
             "INSERT INTO settings VALUES ('ImageTransitionType', 1, NULL);",
-            "INSERT INTO settings VALUES ('ImageTransitionTime', 1000, NULL);",
-            nullptr
+            "INSERT INTO settings VALUES ('ImageTransitionTime', 1000, NULL);"
         };
 
-        if (!performActualUpdate(&updates[0], "1318", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1318", dbver))
             return false;
     }
 
     if (dbver == "1318")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "ALTER TABLE program "
             " ADD COLUMN season INT(4) NOT NULL DEFAULT '0', "
             " ADD COLUMN episode INT(4) NOT NULL DEFAULT '0';",
             "ALTER TABLE recordedprogram "
             " ADD COLUMN season INT(4) NOT NULL DEFAULT '0', "
-            " ADD COLUMN episode INT(4) NOT NULL DEFAULT '0';",
-            nullptr
+            " ADD COLUMN episode INT(4) NOT NULL DEFAULT '0';"
         };
 
-        if (!performActualUpdate(&updates[0], "1319", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1319", dbver))
             return false;
     }
 
     if (dbver == "1319")
     {
         // Total number of episodes in the series (season)
-        const char *updates[] = {
+        DBUpdates updates {
             "ALTER TABLE program "
             " ADD COLUMN totalepisodes INT(4) NOT NULL DEFAULT '0';",
             "ALTER TABLE recordedprogram "
-            " ADD COLUMN totalepisodes INT(4) NOT NULL DEFAULT '0';",
-            nullptr
+            " ADD COLUMN totalepisodes INT(4) NOT NULL DEFAULT '0';"
         };
 
-        if (!performActualUpdate(&updates[0], "1320", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1320", dbver))
             return false;
     }
 
     if (dbver == "1320")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "CREATE TABLE IF NOT EXISTS recgroups ("
                 "recgroupid  SMALLINT(4) NOT NULL AUTO_INCREMENT, "
                 "recgroup    VARCHAR(64) NOT NULL DEFAULT '', "
@@ -2626,9 +2527,9 @@ nullptr
                 "UNIQUE KEY recgroup ( recgroup )"
                 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
             // Create the built-in, 'special', groups
-            "INSERT INTO recgroups ( recgroup, special ) VALUES ( 'Default', '1' );",
-            "INSERT INTO recgroups ( recgroup, special ) VALUES ( 'LiveTV', '1' );",
-            "INSERT INTO recgroups ( recgroup, special ) VALUES ( 'Deleted', '1' );",
+            "INSERT INTO recgroups ( recgroupid, recgroup, special ) VALUES ( 1, 'Default', '1' );",
+            "INSERT INTO recgroups ( recgroupid, recgroup, special ) VALUES ( 2, 'LiveTV', '1' );",
+            "INSERT INTO recgroups ( recgroupid, recgroup, special ) VALUES ( 3, 'Deleted', '1' );",
             // Copy in the passwords for the built-in groups
             "DELETE FROM recgrouppassword WHERE password = '';",
             "UPDATE recgroups r, recgrouppassword p SET r.password = p.password WHERE r.recgroup = p.recgroup;",
@@ -2641,32 +2542,33 @@ nullptr
             "ALTER TABLE recorded ADD COLUMN recgroupid SMALLINT(4) NOT NULL DEFAULT '1', ADD INDEX ( recgroupid );",
             // Populate those columns with the corresponding recgroupid from the new recgroups table
             "UPDATE recorded, recgroups SET recorded.recgroupid = recgroups.recgroupid WHERE recorded.recgroup = recgroups.recgroup;",
-            "UPDATE record, recgroups SET record.recgroupid = recgroups.recgroupid WHERE record.recgroup = recgroups.recgroup;",
-            nullptr
+            "UPDATE record, recgroups SET record.recgroupid = recgroups.recgroupid WHERE record.recgroup = recgroups.recgroup;"
         };
 
 
 
-        if (!performActualUpdate(&updates[0], "1321", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1321", dbver))
             return false;
     }
 
     if (dbver == "1321")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "ALTER TABLE `housekeeping` ADD COLUMN `lastsuccess` DATETIME;",
-            "UPDATE `housekeeping` SET `lastsuccess`=`lastrun`;",
-            nullptr
+            "UPDATE `housekeeping` SET `lastsuccess`=`lastrun`;"
         };
 
-        if (!performActualUpdate(&updates[0], "1322", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1322", dbver))
             return false;
     }
 
     if (dbver == "1322")
     {
-        const char *updates[] = {
+        DBUpdates updates {
         // add inetref to (recorded)program before season/episode
+            // NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
             "ALTER TABLE program "
             " ADD COLUMN inetref varchar(40) DEFAULT '' AFTER videoprop;",
             "ALTER TABLE recordedprogram "
@@ -2683,56 +2585,56 @@ nullptr
             "DELETE FROM settings WHERE value='AutoRunUserJob4';",
             "DELETE FROM settings WHERE value='AutoMetadataLookup';",
             "DELETE FROM housekeeping WHERE tag='DailyCleanup';",
-            "DELETE FROM housekeeping WHERE tag='ThemeChooserInfoCacheUpdate';",
-            nullptr
+            "DELETE FROM housekeeping WHERE tag='ThemeChooserInfoCacheUpdate';"
         };
-        if (!performActualUpdate(updates, "1323", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1323", dbver))
             return false;
     }
 
     if (dbver == "1323")
     {
-        const char *updates[] = {
+        DBUpdates updates {
         // add columns for Unicable related configuration data, see #9726
             "ALTER TABLE diseqc_tree "
             " ADD COLUMN scr_userband INTEGER UNSIGNED NOT NULL DEFAULT 0 AFTER address, "
             " ADD COLUMN scr_frequency INTEGER UNSIGNED NOT NULL DEFAULT 1400 AFTER scr_userband, "
-            " ADD COLUMN scr_pin INTEGER  NOT NULL DEFAULT '-1' AFTER scr_frequency;",
-            nullptr
+            " ADD COLUMN scr_pin INTEGER  NOT NULL DEFAULT '-1' AFTER scr_frequency;"
         };
 
-        if (!performActualUpdate(updates, "1324", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1324", dbver))
             return false;
     }
 
     if (dbver == "1324")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "ALTER TABLE recorded "
             " DROP PRIMARY KEY, "
             " ADD recordedid INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, "
-            " ADD UNIQUE KEY (chanid, starttime) ;",
-            nullptr
+            " ADD UNIQUE KEY (chanid, starttime) ;"
         };
 
-        if (!performActualUpdate(updates, "1325", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1325", dbver))
             return false;
     }
 
     if (dbver == "1325")
     {
-        const char *updates[] = {
-            "ALTER TABLE recorded ADD inputname VARCHAR(32);",
-            nullptr
+        DBUpdates updates {
+            "ALTER TABLE recorded ADD inputname VARCHAR(32);"
         };
 
-        if (!performActualUpdate(&updates[0], "1326", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1326", dbver))
             return false;
     }
 
     if (dbver == "1326")
     {
-        const char *updates[] = {
+        DBUpdates updates {
 // Add this time filter
 "REPLACE INTO recordfilter (filterid, description, clause, newruledefault) "
 "  VALUES (8, 'This time', 'ABS(TIMESTAMPDIFF(MINUTE, CONVERT_TZ("
@@ -2744,16 +2646,16 @@ nullptr
 "  VALUES (9, 'This day and time', 'ABS(TIMESTAMPDIFF(MINUTE, CONVERT_TZ("
 "  ADDTIME(RECTABLE.startdate, RECTABLE.starttime), ''Etc/UTC'', ''SYSTEM''), "
 "  CONVERT_TZ(program.starttime, ''Etc/UTC'', ''SYSTEM''))) MOD 10080 "
-"  NOT BETWEEN 11 AND 10069', 0)",
-nullptr
+"  NOT BETWEEN 11 AND 10069', 0)"
 };
-        if (!performActualUpdate(updates, "1327", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1327", dbver))
             return false;
     }
 
     if (dbver == "1327")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "DELETE r1 FROM record r1, record r2 "
             "  WHERE r1.chanid = r2.chanid AND "
             "        r1.starttime = r2.starttime AND "
@@ -2763,16 +2665,16 @@ nullptr
             "        r1.recordid > r2.recordid",
             "ALTER TABLE record DROP INDEX chanid",
             "ALTER TABLE record ADD UNIQUE INDEX "
-            " (chanid, starttime, startdate, title, type)",
-            nullptr
+            " (chanid, starttime, startdate, title, type)"
         };
-        if (!performActualUpdate(updates, "1328", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1328", dbver))
             return false;
     }
 
     if (dbver == "1328")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "ALTER TABLE recordedfile "
             "DROP KEY `chanid`, "
             "DROP COLUMN `chanid`, "
@@ -2783,16 +2685,16 @@ nullptr
             "ALTER TABLE recordedfile "
             "CHANGE audio_type audio_codec varchar(255) NOT NULL DEFAULT '';"
             "ALTER TABLE recordedfile "
-            "CHANGE video_type video_codec varchar(255) NOT NULL DEFAULT '';",
-            nullptr
+            "CHANGE video_type video_codec varchar(255) NOT NULL DEFAULT '';"
         };
-        if (!performActualUpdate(updates, "1329", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1329", dbver))
             return false;
     }
 
     if (dbver == "1329")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "ALTER TABLE recordedfile "
             "DROP COLUMN audio_bits_per_sample ;", // Instead create two columns for avg and max bitrates
             "ALTER TABLE recordedfile "
@@ -2801,10 +2703,10 @@ nullptr
             "ADD COLUMN video_avg_bitrate MEDIUMINT UNSIGNED NOT NULL DEFAULT 0, " // Kbps
             "ADD COLUMN video_max_bitrate MEDIUMINT UNSIGNED NOT NULL DEFAULT 0, " // Kbps
             "ADD COLUMN audio_avg_bitrate MEDIUMINT UNSIGNED NOT NULL DEFAULT 0, " // Kbps
-            "ADD COLUMN audio_max_bitrate MEDIUMINT UNSIGNED NOT NULL DEFAULT 0 ;", // Kbps
-           nullptr
+            "ADD COLUMN audio_max_bitrate MEDIUMINT UNSIGNED NOT NULL DEFAULT 0 ;" // Kbps
         };
-        if (!performActualUpdate(updates, "1330", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1330", dbver))
             return false;
     }
 
@@ -2816,7 +2718,7 @@ nullptr
         while (query.next())
         {
             int recordingID = query.value(0).toInt();
-            RecordingInfo *recInfo = new RecordingInfo(recordingID);
+            auto *recInfo = new RecordingInfo(recordingID);
             RecordingFile *recFile = recInfo->GetRecordingFile();
             recFile->m_fileName = recInfo->GetBasename();
             recFile->m_fileSize = recInfo->GetFilesize();
@@ -2847,7 +2749,7 @@ nullptr
             delete recInfo;
         }
 
-        if (!UpdateDBVersionNumber("1331", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1331", dbver))
             return false;
     }
 
@@ -2919,12 +2821,13 @@ nullptr
             }
         }
 
-        const char *updates[] = {
+        DBUpdates updates {
             // Delete old, automatically created inputgroups.
             "DELETE FROM inputgroup WHERE inputgroupname LIKE 'DVB_%'",
             "DELETE FROM inputgroup WHERE inputgroupname LIKE 'CETON_%'",
             "DELETE FROM inputgroup WHERE inputgroupname LIKE 'HDHOMERUN_%'",
             // Increase the size of inputgroup.inputgroupname.
+            // NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
             "ALTER TABLE inputgroup "
             "    MODIFY COLUMN inputgroupname VARCHAR(48)",
             // Rename remaining inputgroups to have 'user:' prefix.
@@ -2949,11 +2852,10 @@ nullptr
             "UPDATE cardinput i "
             "    SET i.cardinputid = i.cardid + @maxcardid + @maxcardinputid",
             "UPDATE cardinput i "
-            "    SET i.cardinputid = i.cardid",
-            nullptr
+            "    SET i.cardinputid = i.cardid"
         };
 
-        if (!performUpdateSeries(updates))
+        if (!performUpdateSeries("MythTV", updates))
             return false;
 
         // Create an automatically generated inputgroup for each card.
@@ -2983,13 +2885,13 @@ nullptr
         if (!CardUtil::UnlinkInputGroup(0, 0))
             return false;
 
-        if (!UpdateDBVersionNumber("1332", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1332", dbver))
             return false;
     }
 
     if (dbver == "1332")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             // Move contents of cardinput to capturecard.
             "ALTER TABLE capturecard "
             "    ADD COLUMN inputname VARCHAR(32) NOT NULL DEFAULT '', "
@@ -3020,45 +2922,45 @@ nullptr
             "        c.quicktune = i.quicktune, "
             "        c.schedorder = i.schedorder, "
             "        c.livetvorder = i.livetvorder",
-            "TRUNCATE cardinput",
-            nullptr
+            "TRUNCATE cardinput"
         };
-        if (!performActualUpdate(updates, "1333", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1333", dbver))
             return false;
     }
 
     if (dbver == "1333")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             // Fix default value of capturecard.inputname.
             "ALTER TABLE capturecard "
             "    MODIFY COLUMN inputname VARCHAR(32) NOT NULL DEFAULT 'None'",
             "UPDATE capturecard c "
-            "    SET inputname = 'None' WHERE inputname = '' ",
-            nullptr
+            "    SET inputname = 'None' WHERE inputname = '' "
         };
-        if (!performActualUpdate(updates, "1334", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1334", dbver))
             return false;
     }
 
     if (dbver == "1334")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             // Change the default sched/livetvorder from 0 to 1.
             "ALTER TABLE capturecard "
             "    MODIFY COLUMN schedorder INT(10) UNSIGNED "
             "        NOT NULL DEFAULT 1, "
             "    MODIFY COLUMN livetvorder INT(10) UNSIGNED "
-            "        NOT NULL DEFAULT 1",
-            nullptr
+            "        NOT NULL DEFAULT 1"
         };
-        if (!performActualUpdate(updates, "1335", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1335", dbver))
             return false;
     }
 
     if (dbver == "1335")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             // Fix custom record and custom priority references to
             // cardinput and cardinputid.
             "UPDATE record SET description = "
@@ -3070,16 +2972,16 @@ nullptr
             "UPDATE powerpriority SET selectclause = "
             "    replace(selectclause, 'cardinputid', 'cardid')",
             "UPDATE powerpriority SET selectclause = "
-            "    replace(selectclause, 'cardinput', 'capturecard')",
-            nullptr
+            "    replace(selectclause, 'cardinput', 'capturecard')"
         };
-        if (!performActualUpdate(updates, "1336", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1336", dbver))
             return false;
     }
 
     if (dbver == "1336")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             // Add a parentid columne to capturecard.
             "ALTER TABLE capturecard "
             "    ADD parentid INT UNSIGNED NOT NULL DEFAULT 0 AFTER cardid",
@@ -3094,18 +2996,19 @@ nullptr
             "WHERE c.hostname = mins.hostname and "
             "      c.videodevice = mins.videodevice and "
             "      c.inputname = mins.inputname and "
-            "      c.cardid <> mins.cardid",
-            nullptr
+            "      c.cardid <> mins.cardid"
         };
-        if (!performActualUpdate(updates, "1337", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1337", dbver))
             return false;
     }
 
     if (dbver == "1337")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             // All next_record, last_record and last_delete to be NULL.
             "ALTER TABLE record MODIFY next_record DATETIME NULL",
+            // NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
             "UPDATE record SET next_record = NULL "
             "    WHERE next_record = '0000-00-00 00:00:00'",
             "ALTER TABLE record MODIFY last_record DATETIME NULL",
@@ -3113,16 +3016,16 @@ nullptr
             "    WHERE last_record = '0000-00-00 00:00:00'",
             "ALTER TABLE record MODIFY last_delete DATETIME NULL",
             "UPDATE record SET last_delete = NULL "
-            "    WHERE last_delete = '0000-00-00 00:00:00'",
-            nullptr
+            "    WHERE last_delete = '0000-00-00 00:00:00'"
         };
-        if (!performActualUpdate(updates, "1338", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1338", dbver))
             return false;
     }
 
     if (dbver == "1338")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "CREATE TABLE users ("
             " userid int(5) unsigned NOT NULL AUTO_INCREMENT,"
             " username varchar(128) NOT NULL DEFAULT '',"
@@ -3147,10 +3050,10 @@ nullptr
             " UNIQUE KEY userid_client (userid,client)"
             " ) ENGINE=MyISAM DEFAULT CHARSET=utf8;",
             "INSERT INTO users SET username='admin'," // Temporary default account
-            " password_digest='bcd911b2ecb15ffbd6d8e6e744d60cf6';",
-            nullptr
+            " password_digest='bcd911b2ecb15ffbd6d8e6e744d60cf6';"
         };
-        if (!performActualUpdate(updates, "1339", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1339", dbver))
             return false;
     }
 
@@ -3203,29 +3106,29 @@ nullptr
             return false;
         }
 
-        if (!UpdateDBVersionNumber("1340", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1340", dbver))
             return false;
     }
 
     if (dbver == "1340")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             // Add filter to ignore episodes (e.g. in a person search)
             "REPLACE INTO recordfilter (filterid, description, clause, newruledefault) "
-            "  VALUES (11, 'No episodes', 'program.category_type <> ''series''', 0)",
-            nullptr
+            "  VALUES (11, 'No episodes', 'program.category_type <> ''series''', 0)"
         };
-        if (!performActualUpdate(updates, "1341", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1341", dbver))
             return false;
     }
 
     if (dbver == "1341")
     {
-        const char *updates[] = {
-            "UPDATE profilegroups SET cardtype='FREEBOX' WHERE cardtype='Freebox'",
-            nullptr
+        DBUpdates updates {
+            "UPDATE profilegroups SET cardtype='FREEBOX' WHERE cardtype='Freebox'"
         };
-        if (!performActualUpdate(updates, "1342", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1342", dbver))
             return false;
     }
 
@@ -3235,16 +3138,15 @@ nullptr
         MSqlQuery select(MSqlQuery::InitCon());
         MSqlQuery update(MSqlQuery::InitCon());
 
-        const char *updates[] = {
+        DBUpdates updates {
             // Delete automatically created inputgroups.
             "DELETE FROM inputgroup WHERE inputgroupname REGEXP '^[a-z_-]*\\\\|'",
             // Increase the size of inputgroup.inputgroupname.
             "ALTER TABLE inputgroup "
-            "    MODIFY COLUMN inputgroupname VARCHAR(128)",
-            nullptr
+            "    MODIFY COLUMN inputgroupname VARCHAR(128)"
         };
 
-        if (!performUpdateSeries(updates))
+        if (!performUpdateSeries("MythTV", updates))
             return false;
 
         // Recreate automatically generated inputgroup for each card.
@@ -3280,13 +3182,13 @@ nullptr
         if (!CardUtil::UnlinkInputGroup(0, 0))
             return false;
 
-        if (!UpdateDBVersionNumber("1343", dbver))
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1343", dbver))
             return false;
     }
 
     if (dbver == "1343")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "DROP TABLE IF EXISTS bdbookmark;",
             "CREATE TABLE bdbookmark ("
             "  serialid varchar(40) NOT NULL DEFAULT '',"
@@ -3301,17 +3203,17 @@ nullptr
             "name=REPLACE(name,'\\0','');",
 
             // "BackendWSPort" was removed in caaaeef8166722888012f4ecaf3e9b0f09df512a
-            "DELETE FROM settings WHERE value='BackendWSPort';",
-            nullptr
+            "DELETE FROM settings WHERE value='BackendWSPort';"
         };
 
-        if (!performActualUpdate(&updates[0], "1344", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1344", dbver))
             return false;
     }
 
     if (dbver == "1344")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "ALTER TABLE capturecard ADD COLUMN "
             "    reclimit INT UNSIGNED DEFAULT 1 NOT NULL",
             "UPDATE capturecard cc, "
@@ -3321,23 +3223,23 @@ nullptr
             "         GROUP BY if(parentid>0, parentid, cardid) "
             "       ) p "
             "SET cc.reclimit = p.cnt "
-            "WHERE cc.cardid = p.cardid OR cc.parentid = p.cardid",
-            nullptr
+            "WHERE cc.cardid = p.cardid OR cc.parentid = p.cardid"
         };
 
-        if (!performActualUpdate(&updates[0], "1345", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1345", dbver))
             return false;
     }
 
     if (dbver == "1345")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "ALTER TABLE capturecard ADD COLUMN "
-            "    schedgroup TINYINT(1) DEFAULT 0 NOT NULL",
-            nullptr
+            "    schedgroup TINYINT(1) DEFAULT 0 NOT NULL"
         };
 
-        if (!performActualUpdate(&updates[0], "1346", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1346", dbver))
             return false;
     }
 
@@ -3353,11 +3255,14 @@ nullptr
         QString master;
         // Create new MasterServerName setting
         if (gCoreContext->IsMasterHost())
+        {
             master =
             "insert into settings (value,data,hostname) "
             "values('MasterServerName','"
                 + gCoreContext->GetHostName() + "', null);";
+        }
         else
+        {
             master =
             "insert into settings (value,data,hostname) "
             "select 'MasterServerName', b.hostname, null "
@@ -3365,8 +3270,9 @@ nullptr
             "where a.value = 'MasterServerIP' "
             "and b.value in ('BackendServerIP','BackendServerIP6')"
             "and a.data = b.data;";
+        }
 
-        const char *updates[] = {
+        DBUpdates updates {
             // Create new MasterServerName setting
             master.toLocal8Bit().constData(),
             // Create new BackendServerAddr setting for each backend server
@@ -3394,48 +3300,430 @@ nullptr
                 "and c.hostname = b.data;",          // restrict to master
             // Delete obsolete settings
             "delete from settings "
-                "where value in ('WatchTVGuide');",
-            nullptr
+                "where value in ('WatchTVGuide');"
         };
 
-        if (!performActualUpdate(&updates[0], "1347", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1347", dbver))
             return false;
     }
 
     if (dbver == "1347")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "ALTER TABLE record MODIFY COLUMN startdate DATE DEFAULT NULL",
             "ALTER TABLE record MODIFY COLUMN enddate DATE DEFAULT NULL",
             "ALTER TABLE record MODIFY COLUMN starttime TIME DEFAULT NULL",
-            "ALTER TABLE record MODIFY COLUMN endtime TIME DEFAULT NULL",
-            nullptr
+            "ALTER TABLE record MODIFY COLUMN endtime TIME DEFAULT NULL"
         };
-        if (!performActualUpdate(updates, "1348", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1348", dbver))
             return false;
     }
 
     if (dbver == "1348")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             "update capturecard "
             "    set videodevice=left(videodevice, "
             "                         locate('-', videodevice)-1) "
             "    where cardtype='HDHOMERUN' "
-            "          and videodevice like '%-%'",
-            nullptr
+            "          and videodevice like '%-%'"
         };
-        if (!performActualUpdate(updates, "1349", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1349", dbver))
             return false;
     }
 
     if (dbver == "1349")
     {
-        const char *updates[] = {
+        DBUpdates updates {
             // Incorrect DB update removed
-            nullptr
         };
-        if (!performActualUpdate(updates, "1350", dbver))
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1350", dbver))
+            return false;
+    }
+
+    if (dbver == "1350")
+    {
+        DBUpdates updates {
+            "ALTER TABLE videosource ADD COLUMN bouquet_id INT DEFAULT 0;",
+            "ALTER TABLE videosource ADD COLUMN region_id INT DEFAULT 0;"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1351", dbver))
+            return false;
+    }
+
+    if (dbver == "1351")
+    {
+        DBUpdates updates {
+            "ALTER TABLE videosource MODIFY bouquet_id INT UNSIGNED;",
+            "ALTER TABLE videosource MODIFY region_id INT UNSIGNED;",
+            "ALTER TABLE channel ADD COLUMN service_type INT UNSIGNED DEFAULT 0 AFTER serviceid;"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1352", dbver))
+            return false;
+    }
+
+    if (dbver == "1352")
+    {
+        DBUpdates updates {
+            "ALTER TABLE capturecard MODIFY schedgroup TINYINT(1) DEFAULT 1 NOT NULL"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1353", dbver))
+            return false;
+    }
+
+    if (dbver == "1353")
+    {
+        DBUpdates updates {
+            "ALTER TABLE channel ADD COLUMN deleted TIMESTAMP NULL"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1354", dbver))
+            return false;
+    }
+
+    if (dbver == "1354")
+    {
+        DBUpdates updates {
+            "ALTER TABLE videosource ADD COLUMN scanfrequency INT UNSIGNED DEFAULT 0;"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1355", dbver))
+            return false;
+    }
+
+    if (dbver == "1355")
+    {
+        DBUpdates updates {
+            "UPDATE capturecard "
+            "SET displayname = CONCAT('Input ', cardid) "
+            "WHERE displayname = ''"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1356", dbver))
+            return false;
+    }
+
+    if (dbver == "1356")
+    {
+        DBUpdates updates {
+            "REPLACE INTO recordfilter (filterid, description, clause, "
+            "                          newruledefault) "
+            "  VALUES (12, 'Priority channel', 'channel.recpriority > 0', 0)"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1357", dbver))
+            return false;
+    }
+
+    if (dbver == "1357")
+    {
+        // convert old VideoDisplayProfile settings to new format
+        ProfileItem temp;
+        vector<ProfileItem> profiles;
+
+        MSqlQuery query(MSqlQuery::InitCon());
+        query.prepare("SELECT profileid, value, data FROM displayprofiles "
+                      "ORDER BY profileid");
+
+        for (;;)
+        {
+            if (!query.exec())
+                break;
+
+            uint currentprofile = 0;
+            while (query.next())
+            {
+                if (query.value(0).toUInt() != currentprofile)
+                {
+                    if (currentprofile)
+                    {
+                        temp.SetProfileID(currentprofile);
+                        profiles.push_back(temp);
+                    }
+                    temp.Clear();
+                    currentprofile = query.value(0).toUInt();
+                }
+                temp.Set(query.value(1).toString(), query.value(2).toString());
+            }
+
+            if (currentprofile)
+            {
+                temp.SetProfileID(currentprofile);
+                profiles.push_back(temp);
+            }
+
+            for (const ProfileItem& profile : qAsConst(profiles))
+            {
+                QString newdecoder;
+                QString newrender;
+                QString newdeint0;
+                QString newdeint1;
+
+                QString olddecoder = profile.Get("pref_decoder");
+                QString oldrender  = profile.Get("pref_videorenderer");
+                QString olddeint0  = profile.Get("pref_deint0");
+                QString olddeint1  = profile.Get("pref_deint1");
+
+                if (oldrender == "xv-blit")
+                {
+                    newdecoder = "ffmpeg";
+                    newrender  = "opengl-yv12";
+                }
+                if (olddecoder == "openmax" || oldrender == "openmax")
+                {
+                    newdecoder = "mmal-dec";
+                    newrender  = "opengl-yv12";
+                }
+                if ((olddecoder == "mediacodec") || (olddecoder == "nvdec") ||
+                    (olddecoder == "vda") || (olddecoder == "vaapi2") ||
+                    (olddecoder == "vaapi" && oldrender == "openglvaapi") ||
+                    (olddecoder == "vdpau" && oldrender == "vdpau"))
+                {
+                    if (oldrender != "opengl-hw")
+                        newrender = "opengl-hw";
+                }
+                if (olddecoder == "vda")
+                    newdecoder = "vtb";
+                if (olddecoder == "vaapi2")
+                    newdecoder = "vaapi";
+
+                auto UpdateDeinterlacer = [](const QString &Olddeint, QString &Newdeint, const QString &Decoder)
+                {
+                    if (Olddeint.isEmpty())
+                    {
+                        Newdeint = "none";
+                    }
+                    else if (Olddeint == "none" ||
+                             Olddeint.contains(DEINT_QUALITY_SHADER) ||
+                             Olddeint.contains(DEINT_QUALITY_DRIVER) ||
+                             Olddeint.contains(DEINT_QUALITY_LOW) ||
+                             Olddeint.contains(DEINT_QUALITY_MEDIUM) ||
+                             Olddeint.contains(DEINT_QUALITY_HIGH))
+                    {
+                        return;
+                    }
+
+                    QStringList newsettings;
+                    bool driver = (Decoder != "ffmpeg") &&
+                        (Olddeint.contains("vaapi") || Olddeint.contains("vdpau") ||
+                         Olddeint.contains("nvdec"));
+                    if (driver)
+                        newsettings << DEINT_QUALITY_DRIVER;
+                    if (Olddeint.contains("opengl") || driver)
+                        newsettings << DEINT_QUALITY_SHADER;
+
+                    if (Olddeint.contains("greedy") || Olddeint.contains("yadif") ||
+                        Olddeint.contains("kernel") || Olddeint.contains("advanced") ||
+                        Olddeint.contains("compensated") || Olddeint.contains("adaptive"))
+                    {
+                        newsettings << DEINT_QUALITY_HIGH;
+                    }
+                    else if (Olddeint.contains("bob") || Olddeint.contains("onefield") ||
+                             Olddeint.contains("linedouble"))
+                    {
+                        newsettings << DEINT_QUALITY_LOW;
+                    }
+                    else
+                    {
+                        newsettings << DEINT_QUALITY_MEDIUM;
+                    }
+                    Newdeint = newsettings.join(":");
+                };
+
+                QString decoder = newdecoder.isEmpty() ? olddecoder : newdecoder;
+                UpdateDeinterlacer(olddeint0, newdeint0, decoder);
+                UpdateDeinterlacer(olddeint1, newdeint1, decoder);
+
+                auto UpdateData = [](uint ProfileID, const QString &Value, const QString &Data)
+                {
+                    MSqlQuery update(MSqlQuery::InitCon());
+                    update.prepare(
+                        "UPDATE displayprofiles SET data = :DATA "
+                        "WHERE profileid = :PROFILEID AND value = :VALUE");
+                    update.bindValue(":PROFILEID", ProfileID);
+                    update.bindValue(":VALUE",     Value);
+                    update.bindValue(":DATA",      Data);
+                    if (!update.exec())
+                        LOG(VB_GENERAL, LOG_ERR,
+                            QString("Error updating display profile id %1").arg(ProfileID));
+                };
+
+                uint id = profile.GetProfileID();
+                if (!newdecoder.isEmpty())
+                    UpdateData(id, "pref_decoder", newdecoder);
+                if (!newrender.isEmpty())
+                    UpdateData(id, "pref_videorenderer", newrender);
+                if (!newdeint0.isEmpty())
+                    UpdateData(id, "pref_deint0", newdeint0);
+                if (!newdeint1.isEmpty())
+                    UpdateData(id, "pref_deint1", newdeint1);
+            }
+            break;
+        }
+
+        // remove old studio levels keybinding
+        DBUpdates updates {
+            "DELETE FROM keybindings WHERE action='TOGGLESTUDIOLEVELS'"
+        };
+
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1358", dbver))
+            return false;
+    }
+
+    if (dbver == "1358")
+    {
+        DBUpdates updates {
+            // Allow videosouce.userid to be NULL as originally intended.
+            "ALTER TABLE videosource "
+            "  CHANGE COLUMN userid userid VARCHAR(128) NULL DEFAULT NULL",
+            // And fix any leftover, empty values.
+            "UPDATE videosource "
+            "  SET userid = NULL "
+            "  WHERE userid = ''",
+            // Remove potential clear text credentials no longer usable
+            "UPDATE videosource "
+            "  SET userid = NULL, password = NULL "
+            "  WHERE xmltvgrabber IN ('schedulesdirect1', 'datadirect')"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1359", dbver))
+            return false;
+    }
+
+    if (dbver == "1359")
+    {
+        // XineramaMonitorAspectRatio was previously ignored for single screen
+        // setups but now acts as an override for the display aspect ratio.
+        // 0.0 indicates 'Auto' - which should be the default.
+        DBUpdates updates {
+            "UPDATE settings SET data='0.0' WHERE value='XineramaMonitorAspectRatio'"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1360", dbver))
+            return false;
+    }
+
+    if (dbver == "1360")
+    {
+        // missed in 1357 - convert old vdpau and openglvaapi renderers to opengl
+        // convert ancient quartz-blit to opengl as well
+        ProfileItem temp;
+        vector<ProfileItem> profiles;
+
+        MSqlQuery query(MSqlQuery::InitCon());
+        query.prepare("SELECT profileid, value, data FROM displayprofiles "
+                      "ORDER BY profileid");
+
+        for (;;)
+        {
+            if (!query.exec())
+                break;
+
+            uint currentprofile = 0;
+            while (query.next())
+            {
+                if (query.value(0).toUInt() != currentprofile)
+                {
+                    if (currentprofile)
+                    {
+                        temp.SetProfileID(currentprofile);
+                        profiles.push_back(temp);
+                    }
+                    temp.Clear();
+                    currentprofile = query.value(0).toUInt();
+                }
+                temp.Set(query.value(1).toString(), query.value(2).toString());
+            }
+
+            if (currentprofile)
+            {
+                temp.SetProfileID(currentprofile);
+                profiles.push_back(temp);
+            }
+
+            for (const ProfileItem& profile : qAsConst(profiles))
+            {
+                // the old deinterlacers will have been converted already
+                QString oldrender  = profile.Get("pref_videorenderer");
+                if (oldrender == "quartz-blit" || oldrender == "openglvaapi" ||
+                    oldrender == "vdpau")
+                {
+                    auto UpdateData = [](uint ProfileID, const QString &Value, const QString &Data)
+                    {
+                        MSqlQuery update(MSqlQuery::InitCon());
+                        update.prepare(
+                            "UPDATE displayprofiles SET data = :DATA "
+                            "WHERE profileid = :PROFILEID AND value = :VALUE");
+                        update.bindValue(":PROFILEID", ProfileID);
+                        update.bindValue(":VALUE",     Value);
+                        update.bindValue(":DATA",      Data);
+                        if (!update.exec())
+                            LOG(VB_GENERAL, LOG_ERR,
+                                QString("Error updating display profile id %1").arg(ProfileID));
+                    };
+
+                    uint id = profile.GetProfileID();
+                    UpdateData(id, "pref_decoder", "ffmpeg");
+                    UpdateData(id, "pref_videorenderer", "opengl-yv12");
+                }
+            }
+            break;
+        }
+
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1361", dbver))
+            return false;
+    }
+    if (dbver == "1361")
+    {
+        DBUpdates updates {
+            "ALTER TABLE program CHANGE COLUMN videoprop videoprop "
+            "    SET('WIDESCREEN', 'HDTV', 'MPEG2', 'AVC', 'HEVC') NOT NULL; ",
+            "ALTER TABLE recordedprogram CHANGE COLUMN videoprop videoprop "
+            "    SET('WIDESCREEN', 'HDTV', 'MPEG2', 'AVC', 'HEVC', "
+            "        '720', '1080', '4K', '3DTV', 'PROGRESSIVE', "
+            "        'DAMAGED') NOT NULL; ",
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1362", dbver))
+            return false;
+    }
+
+    if (dbver == "1362")
+    {
+        MSqlQuery select(MSqlQuery::InitCon());
+        select.prepare(
+            QString("select index_name from information_schema.statistics "
+            "where table_schema = '%1' "
+            "and table_name = 'recordedartwork' "
+            "and seq_in_index = 1 "
+            "and column_name = 'inetref'")
+            .arg(gCoreContext->GetDatabaseParams().m_dbName));
+
+        if (!select.exec())
+        {
+            MythDB::DBError("Unable to retrieve index values.", select);
+            return false;
+        }
+
+        DBUpdates updates {
+            "CREATE INDEX recordedartwork_ix1 ON recordedartwork (inetref); "
+        };
+
+        // do not create index if already done.
+        if (select.size() > 0) {
+            updates.clear();
+        }
+
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1363", dbver))
             return false;
     }
 
@@ -3481,7 +3769,7 @@ bool InitializeMythSchema(void)
     LOG(VB_GENERAL, LOG_NOTICE,
         "Inserting MythTV initial database information.");
 
-    const char *updates[] = {
+    DBUpdates updates {
 "CREATE TABLE capturecard ("
 "  cardid int(10) unsigned NOT NULL AUTO_INCREMENT,"
 "  videodevice varchar(128) DEFAULT NULL,"
@@ -4115,10 +4403,10 @@ bool InitializeMythSchema(void)
 "CREATE TABLE programrating ("
 "  chanid int(10) unsigned NOT NULL DEFAULT '0',"
 "  starttime datetime NOT NULL DEFAULT '0000-00-00 00:00:00',"
-"  system varchar(8) DEFAULT NULL,"
+"  `system` varchar(8) DEFAULT NULL,"
 "  rating varchar(16) DEFAULT NULL,"
-"  UNIQUE KEY chanid (chanid,starttime,system,rating),"
-"  KEY starttime (starttime,system)"
+"  UNIQUE KEY chanid (chanid,starttime,`system`,rating),"
+"  KEY starttime (starttime,`system`)"
 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
 "CREATE TABLE recgrouppassword ("
 "  recgroup varchar(32) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '',"
@@ -4325,10 +4613,10 @@ bool InitializeMythSchema(void)
 "CREATE TABLE recordedrating ("
 "  chanid int(10) unsigned NOT NULL DEFAULT '0',"
 "  starttime datetime NOT NULL DEFAULT '0000-00-00 00:00:00',"
-"  system varchar(8) DEFAULT NULL,"
+"  `system` varchar(8) DEFAULT NULL,"
 "  rating varchar(16) DEFAULT NULL,"
-"  UNIQUE KEY chanid (chanid,starttime,system,rating),"
-"  KEY starttime (starttime,system)"
+"  UNIQUE KEY chanid (chanid,starttime,`system`,rating),"
+"  KEY starttime (starttime,`system`)"
 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
 "CREATE TABLE recordedseek ("
 "  chanid int(10) unsigned NOT NULL DEFAULT '0',"
@@ -4574,7 +4862,7 @@ bool InitializeMythSchema(void)
 ") ENGINE=MyISAM AUTO_INCREMENT=33 DEFAULT CHARSET=utf8;",
 
 "INSERT INTO channelgroupnames VALUES (1,'Favorites');",
-"INSERT INTO customexample VALUES ('New Flix','','program.category_type = \\'movie\\' AND program.airdate >= \\n     YEAR(DATE_SUB(NOW(), INTERVAL 1 YEAR)) \\nAND program.stars > 0.5 ',1);",
+R"(INSERT INTO customexample VALUES ('New Flix','','program.category_type = \'movie\' AND program.airdate >= \n     YEAR(DATE_SUB(NOW(), INTERVAL 1 YEAR)) \nAND program.stars > 0.5 ',1);)",
 "INSERT INTO dtv_privatetypes VALUES ('dvb',9018,'channel_numbers','131');",
 "INSERT INTO dtv_privatetypes VALUES ('dvb',9018,'guide_fixup','2');",
 "INSERT INTO dtv_privatetypes VALUES ('dvb',256,'guide_fixup','1');",
@@ -4665,10 +4953,10 @@ bool InitializeMythSchema(void)
 "INSERT INTO recordfilter VALUES (0,'New episode','program.previouslyshown = 0',0);",
 "INSERT INTO recordfilter VALUES (1,'Identifiable episode','program.generic = 0',0);",
 "INSERT INTO recordfilter VALUES (2,'First showing','program.first > 0',0);",
-"INSERT INTO recordfilter VALUES (3,'Prime time','HOUR(CONVERT_TZ(program.starttime, \\'Etc/UTC\\', \\'SYSTEM\\')) >= 19 AND HOUR(CONVERT_TZ(program.starttime, \\'Etc/UTC\\', \\'SYSTEM\\')) < 22',0);",
+R"(INSERT INTO recordfilter VALUES (3,'Prime time','HOUR(CONVERT_TZ(program.starttime, \'Etc/UTC\', \'SYSTEM\')) >= 19 AND HOUR(CONVERT_TZ(program.starttime, \'Etc/UTC\', \'SYSTEM\')) < 22',0);)",
 "INSERT INTO recordfilter VALUES (4,'Commercial free','channel.commmethod = -2',0);",
 "INSERT INTO recordfilter VALUES (5,'High definition','program.hdtv > 0',0);",
-"INSERT INTO recordfilter VALUES (6,'This episode','(RECTABLE.programid <> \\'\\' AND program.programid = RECTABLE.programid) OR (RECTABLE.programid = \\'\\' AND program.subtitle = RECTABLE.subtitle AND program.description = RECTABLE.description)',0);",
+R"(INSERT INTO recordfilter VALUES (6,'This episode','(RECTABLE.programid <> \'\' AND program.programid = RECTABLE.programid) OR (RECTABLE.programid = \'\' AND program.subtitle = RECTABLE.subtitle AND program.description = RECTABLE.description)',0);)",
 "INSERT INTO recordfilter VALUES (7,'This series','(RECTABLE.seriesid <> \\'\\' AND program.seriesid = RECTABLE.seriesid)',0);",
 "INSERT INTO recordingprofiles VALUES (1,'Default',NULL,NULL,1);",
 "INSERT INTO recordingprofiles VALUES (2,'Live TV',NULL,NULL,1);",
@@ -4775,12 +5063,12 @@ bool InitializeMythSchema(void)
 "INSERT INTO videotypes VALUES (29,'ts','Internal',0,0);",
 "INSERT INTO videotypes VALUES (30,'swf','Internal',0,0);",
 "INSERT INTO videotypes VALUES (31,'f4v','Internal',0,0);",
-"INSERT INTO videotypes VALUES (32,'nuv','Internal',0,0);",
-nullptr
+"INSERT INTO videotypes VALUES (32,'nuv','Internal',0,0);"
 };
 
     QString dbver = "";
-    if (!performActualUpdate(updates, "1307", dbver))
+    if (!performActualUpdate("MythTV", "DBSchemaVer",
+                             updates, "1307", dbver))
         return false;
 
     GetMythDB()->SetHaveSchema(true);

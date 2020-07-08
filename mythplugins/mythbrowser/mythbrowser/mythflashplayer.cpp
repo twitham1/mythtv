@@ -27,15 +27,15 @@ MythFlashPlayer::MythFlashPlayer(MythScreenStack *parent,
     m_fftime       = PlayGroup::GetSetting("Default", "skipahead", 30);
     m_rewtime      = PlayGroup::GetSetting("Default", "skipback", 5);
     m_jumptime     = PlayGroup::GetSetting("Default", "jump", 10);
-    qApp->setOverrideCursor(QCursor(Qt::BlankCursor));
+    QGuiApplication::setOverrideCursor(QCursor(Qt::BlankCursor));
     GetMythMainWindow()->PauseIdleTimer(true);
-    GetMythUI()->DisableScreensaver();
+    MythUIHelper::DisableScreensaver();
 }
 
 
 MythFlashPlayer::~MythFlashPlayer()
 {
-    qApp->restoreOverrideCursor();
+    QGuiApplication::restoreOverrideCursor();
 
     if (m_browser)
     {
@@ -44,7 +44,7 @@ MythFlashPlayer::~MythFlashPlayer()
         m_browser = nullptr;
     }
     GetMythMainWindow()->PauseIdleTimer(false);
-    GetMythUI()->RestoreScreensaver();
+    MythUIHelper::RestoreScreensaver();
 }
 
 bool MythFlashPlayer::Create(void)

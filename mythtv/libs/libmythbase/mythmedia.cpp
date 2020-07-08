@@ -41,7 +41,7 @@ static const QString PATHTO_MOUNTS("/proc/mounts");
 #   define USE_MOUNT_COMMAND
 #endif
 
-const char* MythMediaDevice::MediaStatusStrings[] =
+const std::array<const QString,9> MythMediaDevice::MediaStatusStrings
 {
     "MEDIASTAT_ERROR",
     "MEDIASTAT_UNKNOWN",
@@ -54,7 +54,7 @@ const char* MythMediaDevice::MediaStatusStrings[] =
     "MEDIASTAT_MOUNTED"
 };
 
-const char* MythMediaDevice::MediaErrorStrings[] =
+const std::array<const QString,3> MythMediaDevice::MediaErrorStrings
 {
     "MEDIAERR_OK",
     "MEDIAERR_FAILED",
@@ -63,6 +63,12 @@ const char* MythMediaDevice::MediaErrorStrings[] =
 
 QEvent::Type MythMediaEvent::kEventType =
     (QEvent::Type) QEvent::registerEventType();
+
+// Force this class to have a vtable so that dynamic_cast works.
+// NOLINTNEXTLINE(modernize-use-equals-default)
+MythMediaEvent::~MythMediaEvent()
+{
+}
 
 ext_to_media_t MythMediaDevice::s_ext_to_media;
 
@@ -128,13 +134,17 @@ bool MythMediaDevice::performMountCmd(bool DoMount)
         // Build a command line for mount/unmount and execute it...
         // Is there a better way to do this?
         if (QFile(PATHTO_PMOUNT).exists() && QFile(PATHTO_PUMOUNT).exists())
+        {
             MountCommand = QString("%1 %2")
                 .arg((DoMount) ? PATHTO_PMOUNT : PATHTO_PUMOUNT)
                 .arg(m_DevicePath);
+        }
         else
+        {
             MountCommand = QString("%1 %2")
                 .arg((DoMount) ? PATHTO_MOUNT : PATHTO_UNMOUNT)
                 .arg(m_DevicePath);
+        }
 
         LOG(VB_MEDIA, LOG_INFO, QString("Executing '%1'").arg(MountCommand));
         int ret = myth_system(MountCommand, kMSDontBlockInputDevs);
@@ -262,14 +272,8 @@ bool MythMediaDevice::ScanMediaType(const QString &directory, ext_cnt_t &cnt)
         return false;
 
     d.setFilter(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
-    QFileInfoList list = d.entryInfoList();
-
-    for( QFileInfoList::iterator it = list.begin();
-                                 it != list.end();
-                               ++it )
+    for (const auto& fi : d.entryInfoList())
     {
-        QFileInfo &fi = *it;
-
         if (fi.isSymLink())
             continue;
 
@@ -297,9 +301,8 @@ bool MythMediaDevice::ScanMediaType(const QString &directory, ext_cnt_t &cnt)
 void MythMediaDevice::RegisterMediaExtensions(uint mediatype,
                                               const QString &extensions)
 {
-    const QStringList list = extensions.split(",");
-    for (QStringList::const_iterator it = list.begin(); it != list.end(); ++it)
-        s_ext_to_media[*it] |= mediatype;
+    for (const auto& ext : extensions.split(","))
+        s_ext_to_media[ext] |= mediatype;
 }
 
 MythMediaError MythMediaDevice::eject(bool open_close)

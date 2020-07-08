@@ -1,9 +1,9 @@
-#ifndef _CHANNEL_IMPORTER_HELPERS_H_
-#define _CHANNEL_IMPORTER_HELPERS_H_
+#ifndef CHANNEL_IMPORTER_HELPERS_H
+#define CHANNEL_IMPORTER_HELPERS_H
 
 // C++ headers
 #include <cstdint>
-typedef unsigned uint;
+using uint = unsigned;
 #include <vector>
 using namespace std;
 
@@ -20,10 +20,11 @@ class ScanInfo
   public:
     ScanInfo() = default;
     ScanInfo(uint scanid, uint cardid, uint sourceid,
-             bool processed, const QDateTime &scandate);
+             bool processed, QDateTime scandate);
 
     static bool MarkProcessed(uint scanid);
     static bool DeleteScan(uint scanid);
+    static void DeleteScansFromSource(uint sourceid);
 
   public:
     uint      m_scanid    {0};
@@ -34,7 +35,8 @@ class ScanInfo
 };
 
 MTV_PUBLIC vector<ScanInfo> LoadScanList(void);
+MTV_PUBLIC vector<ScanInfo> LoadScanList(uint sourceid);
 uint SaveScan(const ScanDTVTransportList &scan);
 MTV_PUBLIC ScanDTVTransportList LoadScan(uint scanid);
 
-#endif // _CHANNEL_IMPORTER_HELPERS_H_
+#endif // CHANNEL_IMPORTER_HELPERS_H

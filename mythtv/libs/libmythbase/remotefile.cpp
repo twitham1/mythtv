@@ -1,9 +1,10 @@
 #include <iostream>
 using namespace std;
 
-#include <QUrl>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
+#include <QUrl>
 
 // POSIX C headers
 #include <unistd.h>
@@ -69,20 +70,20 @@ static bool RemoteSendReceiveStringList(const QString &host, QStringList &strlis
     return ok;
 }
 
-RemoteFile::RemoteFile(const QString &url, bool write, bool usereadahead,
+RemoteFile::RemoteFile(QString url, bool write, bool usereadahead,
                        int timeout_ms,
                        const QStringList *possibleAuxiliaryFiles) :
-    m_path(url),
-    m_usereadahead(usereadahead),  m_timeout_ms(timeout_ms),
-    m_writemode(write)
+    m_path(std::move(url)),
+    m_useReadAhead(usereadahead),  m_timeoutMs(timeout_ms),
+    m_writeMode(write)
 {
-    if (m_writemode)
+    if (m_writeMode)
     {
-        m_usereadahead = false;
-        m_timeout_ms = -1;
+        m_useReadAhead = false;
+        m_timeoutMs = -1;
     }
     else if (possibleAuxiliaryFiles)
-        m_possibleauxfiles = *possibleAuxiliaryFiles;
+        m_possibleAuxFiles = *possibleAuxiliaryFiles;
 
     if (!m_path.isEmpty())
         Open();
@@ -137,7 +138,7 @@ MythSocket *RemoteFile::openSocket(bool control)
 
     QString sgroup = qurl.userName();
 
-    MythSocket *lsock = new MythSocket();
+    auto *lsock = new MythSocket();
     QString stype = (control) ? "control socket" : "file data socket";
 
     QString loc = QString("RemoteFile::openSocket(%1): ").arg(stype);
@@ -171,7 +172,8 @@ MythSocket *RemoteFile::openSocket(bool control)
 
     if (control)
     {
-        strlist.append(QString("ANN Playback %1 %2").arg(hostname).arg(false));
+        strlist.append(QString("ANN Playback %1 %2")
+                       .arg(hostname).arg(static_cast<int>(false)));
         if (!lsock->SendReceiveStringList(strlist))
         {
             LOG(VB_GENERAL, LOG_ERR, loc +
@@ -184,14 +186,13 @@ MythSocket *RemoteFile::openSocket(bool control)
     else
     {
         strlist.push_back(QString("ANN FileTransfer %1 %2 %3 %4")
-                          .arg(hostname).arg(m_writemode)
-                          .arg(m_usereadahead).arg(m_timeout_ms));
+                          .arg(hostname).arg(static_cast<int>(m_writeMode))
+                          .arg(static_cast<int>(m_useReadAhead)).arg(m_timeoutMs));
         strlist << QString("%1").arg(dir);
         strlist << sgroup;
 
-        QStringList::const_iterator it = m_possibleauxfiles.begin();
-        for (; it != m_possibleauxfiles.end(); ++it)
-            strlist << *it;
+        for (const auto& fname : qAsConst(m_possibleAuxFiles))
+            strlist << fname;
 
         if (!lsock->SendReceiveStringList(strlist))
         {
@@ -205,11 +206,11 @@ MythSocket *RemoteFile::openSocket(bool control)
 
         if (strlist.size() >= 3)
         {
-            it = strlist.begin(); ++it;
-            m_recordernum = (*it).toInt(); ++it;
-            m_filesize = (*(it)).toLongLong(); ++it;
+            auto it = strlist.begin(); ++it;
+            m_recorderNum = (*it).toInt(); ++it;
+            m_fileSize = (*(it)).toLongLong(); ++it;
             for (; it != strlist.end(); ++it)
-                m_auxfiles << *it;
+                m_auxFiles << *it;
         }
         else if (!strlist.isEmpty() && strlist.size() < 3 &&
                  strlist[0] != "ERROR")
@@ -247,7 +248,7 @@ bool RemoteFile::isOpen() const
 {
     if (isLocal())
     {
-        return m_writemode ? (m_fileWriter != nullptr) : (m_localFile != -1);
+        return m_writeMode ? (m_fileWriter != nullptr) : (m_localFile != -1);
     }
     return m_sock && m_controlSock;
 }
@@ -269,7 +270,7 @@ bool RemoteFile::OpenInternal()
 {
     if (isLocal())
     {
-        if (m_writemode)
+        if (m_writeMode)
         {
             // make sure the directories are created if necessary
             QFileInfo fi(m_path);
@@ -332,7 +333,7 @@ bool RemoteFile::OpenInternal()
         Close(true);
         return false;
     }
-    m_canresume = true;
+    m_canResume = true;
 
     return true;
 }
@@ -357,7 +358,7 @@ bool RemoteFile::ReOpen(const QString& newFilename)
         return false;
     }
 
-    QStringList strlist( m_query.arg(m_recordernum) );
+    QStringList strlist( m_query.arg(m_recorderNum) );
     strlist << "REOPEN";
     strlist << newFilename;
 
@@ -385,7 +386,7 @@ void RemoteFile::Close(bool haslock)
     if (!m_controlSock)
         return;
 
-    QStringList strlist( m_query.arg(m_recordernum) );
+    QStringList strlist( m_query.arg(m_recorderNum) );
     strlist << "DONE";
 
     if (!haslock)
@@ -454,7 +455,7 @@ bool RemoteFile::Exists(const QString &url)
     if (url.isEmpty())
         return false;
 
-    struct stat fileinfo;
+    struct stat fileinfo {};
     return Exists(url, &fileinfo);
 }
 
@@ -637,7 +638,7 @@ bool RemoteFile::CopyFile (const QString& src, const QString& dst,
     dstFile.SetBlocking(true);
 
     bool success = true;
-    int srcLen;
+    int srcLen = 0;
 
     while ((srcLen = srcFile.Read(buf, readSize)) > 0)
     {
@@ -658,7 +659,7 @@ bool RemoteFile::CopyFile (const QString& src, const QString& dst,
     if (success && verify)
     {
         // Check written file is correct size
-        struct stat fileinfo;
+        struct stat fileinfo {};
         long long dstSize = Exists(dst, &fileinfo) ? fileinfo.st_size : -1;
         long long srcSize = srcFile.GetFileSize();
         if (dstSize != srcSize)
@@ -772,7 +773,7 @@ long long RemoteFile::SeekInternal(long long pos, int whence, long long curpos)
             LOG(VB_FILE, LOG_ERR, "RemoteFile::Seek(): Called with no file opened");
             return -1;
         }
-        if (m_writemode)
+        if (m_writeMode)
             return m_fileWriter->Seek(pos, whence);
 
         long long offset = 0LL;
@@ -810,24 +811,24 @@ long long RemoteFile::SeekInternal(long long pos, int whence, long long curpos)
         return -1;
     }
 
-    QStringList strlist( m_query.arg(m_recordernum) );
+    QStringList strlist( m_query.arg(m_recorderNum) );
     strlist << "SEEK";
     strlist << QString::number(pos);
     strlist << QString::number(whence);
     if (curpos > 0)
         strlist << QString::number(curpos);
     else
-        strlist << QString::number(m_readposition);
+        strlist << QString::number(m_readPosition);
 
     bool ok = m_controlSock->SendReceiveStringList(strlist);
 
     if (ok && !strlist.isEmpty())
     {
-        m_lastposition = m_readposition = strlist[0].toLongLong();
+        m_lastPosition = m_readPosition = strlist[0].toLongLong();
         m_sock->Reset();
         return strlist[0].toLongLong();
     }
-    m_lastposition = 0LL;
+    m_lastPosition = 0LL;
     return -1;
 }
 
@@ -839,7 +840,7 @@ int RemoteFile::Write(const void *data, int size)
     bool error = false;
     bool response = false;
 
-    if (!m_writemode)
+    if (!m_writeMode)
     {
         LOG(VB_NETWORK, LOG_ERR,
                 "RemoteFile::Write(): Called when not in write mode");
@@ -864,7 +865,7 @@ int RemoteFile::Write(const void *data, int size)
         return -1;
     }
 
-    QStringList strlist( m_query.arg(m_recordernum) );
+    QStringList strlist( m_query.arg(m_recorderNum) );
     strlist << "WRITE_BLOCK";
     strlist << QString::number(size);
     bool ok = m_controlSock->WriteStringList(strlist);
@@ -927,7 +928,7 @@ int RemoteFile::Write(const void *data, int size)
     }
     else
     {
-        m_lastposition += sent;
+        m_lastPosition += sent;
     }
 
     return sent;
@@ -944,7 +945,7 @@ int RemoteFile::Read(void *data, int size)
 
     if (isLocal())
     {
-        if (m_writemode)
+        if (m_writeMode)
         {
             LOG(VB_FILE, LOG_ERR, "RemoteFile:Read() called in writing mode");
             return -1;
@@ -977,7 +978,7 @@ int RemoteFile::Read(void *data, int size)
         m_controlSock->Reset();
     }
 
-    QStringList strlist( m_query.arg(m_recordernum) );
+    QStringList strlist( m_query.arg(m_recorderNum) );
     strlist << "REQUEST_BLOCK";
     strlist << QString::number(size);
     bool ok = m_controlSock->WriteStringList(strlist);
@@ -1077,7 +1078,7 @@ int RemoteFile::Read(void *data, int size)
     }
     else
     {
-        m_lastposition += recv;
+        m_lastPosition += recv;
     }
 
     return recv;
@@ -1092,7 +1093,7 @@ long long RemoteFile::GetFileSize(void) const
 {
     if (isLocal())
     {
-        if (isOpen() && m_writemode)
+        if (isOpen() && m_writeMode)
         {
             m_fileWriter->Flush();
         }
@@ -1105,7 +1106,7 @@ long long RemoteFile::GetFileSize(void) const
     }
 
     QMutexLocker locker(&m_lock);
-    return m_filesize;
+    return m_fileSize;
 }
 
 /**
@@ -1128,29 +1129,29 @@ long long RemoteFile::GetRealFileSize(void)
     if (m_completed ||
         (m_lastSizeCheck.isRunning() && m_lastSizeCheck.elapsed() < MAX_FILE_CHECK))
     {
-        return m_filesize;
+        return m_fileSize;
     }
 
     if (!CheckConnection())
     {
         // Can't establish a new connection, using system one
-        struct stat fileinfo;
+        struct stat fileinfo {};
 
         if (Exists(m_path, &fileinfo))
         {
-            m_filesize = fileinfo.st_size;
+            m_fileSize = fileinfo.st_size;
         }
-        return m_filesize;
+        return m_fileSize;
     }
 
-    QStringList strlist(m_query.arg(m_recordernum));
+    QStringList strlist(m_query.arg(m_recorderNum));
     strlist << "REQUEST_SIZE";
 
     bool ok = m_controlSock->SendReceiveStringList(strlist);
 
     if (ok && !strlist.isEmpty())
     {
-        bool validate;
+        bool validate = false;
         long long size = strlist[0].toLongLong(&validate);
 
         if (validate)
@@ -1159,19 +1160,19 @@ long long RemoteFile::GetRealFileSize(void)
             {
                 m_completed = (strlist[1].toInt() != 0);
             }
-            m_filesize = size;
+            m_fileSize = size;
         }
         else
         {
-            struct stat fileinfo;
+            struct stat fileinfo {};
 
             if (Exists(m_path, &fileinfo))
             {
-                m_filesize = fileinfo.st_size;
+                m_fileSize = fileinfo.st_size;
             }
         }
         m_lastSizeCheck.restart();
-        return m_filesize;
+        return m_fileSize;
     }
 
     return -1;
@@ -1197,7 +1198,7 @@ void RemoteFile::SetTimeout(bool fast)
         // not much we can do with local accesses
         return;
     }
-    if (m_timeoutisfast == fast)
+    if (m_timeoutIsFast == fast)
         return;
 
     QMutexLocker locker(&m_lock);
@@ -1207,7 +1208,7 @@ void RemoteFile::SetTimeout(bool fast)
     // handled.  The CheckConnection function can call Resume which
     // calls Close, which deletes m_controlSock.  However, the
     // subsequent call to OpenInternal is guaranteed to recreate the
-    // socket or return false for a non-local connection, an this must
+    // socket or return false for a non-local connection, and this must
     // be a non-local connection if this line of code is executed.
     if (!CheckConnection())
     {
@@ -1215,14 +1216,16 @@ void RemoteFile::SetTimeout(bool fast)
             "RemoteFile::SetTimeout(): Couldn't connect");
         return;
     }
+    if (m_controlSock == nullptr)
+        return;
 
-    QStringList strlist( m_query.arg(m_recordernum) );
+    QStringList strlist( m_query.arg(m_recorderNum) );
     strlist << "SET_TIMEOUT";
     strlist << QString::number((int)fast);
 
     m_controlSock->SendReceiveStringList(strlist);
 
-    m_timeoutisfast = fast;
+    m_timeoutIsFast = fast;
 }
 
 QDateTime RemoteFile::LastModified(const QString &url)
@@ -1254,14 +1257,10 @@ QDateTime RemoteFile::LastModified(const QString &url)
     gCoreContext->SendReceiveStringList(strlist);
 
     if (strlist.size() > 1) {
-#if QT_VERSION < QT_VERSION_CHECK(5,8,0)
-        result = MythDate::fromTime_t(strlist[1].toUInt());
-#else
         if (!strlist[1].isEmpty() && (strlist[1].toInt() != -1))
             result = MythDate::fromSecsSinceEpoch(strlist[1].toLongLong());
         else
             result = QDateTime();;
-#endif
     }
 
     return result;
@@ -1295,7 +1294,7 @@ QString RemoteFile::FindFile(const QString& filename, const QString& host,
 
 /**
  *  \brief Search all BE's for files in the give storage group
- *  \param filename the partial path and filename to look for or regex
+ *  \param filename the partial path and filename to look for or regular espression (QRegularExpression)
  *  \param host search this host first if given or default to the master BE if empty
  *  \param storageGroup the name of the storage group to search
  *  \param useRegex if true filename is assumed to be a regex expression of files to find
@@ -1342,21 +1341,23 @@ QStringList RemoteFile::FindFileList(const QString& filename, const QString& hos
                                                .arg(x).arg(files[x]));
             }
 
-            QStringList filteredFiles = files.filter(QRegExp(fi.fileName()));
+            QStringList filteredFiles = files.filter(QRegularExpression(fi.fileName()));
             for (int x = 0; x < filteredFiles.size(); x++)
             {
-                strList << gCoreContext->GenMythURL(gCoreContext->GetHostName(),
-                                                    gCoreContext->GetBackendServerPort(),
-                                                    fi.path() + '/' + filteredFiles[x],
-                                                    storageGroup);
+                strList << MythCoreContext::GenMythURL(gCoreContext->GetHostName(),
+                                                       gCoreContext->GetBackendServerPort(),
+                                                       fi.path() + '/' + filteredFiles[x],
+                                                       storageGroup);
             }
         }
         else
         {
             if (!sgroup.FindFile(filename).isEmpty())
-                strList << gCoreContext->GenMythURL(hostName,
-                                                    gCoreContext->GetBackendServerPort(hostName),
-                                                    filename, storageGroup);
+            {
+                strList << MythCoreContext::GenMythURL(hostName,
+                                                       gCoreContext->GetBackendServerPort(hostName),
+                                                       filename, storageGroup);
+            }
         }
 
         if (!strList.isEmpty() || !allowFallback)
@@ -1407,7 +1408,7 @@ bool RemoteFile::CheckConnection(bool repos)
     {
         return true;
     }
-    if (!m_canresume)
+    if (!m_canResume)
     {
         return false;
     }
@@ -1437,17 +1438,17 @@ bool RemoteFile::Resume(bool repos)
 
     if (repos)
     {
-        m_readposition = m_lastposition;
-        if (SeekInternal(m_lastposition, SEEK_SET) < 0)
+        m_readPosition = m_lastPosition;
+        if (SeekInternal(m_lastPosition, SEEK_SET) < 0)
         {
             Close(true);
             LOG(VB_FILE, LOG_ERR,
                 QString("RemoteFile::Resume: Enable to re-seek into last known "
-                        "position (%1").arg(m_lastposition));
+                        "position (%1").arg(m_lastPosition));
             return false;
         }
     }
-    m_readposition = m_lastposition = 0;
+    m_readPosition = m_lastPosition = 0;
     return true;
 }
 

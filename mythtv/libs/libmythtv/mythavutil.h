@@ -16,6 +16,7 @@ extern "C" {
 
 #include <QMap>
 #include <QMutex>
+#include <QVector>
 
 struct AVFilterGraph;
 struct AVFilterContext;
@@ -72,7 +73,7 @@ public:
     }
 
 private:
-    AVFrame *m_frame;
+    AVFrame *m_frame {nullptr};
 };
 
 /**
@@ -81,29 +82,21 @@ private:
  * an AVStream and its AVCodecContext. The codec member
  * of AVStream was previously used for this but is now
  * deprecated.
- *
- * This is a singeton class - only 1 instance gets created.
  */
-
 class MTV_PUBLIC MythCodecMap
 {
   public:
-    MythCodecMap();
+    MythCodecMap() = default;
     ~MythCodecMap();
-    static MythCodecMap *getInstance();
-    AVCodecContext *getCodecContext(const AVStream*,
+    AVCodecContext *getCodecContext(const AVStream *stream,
         const AVCodec *pCodec = nullptr, bool nullCodec = false);
-    AVCodecContext *hasCodecContext(const AVStream*);
-    void freeCodecContext(const AVStream*);
+    AVCodecContext *hasCodecContext(const AVStream *stream);
+    void freeCodecContext(const AVStream *stream);
     void freeAllCodecContexts();
   protected:
-    QMap<const AVStream*, AVCodecContext*> streamMap;
-    QMutex mapLock;
+    QMap<const AVStream*, AVCodecContext*> m_streamMap;
+    QMutex m_mapLock {QMutex::Recursive};
 };
-
-/// This global variable contains the MythCodecMap instance for the app
-extern MTV_PUBLIC MythCodecMap *gCodecMap;
-
 
 class MythAVCopyPrivate;
 
@@ -116,6 +109,8 @@ class MTV_PUBLIC MythAVCopy
 public:
     explicit MythAVCopy(bool USWC=true);
     virtual ~MythAVCopy();
+    MythAVCopy(const MythAVCopy &) = delete;            // not copyable
+    MythAVCopy &operator=(const MythAVCopy &) = delete; // not copyable
 
     int Copy(VideoFrame *dst, const VideoFrame *src);
     /**
@@ -141,11 +136,9 @@ public:
              int width, int height);
 
 private:
-    void FillFrame(VideoFrame *frame, const AVFrame *pic, int pitch,
-                   int width, int height, AVPixelFormat pix_fmt);
-    MythAVCopy(const MythAVCopy &) = delete;            // not copyable
-    MythAVCopy &operator=(const MythAVCopy &) = delete; // not copyable
-    MythAVCopyPrivate *d;
+    static void FillFrame(VideoFrame *frame, const AVFrame *pic, int pitch,
+                          int width, int height, AVPixelFormat pix_fmt);
+    MythAVCopyPrivate *d {nullptr}; // NOLINT(readability-identifier-naming)
 };
 
 /**
@@ -161,6 +154,12 @@ int MTV_PUBLIC AVPictureFill(AVFrame *pic, const VideoFrame *frame,
  */
 MTV_PUBLIC AVPixelFormat FrameTypeToPixelFormat(VideoFrameType type);
 MTV_PUBLIC VideoFrameType PixelFormatToFrameType(AVPixelFormat fmt);
+
+/*! \brief Return a user friendly description of the given deinterlacer
+*/
+MTV_PUBLIC QString DeinterlacerName(MythDeintType Deint, bool DoubleRate, VideoFrameType Format = FMT_NONE);
+
+MTV_PUBLIC QString DeinterlacerPref(MythDeintType Deint);
 
 /**
  * MythPictureDeinterlacer
@@ -182,14 +181,49 @@ public:
     // Flush and reset the deinterlacer.
     int Flush();
 private:
-    AVFilterGraph*      m_filter_graph;
-    MythAVFrame         m_filter_frame;
-    AVFilterContext*    m_buffersink_ctx;
-    AVFilterContext*    m_buffersrc_ctx;
-    AVPixelFormat       m_pixfmt;
-    int                 m_width;
-    int                 m_height;
+    AVFilterGraph*      m_filterGraph   {nullptr};
+    MythAVFrame         m_filterFrame;
+    AVFilterContext*    m_bufferSinkCtx {nullptr};
+    AVFilterContext*    m_bufferSrcCtx  {nullptr};
+    AVPixelFormat       m_pixfmt        {AV_PIX_FMT_NONE};
+    int                 m_width         {0};
+    int                 m_height        {0};
     float               m_ar;
-    bool                m_errored;
+    bool                m_errored       {false};
 };
+
+
+class MTV_PUBLIC MythStreamInfo {
+public:
+    // These are for All types
+    char                m_codecType {' '};   // V=video, A=audio, S=subtitle
+    QString             m_codecName;
+    int64_t             m_duration {0};
+    // These are for Video only
+    int                 m_width {0};
+    int                 m_height {0};
+    float               m_SampleAspectRatio {0.0};
+    // AV_FIELD_TT,          //< Top coded_first, top displayed first
+    // AV_FIELD_BB,          //< Bottom coded first, bottom displayed first
+    // AV_FIELD_TB,          //< Top coded first, bottom displayed first
+    // AV_FIELD_BT,          //< Bottom coded first, top displayed first
+    QString             m_fieldOrder {"UN"};   // UNknown, PRogressive, TT, BB, TB, BT
+    float               m_frameRate {0.0};
+    float               m_avgFrameRate {0.0};
+    // This is for audio only
+    int                 m_channels {0};
+};
+
+
+/*
+*   Class to get stream info, used by service Video/GetStreamInfo
+*/
+class MTV_PUBLIC MythStreamInfoList {
+public:
+    MythStreamInfoList(QString filename);
+    int                     m_errorCode         {0};
+    QString                 m_errorMsg;
+    QVector<MythStreamInfo> m_streamInfoList;
+};
+
 #endif

@@ -81,15 +81,13 @@ class MediaServer : public MediaServerItem
   public:
     MediaServer()
      : MediaServerItem(QString("0"), QString(), QString(), QString()),
-       m_controlURL(QUrl()),
-       m_eventSubURL(QUrl()), m_eventSubPath(QString()),
+       m_eventSubPath(QString()),
        m_friendlyName(QString("Unknown"))
     {
     }
     explicit MediaServer(QUrl URL)
      : MediaServerItem(QString("0"), QString(), QString(), QString()),
-       m_URL(std::move(URL)), m_controlURL(QUrl()),
-       m_eventSubURL(QUrl()), m_eventSubPath(QString()),
+       m_url(std::move(URL)), m_eventSubPath(QString()),
        m_friendlyName(QString("Unknown"))
     {
     }
@@ -106,7 +104,7 @@ class MediaServer : public MediaServerItem
         return result;
     }
 
-    QUrl    m_URL;
+    QUrl    m_url;
     int     m_connectionAttempts {0};
     QUrl    m_controlURL;
     QUrl    m_eventSubURL;
@@ -194,7 +192,7 @@ UPNPScanner* UPNPScanner::Instance(UPNPSubscription *sub)
 void UPNPScanner::StartFullScan(void)
 {
     m_fullscan = true;
-    MythEvent *me = new MythEvent(QString("UPNP_STARTSCAN"));
+    auto *me = new MythEvent(QString("UPNP_STARTSCAN"));
     qApp->postEvent(this, me);
 }
 
@@ -302,7 +300,7 @@ bool UPNPScanner::GetMetadata(QVariant &data)
     if (!valid)
         return false;
 
-    MythEvent *me = new MythEvent("UPNP_BROWSEOBJECT", list);
+    auto *me = new MythEvent("UPNP_BROWSEOBJECT", list);
     qApp->postEvent(this, me);
 
     int count = 0;
@@ -474,13 +472,13 @@ void UPNPScanner::Stop(void)
     m_servers.clear();
 
     // cleanup the network
-    foreach (QNetworkReply *reply, m_descriptionRequests)
+    for (QNetworkReply *reply : qAsConst(m_descriptionRequests))
     {
         reply->abort();
         delete reply;
     }
     m_descriptionRequests.clear();
-    foreach (QNetworkReply *reply, m_browseRequests)
+    for (QNetworkReply *reply : qAsConst(m_browseRequests))
     {
         reply->abort();
         delete reply;
@@ -525,7 +523,7 @@ void UPNPScanner::Update(void)
             (it.value()->m_controlURL.isEmpty()))
         {
             bool sent = false;
-            QUrl url = it.value()->m_URL;
+            QUrl url = it.value()->m_url;
             if (!m_descriptionRequests.contains(url) &&
                 (m_descriptionRequests.empty()) &&
                 url.isValid())
@@ -567,7 +565,7 @@ void UPNPScanner::CheckStatus(void)
         {
             LOG(VB_UPNP, LOG_INFO, LOC +
                 QString("%1 no longer in SSDP cache. Removing")
-                    .arg(it.value()->m_URL.toString()));
+                    .arg(it.value()->m_url.toString()));
             MediaServer* last = it.value();
             it.remove();
             delete last;
@@ -643,7 +641,10 @@ void UPNPScanner::customEvent(QEvent *event)
         return;
 
     // UPnP events
-    MythEvent *me  = static_cast<MythEvent *>(event);
+    auto *me = dynamic_cast<MythEvent *>(event);
+    if (me == nullptr)
+        return;
+
     const QString&    ev  = me->Message();
 
     if (ev == "UPNP_STARTSCAN")
@@ -673,7 +674,7 @@ void UPNPScanner::customEvent(QEvent *event)
     }
     if (ev == "UPNP_EVENT")
     {
-        MythInfoMapEvent *info = (MythInfoMapEvent*)event;
+        auto *info = (MythInfoMapEvent*)event;
         if (!info)
             return;
         if (!info->GetInfoMap())
@@ -771,7 +772,7 @@ void UPNPScanner::CheckFailure(const QUrl &url)
     while (it.hasNext())
     {
         it.next();
-        if (it.value()->m_URL == url &&
+        if (it.value()->m_url == url &&
             it.value()->m_connectionAttempts == MAX_ATTEMPTS)
         {
             Debug();
@@ -991,7 +992,7 @@ void UPNPScanner::ParseBrowse(const QUrl &url, QNetworkReply *reply)
         return;
 
     // Open the response for parsing
-    QDomDocument *parent = new QDomDocument();
+    auto *parent = new QDomDocument();
     QString errorMessage;
     int errorLine   = 0;
     int errorColumn = 0;
@@ -1297,7 +1298,7 @@ bool UPNPScanner::ParseDescription(const QUrl &url, QNetworkReply *reply)
     while (it.hasNext())
     {
         it.next();
-        if (it.value()->m_URL == url)
+        if (it.value()->m_url == url)
         {
             usn = it.key();
             QUrl qcontrolurl(controlURL);

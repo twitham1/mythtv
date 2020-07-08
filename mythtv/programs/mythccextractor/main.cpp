@@ -16,7 +16,7 @@ using namespace std;
 #include "mythcontext.h"
 #include "mythversion.h"
 #include "programinfo.h"
-#include "ringbuffer.h"
+#include "io/mythmediabuffer.h"
 #include "exitcodes.h"
 #include "signalhandling.h"
 #include "loggingserver.h"
@@ -31,7 +31,7 @@ namespace {
     }
 }
 
-static int RunCCExtract(const ProgramInfo &program_info, const QString & destdir)
+static int RunCCExtract(ProgramInfo &program_info, const QString & destdir)
 {
     QString filename = program_info.GetPlaybackURL();
     if (filename.startsWith("myth://"))
@@ -50,7 +50,7 @@ static int RunCCExtract(const ProgramInfo &program_info, const QString & destdir
         return GENERIC_EXIT_INVALID_CMDLINE;
     }
 
-    RingBuffer *tmprbuf = RingBuffer::Create(filename, false);
+    MythMediaBuffer *tmprbuf = MythMediaBuffer::Create(filename, false);
     if (!tmprbuf)
     {
         cerr << qPrintable(QString("Unable to create RingBuffer for %1")
@@ -66,13 +66,12 @@ static int RunCCExtract(const ProgramInfo &program_info, const QString & destdir
         tmprbuf->SetWaitForWrite();
     }
 
-    PlayerFlags flags = (PlayerFlags)(kVideoIsNull | kAudioMuted  |
-                                      kDecodeNoLoopFilter | kDecodeFewBlocks |
-                                      kDecodeLowRes | kDecodeSingleThreaded |
-                                      kDecodeNoDecode);
-    MythCCExtractorPlayer *ccp = new MythCCExtractorPlayer(flags, true,
-                                                           filename, destdir);
-    PlayerContext *ctx = new PlayerContext(kCCExtractorInUseID);
+    auto flags = (PlayerFlags)(kVideoIsNull | kAudioMuted  |
+                               kDecodeNoLoopFilter | kDecodeFewBlocks |
+                               kDecodeLowRes | kDecodeSingleThreaded |
+                               kDecodeNoDecode);
+    auto *ccp = new MythCCExtractorPlayer(flags, true, filename, destdir);
+    auto *ctx = new PlayerContext(kCCExtractorInUseID);
     ctx->SetPlayingInfo(&program_info);
     ctx->SetRingBuffer(tmprbuf);
     ctx->SetPlayer(ccp);
@@ -98,8 +97,6 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-    bool useDB;
-
     QCoreApplication::setApplicationName(MYTH_APPNAME_MYTHCCEXTRACTOR);
 
     MythCCExtractorCommandLineParser cmdline;
@@ -121,7 +118,7 @@ int main(int argc, char *argv[])
 
     if (cmdline.toBool("showversion"))
     {
-        cmdline.PrintVersion();
+        MythCCExtractorCommandLineParser::PrintVersion();
         return GENERIC_EXIT_OK;
     }
 
@@ -134,7 +131,7 @@ int main(int argc, char *argv[])
 
     QString destdir = cmdline.toString("destdir");
 
-    useDB = !QFile::exists(infile);
+    bool useDB = !QFile::exists(infile);
 
     CleanupGuard callCleanup(cleanup);
 

@@ -111,8 +111,6 @@ void TaskQueue::run( )
 {
     RunProlog();
 
-    Task *pTask;
-
     LOG(VB_UPNP, LOG_INFO, "TaskQueue Thread Running.");
 
     while ( !m_bTermRequested )
@@ -124,7 +122,8 @@ void TaskQueue::run( )
         TaskTime ttNow;
         gettimeofday( (&ttNow), nullptr );
 
-        if ((pTask = GetNextExpiredTask( ttNow )) != nullptr)
+        Task *pTask = GetNextExpiredTask( ttNow );
+        if (pTask != nullptr)
         {
             try
             {
@@ -153,12 +152,10 @@ void TaskQueue::Clear( )
 {
     m_mutex.lock(); 
 
-    for ( TaskMap::iterator it  = m_mapTasks.begin();
-                            it != m_mapTasks.end();
-                          ++it )
+    for (auto & task : m_mapTasks)
     {
-        if ((*it).second != nullptr)
-            (*it).second->DecrRef();
+        if (task.second != nullptr)
+            task.second->DecrRef();
     }
 
     m_mapTasks.clear();
@@ -223,8 +220,7 @@ Task *TaskQueue::GetNextExpiredTask( TaskTime tt, long nWithinMilliSecs /*=50*/ 
 
     m_mutex.lock(); 
 
-    TaskMap::iterator it = m_mapTasks.begin();
-
+    auto it = m_mapTasks.begin();
     if (it != m_mapTasks.end())
     {
         TaskTime ttTask = (*it).first;

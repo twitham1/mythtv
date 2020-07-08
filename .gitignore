@@ -13,6 +13,7 @@ moc_*.h
 *.dylib
 object_script.*
 *~
+.#*
 .DS_Store
 .*.swp
 *.pc
@@ -48,3 +49,10 @@ GPATH
 GRTAGS
 GTAGS
 compile_commands.json
+qdbusxml2cpp_wrapper.sh
+uic_wrapper.sh
+*.gcov
+*.gcda
+*.gcno
+*.profraw
+*.profdata

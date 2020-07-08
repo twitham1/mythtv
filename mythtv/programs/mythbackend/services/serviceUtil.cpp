@@ -189,35 +189,37 @@ bool FillChannelInfo( DTC::ChannelInfo *pChannel,
 
     // TODO update DTC::ChannelInfo to match functionality of ChannelInfo,
     //      ultimately replacing it's progenitor?
-    pChannel->setChanId(channelInfo.m_chanid);
-    pChannel->setChanNum(channelInfo.m_channum);
-    pChannel->setCallSign(channelInfo.m_callsign);
+    pChannel->setChanId(channelInfo.m_chanId);
+    pChannel->setChanNum(channelInfo.m_chanNum);
+    pChannel->setCallSign(channelInfo.m_callSign);
     if (!channelInfo.m_icon.isEmpty())
     {
         QString sIconURL  = QString( "/Guide/GetChannelIcon?ChanId=%3")
-                                    .arg( channelInfo.m_chanid );
+                                    .arg( channelInfo.m_chanId );
         pChannel->setIconURL( sIconURL );
     }
     pChannel->setChannelName(channelInfo.m_name);
-    pChannel->setVisible(channelInfo.m_visible);
+    pChannel->setVisible(channelInfo.m_visible > kChannelNotVisible);
+    pChannel->setExtendedVisible(toRawString(channelInfo.m_visible));
 
     pChannel->setSerializeDetails( bDetails );
 
     if (bDetails)
     {
-        pChannel->setMplexId(channelInfo.m_mplexid);
-        pChannel->setServiceId(channelInfo.m_serviceid);
-        pChannel->setATSCMajorChan(channelInfo.m_atsc_major_chan);
-        pChannel->setATSCMinorChan(channelInfo.m_atsc_minor_chan);
-        pChannel->setFormat(channelInfo.m_tvformat);
-        pChannel->setFineTune(channelInfo.m_finetune);
-        pChannel->setFrequencyId(channelInfo.m_freqid);
-        pChannel->setChanFilters(channelInfo.m_videofilters);
-        pChannel->setSourceId(channelInfo.m_sourceid);
-        pChannel->setCommFree(channelInfo.m_commmethod == -2);
-        pChannel->setUseEIT(channelInfo.m_useonairguide);
-        pChannel->setXMLTVID(channelInfo.m_xmltvid);
-        pChannel->setDefaultAuth(channelInfo.m_default_authority);
+        pChannel->setMplexId(channelInfo.m_mplexId);
+        pChannel->setServiceId(channelInfo.m_serviceId);
+        pChannel->setATSCMajorChan(channelInfo.m_atscMajorChan);
+        pChannel->setATSCMinorChan(channelInfo.m_atscMinorChan);
+        pChannel->setFormat(channelInfo.m_tvFormat);
+        pChannel->setFineTune(channelInfo.m_fineTune);
+        pChannel->setFrequencyId(channelInfo.m_freqId);
+        pChannel->setChanFilters(channelInfo.m_videoFilters);
+        pChannel->setSourceId(channelInfo.m_sourceId);
+        pChannel->setCommFree(channelInfo.m_commMethod == -2);
+        pChannel->setUseEIT(channelInfo.m_useOnAirGuide);
+        pChannel->setXMLTVID(channelInfo.m_xmltvId);
+        pChannel->setDefaultAuth(channelInfo.m_defaultAuthority);
+        pChannel->setServiceType(channelInfo.m_serviceType);
 
         QList<uint> groupIds = channelInfo.GetGroupIds();
         QString sGroupIds;
@@ -254,7 +256,7 @@ void FillChannelGroup(DTC::ChannelGroup* pGroup, const ChannelGroupItem& pGroupI
     if (!pGroup)
         return;
 
-    pGroup->setGroupId(pGroupItem.m_grpid);
+    pGroup->setGroupId(pGroupItem.m_grpId);
     pGroup->setName(pGroupItem.m_name);
     pGroup->setPassword(""); // Not currently supported
 }
@@ -519,12 +521,12 @@ void FillMusicMetadataInfo (DTC::MusicMetadataInfo *pVideoMetadataInfo,
 
 void FillInputInfo(DTC::Input* input, const InputInfo& inputInfo)
 {
-    input->setId(inputInfo.m_inputid);
+    input->setId(inputInfo.m_inputId);
     input->setInputName(inputInfo.m_name);
-    input->setCardId(inputInfo.m_inputid);
-    input->setSourceId(inputInfo.m_sourceid);
+    input->setCardId(inputInfo.m_inputId);
+    input->setSourceId(inputInfo.m_sourceId);
     input->setDisplayName(inputInfo.m_displayName);
-    input->setLiveTVOrder(inputInfo.m_livetvorder);
+    input->setLiveTVOrder(inputInfo.m_liveTvOrder);
     input->setScheduleOrder(inputInfo.m_scheduleOrder);
     input->setRecPriority(inputInfo.m_recPriority);
     input->setQuickTune(inputInfo.m_quickTune);
@@ -542,18 +544,22 @@ void FillCastMemberList(DTC::CastMemberList* pCastMemberList,
 
     MSqlQuery query(MSqlQuery::InitCon());
     if (pInfo->GetFilesize() > 0) // FIXME: This shouldn't be the way to determine what is or isn't a recording!
+    {
         query.prepare("SELECT role, people.name FROM recordedcredits"
                         " AS credits"
                         " LEFT JOIN people ON credits.person = people.person"
                         " WHERE credits.chanid = :CHANID"
                         " AND credits.starttime = :STARTTIME"
                         " ORDER BY role;");
+    }
     else
+    {
         query.prepare("SELECT role, people.name FROM credits"
                         " LEFT JOIN people ON credits.person = people.person"
                         " WHERE credits.chanid = :CHANID"
                         " AND credits.starttime = :STARTTIME"
                         " ORDER BY role;");
+    }
     query.bindValue(":CHANID",    pInfo->GetChanID());
     query.bindValue(":STARTTIME", pInfo->GetScheduledStartTime());
 
@@ -628,7 +634,7 @@ void FillCutList(DTC::CutList* pCutList, RecordingInfo* rInfo, int marktype)
             }
             else if (marktype == 1)
             {
-                uint64_t offset;
+                uint64_t offset = 0;
                 if (rInfo->QueryKeyFramePosition(&offset, it.key(), isend))
                 {
                   DTC::Cutting *pCutting = pCutList->AddNewCutting();
@@ -638,7 +644,7 @@ void FillCutList(DTC::CutList* pCutList, RecordingInfo* rInfo, int marktype)
             }
             else if (marktype == 2)
             {
-                uint64_t offset;
+                uint64_t offset = 0;
                 if (rInfo->QueryKeyFrameDuration(&offset, it.key(), isend))
                 {
                   DTC::Cutting *pCutting = pCutList->AddNewCutting();
@@ -674,7 +680,7 @@ void FillCommBreak(DTC::CutList* pCutList, RecordingInfo* rInfo, int marktype)
             }
             else if (marktype == 1)
             {
-                uint64_t offset;
+                uint64_t offset = 0;
                 if (rInfo->QueryKeyFramePosition(&offset, it.key(), isend))
                 {
                   DTC::Cutting *pCutting = pCutList->AddNewCutting();
@@ -684,7 +690,7 @@ void FillCommBreak(DTC::CutList* pCutList, RecordingInfo* rInfo, int marktype)
             }
             else if (marktype == 2)
             {
-                uint64_t offset;
+                uint64_t offset = 0;
                 if (rInfo->QueryKeyFrameDuration(&offset, it.key(), isend))
                 {
                   DTC::Cutting *pCutting = pCutList->AddNewCutting();

@@ -11,26 +11,19 @@ class DummyDecoder : public DecoderBase
   public:
     DummyDecoder(MythPlayer *parent, const ProgramInfo &pginfo) :
         DecoderBase(parent, pginfo) {}
-    virtual ~DummyDecoder() = default;
+    ~DummyDecoder() override = default;
 
-    int OpenFile(RingBuffer *, bool, char *, int) override // DecoderBase
-        { return 0; }
-    bool GetFrame(DecodeType)override // DecoderBase
-        { usleep(10000); return false; }
-
-    bool IsLastFrameKey(void) const override // DecoderBase
-        { return true; }
-    void WriteStoredData(RingBuffer *, bool, long) override {} // DecoderBase
-
-    long UpdateStoredFrameNum(long) override { return 0; } // DecoderBase
-
-    QString GetCodecDecoderName(void) const override // DecoderBase
-        { return "dummy"; }
-    MythCodecID GetVideoCodecID(void) const override // DecoderBase
-        { return kCodec_NONE; }
-
-    bool SyncPositionMap(void) override // DecoderBase
-        { return false; }
+    // DecoderBase
+    int         OpenFile(MythMediaBuffer* /*Buffer*/, bool /*novideo*/, char */*testbuf*/, int /*testbufsize*/) override
+                    { return 0; }
+    bool        GetFrame(DecodeType /*Type*/, bool &/*Retry*/) override
+                    { usleep(10000); return false; }
+    bool        IsLastFrameKey(void) const override       { return true; }
+    void        WriteStoredData(MythMediaBuffer* /*Buffer*/, bool /*storevid*/, long /*timecodeOffset*/) override {}
+    long        UpdateStoredFrameNum(long /*frame*/) override { return 0; }
+    QString     GetCodecDecoderName(void) const override  { return "dummy"; }
+    MythCodecID GetVideoCodecID(void) const override      { return kCodec_NONE; }
+    bool        SyncPositionMap(void) override            { return false; }
 };
 
 #endif

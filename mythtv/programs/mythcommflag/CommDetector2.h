@@ -1,5 +1,5 @@
-#ifndef _COMMDETECTOR2_H_
-#define _COMMDETECTOR2_H_
+#ifndef COMMDETECTOR2_H
+#define COMMDETECTOR2_H
 
 // C++ headers
 #include <vector>
@@ -31,8 +31,8 @@ QString strftimeval(const struct timeval *tv);
 
 };  /* namespace */
 
-typedef vector<FrameAnalyzer*>    FrameAnalyzerItem;
-typedef vector<FrameAnalyzerItem> FrameAnalyzerList;
+using FrameAnalyzerItem = vector<FrameAnalyzer*>;
+using FrameAnalyzerList = vector<FrameAnalyzerItem>;
 
 class CommDetector2 : public CommDetectorBase
 {
@@ -40,8 +40,8 @@ class CommDetector2 : public CommDetectorBase
     CommDetector2(
         SkipType commDetectMethod,
         bool showProgress, bool fullSpeed, MythPlayer* player,
-        int chanid, const QDateTime& startts, const QDateTime& endts,
-        const QDateTime& recstartts, const QDateTime& recendts, bool useDB);
+        int chanid, QDateTime startts, QDateTime endts,
+        QDateTime recstartts, QDateTime recendts, bool useDB);
     bool go(void) override; // CommDetectorBase
     void GetCommercialBreakList(frm_dir_map_t &marks) override; // CommDetectorBase
     void recordingFinished(long long totalFileSize) override; // CommDetectorBase
@@ -50,14 +50,14 @@ class CommDetector2 : public CommDetectorBase
                       bool verbose) const override; // CommDetectorBase
 
   private:
-    virtual ~CommDetector2() = default;
+    ~CommDetector2() override = default;
 
     void reportState(int elapsedms, long long frameno, long long nframes,
             unsigned int passno, unsigned int npasses);
     int computeBreaks(long long nframes);
 
   private:
-    enum SkipTypes               m_commDetectMethod;
+    SkipType                     m_commDetectMethod;
     bool                         m_showProgress            {false};
     bool                         m_fullSpeed               {false};
     MythPlayer                  *m_player                  {nullptr};
@@ -87,6 +87,6 @@ class CommDetector2 : public CommDetectorBase
     QString                      m_debugdir;
 };
 
-#endif  /* !_COMMDETECTOR2_H_ */
+#endif  /* !COMMDETECTOR2_H */
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

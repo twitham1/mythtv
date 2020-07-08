@@ -13,14 +13,13 @@ using namespace std;
 // MythTV headers
 #include "mpegstreamdata.h"
 #include "mpegtables.h"
-#include "ringbuffer.h"
 #include "mpegtables.h"
 
 #include "atscstreamdata.h"
 #include "atsctables.h"
 
 //#define DEBUG_MPEG_RADIO // uncomment to strip video streams from TS stream
-#define LOC QString("MPEGStream[%1](0x%2): ").arg(_cardid).arg((intptr_t)this, QT_POINTER_SIZE, 16, QChar('0'))
+#define LOC QString("MPEGStream[%1](0x%2): ").arg(m_cardId).arg((intptr_t)this, QT_POINTER_SIZE, 16, QChar('0'))
 
 /** \class MPEGStreamData
  *  \brief Encapsulates data about MPEG stream and emits events for each table.
@@ -29,7 +28,7 @@ using namespace std;
 /** \fn MPEGStreamData::MPEGStreamData(int, bool)
  *  \brief Initializes MPEGStreamData.
  *
- *   This adds the PID of the PAT table to "_pids_listening"
+ *   This adds the PID of the PAT table to "m_pidsListening"
  *
  *  \param desiredProgram If you want rewritten PAT and PMTs, for
  *                        a desired program set this to a value > -1
@@ -40,29 +39,11 @@ using namespace std;
  */
 MPEGStreamData::MPEGStreamData(int desiredProgram, int cardnum,
                                bool cacheTables)
-    : _cardid(cardnum),
-      _sistandard("mpeg"),
-      _have_CRC_bug(false),
-      _si_time_offset_cnt(0),
-      _si_time_offset_indx(0),
-      _eit_helper(nullptr), _eit_rate(0.0F),
-      _listening_disabled(false),
-      _encryption_lock(QMutex::Recursive), _listener_lock(QMutex::Recursive),
-      _cache_tables(cacheTables), _cache_lock(QMutex::Recursive),
+    : m_cardId(cardnum),
+      m_cacheTables(cacheTables),
       // Single program stuff
-      _desired_program(desiredProgram),
-      _recording_type("all"),
-      _strip_pmt_descriptors(false),
-      _normalize_stream_type(true),
-      _pid_video_single_program(0xffffffff),
-      _pid_pmt_single_program(0xffffffff),
-      _pmt_single_program_num_video(1),
-      _pmt_single_program_num_audio(0),
-      _pat_single_program(nullptr), _pmt_single_program(nullptr),
-      _invalid_pat_seen(false), _invalid_pat_warning(false)
+      m_desiredProgram(desiredProgram)
 {
-    memset(_si_time_offsets, 0, sizeof(_si_time_offsets));
-
     MPEGStreamData::AddListeningPID(MPEG_PAT_PID);
     MPEGStreamData::AddListeningPID(MPEG_CAT_PID);
 }
@@ -74,13 +55,13 @@ MPEGStreamData::~MPEGStreamData()
     SetPMTSingleProgram(nullptr);
 
     // Delete any cached tables that haven't been returned
-    psip_refcnt_map_t::iterator it = _cached_slated_for_deletion.begin();
-    for (; it != _cached_slated_for_deletion.end(); ++it)
+    for (auto it = m_cachedSlatedForDeletion.cbegin();
+         it != m_cachedSlatedForDeletion.cend(); ++it)
         delete it.key();
 
-    QMutexLocker locker(&_listener_lock);
-    _mpeg_listeners.clear();
-    _mpeg_sp_listeners.clear();
+    QMutexLocker locker(&m_listenerLock);
+    m_mpegListeners.clear();
+    m_mpegSpListeners.clear();
 }
 
 void MPEGStreamData::SetDesiredProgram(int p)
@@ -101,13 +82,13 @@ void MPEGStreamData::SetDesiredProgram(int p)
     if (pid)
     {
         reset = false;
-        _desired_program = p;
+        m_desiredProgram = p;
         ProcessPAT(pat);
         pmt_vec_t pmts = GetCachedPMTs();
-        for (size_t i = 0; i < pmts.size(); i++)
+        for (auto & pmt : pmts)
         {
-            if (pmts[i]->ProgramNumber() == (uint)p)
-                ProcessPMT(pmts[i]);
+            if (pmt->ProgramNumber() == (uint)p)
+                ProcessPMT(pmt);
         }
         ReturnCachedPMTTables(pmts);
     }
@@ -120,70 +101,66 @@ void MPEGStreamData::SetDesiredProgram(int p)
 
 void MPEGStreamData::SetRecordingType(const QString &recording_type)
 {
-    _recording_type = recording_type;
-    uint neededAudio = (_recording_type == "audio") ? 1 : 0;
+    m_recordingType = recording_type;
+    uint neededAudio = (m_recordingType == "audio") ? 1 : 0;
     SetVideoStreamsRequired(0);
     SetAudioStreamsRequired(neededAudio);
 }
 
 void MPEGStreamData::SetEITHelper(EITHelper *eit_helper)
 {
-    QMutexLocker locker(&_listener_lock);
-    _eit_helper = eit_helper;
+    QMutexLocker locker(&m_listenerLock);
+    m_eitHelper = eit_helper;
 }
 
 void MPEGStreamData::SetEITRate(float rate)
 {
-    QMutexLocker locker(&_listener_lock);
-    _eit_rate = rate;
+    QMutexLocker locker(&m_listenerLock);
+    m_eitRate = rate;
 }
 
 void MPEGStreamData::Reset(int desiredProgram)
 {
-    _desired_program       = desiredProgram;
-    _recording_type        = "all";
-    _strip_pmt_descriptors = false;
-    _normalize_stream_type = true;
+    m_desiredProgram      = desiredProgram;
+    m_recordingType       = "all";
+    m_stripPmtDescriptors = false;
+    m_normalizeStreamType = true;
 
-    _invalid_pat_seen = false;
+    m_invalidPatSeen = false;
 
     SetPATSingleProgram(nullptr);
     SetPMTSingleProgram(nullptr);
 
-    pid_psip_map_t old = _partial_psip_packet_cache;
-    pid_psip_map_t::iterator it = old.begin();
-    for (; it != old.end(); ++it)
+    pid_psip_map_t old = m_partialPsipPacketCache;
+    for (auto it = old.begin(); it != old.end(); ++it)
         DeletePartialPSIP(it.key());
-    _partial_psip_packet_cache.clear();
+    m_partialPsipPacketCache.clear();
 
-    _pids_listening.clear();
-    _pids_notlistening.clear();
-    _pids_writing.clear();
-    _pids_audio.clear();
+    m_pidsListening.clear();
+    m_pidsNotListening.clear();
+    m_pidsWriting.clear();
+    m_pidsAudio.clear();
 
-    _pid_video_single_program = _pid_pmt_single_program = 0xffffffff;
+    m_pidVideoSingleProgram = m_pidPmtSingleProgram = 0xffffffff;
 
-    _pat_status.clear();
+    m_patStatus.clear();
 
-    _pmt_status.clear();
+    m_pmtStatus.clear();
 
     {
-        QMutexLocker locker(&_cache_lock);
+        QMutexLocker locker(&m_cacheLock);
 
-        pat_cache_t::iterator it1 = _cached_pats.begin();
-        for (; it1 != _cached_pats.end(); ++it1)
-            DeleteCachedTable(*it1);
-        _cached_pats.clear();
+        for (const auto & cached : qAsConst(m_cachedPats))
+            DeleteCachedTable(cached);
+        m_cachedPats.clear();
 
-        pmt_cache_t::iterator it2 = _cached_pmts.begin();
-        for (; it2 != _cached_pmts.end(); ++it2)
-            DeleteCachedTable(*it2);
-        _cached_pmts.clear();
+        for (const auto & cached : qAsConst(m_cachedPmts))
+            DeleteCachedTable(cached);
+        m_cachedPmts.clear();
 
-        cat_cache_t::iterator it3 = _cached_cats.begin();
-        for (; it3 != _cached_cats.end(); ++it3)
-            DeleteCachedTable(*it3);
-        _cached_cats.clear();
+        for (const auto & cached : qAsConst(m_cachedCats))
+            DeleteCachedTable(cached);
+        m_cachedCats.clear();
     }
 
     ResetDecryptionMonitoringState();
@@ -194,11 +171,11 @@ void MPEGStreamData::Reset(int desiredProgram)
 
 void MPEGStreamData::DeletePartialPSIP(uint pid)
 {
-    pid_psip_map_t::iterator it = _partial_psip_packet_cache.find(pid);
-    if (it != _partial_psip_packet_cache.end())
+    pid_psip_map_t::iterator it = m_partialPsipPacketCache.find(pid);
+    if (it != m_partialPsipPacketCache.end())
     {
         PSIPTable *pkt = *it;
-        _partial_psip_packet_cache.erase(it);
+        m_partialPsipPacketCache.erase(it);
         delete pkt;
     }
 }
@@ -247,7 +224,7 @@ PSIPTable* MPEGStreamData::AssemblePSIP(const TSPacket* tspacket,
         }
 
         // Discard broken packets
-        bool buggy = _have_CRC_bug &&
+        bool buggy = m_haveCrcBug &&
         ((TableID::PMT == partial->StreamID()) ||
          (TableID::PAT == partial->StreamID()));
         if (!buggy && !partial->IsGood())
@@ -257,7 +234,7 @@ PSIPTable* MPEGStreamData::AssemblePSIP(const TSPacket* tspacket,
             return nullptr;
         }
 
-        PSIPTable* psip = new PSIPTable(*partial);
+        auto* psip = new PSIPTable(*partial);
 
         // Advance to the next packet
         // pesdata starts only at PSIOffset()+1
@@ -275,7 +252,7 @@ PSIPTable* MPEGStreamData::AssemblePSIP(const TSPacket* tspacket,
                 // create a new partial packet to prevent overflow
                 if ((partial->TSSizeInBuffer() > TSPacket::kSize) &&
                     (packetStart >
-                     partial->TSSizeInBuffer() - TSPacket::PAYLOAD_SIZE))
+                     partial->TSSizeInBuffer() - TSPacket::kPayloadSize))
                 {
                     // Saving will handle deleting the old one
                     SavePartialPSIP(tspacket->PID(),
@@ -346,7 +323,7 @@ PSIPTable* MPEGStreamData::AssemblePSIP(const TSPacket* tspacket,
         return nullptr;
     }
 
-    PSIPTable *psip = new PSIPTable(*tspacket); // must be complete packet
+    auto *psip = new PSIPTable(*tspacket); // must be complete packet
 
     // There might be another section after this one in the
     // current packet. We need room before the end of the
@@ -356,7 +333,7 @@ PSIPTable* MPEGStreamData::AssemblePSIP(const TSPacket* tspacket,
     {
         // This isn't stuffing, so we need to put this
         // on as a partial packet.
-        PSIPTable *pesp = new PSIPTable(*tspacket);
+        auto *pesp = new PSIPTable(*tspacket);
         pesp->SetPSIOffset(offset + psip->SectionLength());
         SavePartialPSIP(tspacket->PID(), pesp);
         return psip;
@@ -372,19 +349,19 @@ bool MPEGStreamData::CreatePATSingleProgram(
     LOG(VB_RECORD, LOG_DEBUG, LOC + "CreatePATSingleProgram()");
     LOG(VB_RECORD, LOG_DEBUG, LOC + "PAT in input stream");
     LOG(VB_RECORD, LOG_DEBUG, LOC + pat.toString());
-    if (_desired_program < 0)
+    if (m_desiredProgram < 0)
     {
         LOG(VB_RECORD, LOG_ERR, LOC + "Desired program not set yet");
         return false;
     }
-    _pid_pmt_single_program = pat.FindPID(_desired_program);
+    m_pidPmtSingleProgram = pat.FindPID(m_desiredProgram);
     LOG(VB_RECORD, LOG_DEBUG, LOC + QString("desired_program(%1) pid(0x%2)").
-            arg(_desired_program).arg(_pid_pmt_single_program, 0, 16));
+            arg(m_desiredProgram).arg(m_pidPmtSingleProgram, 0, 16));
 
-    if (!_pid_pmt_single_program)
+    if (!m_pidPmtSingleProgram)
     {
-        _pid_pmt_single_program = pat.FindAnyPID();
-        if (!_pid_pmt_single_program)
+        m_pidPmtSingleProgram = pat.FindAnyPID();
+        if (!m_pidPmtSingleProgram)
         {
             LOG(VB_GENERAL, LOG_ERR, LOC + "No program found in PAT. "
                                      "This recording will not play in MythTV.");
@@ -392,17 +369,18 @@ bool MPEGStreamData::CreatePATSingleProgram(
         LOG(VB_GENERAL, LOG_ERR, LOC +
             QString("Desired program #%1 not found in PAT."
                     "\n\t\t\tCannot create single program PAT.")
-                .arg(_desired_program));
+                .arg(m_desiredProgram));
         SetPATSingleProgram(nullptr);
         return false;
     }
 
-    AddListeningPID(_pid_pmt_single_program);
+    AddListeningPID(m_pidPmtSingleProgram);
 
-    vector<uint> pnums, pids;
+    vector<uint> pnums;
+    vector<uint> pids;
 
     pnums.push_back(1);
-    pids.push_back(_pid_pmt_single_program);
+    pids.push_back(m_pidPmtSingleProgram);
 
     uint tsid = pat.TableIDExtension();
     uint ver = pat.Version();
@@ -420,7 +398,7 @@ bool MPEGStreamData::CreatePATSingleProgram(
     pat2->tsheader()->SetContinuityCounter(pat.tsheader()->ContinuityCounter());
 
     LOG(VB_RECORD, LOG_DEBUG, LOC + QString("pmt_pid(0x%1)")
-            .arg(_pid_pmt_single_program, 0, 16));
+            .arg(m_pidPmtSingleProgram, 0, 16));
     LOG(VB_RECORD, LOG_DEBUG, LOC + "PAT for output stream");
     LOG(VB_RECORD, LOG_DEBUG, LOC + pat2->toString());
 
@@ -438,11 +416,11 @@ static desc_list_t extract_atsc_desc(const tvct_vec_t &tvct,
 
     vector<const VirtualChannelTable*> vct;
 
-    for (size_t i = 0; i < tvct.size(); i++)
-        vct.push_back(tvct[i]);
+    for (const auto *i : tvct)
+        vct.push_back(i);
 
-    for (size_t i = 0; i < cvct.size(); i++)
-        vct.push_back(cvct[i]);
+    for (const auto *i : cvct)
+        vct.push_back(i);
 
     for (size_t i = 0; i < tvct.size(); i++)
     {
@@ -495,7 +473,7 @@ bool MPEGStreamData::CreatePMTSingleProgram(const ProgramMapTable &pmt)
 
     desc_list_t gdesc;
 
-    if (!_strip_pmt_descriptors)
+    if (!m_stripPmtDescriptors)
     {
         gdesc = MPEGDescriptor::ParseAndExclude(
             pmt.ProgramInfo(), pmt.ProgramInfoLength(),
@@ -524,7 +502,9 @@ bool MPEGStreamData::CreatePMTSingleProgram(const ProgramMapTable &pmt)
     uint video_cnt = 0;
     uint audio_cnt = 0;
 
-    vector<uint> videoPIDs, audioPIDs, dataPIDs;
+    vector<uint> videoPIDs;
+    vector<uint> audioPIDs;
+    vector<uint> dataPIDs;
 
     for (uint i = 0; i < pmt.StreamCount(); i++)
     {
@@ -535,7 +515,7 @@ bool MPEGStreamData::CreatePMTSingleProgram(const ProgramMapTable &pmt)
             DescriptorID::conditional_access);
 
         uint type = StreamID::Normalize(
-            pmt.StreamType(i), desc, _sistandard);
+            pmt.StreamType(i), desc, m_siStandard);
 
         bool is_video = StreamID::IsVideo(type);
         bool is_audio = StreamID::IsAudio(type);
@@ -545,7 +525,7 @@ bool MPEGStreamData::CreatePMTSingleProgram(const ProgramMapTable &pmt)
             audio_cnt++;
             audioPIDs.push_back(pid);
         }
-        else if (_recording_type == "audio" )
+        else if (m_recordingType == "audio" )
         {
             // If not an audio PID but we only want audio,
             // ignore this PID.
@@ -563,11 +543,11 @@ bool MPEGStreamData::CreatePMTSingleProgram(const ProgramMapTable &pmt)
             videoPIDs.push_back(pid);
         }
 
-        if (_strip_pmt_descriptors)
+        if (m_stripPmtDescriptors)
             desc.clear();
 
         // Filter out streams not used for basic television
-        if (_recording_type == "tv" && !is_audio && !is_video &&
+        if (m_recordingType == "tv" && !is_audio && !is_video &&
             !MPEGDescriptor::Find(desc, DescriptorID::teletext) &&
             !MPEGDescriptor::Find(desc, DescriptorID::subtitling) &&
             pid != pmt.PCRPID()) // We must not strip the PCR!
@@ -583,43 +563,43 @@ bool MPEGStreamData::CreatePMTSingleProgram(const ProgramMapTable &pmt)
         types.push_back(type);
     }
 
-    if (video_cnt < _pmt_single_program_num_video)
+    if (video_cnt < m_pmtSingleProgramNumVideo)
     {
         LOG(VB_RECORD, LOG_ERR, LOC +
             QString("Only %1 video streams seen in PMT, but %2 are required.")
-                .arg(video_cnt).arg(_pmt_single_program_num_video));
+                .arg(video_cnt).arg(m_pmtSingleProgramNumVideo));
         return false;
     }
 
-    if (audioPIDs.size() < _pmt_single_program_num_audio)
+    if (audioPIDs.size() < m_pmtSingleProgramNumAudio)
     {
         LOG(VB_RECORD, LOG_ERR, LOC +
             QString("Only %1 audio streams seen in PMT, but %2 are required.")
-                .arg(audioPIDs.size()).arg(_pmt_single_program_num_audio));
+                .arg(audioPIDs.size()).arg(m_pmtSingleProgramNumAudio));
         return false;
     }
 
     desc_list_t cdesc = MPEGDescriptor::ParseOnlyInclude(
         pmt.ProgramInfo(), pmt.ProgramInfoLength(),
         DescriptorID::conditional_access);
-    for (size_t i = 0; i < cdesc.size(); i++)
+    for (auto & i : cdesc)
     {
-        ConditionalAccessDescriptor cad(cdesc[i]);
+        ConditionalAccessDescriptor cad(i);
         if (cad.IsValid())
             AddListeningPID(cad.PID());
     }
 
-    _pids_audio.clear();
-    for (size_t i = 0; i < audioPIDs.size(); i++)
-        AddAudioPID(audioPIDs[i]);
+    m_pidsAudio.clear();
+    for (uint pid : audioPIDs)
+        AddAudioPID(pid);
 
-    _pids_writing.clear();
-    _pid_video_single_program = !videoPIDs.empty() ? videoPIDs[0] : 0xffffffff;
+    m_pidsWriting.clear();
+    m_pidVideoSingleProgram = !videoPIDs.empty() ? videoPIDs[0] : 0xffffffff;
     for (size_t i = 1; i < videoPIDs.size(); i++)
         AddWritingPID(videoPIDs[i]);
 
-    for (size_t i = 0; i < dataPIDs.size(); i++)
-        AddWritingPID(dataPIDs[i]);
+    for (uint pid : dataPIDs)
+        AddWritingPID(pid);
 
     // Timebase
     int pcrpidIndex = pmt.FindPID(pmt.PCRPID());
@@ -632,7 +612,7 @@ bool MPEGStreamData::CreatePMTSingleProgram(const ProgramMapTable &pmt)
 
     // Create the PMT
     ProgramMapTable *pmt2 = ProgramMapTable::Create(
-        programNumber, _pid_pmt_single_program, pmt.PCRPID(),
+        programNumber, m_pidPmtSingleProgram, pmt.PCRPID(),
         pmt.Version(), gdesc, pids, types, pdesc);
 
     // Return any TVCT & CVCT tables, once we've copied any descriptors.
@@ -664,28 +644,28 @@ bool MPEGStreamData::IsRedundant(uint pid, const PSIPTable &psip) const
 
     if (TableID::PAT == table_id)
     {
-        return _pat_status.IsSectionSeen(psip.TableIDExtension(), version, psip.Section());
+        return m_patStatus.IsSectionSeen(psip.TableIDExtension(), version, psip.Section());
     }
 
     if (TableID::CAT == table_id)
     {
-        return _cat_status.IsSectionSeen(psip.TableIDExtension(), version, psip.Section());
+        return m_catStatus.IsSectionSeen(psip.TableIDExtension(), version, psip.Section());
     }
 
     if (TableID::PMT == table_id)
     {
-        return _pmt_status.IsSectionSeen(psip.TableIDExtension(), version, psip.Section());
+        return m_pmtStatus.IsSectionSeen(psip.TableIDExtension(), version, psip.Section());
     }
 
     return false;
 }
 
 /** \fn MPEGStreamData::HandleTables(uint pid, const PSIPTable &psip)
- *  \brief Assembles PSIP packets and processes them.
+ *  \brief Process PSIP packets.
  */
 bool MPEGStreamData::HandleTables(uint pid, const PSIPTable &psip)
 {
-    if (IsRedundant(pid, psip))
+    if (MPEGStreamData::IsRedundant(pid, psip))
         return true;
 
     const int version = psip.Version();
@@ -695,11 +675,11 @@ bool MPEGStreamData::HandleTables(uint pid, const PSIPTable &psip)
         case TableID::PAT:
         {
             uint tsid = psip.TableIDExtension();
-            _pat_status.SetSectionSeen(tsid, version,  psip.Section(), psip.LastSection());
+            m_patStatus.SetSectionSeen(tsid, version,  psip.Section(), psip.LastSection());
 
             ProgramAssociationTable pat(psip);
 
-            if (_cache_tables)
+            if (m_cacheTables)
                 CachePAT(&pat);
 
             ProcessPAT(&pat);
@@ -709,11 +689,11 @@ bool MPEGStreamData::HandleTables(uint pid, const PSIPTable &psip)
         case TableID::CAT:
         {
             uint tsid = psip.TableIDExtension();
-            _cat_status.SetSectionSeen(tsid, version, psip.Section(), psip.LastSection());
+            m_catStatus.SetSectionSeen(tsid, version, psip.Section(), psip.LastSection());
 
             ConditionalAccessTable cat(psip);
 
-            if (_cache_tables)
+            if (m_cacheTables)
                 CacheCAT(&cat);
 
             ProcessCAT(&cat);
@@ -723,11 +703,11 @@ bool MPEGStreamData::HandleTables(uint pid, const PSIPTable &psip)
         case TableID::PMT:
         {
             uint prog_num = psip.TableIDExtension();
-            _pmt_status.SetSectionSeen(prog_num, version, psip.Section(), psip.LastSection());
+            m_pmtStatus.SetSectionSeen(prog_num, version, psip.Section(), psip.LastSection());
 
             ProgramMapTable pmt(psip);
 
-            if (_cache_tables)
+            if (m_cacheTables)
                 CachePMT(&pmt);
 
             ProcessPMT(&pmt);
@@ -739,10 +719,10 @@ bool MPEGStreamData::HandleTables(uint pid, const PSIPTable &psip)
             SpliceInformationTable sit(psip);
             sit.setSCTEPID(pid);
 
-            _listener_lock.lock();
-            for (size_t i = 0; i < _mpeg_listeners.size(); i++)
-                _mpeg_listeners[i]->HandleSplice(&sit);
-            _listener_lock.unlock();
+            m_listenerLock.lock();
+            for (auto & listener : m_mpegListeners)
+                listener->HandleSplice(&sit);
+            m_listenerLock.unlock();
 
             return true;
         }
@@ -752,29 +732,29 @@ bool MPEGStreamData::HandleTables(uint pid, const PSIPTable &psip)
 
 void MPEGStreamData::ProcessPAT(const ProgramAssociationTable *pat)
 {
-    bool foundProgram = pat->FindPID(_desired_program) != 0u;
+    bool foundProgram = pat->FindPID(m_desiredProgram) != 0U;
 
-    _listener_lock.lock();
-    for (size_t i = 0; i < _mpeg_listeners.size(); i++)
-        _mpeg_listeners[i]->HandlePAT(pat);
-    _listener_lock.unlock();
+    m_listenerLock.lock();
+    for (auto & listener : m_mpegListeners)
+        listener->HandlePAT(pat);
+    m_listenerLock.unlock();
 
-    if (_desired_program < 0)
+    if (m_desiredProgram < 0)
         return;
 
     bool send_single_program = false;
-    if (!_invalid_pat_seen && !foundProgram)
+    if (!m_invalidPatSeen && !foundProgram)
     {
-        _invalid_pat_seen = true;
-        _invalid_pat_warning = false;
-        _invalid_pat_timer.start();
+        m_invalidPatSeen = true;
+        m_invalidPatWarning = false;
+        m_invalidPatTimer.start();
         LOG(VB_RECORD, LOG_WARNING, LOC +
             "ProcessPAT: PAT is missing program, setting timeout");
     }
-    else if (_invalid_pat_seen && !foundProgram &&
-             (_invalid_pat_timer.elapsed() > 400) && !_invalid_pat_warning)
+    else if (m_invalidPatSeen && !foundProgram &&
+             (m_invalidPatTimer.elapsed() > 400) && !m_invalidPatWarning)
     {
-        _invalid_pat_warning = true; // only emit one warning...
+        m_invalidPatWarning = true; // only emit one warning...
         // After 400ms emit error if we haven't found correct PAT.
         LOG(VB_GENERAL, LOG_ERR, LOC + "ProcessPAT: Program not found in PAT. "
             "Rescan your transports.");
@@ -783,37 +763,37 @@ void MPEGStreamData::ProcessPAT(const ProgramAssociationTable *pat)
     }
     else if (foundProgram)
     {
-        if (_invalid_pat_seen)
+        if (m_invalidPatSeen)
             LOG(VB_RECORD, LOG_INFO, LOC +
                 "ProcessPAT: Good PAT seen after a bad PAT");
 
-        _invalid_pat_seen = false;
+        m_invalidPatSeen = false;
 
         send_single_program = CreatePATSingleProgram(*pat);
     }
 
     if (send_single_program)
     {
-        QMutexLocker locker(&_listener_lock);
+        QMutexLocker locker(&m_listenerLock);
         ProgramAssociationTable *pat_sp = PATSingleProgram();
-        for (size_t i = 0; i < _mpeg_sp_listeners.size(); i++)
-            _mpeg_sp_listeners[i]->HandleSingleProgramPAT(pat_sp, false);
+        for (auto & listener : m_mpegSpListeners)
+            listener->HandleSingleProgramPAT(pat_sp, false);
     }
 }
 
 void MPEGStreamData::ProcessCAT(const ConditionalAccessTable *cat)
 {
-    _listener_lock.lock();
-    for (size_t i = 0; i < _mpeg_listeners.size(); i++)
-        _mpeg_listeners[i]->HandleCAT(cat);
-    _listener_lock.unlock();
+    m_listenerLock.lock();
+    for (auto & listener : m_mpegListeners)
+        listener->HandleCAT(cat);
+    m_listenerLock.unlock();
 
     desc_list_t cdesc = MPEGDescriptor::ParseOnlyInclude(
         cat->Descriptors(), cat->DescriptorsLength(),
         DescriptorID::conditional_access);
-    for (size_t i = 0; i < cdesc.size(); i++)
+    for (auto & i : cdesc)
     {
-        ConditionalAccessDescriptor cad(cdesc[i]);
+        ConditionalAccessDescriptor cad(i);
         if (cad.IsValid())
             AddListeningPID(cad.PID());
     }
@@ -821,51 +801,51 @@ void MPEGStreamData::ProcessCAT(const ConditionalAccessTable *cat)
 
 void MPEGStreamData::ProcessPMT(const ProgramMapTable *pmt)
 {
-    _listener_lock.lock();
-    for (size_t i = 0; i < _mpeg_listeners.size(); i++)
-        _mpeg_listeners[i]->HandlePMT(pmt->ProgramNumber(), pmt);
-    _listener_lock.unlock();
+    m_listenerLock.lock();
+    for (auto & listener : m_mpegListeners)
+        listener->HandlePMT(pmt->ProgramNumber(), pmt);
+    m_listenerLock.unlock();
 
-    bool desired = pmt->ProgramNumber() == (uint) _desired_program;
+    bool desired = pmt->ProgramNumber() == (uint) m_desiredProgram;
     if (desired && CreatePMTSingleProgram(*pmt))
     {
-        QMutexLocker locker(&_listener_lock);
+        QMutexLocker locker(&m_listenerLock);
         ProgramMapTable *pmt_sp = PMTSingleProgram();
-        for (size_t i = 0; i < _mpeg_sp_listeners.size(); i++)
-            _mpeg_sp_listeners[i]->HandleSingleProgramPMT(pmt_sp, false);
+        for (auto & listener : m_mpegSpListeners)
+            listener->HandleSingleProgramPMT(pmt_sp, false);
     }
 }
 
 double MPEGStreamData::TimeOffset(void) const
 {
-    QMutexLocker locker(&_si_time_lock);
-    if (!_si_time_offset_cnt)
+    QMutexLocker locker(&m_siTimeLock);
+    if (!m_siTimeOffsetCnt)
         return 0.0;
 
     double avg_offset = 0.0;
-    double mult = 1.0 / _si_time_offset_cnt;
-    for (uint i = 0; i < _si_time_offset_cnt; i++)
-        avg_offset += _si_time_offsets[i] * mult;
+    double mult = 1.0 / m_siTimeOffsetCnt;
+    for (uint i = 0; i < m_siTimeOffsetCnt; i++)
+        avg_offset += m_siTimeOffsets[i] * mult;
 
     return avg_offset;
 }
 
 void MPEGStreamData::UpdateTimeOffset(uint64_t _si_utc_time)
 {
-    struct timeval tm;
+    struct timeval tm {};
     if (gettimeofday(&tm, nullptr) != 0)
         return;
 
     double utc_time = tm.tv_sec + (tm.tv_usec * 0.000001);
     double si_time  = _si_utc_time;
 
-    QMutexLocker locker(&_si_time_lock);
-    _si_time_offsets[_si_time_offset_indx] = si_time - utc_time;
+    QMutexLocker locker(&m_siTimeLock);
+    m_siTimeOffsets[m_siTimeOffsetIndx] = si_time - utc_time;
 
-    if (_si_time_offset_indx + 1 > _si_time_offset_cnt)
-        _si_time_offset_cnt = _si_time_offset_indx + 1;
+    if (m_siTimeOffsetIndx + 1 > m_siTimeOffsetCnt)
+        m_siTimeOffsetCnt = m_siTimeOffsetIndx + 1;
 
-    _si_time_offset_indx = (_si_time_offset_indx + 1) & 0xf;
+    m_siTimeOffsetIndx = (m_siTimeOffsetIndx + 1) & 0xf;
 
 }
 
@@ -877,7 +857,7 @@ void MPEGStreamData::UpdateTimeOffset(uint64_t _si_utc_time)
  */
 void MPEGStreamData::HandleTSTables(const TSPacket* tspacket)
 {
-    bool morePSIPTables;
+    bool morePSIPTables = false;
   HAS_ANOTHER_PSIP:
     // Assemble PSIP
     PSIPTable *psip = AssemblePSIP(tspacket, morePSIPTables);
@@ -901,7 +881,7 @@ void MPEGStreamData::HandleTSTables(const TSPacket* tspacket)
 
     // Validate PSIP
     // but don't validate PMT/PAT if our driver has the PMT/PAT CRC bug.
-    bool buggy = _have_CRC_bug &&
+    bool buggy = m_haveCrcBug &&
         ((TableID::PMT == psip->TableID()) ||
          (TableID::PAT == psip->TableID()));
     if (!buggy && !psip->IsGood())
@@ -927,7 +907,7 @@ void MPEGStreamData::HandleTSTables(const TSPacket* tspacket)
         DONE_WITH_PSIP_PACKET();
     }
 
-    if (!psip->VerifyPSIP(!_have_CRC_bug))
+    if (!psip->VerifyPSIP(!m_haveCrcBug))
     {
         LOG(VB_RECORD, LOG_ERR, LOC + QString("PSIP table 0x%1 is invalid")
             .arg(psip->TableID(),2,16,QChar('0')));
@@ -936,22 +916,22 @@ void MPEGStreamData::HandleTSTables(const TSPacket* tspacket)
 
     // Don't decode redundant packets,
     // but if it is a desired PAT or PMT emit a "heartbeat" signal.
-    if (IsRedundant(tspacket->PID(), *psip))
+    if (MPEGStreamData::IsRedundant(tspacket->PID(), *psip))
     {
         if (TableID::PAT == psip->TableID())
         {
-            QMutexLocker locker(&_listener_lock);
+            QMutexLocker locker(&m_listenerLock);
             ProgramAssociationTable *pat_sp = PATSingleProgram();
-            for (size_t i = 0; i < _mpeg_sp_listeners.size(); i++)
-                _mpeg_sp_listeners[i]->HandleSingleProgramPAT(pat_sp, false);
+            for (auto & listener : m_mpegSpListeners)
+                listener->HandleSingleProgramPAT(pat_sp, false);
         }
         if (TableID::PMT == psip->TableID() &&
-            tspacket->PID() == _pid_pmt_single_program)
+            tspacket->PID() == m_pidPmtSingleProgram)
         {
-            QMutexLocker locker(&_listener_lock);
+            QMutexLocker locker(&m_listenerLock);
             ProgramMapTable *pmt_sp = PMTSingleProgram();
-            for (size_t i = 0; i < _mpeg_sp_listeners.size(); i++)
-                _mpeg_sp_listeners[i]->HandleSingleProgramPMT(pmt_sp, false);
+            for (auto & listener : m_mpegSpListeners)
+                listener->HandleSingleProgramPMT(pmt_sp, false);
         }
         DONE_WITH_PSIP_PACKET(); // already parsed this table, toss it.
     }
@@ -967,11 +947,11 @@ int MPEGStreamData::ProcessData(const unsigned char *buffer, int len)
     int pos = 0;
     bool resync = false;
 
-    if (!_ps_listeners.empty())
+    if (!m_psListeners.empty())
     {
 
-        for (size_t j = 0; j < _ps_listeners.size(); ++j)
-            _ps_listeners[j]->FindPSKeyFrames(buffer, len);
+        for (auto & listener : m_psListeners)
+            listener->FindPSKeyFrames(buffer, len);
 
         return 0;
     }
@@ -991,7 +971,7 @@ int MPEGStreamData::ProcessData(const unsigned char *buffer, int len)
             pos = newpos;
         }
 
-        const TSPacket *pkt = reinterpret_cast<const TSPacket*>(&buffer[pos]);
+        const auto *pkt = reinterpret_cast<const TSPacket*>(&buffer[pos]);
         pos += TSPacket::kSize; // Advance to next TS packet
         resync = false;
         if (!ProcessTSPacket(*pkt))
@@ -1029,39 +1009,41 @@ bool MPEGStreamData::ProcessTSPacket(const TSPacket& tspacket)
 
     if (VERBOSE_LEVEL_CHECK(VB_RECORD, LOG_DEBUG))
     {
-        if (_pmt_single_program && tspacket.PID() ==
-            _pmt_single_program->PCRPID())
+        if (m_pmtSingleProgram && tspacket.PID() ==
+            m_pmtSingleProgram->PCRPID())
         {
             if (tspacket.HasPCR())
+            {
                 LOG(VB_RECORD, LOG_DEBUG, LOC +
                     QString("PID %1 (0x%2) has PCR %3μs")
-                    .arg(_pmt_single_program->PCRPID())
-                    .arg(_pmt_single_program->PCRPID(), 0, 16)
+                    .arg(m_pmtSingleProgram->PCRPID())
+                    .arg(m_pmtSingleProgram->PCRPID(), 0, 16)
                     .arg(std::chrono::duration_cast<std::chrono::microseconds>
                          (tspacket.GetPCR().time_since_epoch()).count()));
+            }
         }
     }
 
     if (IsVideoPID(tspacket.PID()))
     {
-        for (size_t j = 0; j < _ts_av_listeners.size(); j++)
-            _ts_av_listeners[j]->ProcessVideoTSPacket(tspacket);
+        for (auto & listener : m_tsAvListeners)
+            listener->ProcessVideoTSPacket(tspacket);
 
         return true;
     }
 
     if (IsAudioPID(tspacket.PID()))
     {
-        for (size_t j = 0; j < _ts_av_listeners.size(); j++)
-            _ts_av_listeners[j]->ProcessAudioTSPacket(tspacket);
+        for (auto & listener : m_tsAvListeners)
+            listener->ProcessAudioTSPacket(tspacket);
 
         return true;
     }
 
     if (IsWritingPID(tspacket.PID()))
     {
-        for (size_t j = 0; j < _ts_writing_listeners.size(); j++)
-            _ts_writing_listeners[j]->ProcessTSPacket(tspacket);
+        for (auto & listener : m_tsWritingListeners)
+            listener->ProcessTSPacket(tspacket);
     }
 
     if (IsListeningPID(tspacket.PID()) && tspacket.HasPayload())
@@ -1094,47 +1076,44 @@ int MPEGStreamData::ResyncStream(const unsigned char *buffer, int curr_pos,
 
 bool MPEGStreamData::IsListeningPID(uint pid) const
 {
-    if (_listening_disabled || IsNotListeningPID(pid))
+    if (m_listeningDisabled || IsNotListeningPID(pid))
         return false;
-    pid_map_t::const_iterator it = _pids_listening.find(pid);
-    return it != _pids_listening.end();
+    pid_map_t::const_iterator it = m_pidsListening.find(pid);
+    return it != m_pidsListening.end();
 }
 
 bool MPEGStreamData::IsNotListeningPID(uint pid) const
 {
-    pid_map_t::const_iterator it = _pids_notlistening.find(pid);
-    return it != _pids_notlistening.end();
+    pid_map_t::const_iterator it = m_pidsNotListening.find(pid);
+    return it != m_pidsNotListening.end();
 }
 
 bool MPEGStreamData::IsWritingPID(uint pid) const
 {
-    pid_map_t::const_iterator it = _pids_writing.find(pid);
-    return it != _pids_writing.end();
+    pid_map_t::const_iterator it = m_pidsWriting.find(pid);
+    return it != m_pidsWriting.end();
 }
 
 bool MPEGStreamData::IsAudioPID(uint pid) const
 {
-    pid_map_t::const_iterator it = _pids_audio.find(pid);
-    return it != _pids_audio.end();
+    pid_map_t::const_iterator it = m_pidsAudio.find(pid);
+    return it != m_pidsAudio.end();
 }
 
 uint MPEGStreamData::GetPIDs(pid_map_t &pids) const
 {
     uint sz = pids.size();
 
-    if (_pid_video_single_program < 0x1fff)
-        pids[_pid_video_single_program] = kPIDPriorityHigh;
+    if (m_pidVideoSingleProgram < 0x1fff)
+        pids[m_pidVideoSingleProgram] = kPIDPriorityHigh;
 
-    pid_map_t::const_iterator it = _pids_listening.begin();
-    for (; it != _pids_listening.end(); ++it)
+    for (auto it = m_pidsListening.cbegin(); it != m_pidsListening.cend(); ++it)
         pids[it.key()] = max(pids[it.key()], *it);
 
-    it = _pids_audio.begin();
-    for (; it != _pids_audio.end(); ++it)
+    for (auto it = m_pidsAudio.cbegin(); it != m_pidsAudio.cend(); ++it)
         pids[it.key()] = max(pids[it.key()], *it);
 
-    it = _pids_writing.begin();
-    for (; it != _pids_writing.end(); ++it)
+    for (auto it = m_pidsWriting.cbegin(); it != m_pidsWriting.cend(); ++it)
         pids[it.key()] = max(pids[it.key()], *it);
 
     return pids.size() - sz;
@@ -1142,21 +1121,21 @@ uint MPEGStreamData::GetPIDs(pid_map_t &pids) const
 
 PIDPriority MPEGStreamData::GetPIDPriority(uint pid) const
 {
-    if (_pid_video_single_program == pid)
+    if (m_pidVideoSingleProgram == pid)
         return kPIDPriorityHigh;
 
     pid_map_t::const_iterator it;
-    it = _pids_listening.find(pid);
-    if (it != _pids_listening.end())
+    it = m_pidsListening.find(pid);
+    if (it != m_pidsListening.end())
         return *it;
-    it = _pids_notlistening.find(pid);
-    if (it != _pids_notlistening.end())
+    it = m_pidsNotListening.find(pid);
+    if (it != m_pidsNotListening.end())
         return *it;
-    it = _pids_writing.find(pid);
-    if (it != _pids_writing.end())
+    it = m_pidsWriting.find(pid);
+    if (it != m_pidsWriting.end())
         return *it;
-    it = _pids_audio.find(pid);
-    if (it != _pids_audio.end())
+    it = m_pidsAudio.find(pid);
+    if (it != m_pidsAudio.end())
         return *it;
 
     return kPIDPriorityNone;
@@ -1164,31 +1143,31 @@ PIDPriority MPEGStreamData::GetPIDPriority(uint pid) const
 
 void MPEGStreamData::SavePartialPSIP(uint pid, PSIPTable* packet)
 {
-    pid_psip_map_t::iterator it = _partial_psip_packet_cache.find(pid);
-    if (it == _partial_psip_packet_cache.end())
-        _partial_psip_packet_cache[pid] = packet;
+    pid_psip_map_t::iterator it = m_partialPsipPacketCache.find(pid);
+    if (it == m_partialPsipPacketCache.end())
+        m_partialPsipPacketCache[pid] = packet;
     else
     {
         PSIPTable *old = *it;
-        _partial_psip_packet_cache.remove(pid);
-        _partial_psip_packet_cache.insert(pid, packet);
+        m_partialPsipPacketCache.remove(pid);
+        m_partialPsipPacketCache.insert(pid, packet);
         delete old;
     }
 }
 
 bool MPEGStreamData::HasAllPATSections(uint tsid) const
 {
-    return _pat_status.HasAllSections(tsid);
+    return m_patStatus.HasAllSections(tsid);
 }
 
 bool MPEGStreamData::HasAllCATSections(uint tsid) const
 {
-    return _cat_status.HasAllSections(tsid);
+    return m_catStatus.HasAllSections(tsid);
 }
 
 bool MPEGStreamData::HasAllPMTSections(uint prog_num) const
 {
-    return _pmt_status.HasAllSections(prog_num);
+    return m_pmtStatus.HasAllSections(prog_num);
 }
 
 bool MPEGStreamData::HasProgram(uint progNum) const
@@ -1202,10 +1181,10 @@ bool MPEGStreamData::HasProgram(uint progNum) const
 
 bool MPEGStreamData::HasCachedAllPAT(uint tsid) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
-    pat_cache_t::const_iterator it = _cached_pats.find(tsid << 8);
-    if (it == _cached_pats.end())
+    pat_cache_t::const_iterator it = m_cachedPats.find(tsid << 8);
+    if (it == m_cachedPats.end())
         return false;
 
     uint last_section = (*it)->LastSection();
@@ -1213,7 +1192,7 @@ bool MPEGStreamData::HasCachedAllPAT(uint tsid) const
         return true;
 
     for (uint i = 1; i <= last_section; i++)
-        if (_cached_pats.find((tsid << 8) | i) == _cached_pats.end())
+        if (m_cachedPats.find((tsid << 8) | i) == m_cachedPats.end())
             return false;
 
     return true;
@@ -1221,10 +1200,10 @@ bool MPEGStreamData::HasCachedAllPAT(uint tsid) const
 
 bool MPEGStreamData::HasCachedAnyPAT(uint tsid) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
     for (uint i = 0; i <= 255; i++)
-        if (_cached_pats.find((tsid << 8) | i) != _cached_pats.end())
+        if (m_cachedPats.find((tsid << 8) | i) != m_cachedPats.end())
             return true;
 
     return false;
@@ -1232,16 +1211,16 @@ bool MPEGStreamData::HasCachedAnyPAT(uint tsid) const
 
 bool MPEGStreamData::HasCachedAnyPAT(void) const
 {
-    QMutexLocker locker(&_cache_lock);
-    return !_cached_pats.empty();
+    QMutexLocker locker(&m_cacheLock);
+    return !m_cachedPats.empty();
 }
 
 bool MPEGStreamData::HasCachedAllCAT(uint tsid) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
-    cat_cache_t::const_iterator it = _cached_cats.find(tsid << 8);
-    if (it == _cached_cats.end())
+    cat_cache_t::const_iterator it = m_cachedCats.find(tsid << 8);
+    if (it == m_cachedCats.end())
         return false;
 
     uint last_section = (*it)->LastSection();
@@ -1249,7 +1228,7 @@ bool MPEGStreamData::HasCachedAllCAT(uint tsid) const
         return true;
 
     for (uint i = 1; i <= last_section; i++)
-        if (_cached_cats.find((tsid << 8) | i) == _cached_cats.end())
+        if (m_cachedCats.find((tsid << 8) | i) == m_cachedCats.end())
             return false;
 
     return true;
@@ -1257,10 +1236,10 @@ bool MPEGStreamData::HasCachedAllCAT(uint tsid) const
 
 bool MPEGStreamData::HasCachedAnyCAT(uint tsid) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
     for (uint i = 0; i <= 255; i++)
-        if (_cached_cats.find((tsid << 8) | i) != _cached_cats.end())
+        if (m_cachedCats.find((tsid << 8) | i) != m_cachedCats.end())
             return true;
 
     return false;
@@ -1268,16 +1247,16 @@ bool MPEGStreamData::HasCachedAnyCAT(uint tsid) const
 
 bool MPEGStreamData::HasCachedAnyCAT(void) const
 {
-    QMutexLocker locker(&_cache_lock);
-    return !_cached_cats.empty();
+    QMutexLocker locker(&m_cacheLock);
+    return !m_cachedCats.empty();
 }
 
 bool MPEGStreamData::HasCachedAllPMT(uint pnum) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
-    pmt_cache_t::const_iterator it = _cached_pmts.find(pnum << 8);
-    if (it == _cached_pmts.end())
+    pmt_cache_t::const_iterator it = m_cachedPmts.find(pnum << 8);
+    if (it == m_cachedPmts.end())
         return false;
 
     uint last_section = (*it)->LastSection();
@@ -1285,7 +1264,7 @@ bool MPEGStreamData::HasCachedAllPMT(uint pnum) const
         return true;
 
     for (uint i = 1; i <= last_section; i++)
-        if (_cached_pmts.find((pnum << 8) | i) == _cached_pmts.end())
+        if (m_cachedPmts.find((pnum << 8) | i) == m_cachedPmts.end())
             return false;
 
     return true;
@@ -1293,10 +1272,10 @@ bool MPEGStreamData::HasCachedAllPMT(uint pnum) const
 
 bool MPEGStreamData::HasCachedAnyPMT(uint pnum) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
     for (uint i = 0; i <= 255; i++)
-        if (_cached_pmts.find((pnum << 8) | i) != _cached_pmts.end())
+        if (m_cachedPmts.find((pnum << 8) | i) != m_cachedPmts.end())
             return true;
 
     return false;
@@ -1304,12 +1283,13 @@ bool MPEGStreamData::HasCachedAnyPMT(uint pnum) const
 
 bool MPEGStreamData::HasCachedAllPMTs(void) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
-    pat_cache_t::const_iterator it = _cached_pats.begin();
-    for (; it != _cached_pats.end(); ++it)
+    if (m_cachedPats.empty())
+        return false;
+
+    for (auto *pat : qAsConst(m_cachedPats))
     {
-        const ProgramAssociationTable *pat = *it;
         if (!HasCachedAllPAT(pat->TransportStreamID()))
             return false;
 
@@ -1326,18 +1306,18 @@ bool MPEGStreamData::HasCachedAllPMTs(void) const
 
 bool MPEGStreamData::HasCachedAnyPMTs(void) const
 {
-    QMutexLocker locker(&_cache_lock);
-    return !_cached_pmts.empty();
+    QMutexLocker locker(&m_cacheLock);
+    return !m_cachedPmts.empty();
 }
 
 pat_const_ptr_t MPEGStreamData::GetCachedPAT(uint tsid, uint section_num) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
     ProgramAssociationTable *pat = nullptr;
 
     uint key = (tsid << 8) | section_num;
-    pat_cache_t::const_iterator it = _cached_pats.find(key);
-    if (it != _cached_pats.end())
+    pat_cache_t::const_iterator it = m_cachedPats.find(key);
+    if (it != m_cachedPats.end())
         IncrementRefCnt(pat = *it);
 
     return pat;
@@ -1345,7 +1325,7 @@ pat_const_ptr_t MPEGStreamData::GetCachedPAT(uint tsid, uint section_num) const
 
 pat_vec_t MPEGStreamData::GetCachedPATs(uint tsid) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
     pat_vec_t pats;
 
     for (uint i=0; i < 256; i++)
@@ -1360,13 +1340,11 @@ pat_vec_t MPEGStreamData::GetCachedPATs(uint tsid) const
 
 pat_vec_t MPEGStreamData::GetCachedPATs(void) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
     pat_vec_t pats;
 
-    pat_cache_t::const_iterator it = _cached_pats.begin();
-    for (; it != _cached_pats.end(); ++it)
+    for (auto *pat : qAsConst(m_cachedPats))
     {
-        ProgramAssociationTable* pat = *it;
         IncrementRefCnt(pat);
         pats.push_back(pat);
     }
@@ -1376,12 +1354,12 @@ pat_vec_t MPEGStreamData::GetCachedPATs(void) const
 
 cat_const_ptr_t MPEGStreamData::GetCachedCAT(uint tsid, uint section_num) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
     ConditionalAccessTable *cat = nullptr;
 
     uint key = (tsid << 8) | section_num;
-    cat_cache_t::const_iterator it = _cached_cats.find(key);
-    if (it != _cached_cats.end())
+    cat_cache_t::const_iterator it = m_cachedCats.find(key);
+    if (it != m_cachedCats.end())
         IncrementRefCnt(cat = *it);
 
     return cat;
@@ -1389,7 +1367,7 @@ cat_const_ptr_t MPEGStreamData::GetCachedCAT(uint tsid, uint section_num) const
 
 cat_vec_t MPEGStreamData::GetCachedCATs(uint tsid) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
     cat_vec_t cats;
 
     for (uint i=0; i < 256; i++)
@@ -1404,13 +1382,11 @@ cat_vec_t MPEGStreamData::GetCachedCATs(uint tsid) const
 
 cat_vec_t MPEGStreamData::GetCachedCATs(void) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
     cat_vec_t cats;
 
-    cat_cache_t::const_iterator it = _cached_cats.begin();
-    for (; it != _cached_cats.end(); ++it)
+    for (auto *cat : qAsConst(m_cachedCats))
     {
-        ConditionalAccessTable* cat = *it;
         IncrementRefCnt(cat);
         cats.push_back(cat);
     }
@@ -1421,12 +1397,12 @@ cat_vec_t MPEGStreamData::GetCachedCATs(void) const
 pmt_const_ptr_t MPEGStreamData::GetCachedPMT(
     uint program_num, uint section_num) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
     ProgramMapTable *pmt = nullptr;
 
     uint key = (program_num << 8) | section_num;
-    pmt_cache_t::const_iterator it = _cached_pmts.find(key);
-    if (it != _cached_pmts.end())
+    pmt_cache_t::const_iterator it = m_cachedPmts.find(key);
+    if (it != m_cachedPmts.end())
         IncrementRefCnt(pmt = *it);
 
     return pmt;
@@ -1434,13 +1410,11 @@ pmt_const_ptr_t MPEGStreamData::GetCachedPMT(
 
 pmt_vec_t MPEGStreamData::GetCachedPMTs(void) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
     vector<const ProgramMapTable*> pmts;
 
-    pmt_cache_t::const_iterator it = _cached_pmts.begin();
-    for (; it != _cached_pmts.end(); ++it)
+    for (auto *pmt : m_cachedPmts)
     {
-        ProgramMapTable* pmt = *it;
         IncrementRefCnt(pmt);
         pmts.push_back(pmt);
     }
@@ -1450,13 +1424,11 @@ pmt_vec_t MPEGStreamData::GetCachedPMTs(void) const
 
 pmt_map_t MPEGStreamData::GetCachedPMTMap(void) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
     pmt_map_t pmts;
 
-    pmt_cache_t::const_iterator it = _cached_pmts.begin();
-    for (; it != _cached_pmts.end(); ++it)
+    for (auto *pmt : m_cachedPmts)
     {
-        ProgramMapTable* pmt = *it;
         IncrementRefCnt(pmt);
         pmts[pmt->ProgramNumber()].push_back(pmt);
     }
@@ -1466,30 +1438,31 @@ pmt_map_t MPEGStreamData::GetCachedPMTMap(void) const
 
 void MPEGStreamData::ReturnCachedTable(const PSIPTable *psip) const
 {
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
-    int val = _cached_ref_cnt[psip] - 1;
-    _cached_ref_cnt[psip] = val;
+    int val = m_cachedRefCnt[psip] - 1;
+    m_cachedRefCnt[psip] = val;
 
     // if ref <= 0 and table was slated for deletion, delete it.
     if (val <= 0)
     {
         psip_refcnt_map_t::iterator it;
-        it = _cached_slated_for_deletion.find(psip);
-        if (it != _cached_slated_for_deletion.end())
-            DeleteCachedTable(const_cast<PSIPTable*>(psip));
+        it = m_cachedSlatedForDeletion.find(psip);
+        if (it != m_cachedSlatedForDeletion.end())
+            DeleteCachedTable(psip);
     }
 }
 
 void MPEGStreamData::ReturnCachedPATTables(pat_vec_t &pats) const
 {
-    for (pat_vec_t::iterator it = pats.begin(); it != pats.end(); ++it)
-        ReturnCachedTable(*it);
+    for (auto & pat : pats)
+        ReturnCachedTable(pat);
     pats.clear();
 }
 
 void MPEGStreamData::ReturnCachedPATTables(pat_map_t &pats) const
 {
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (pat_map_t::iterator it = pats.begin(); it != pats.end(); ++it)
         ReturnCachedPATTables(*it);
     pats.clear();
@@ -1497,13 +1470,14 @@ void MPEGStreamData::ReturnCachedPATTables(pat_map_t &pats) const
 
 void MPEGStreamData::ReturnCachedCATTables(cat_vec_t &cats) const
 {
-    for (cat_vec_t::iterator it = cats.begin(); it != cats.end(); ++it)
-        ReturnCachedTable(*it);
+    for (auto & cat : cats)
+        ReturnCachedTable(cat);
     cats.clear();
 }
 
 void MPEGStreamData::ReturnCachedCATTables(cat_map_t &cats) const
 {
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (cat_map_t::iterator it = cats.begin(); it != cats.end(); ++it)
         ReturnCachedCATTables(*it);
     cats.clear();
@@ -1511,13 +1485,14 @@ void MPEGStreamData::ReturnCachedCATTables(cat_map_t &cats) const
 
 void MPEGStreamData::ReturnCachedPMTTables(pmt_vec_t &pmts) const
 {
-    for (pmt_vec_t::iterator it = pmts.begin(); it != pmts.end(); ++it)
-        ReturnCachedTable(*it);
+    for (auto & pmt : pmts)
+        ReturnCachedTable(pmt);
     pmts.clear();
 }
 
 void MPEGStreamData::ReturnCachedPMTTables(pmt_map_t &pmts) const
 {
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (pmt_map_t::iterator it = pmts.begin(); it != pmts.end(); ++it)
         ReturnCachedPMTTables(*it);
     pmts.clear();
@@ -1525,118 +1500,116 @@ void MPEGStreamData::ReturnCachedPMTTables(pmt_map_t &pmts) const
 
 void MPEGStreamData::IncrementRefCnt(const PSIPTable *psip) const
 {
-    QMutexLocker locker(&_cache_lock);
-    _cached_ref_cnt[psip] = _cached_ref_cnt[psip] + 1;
+    QMutexLocker locker(&m_cacheLock);
+    m_cachedRefCnt[psip] = m_cachedRefCnt[psip] + 1;
 }
 
-bool MPEGStreamData::DeleteCachedTable(PSIPTable *psip) const
+bool MPEGStreamData::DeleteCachedTable(const PSIPTable *psip) const
 {
     if (!psip)
         return false;
 
     uint tid = psip->TableIDExtension();
 
-    QMutexLocker locker(&_cache_lock);
-    if (_cached_ref_cnt[psip] > 0)
+    QMutexLocker locker(&m_cacheLock);
+    if (m_cachedRefCnt[psip] > 0)
     {
-        _cached_slated_for_deletion[psip] = 1;
+        m_cachedSlatedForDeletion[psip] = 1;
         return false;
     }
     if (TableID::PAT == psip->TableID() &&
-             (_cached_pats[(tid << 8) | psip->Section()] == psip))
+             (m_cachedPats[(tid << 8) | psip->Section()] == psip))
     {
-        _cached_pats[(tid << 8) | psip->Section()] = nullptr;
+        m_cachedPats[(tid << 8) | psip->Section()] = nullptr;
         delete psip;
     }
     else if (TableID::CAT == psip->TableID() &&
-             (_cached_cats[(tid << 8) | psip->Section()] == psip))
+             (m_cachedCats[(tid << 8) | psip->Section()] == psip))
     {
-        _cached_cats[(tid << 8) | psip->Section()] = nullptr;
+        m_cachedCats[(tid << 8) | psip->Section()] = nullptr;
         delete psip;
     }
     else if ((TableID::PMT == psip->TableID()) &&
-             (_cached_pmts[(tid << 8) | psip->Section()] == psip))
+             (m_cachedPmts[(tid << 8) | psip->Section()] == psip))
     {
-        _cached_pmts[(tid << 8) | psip->Section()] = nullptr;
+        m_cachedPmts[(tid << 8) | psip->Section()] = nullptr;
         delete psip;
     }
     else
     {
-        _cached_slated_for_deletion[psip] = 2;
+        m_cachedSlatedForDeletion[psip] = 2;
         return false;
     }
     psip_refcnt_map_t::iterator it;
-    it = _cached_slated_for_deletion.find(psip);
-    if (it != _cached_slated_for_deletion.end())
-        _cached_slated_for_deletion.erase(it);
+    it = m_cachedSlatedForDeletion.find(psip);
+    if (it != m_cachedSlatedForDeletion.end())
+        m_cachedSlatedForDeletion.erase(it);
 
     return true;
 }
 
 void MPEGStreamData::CachePAT(const ProgramAssociationTable *_pat)
 {
-    ProgramAssociationTable *pat = new ProgramAssociationTable(*_pat);
+    auto *pat = new ProgramAssociationTable(*_pat);
     uint key = (_pat->TransportStreamID() << 8) | _pat->Section();
 
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
-    pat_cache_t::iterator it = _cached_pats.find(key);
-    if (it != _cached_pats.end())
+    pat_cache_t::iterator it = m_cachedPats.find(key);
+    if (it != m_cachedPats.end())
         DeleteCachedTable(*it);
 
-    _cached_pats[key] = pat;
+    m_cachedPats[key] = pat;
 }
 
 void MPEGStreamData::CacheCAT(const ConditionalAccessTable *_cat)
 {
-    ConditionalAccessTable *cat = new ConditionalAccessTable(*_cat);
+    auto *cat = new ConditionalAccessTable(*_cat);
     uint key = (_cat->TableIDExtension() << 8) | _cat->Section();
 
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
-    cat_cache_t::iterator it = _cached_cats.find(key);
-    if (it != _cached_cats.end())
+    cat_cache_t::iterator it = m_cachedCats.find(key);
+    if (it != m_cachedCats.end())
         DeleteCachedTable(*it);
 
-    _cached_cats[key] = cat;
+    m_cachedCats[key] = cat;
 }
 
 void MPEGStreamData::CachePMT(const ProgramMapTable *_pmt)
 {
-    ProgramMapTable *pmt = new ProgramMapTable(*_pmt);
+    auto *pmt = new ProgramMapTable(*_pmt);
     uint key = (_pmt->ProgramNumber() << 8) | _pmt->Section();
 
-    QMutexLocker locker(&_cache_lock);
+    QMutexLocker locker(&m_cacheLock);
 
-    pmt_cache_t::iterator it = _cached_pmts.find(key);
-    if (it != _cached_pmts.end())
+    pmt_cache_t::iterator it = m_cachedPmts.find(key);
+    if (it != m_cachedPmts.end())
         DeleteCachedTable(*it);
 
-    _cached_pmts[key] = pmt;
+    m_cachedPmts[key] = pmt;
 }
 
 void MPEGStreamData::AddMPEGListener(MPEGStreamListener *val)
 {
-    QMutexLocker locker(&_listener_lock);
+    QMutexLocker locker(&m_listenerLock);
 
-    mpeg_listener_vec_t::iterator it = _mpeg_listeners.begin();
-    for (; it != _mpeg_listeners.end(); ++it)
-        if (((void*)val) == ((void*)*it))
+    for (auto & listener : m_mpegListeners)
+        if (((void*)val) == ((void*)listener))
             return;
 
-    _mpeg_listeners.push_back(val);
+    m_mpegListeners.push_back(val);
 }
 
 void MPEGStreamData::RemoveMPEGListener(MPEGStreamListener *val)
 {
-    QMutexLocker locker(&_listener_lock);
+    QMutexLocker locker(&m_listenerLock);
 
-    mpeg_listener_vec_t::iterator it = _mpeg_listeners.begin();
-    for (; it != _mpeg_listeners.end(); ++it)
+    for (auto it = m_mpegListeners.begin(); it != m_mpegListeners.end(); ++it)
     {
         if (((void*)val) == ((void*)*it))
         {
-            _mpeg_listeners.erase(it);
+            m_mpegListeners.erase(it);
             return;
         }
     }
@@ -1644,26 +1617,24 @@ void MPEGStreamData::RemoveMPEGListener(MPEGStreamListener *val)
 
 void MPEGStreamData::AddWritingListener(TSPacketListener *val)
 {
-    QMutexLocker locker(&_listener_lock);
+    QMutexLocker locker(&m_listenerLock);
 
-    ts_listener_vec_t::iterator it = _ts_writing_listeners.begin();
-    for (; it != _ts_writing_listeners.end(); ++it)
-        if (((void*)val) == ((void*)*it))
+    for (auto & listener : m_tsWritingListeners)
+        if (((void*)val) == ((void*)listener))
             return;
 
-    _ts_writing_listeners.push_back(val);
+    m_tsWritingListeners.push_back(val);
 }
 
 void MPEGStreamData::RemoveWritingListener(TSPacketListener *val)
 {
-    QMutexLocker locker(&_listener_lock);
+    QMutexLocker locker(&m_listenerLock);
 
-    ts_listener_vec_t::iterator it = _ts_writing_listeners.begin();
-    for (; it != _ts_writing_listeners.end(); ++it)
+    for (auto it = m_tsWritingListeners.begin(); it != m_tsWritingListeners.end(); ++it)
     {
         if (((void*)val) == ((void*)*it))
         {
-            _ts_writing_listeners.erase(it);
+            m_tsWritingListeners.erase(it);
             return;
         }
     }
@@ -1671,26 +1642,24 @@ void MPEGStreamData::RemoveWritingListener(TSPacketListener *val)
 
 void MPEGStreamData::AddAVListener(TSPacketListenerAV *val)
 {
-    QMutexLocker locker(&_listener_lock);
+    QMutexLocker locker(&m_listenerLock);
 
-    ts_av_listener_vec_t::iterator it = _ts_av_listeners.begin();
-    for (; it != _ts_av_listeners.end(); ++it)
-        if (((void*)val) == ((void*)*it))
+    for (auto & listener : m_tsAvListeners)
+        if (((void*)val) == ((void*)listener))
             return;
 
-    _ts_av_listeners.push_back(val);
+    m_tsAvListeners.push_back(val);
 }
 
 void MPEGStreamData::RemoveAVListener(TSPacketListenerAV *val)
 {
-    QMutexLocker locker(&_listener_lock);
+    QMutexLocker locker(&m_listenerLock);
 
-    ts_av_listener_vec_t::iterator it = _ts_av_listeners.begin();
-    for (; it != _ts_av_listeners.end(); ++it)
+    for (auto it = m_tsAvListeners.begin(); it != m_tsAvListeners.end(); ++it)
     {
         if (((void*)val) == ((void*)*it))
         {
-            _ts_av_listeners.erase(it);
+            m_tsAvListeners.erase(it);
             return;
         }
     }
@@ -1698,26 +1667,24 @@ void MPEGStreamData::RemoveAVListener(TSPacketListenerAV *val)
 
 void MPEGStreamData::AddMPEGSPListener(MPEGSingleProgramStreamListener *val)
 {
-    QMutexLocker locker(&_listener_lock);
+    QMutexLocker locker(&m_listenerLock);
 
-    mpeg_sp_listener_vec_t::iterator it = _mpeg_sp_listeners.begin();
-    for (; it != _mpeg_sp_listeners.end(); ++it)
-        if (((void*)val) == ((void*)*it))
+    for (auto & listener : m_mpegSpListeners)
+        if (((void*)val) == ((void*)listener))
             return;
 
-    _mpeg_sp_listeners.push_back(val);
+    m_mpegSpListeners.push_back(val);
 }
 
 void MPEGStreamData::RemoveMPEGSPListener(MPEGSingleProgramStreamListener *val)
 {
-    QMutexLocker locker(&_listener_lock);
+    QMutexLocker locker(&m_listenerLock);
 
-    mpeg_sp_listener_vec_t::iterator it = _mpeg_sp_listeners.begin();
-    for (; it != _mpeg_sp_listeners.end(); ++it)
+    for (auto it = m_mpegSpListeners.begin(); it != m_mpegSpListeners.end(); ++it)
     {
         if (((void*)val) == ((void*)*it))
         {
-            _mpeg_sp_listeners.erase(it);
+            m_mpegSpListeners.erase(it);
             return;
         }
     }
@@ -1725,26 +1692,24 @@ void MPEGStreamData::RemoveMPEGSPListener(MPEGSingleProgramStreamListener *val)
 
 void MPEGStreamData::AddPSStreamListener(PSStreamListener *val)
 {
-    QMutexLocker locker(&_listener_lock);
+    QMutexLocker locker(&m_listenerLock);
 
-    ps_listener_vec_t::iterator it = _ps_listeners.begin();
-    for (; it != _ps_listeners.end(); ++it)
-        if (((void*)val) == ((void*)*it))
+    for (auto & listener : m_psListeners)
+        if (((void*)val) == ((void*)listener))
             return;
 
-    _ps_listeners.push_back(val);
+    m_psListeners.push_back(val);
 }
 
 void MPEGStreamData::RemovePSStreamListener(PSStreamListener *val)
 {
-    QMutexLocker locker(&_listener_lock);
+    QMutexLocker locker(&m_listenerLock);
 
-    ps_listener_vec_t::iterator it = _ps_listeners.begin();
-    for (; it != _ps_listeners.end(); ++it)
+    for (auto it = m_psListeners.begin(); it != m_psListeners.end(); ++it)
     {
         if (((void*)val) == ((void*)*it))
         {
-            _ps_listeners.erase(it);
+            m_psListeners.erase(it);
             return;
         }
     }
@@ -1752,7 +1717,7 @@ void MPEGStreamData::RemovePSStreamListener(PSStreamListener *val)
 
 void MPEGStreamData::AddEncryptionTestPID(uint pnum, uint pid, bool isvideo)
 {
-    QMutexLocker locker(&_encryption_lock);
+    QMutexLocker locker(&m_encryptionLock);
 
 #if 0
     LOG(VB_GENERAL, LOG_DEBUG, LOC + QString("AddEncryptionTestPID(%1, 0x%2)")
@@ -1761,16 +1726,16 @@ void MPEGStreamData::AddEncryptionTestPID(uint pnum, uint pid, bool isvideo)
 
     AddListeningPID(pid);
 
-    _encryption_pid_to_info[pid] = CryptInfo((isvideo) ? 10000 : 500, 8);
+    m_encryptionPidToInfo[pid] = CryptInfo((isvideo) ? 10000 : 500, 8);
 
-    _encryption_pid_to_pnums[pid].push_back(pnum);
-    _encryption_pnum_to_pids[pnum].push_back(pid);
-    _encryption_pnum_to_status[pnum] = kEncUnknown;
+    m_encryptionPidToPnums[pid].push_back(pnum);
+    m_encryptionPnumToPids[pnum].push_back(pid);
+    m_encryptionPnumToStatus[pnum] = kEncUnknown;
 }
 
 void MPEGStreamData::RemoveEncryptionTestPIDs(uint pnum)
 {
-    QMutexLocker locker(&_encryption_lock);
+    QMutexLocker locker(&m_encryptionLock);
 
 #if 0
     LOG(VB_RECORD, LOG_DEBUG, LOC +
@@ -1781,11 +1746,9 @@ void MPEGStreamData::RemoveEncryptionTestPIDs(uint pnum)
     QMap<uint, uint_vec_t>::iterator list;
     uint_vec_t::iterator it;
 
-    uint_vec_t pids = _encryption_pnum_to_pids[pnum];
-    for (size_t i = 0; i < pids.size(); i++)
+    uint_vec_t pids = m_encryptionPnumToPids[pnum];
+    for (uint pid : pids)
     {
-        uint pid = pids[i];
-
 #if 0
         LOG(VB_GENERAL, LOG_DEBUG, LOC +
             QString("Removing 0x%1 PID Enc monitoring").arg(pid,0,16));
@@ -1793,8 +1756,8 @@ void MPEGStreamData::RemoveEncryptionTestPIDs(uint pnum)
 
         RemoveListeningPID(pid);
 
-        list = _encryption_pid_to_pnums.find(pid);
-        if (list != _encryption_pid_to_pnums.end())
+        list = m_encryptionPidToPnums.find(pid);
+        if (list != m_encryptionPidToPnums.end())
         {
             it = find((*list).begin(), (*list).end(), pnum);
 
@@ -1803,28 +1766,28 @@ void MPEGStreamData::RemoveEncryptionTestPIDs(uint pnum)
 
             if ((*list).empty())
             {
-                _encryption_pid_to_pnums.remove(pid);
-                _encryption_pid_to_info.remove(pid);
+                m_encryptionPidToPnums.remove(pid);
+                m_encryptionPidToInfo.remove(pid);
             }
         }
     }
 
-    _encryption_pnum_to_pids.remove(pnum);
+    m_encryptionPnumToPids.remove(pnum);
 }
 
 bool MPEGStreamData::IsEncryptionTestPID(uint pid) const
 {
-    QMutexLocker locker(&_encryption_lock);
+    QMutexLocker locker(&m_encryptionLock);
 
     QMap<uint, CryptInfo>::const_iterator it =
-        _encryption_pid_to_info.find(pid);
+        m_encryptionPidToInfo.find(pid);
 
-    return it != _encryption_pid_to_info.end();
+    return it != m_encryptionPidToInfo.end();
 }
 
 void MPEGStreamData::TestDecryption(const ProgramMapTable *pmt)
 {
-    QMutexLocker locker(&_encryption_lock);
+    QMutexLocker locker(&m_encryptionLock);
 
 #if 0
     LOG(VB_RECORD, LOG_DEBUG, LOC +
@@ -1838,8 +1801,8 @@ void MPEGStreamData::TestDecryption(const ProgramMapTable *pmt)
         if (!encrypted && !pmt->IsStreamEncrypted(i))
             continue;
 
-        bool is_vid = pmt->IsVideo(i, _sistandard);
-        bool is_aud = pmt->IsAudio(i, _sistandard);
+        bool is_vid = pmt->IsVideo(i, m_siStandard);
+        bool is_aud = pmt->IsAudio(i, m_siStandard);
         if (is_vid || is_aud)
         {
             AddEncryptionTestPID(
@@ -1850,23 +1813,23 @@ void MPEGStreamData::TestDecryption(const ProgramMapTable *pmt)
 
 void MPEGStreamData::ResetDecryptionMonitoringState(void)
 {
-    QMutexLocker locker(&_encryption_lock);
+    QMutexLocker locker(&m_encryptionLock);
 
-    _encryption_pid_to_info.clear();
-    _encryption_pid_to_pnums.clear();
-    _encryption_pnum_to_pids.clear();
+    m_encryptionPidToInfo.clear();
+    m_encryptionPidToPnums.clear();
+    m_encryptionPnumToPids.clear();
 }
 
 bool MPEGStreamData::IsProgramDecrypted(uint pnum) const
 {
-    QMutexLocker locker(&_encryption_lock);
-    return _encryption_pnum_to_status[pnum] == kEncDecrypted;
+    QMutexLocker locker(&m_encryptionLock);
+    return m_encryptionPnumToStatus[pnum] == kEncDecrypted;
 }
 
 bool MPEGStreamData::IsProgramEncrypted(uint pnum) const
 {
-    QMutexLocker locker(&_encryption_lock);
-    return _encryption_pnum_to_status[pnum] == kEncEncrypted;
+    QMutexLocker locker(&m_encryptionLock);
+    return m_encryptionPnumToStatus[pnum] == kEncEncrypted;
 }
 
 static QString toString(CryptStatus status)
@@ -1883,56 +1846,56 @@ static QString toString(CryptStatus status)
  */
 void MPEGStreamData::ProcessEncryptedPacket(const TSPacket& tspacket)
 {
-    QMutexLocker locker(&_encryption_lock);
+    QMutexLocker locker(&m_encryptionLock);
 
     const uint pid = tspacket.PID();
-    CryptInfo &info = _encryption_pid_to_info[pid];
+    CryptInfo &info = m_encryptionPidToInfo[pid];
 
     CryptStatus status = kEncUnknown;
 
     if (tspacket.Scrambled())
     {
-        info.decrypted_packets = 0;
+        info.m_decryptedPackets = 0;
 
         // If a fair amount of encrypted packets is passed assume that
         // the stream is not decryptable
-        if (++info.encrypted_packets >= info.encrypted_min)
+        if (++info.m_encryptedPackets >= info.m_encryptedMin)
             status = kEncEncrypted;
     }
     else
     {
-        info.encrypted_packets = 0;
-        if (++info.decrypted_packets > info.decrypted_min)
+        info.m_encryptedPackets = 0;
+        if (++info.m_decryptedPackets > info.m_decryptedMin)
             status = kEncDecrypted;
     }
 
-    if (status == info.status)
+    if (status == info.m_status)
         return; // pid encryption status unchanged
 
-    info.status = status;
+    info.m_status = status;
 
     LOG(status != kEncDecrypted ? VB_GENERAL : VB_RECORD, LOG_DEBUG, LOC +
         QString("PID 0x%1 status: %2") .arg(pid,0,16).arg(toString(status)));
 
     uint_vec_t pnum_del_list;
-    const uint_vec_t &pnums = _encryption_pid_to_pnums[pid];
-    for (size_t i = 0; i < pnums.size(); i++)
+    const uint_vec_t &pnums = m_encryptionPidToPnums[pid];
+    for (uint pnum : pnums)
     {
-        status = _encryption_pnum_to_status[pnums[i]];
+        status = m_encryptionPnumToStatus[pnum];
 
-        const uint_vec_t &pids = _encryption_pnum_to_pids[pnums[i]];
+        const uint_vec_t &pids = m_encryptionPnumToPids[pnum];
         if (!pids.empty())
         {
-            uint enc_cnt[3] = { 0, 0, 0 };
-            for (size_t j = 0; j < pids.size(); j++)
+            std::array<uint,3> enc_cnt { 0, 0, 0 };
+            for (uint pid2 : pids)
             {
-                CryptStatus stat = _encryption_pid_to_info[pids[j]].status;
+                CryptStatus stat = m_encryptionPidToInfo[pid2].m_status;
                 enc_cnt[stat]++;
 
 #if 0
                 LOG(VB_GENERAL, LOG_DEBUG, LOC +
                     QString("\tpnum %1 PID 0x%2 status: %3")
-                        .arg(pnums[i]).arg(pids[j],0,16) .arg(toString(stat)));
+                        .arg(pnum).arg(pid2,0,16) .arg(toString(stat)));
 #endif
             }
             status = kEncUnknown;
@@ -1943,22 +1906,22 @@ void MPEGStreamData::ProcessEncryptedPacket(const TSPacket& tspacket)
                 status = kEncDecrypted;
         }
 
-        if (status == _encryption_pnum_to_status[pnums[i]])
+        if (status == m_encryptionPnumToStatus[pnum])
             continue; // program encryption status unchanged
 
         LOG(VB_RECORD, LOG_DEBUG, LOC + QString("Program %1 status: %2")
-                .arg(pnums[i]).arg(toString(status)));
+                .arg(pnum).arg(toString(status)));
 
-        _encryption_pnum_to_status[pnums[i]] = status;
+        m_encryptionPnumToStatus[pnum] = status;
 
         bool encrypted = kEncUnknown == status || kEncEncrypted == status;
-        _listener_lock.lock();
-        for (size_t j = 0; j < _mpeg_listeners.size(); j++)
-            _mpeg_listeners[j]->HandleEncryptionStatus(pnums[i], encrypted);
-        _listener_lock.unlock();
+        m_listenerLock.lock();
+        for (auto & listener : m_mpegListeners)
+            listener->HandleEncryptionStatus(pnum, encrypted);
+        m_listenerLock.unlock();
 
         if (kEncDecrypted == status)
-            pnum_del_list.push_back(pnums[i]);
+            pnum_del_list.push_back(pnum);
     }
 
     for (size_t i = 0; i < pnum_del_list.size(); i++)

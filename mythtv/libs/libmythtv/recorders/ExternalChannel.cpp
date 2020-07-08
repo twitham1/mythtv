@@ -8,7 +8,7 @@
 #include "ExternalChannel.h"
 #include "tv_rec.h"
 
-#define LOC  QString("ExternChan[%1](%2): ").arg(m_inputid).arg(m_loc)
+#define LOC  QString("ExternChan[%1](%2): ").arg(m_inputId).arg(m_loc)
 
 ExternalChannel::~ExternalChannel(void)
 {
@@ -25,7 +25,7 @@ bool ExternalChannel::Open(void)
 
     if (IsOpen())
     {
-        if (m_stream_handler->IsAppOpen())
+        if (m_streamHandler->IsAppOpen())
             return true;
 
         LOG(VB_GENERAL, LOG_ERR, LOC +
@@ -37,12 +37,12 @@ bool ExternalChannel::Open(void)
     if (!InitializeInput())
         return false;
 
-    if (!m_inputid)
+    if (!m_inputId)
         return false;
 
-    m_stream_handler = ExternalStreamHandler::Get(m_device, GetInputID(),
+    m_streamHandler = ExternalStreamHandler::Get(m_device, GetInputID(),
                                                   GetMajorID());
-    if (!m_stream_handler || m_stream_handler->HasError())
+    if (!m_streamHandler || m_streamHandler->HasError())
     {
         LOG(VB_GENERAL, LOG_ERR, LOC + "Open failed");
         return false;
@@ -59,15 +59,15 @@ void ExternalChannel::Close()
 
     if (ExternalChannel::IsOpen())
     {
-        ExternalStreamHandler::Return(m_stream_handler, GetInputID());
-        m_stream_handler = nullptr;
+        ExternalStreamHandler::Return(m_streamHandler, GetInputID());
+        m_streamHandler = nullptr;
     }
 }
 
 QString ExternalChannel::UpdateDescription(void)
 {
-    if (m_stream_handler)
-        m_loc = m_stream_handler->UpdateDescription();
+    if (m_streamHandler)
+        m_loc = m_streamHandler->UpdateDescription();
     else
         m_loc = GetDevice();
 
@@ -76,8 +76,8 @@ QString ExternalChannel::UpdateDescription(void)
 
 QString ExternalChannel::GetDescription(void)
 {
-    if (m_stream_handler)
-        m_loc = m_stream_handler->GetDescription();
+    if (m_streamHandler)
+        m_loc = m_streamHandler->GetDescription();
     else
         m_loc = GetDevice();
 
@@ -94,22 +94,42 @@ bool ExternalChannel::Tune(const QString &channum)
         return false;
     }
 
-    if (!m_stream_handler->HasTuner())
+    if (!m_streamHandler->HasTuner())
         return true;
 
     QString result;
-
-    LOG(VB_CHANNEL, LOG_INFO, LOC + "Tuning to " + channum);
-
-    if (!m_stream_handler->ProcessCommand("TuneChannel:" + channum, result,
-                                          20000))
+    if (m_tuneTimeout < 0)
     {
-        LOG(VB_CHANNEL, LOG_ERR, LOC + QString
-            ("Failed to Tune %1: %2").arg(channum).arg(result));
-        return false;
-    }
+        // When mythbackend first starts up, just retrive the
+        // tuneTimeout for subsequent tune requests.
 
-    UpdateDescription();
+        if (!m_streamHandler->ProcessCommand("LockTimeout?", result))
+        {
+            LOG(VB_CHANNEL, LOG_ERR, LOC + QString
+                ("Failed to retrieve LockTimeout: %1").arg(result));
+            m_tuneTimeout = 60000;
+        }
+        else
+            m_tuneTimeout = result.split(":")[1].toInt();
+
+        LOG(VB_CHANNEL, LOG_INFO, LOC + QString("Using Tune timeout of %1ms")
+            .arg(m_tuneTimeout));
+    }
+    else
+    {
+        LOG(VB_CHANNEL, LOG_INFO, LOC + "Tuning to " + channum);
+
+        if (!m_streamHandler->ProcessCommand("TuneChannel:" + channum,
+                                             result, m_tuneTimeout))
+        {
+            LOG(VB_CHANNEL, LOG_ERR, LOC + QString
+                ("Failed to Tune %1: %2").arg(channum).arg(result));
+            return false;
+        }
+
+        UpdateDescription();
+        m_backgroundTuning = result.startsWith("OK:InProgress");
+    }
 
     return true;
 }
@@ -123,4 +143,41 @@ bool ExternalChannel::EnterPowerSavingMode(void)
 {
     Close();
     return true;
+}
+
+uint ExternalChannel::GetTuneStatus(void)
+{
+
+    if (!m_backgroundTuning)
+        return 3;
+
+    LOG(VB_CHANNEL, LOG_DEBUG, LOC + QString("GetScriptStatus() %1")
+        .arg(m_systemStatus));
+
+    QString result;
+    int     ret = 0;
+
+    if (!m_streamHandler->ProcessCommand("TuneStatus?", result))
+    {
+        LOG(VB_CHANNEL, LOG_ERR, LOC + QString
+            ("Failed to Tune: %1").arg(result));
+        ret = 2;
+        m_backgroundTuning = false;
+    }
+    else
+    {
+        if (result.startsWith("OK:InProgress"))
+            ret = 1;
+        else
+        {
+            ret = 3;
+            m_backgroundTuning = false;
+            UpdateDescription();
+        }
+    }
+
+    LOG(VB_CHANNEL, LOG_DEBUG, LOC + QString("GetScriptStatus() %1 -> %2")
+        .arg(m_systemStatus). arg(ret));
+
+    return ret;
 }

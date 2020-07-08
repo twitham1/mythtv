@@ -45,10 +45,9 @@ ZMClient *ZMClient::get(void)
 bool ZMClient::setupZMClient(void)
 {
     QString zmserver_host;
-    int zmserver_port;
 
     zmserver_host = gCoreContext->GetSetting("ZoneMinderServerIP", "");
-    zmserver_port = gCoreContext->GetNumSetting("ZoneMinderServerPort", -1);
+    int zmserver_port = gCoreContext->GetNumSetting("ZoneMinderServerPort", -1);
 
     // don't try to connect if we don't have a valid host or port
     if (zmserver_host.isEmpty() || zmserver_port == -1)
@@ -290,7 +289,7 @@ void ZMClient::updateMonitorStatus(void)
         return;
     }
 
-    bool bOK;
+    bool bOK = false;
     int monitorCount = strList[1].toInt(&bOK);
     if (!bOK)
     {
@@ -361,7 +360,7 @@ bool ZMClient::updateAlarmStates(void)
         return false;
     }
 
-    bool bOK;
+    bool bOK = false;
     int monitorCount = strList[1].toInt(&bOK);
     if (!bOK)
     {
@@ -376,7 +375,7 @@ bool ZMClient::updateAlarmStates(void)
     for (int x = 0; x < monitorCount; x++)
     {
         int monID = strList[x * 2 + 2].toInt();
-        State state = (State)strList[x * 2 + 3].toInt();
+        auto state = (State)strList[x * 2 + 3].toInt();
 
         if (m_monitorMap.contains(monID))
         {
@@ -420,7 +419,7 @@ void ZMClient::getEventList(const QString &monitorName, bool oldestFirst,
         return;
     }
 
-    bool bOK;
+    bool bOK = false;
     int eventCount = strList[1].toInt(&bOK);
     if (!bOK)
     {
@@ -472,7 +471,7 @@ void ZMClient::getEventDates(const QString &monitorName, bool oldestFirst,
         return;
     }
 
-    bool bOK;
+    bool bOK = false;
     int dateCount = strList[1].toInt(&bOK);
     if (!bOK)
     {
@@ -516,7 +515,7 @@ void ZMClient::getFrameList(int eventID, vector<Frame*> *frameList)
         return;
     }
 
-    bool bOK;
+    bool bOK = false;
     int frameCount = strList[1].toInt(&bOK);
     if (!bOK)
     {
@@ -537,7 +536,7 @@ void ZMClient::getFrameList(int eventID, vector<Frame*> *frameList)
     it++; it++;
     for (int x = 0; x < frameCount; x++)
     {
-        Frame *item = new Frame;
+        auto *item = new Frame;
         item->type = *it++;
         item->delta = (*it++).toDouble();
         frameList->push_back(item);
@@ -587,7 +586,6 @@ bool ZMClient::readData(unsigned char *data, int dataSize)
     int errmsgtime = 0;
     MythTimer timer;
     timer.start();
-    int elapsed;
 
     while (dataSize > 0)
     {
@@ -617,7 +615,7 @@ bool ZMClient::readData(unsigned char *data, int dataSize)
         }
         else
         {
-            elapsed = timer.elapsed();
+            int elapsed = timer.elapsed();
             if (elapsed  > 10000)
             {
                 if ((elapsed - errmsgtime) > 10000)
@@ -669,7 +667,7 @@ void ZMClient::getEventFrame(Event *event, int frameNo, MythImage **image)
     int imageSize = strList[1].toInt();
 
     // grab the image data
-    unsigned char *data = new unsigned char[imageSize];
+    auto *data = new unsigned char[imageSize];
     if (!readData(data, imageSize))
     {
         LOG(VB_GENERAL, LOG_ERR,
@@ -717,7 +715,7 @@ void ZMClient::getAnalyseFrame(Event *event, int frameNo, QImage &image)
     int imageSize = strList[1].toInt();
 
     // grab the image data
-    unsigned char *data = new unsigned char[imageSize];
+    auto *data = new unsigned char[imageSize];
     if (!readData(data, imageSize))
     {
         LOG(VB_GENERAL, LOG_ERR,
@@ -813,7 +811,7 @@ void ZMClient::getCameraList(QStringList &cameraList)
         return;
     }
 
-    bool bOK;
+    bool bOK = false;
     int cameraCount = strList[1].toInt(&bOK);
     if (!bOK)
     {
@@ -886,7 +884,7 @@ void ZMClient::doGetMonitorList(void)
         return;
     }
 
-    bool bOK;
+    bool bOK = false;
     int monitorCount = strList[1].toInt(&bOK);
     if (!bOK)
     {
@@ -910,7 +908,7 @@ void ZMClient::doGetMonitorList(void)
 
     for (int x = 0; x < monitorCount; x++)
     {
-        Monitor *item = new Monitor;
+        auto *item = new Monitor;
         item->id = strList[x * 5 + 2].toInt();
         item->name = strList[x * 5 + 3];
         item->width = strList[x * 5 + 4].toInt();
@@ -967,8 +965,7 @@ void ZMClient::customEvent (QEvent* event)
 {
     if (event->type() == MythEvent::MythEventMessage)
     {
-        MythEvent *me = static_cast<MythEvent*>(event);
-
+        auto *me = dynamic_cast<MythEvent*>(event);
         if (!me)
             return;
 
@@ -987,14 +984,14 @@ void ZMClient::customEvent (QEvent* event)
     QObject::customEvent(event);
 }
 
-void ZMClient::showMiniPlayer(int monitorID)
+void ZMClient::showMiniPlayer(int monitorID) const
 {
     if (!isMiniPlayerEnabled())
         return;
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");
 
-    ZMMiniPlayer *miniPlayer = new ZMMiniPlayer(popupStack);
+    auto *miniPlayer = new ZMMiniPlayer(popupStack);
 
     miniPlayer->setAlarmMonitor(monitorID);
 

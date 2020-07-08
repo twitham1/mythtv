@@ -1,6 +1,8 @@
 #ifndef MYTHBURN_H_
 #define MYTHBURN_H_
 
+#include <utility>
+
 // mythtv
 #include <mythscreentype.h>
 
@@ -23,7 +25,7 @@ class ProfileDialog : public MythScreenType
                   QList<EncoderProfile *> profileList)
          : MythScreenType(parent, "functionpopup"),
            m_archiveItem(archiveItem),
-           m_profileList(profileList) {}
+           m_profileList(std::move(profileList)) {}
     bool Create() override; // MythScreenType
 
   signals:
@@ -42,7 +44,7 @@ class ProfileDialog : public MythScreenType
     MythUIText             *m_oldSizeText     {nullptr};
     MythUIText             *m_newSizeText     {nullptr};
 
-    MythUIButtonList       *m_profile_list    {nullptr};
+    MythUIButtonList       *m_profileBtnList  {nullptr};
     MythUICheckBox         *m_enabledCheck    {nullptr};
     MythUIButton           *m_okButton        {nullptr};
 };
@@ -57,10 +59,10 @@ class MythBurn : public MythScreenType
              MythScreenType *destinationScreen, MythScreenType *themeScreen,
              ArchiveDestination archiveDestination, const QString& name);
 
-    ~MythBurn(void);
+    ~MythBurn(void) override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
     void createConfigFile(const QString &filename);
 
@@ -89,8 +91,8 @@ class MythBurn : public MythScreenType
     void loadConfiguration(void);
     void saveConfiguration(void);
     EncoderProfile *getProfileFromName(const QString &profileName);
-    QString loadFile(const QString &filename);
-    bool isArchiveItemValid(const QString &type, const QString &filename);
+    static QString loadFile(const QString &filename);
+    static bool isArchiveItemValid(const QString &type, const QString &filename);
     void loadEncoderProfiles(void);
     EncoderProfile *getDefaultProfile(ArchiveItem *item);
     void setProfile(EncoderProfile *profile, ArchiveItem *item);
@@ -137,13 +139,13 @@ class BurnMenu : public QObject
 
   public:
     BurnMenu(void);
-    ~BurnMenu(void) = default;
+    ~BurnMenu(void) override = default;
 
     void start(void);
 
   private:
     void customEvent(QEvent *event) override; // QObject
-    void doBurn(int mode);
+    static void doBurn(int mode);
 };
 
 #endif

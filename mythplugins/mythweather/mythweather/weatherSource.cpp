@@ -316,9 +316,11 @@ ScriptInfo *WeatherSource::ProbeScript(const QFileInfo &fi)
     return new ScriptInfo(info);
 }
 
-/*
+/**
  * Watch out, we store the parameter as a member variable, don't go deleting it,
  * that wouldn't be good.
+ *
+ * \param info is a required variable.
  */
 WeatherSource::WeatherSource(ScriptInfo *info)
     : m_ready(info != nullptr),
@@ -330,9 +332,11 @@ WeatherSource::WeatherSource(ScriptInfo *info)
     if (!dir.exists("MythWeather"))
         dir.mkdir("MythWeather");
     dir.cd("MythWeather");
-    if (!dir.exists(info->name))
-        dir.mkdir(info->name);
-    dir.cd(info->name);
+    if (info != nullptr) {
+        if (!dir.exists(info->name))
+            dir.mkdir(info->name);
+        dir.cd(info->name);
+    }
     m_dir = dir.absolutePath();
 
     connect( m_updateTimer, SIGNAL(timeout()), this, SLOT(updateTimeout()));
@@ -559,13 +563,21 @@ void WeatherSource::processData()
 {
     QTextCodec *codec = QTextCodec::codecForName("UTF-8");
     QString unicode_buffer = codec->toUnicode(m_buffer);
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList data = unicode_buffer.split('\n', QString::SkipEmptyParts);
+#else
+    QStringList data = unicode_buffer.split('\n', Qt::SkipEmptyParts);
+#endif
 
     m_data.clear();
 
     for (int i = 0; i < data.size(); ++i)
     {
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
         QStringList temp = data[i].split("::", QString::SkipEmptyParts);
+#else
+        QStringList temp = data[i].split("::", Qt::SkipEmptyParts);
+#endif
         if (temp.size() > 2)
             LOG(VB_GENERAL, LOG_ERR, "Error parsing script file, ignoring");
         if (temp.size() < 2)

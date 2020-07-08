@@ -47,15 +47,23 @@ void MythRect::CalculateArea(const MythRect & parentArea)
     if (m_percentY > 0.0F)
         Y = (int) (m_percentY * (float)m_parentArea.height()) + m_offsetY;
     if (m_percentWidth > 0.0F)
+    {
         w = (int) (m_percentWidth * (float)(m_parentArea.width() - X))
             + m_offsetWidth;
+    }
     else if (m_offsetWidth != 0)
+    {
         w = m_parentArea.width() - X + m_offsetWidth;
+    }
     if (m_percentHeight > 0.0F)
+    {
         h = (int) (m_percentHeight * (float)(m_parentArea.height() - Y))
             + m_offsetHeight;
+    }
     else if (m_offsetHeight != 0)
+    {
         h = m_parentArea.height() - Y + m_offsetHeight;
+    }
 
     QRect::setRect(X,Y,w,h);
 
@@ -172,8 +180,8 @@ bool MythRect::parsePosition(float & percent, int & offset, int & absolute,
     if (value.isEmpty())
         return true;
 
-    int  number;
-    char ch;
+    int  number = 0;
+    char ch = ' ';
     QString tmp(value); // QTextStream won't accept a const!
     QTextStream is(&tmp);
 
@@ -201,7 +209,7 @@ bool MythRect::parsePosition(float & percent, int & offset, int & absolute,
 
 void MythRect::setX(const QString &sX)
 {
-    int absoluteX;
+    int absoluteX = 0;
 
     if (parsePosition(m_percentX, m_offsetX, absoluteX, sX, false))
         QRect::setX(absoluteX);
@@ -211,7 +219,7 @@ void MythRect::setX(const QString &sX)
 
 void MythRect::setY(const QString &sY)
 {
-    int absoluteY;
+    int absoluteY = 0;
 
     if (parsePosition(m_percentY, m_offsetY, absoluteY, sY, false))
         QRect::setY(absoluteY);
@@ -221,7 +229,7 @@ void MythRect::setY(const QString &sY)
 
 void MythRect::setWidth(const QString &sWidth)
 {
-    int absoluteWidth;
+    int absoluteWidth = 0;
 
     if (parsePosition(m_percentWidth, m_offsetWidth, absoluteWidth,
                       sWidth, true))
@@ -232,7 +240,7 @@ void MythRect::setWidth(const QString &sWidth)
 
 void MythRect::setHeight(const QString &sHeight)
 {
-    int absoluteHeight;
+    int absoluteHeight = 0;
 
     if (parsePosition(m_percentHeight, m_offsetHeight, absoluteHeight,
                       sHeight, true))
@@ -257,7 +265,7 @@ void MythRect::moveTopLeft(const MythPoint &point)
 
 void MythRect::moveLeft(const QString &sX)
 {
-    int absoluteX;
+    int absoluteX = 0;
 
     if (parsePosition(m_percentX, m_offsetX, absoluteX, sX, false))
         QRect::moveLeft(absoluteX);
@@ -267,7 +275,7 @@ void MythRect::moveLeft(const QString &sX)
 
 void MythRect::moveTop(const QString &sY)
 {
-    int absoluteY;
+    int absoluteY = 0;
 
     if (parsePosition(m_percentY, m_offsetY, absoluteY, sY, false))
         QRect::moveTop(absoluteY);
@@ -425,8 +433,8 @@ bool MythPoint::parsePosition(float & percent, int & offset, int & absolute,
     if (value.isEmpty())
         return true;
 
-    int  number;
-    char ch;
+    int  number = 0;
+    char ch = ' ';
     QString tmp(value); // QTextStream won't accept a const!
     QTextStream is(&tmp);
 
@@ -449,7 +457,7 @@ bool MythPoint::parsePosition(float & percent, int & offset, int & absolute,
 
 void MythPoint::setX(const QString &sX)
 {
-    int absoluteX;
+    int absoluteX = 0;
 
     if (parsePosition(m_percentX, m_offsetX, absoluteX, sX))
         QPoint::setX(absoluteX);
@@ -459,7 +467,7 @@ void MythPoint::setX(const QString &sX)
 
 void MythPoint::setY(const QString &sY)
 {
-    int absoluteY;
+    int absoluteY = 0;
 
     if (parsePosition(m_percentY, m_offsetY, absoluteY, sY))
         QPoint::setY(absoluteY);

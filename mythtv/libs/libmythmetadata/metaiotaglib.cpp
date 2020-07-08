@@ -106,16 +106,18 @@ int MetaIOTagLib::getTrackLength(const QString &filename)
 {
     int milliseconds = 0;
     QByteArray fname = filename.toLocal8Bit();
-    TagLib::FileRef *file = new TagLib::FileRef(fname.constData());
+    auto *file = new TagLib::FileRef(fname.constData());
 
     if (file && file->audioProperties())
         milliseconds = file->audioProperties()->length() * 1000;
 
     // If we didn't get a valid length, add the metadata but show warning.
     if (milliseconds <= 1000)
+    {
         LOG(VB_GENERAL, LOG_ERR,
             QString("MetaIOTagLib: Failed to read length "
                     "from '%1'. It may be corrupt.").arg(filename));
+    }
 
     delete file;
 

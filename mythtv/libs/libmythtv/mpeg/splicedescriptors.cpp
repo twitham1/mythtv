@@ -18,8 +18,8 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#ifndef _SPLICE_DESCRIPTOR_H_
-#define _SPLICE_DESCRIPTOR_H_
+#ifndef SPLICE_DESCRIPTOR_H
+#define SPLICE_DESCRIPTOR_H
 
 #include "splicedescriptors.h"
 #include "mythmiscutil.h" // for xml_indent
@@ -88,11 +88,10 @@ desc_list_t SpliceDescriptor::ParseOnlyInclude(
 const unsigned char *SpliceDescriptor::Find(
     const desc_list_t &parsed, uint desc_tag)
 {
-    desc_list_t::const_iterator it = parsed.begin();
-    for (; it != parsed.end(); ++it)
+    for (const auto *item : parsed)
     {
-        if ((*it)[0] == desc_tag)
-            return *it;
+        if (item[0] == desc_tag)
+            return item;
     }
     return nullptr;
 }
@@ -100,11 +99,10 @@ const unsigned char *SpliceDescriptor::Find(
 desc_list_t SpliceDescriptor::FindAll(const desc_list_t &parsed, uint desc_tag)
 {
     desc_list_t tmp;
-    desc_list_t::const_iterator it = parsed.begin();
-    for (; it != parsed.end(); ++it)
+    for (const auto *item : parsed)
     {
-        if ((*it)[0] == desc_tag)
-            tmp.push_back(*it);
+        if (item[0] == desc_tag)
+            tmp.push_back(item);
     }
     return tmp;
 }
@@ -132,19 +130,19 @@ QString SpliceDescriptor::toString(void) const
         return "Invalid Splice Descriptor";
     if (SpliceDescriptorID::avail == DescriptorTag())
     {
-        auto desc = AvailDescriptor(_data);
+        auto desc = AvailDescriptor(m_data);
         if (desc.IsValid())
             str = desc.toString();
     }
     else if (SpliceDescriptorID::dtmf == DescriptorTag())
     {
-        auto desc = DTMFDescriptor(_data);
+        auto desc = DTMFDescriptor(m_data);
         if (desc.IsValid())
             str = desc.toString();
     }
     else if (SpliceDescriptorID::segmentation == DescriptorTag())
     {
-        auto desc = SegmentationDescriptor(_data);
+        auto desc = SegmentationDescriptor(m_data);
         if (desc.IsValid())
             str = desc.toString();
     }
@@ -155,7 +153,7 @@ QString SpliceDescriptor::toString(void) const
                    .arg(int(DescriptorTag()), 0, 16));
         str.append(QString(" length(%1)").arg(int(DescriptorLength())));
         for (uint i=0; i<DescriptorLength(); i++)
-            str.append(QString(" 0x%1").arg(int(_data[i+2]), 0, 16));
+            str.append(QString(" 0x%1").arg(int(m_data[i+2]), 0, 16));
     }
 
     return str.isEmpty() ? "Invalid Splice Descriptor" : str;
@@ -177,7 +175,7 @@ QString SpliceDescriptor::toStringXML(uint level) const
 
     str += indent_1 + "<DATA>";
     for (uint i = 0; i < DescriptorLength(); i++)
-        str += QString("0x%1 ").arg(_data[i+2],2,16,QChar('0'));
+        str += QString("0x%1 ").arg(m_data[i+2],2,16,QChar('0'));
     str = str.trimmed();
     str += "</DATA>\n";
 
@@ -205,7 +203,7 @@ bool DTMFDescriptor::IsParsible(const unsigned char *data, uint safe_bytes)
 
 bool SegmentationDescriptor::Parse(void)
 {
-    _ptrs[0] = _data + (IsProgramSegmentation() ? 12 : 13 + ComponentCount() * 6);
+    _ptrs[0] = m_data + (IsProgramSegmentation() ? 12 : 13 + ComponentCount() * 6);
     _ptrs[1] = _ptrs[0] + (HasSegmentationDuration() ? 5 : 0);
     _ptrs[2] = _ptrs[1] + 2 + SegmentationUPIDLength();
     return true;
@@ -217,4 +215,4 @@ QString SegmentationDescriptor::toString() const
     return QString("Segmentation: id(%1)").arg(SegmentationEventIdString());
 }
 
-#endif // _SPLICE_DESCRIPTOR_H_
+#endif // SPLICE_DESCRIPTOR_H

@@ -23,7 +23,7 @@ class MPUBLIC ZMClient : public QObject
     static ZMClient *m_zmclient;
 
   public:
-    ~ZMClient();
+    ~ZMClient() override;
 
     static ZMClient *get(void);
     static bool setupZMClient (void);
@@ -32,7 +32,7 @@ class MPUBLIC ZMClient : public QObject
 
     // Used to actually connect to an ZM server
     bool connectToHost(const QString &hostname, unsigned int port);
-    bool connected(void) { return m_bConnected; }
+    bool connected(void) const { return m_bConnected; }
 
     bool checkProtoVersion(void);
 
@@ -58,14 +58,14 @@ class MPUBLIC ZMClient : public QObject
     void getCameraList(QStringList &cameraList);
     void getEventDates(const QString &monitorName, bool oldestFirst, 
                        QStringList &dateList);
-    void setMonitorFunction(const int monitorID, const QString &function, const bool enabled);
+    void setMonitorFunction(int monitorID, const QString &function, bool enabled);
     bool updateAlarmStates(void);
 
-    bool isMiniPlayerEnabled(void) { return m_isMiniPlayerEnabled; }
+    bool isMiniPlayerEnabled(void) const { return m_isMiniPlayerEnabled; }
     void setIsMiniPlayerEnabled(bool enabled) { m_isMiniPlayerEnabled = enabled; }
 
     void saveNotificationMonitors(void);
-    void showMiniPlayer(int monitorID);
+    void showMiniPlayer(int monitorID) const;
 
   private slots:
     void restartConnection(void);  // Try to re-establish the connection to 

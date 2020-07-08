@@ -3,6 +3,8 @@
 // C++ includes
 #include <algorithm>
 #include <climits>
+#include <utility>
+
 using namespace std;
 
 // Qt includes
@@ -17,7 +19,7 @@ using namespace std;
 
 #define LOC      QString("ProgramData: ")
 
-static const char *roles[] =
+static const std::array<const std::string,DBPerson::kGuest+1> roles
 {
     "",
     "actor",     "director",    "producer", "executive_producer",
@@ -38,9 +40,8 @@ static QVariant denullify(const QDateTime &dt)
 static void add_genres(MSqlQuery &query, const QStringList &genres,
                 uint chanid, const QDateTime &starttime)
 {
-    QString relevance = QStringLiteral("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-    QStringList::const_iterator it = genres.constBegin();
-    for (; (it != genres.end()) &&
+    QString relevance = QString("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    for (auto it = genres.constBegin(); (it != genres.constEnd()) &&
              ((it - genres.constBegin()) < relevance.size()); ++it)
     {
         query.prepare(
@@ -63,20 +64,31 @@ DBPerson::DBPerson(const DBPerson &other) :
     m_name.squeeze();
 }
 
-DBPerson::DBPerson(Role role, const QString &name) :
-    m_role(role), m_name(name)
+DBPerson& DBPerson::operator=(const DBPerson &rhs)
+{
+    if (this == &rhs)
+        return *this;
+    m_role = rhs.m_role;
+    m_name = rhs.m_name;
+    m_name.squeeze();
+    return *this;
+}
+
+DBPerson::DBPerson(Role role, QString name) :
+    m_role(role), m_name(std::move(name))
 {
     m_name.squeeze();
 }
 
-DBPerson::DBPerson(const QString &role, const QString &name) :
-    m_role(kUnknown), m_name(name)
+DBPerson::DBPerson(const QString &role, QString name) :
+    m_role(kUnknown), m_name(std::move(name))
 {
     if (!role.isEmpty())
     {
-        for (size_t i = 0; i < sizeof(roles) / sizeof(char *); i++)
+        std::string rolestr = role.toStdString();
+        for (size_t i = 0; i < roles.size(); i++)
         {
-            if (role == QString(roles[i]))
+            if (rolestr == roles[i])
                 m_role = (Role) i;
         }
     }
@@ -87,7 +99,7 @@ QString DBPerson::GetRole(void) const
 {
     if ((m_role < kActor) || (m_role > kGuest))
         return "guest";
-    return roles[m_role];
+    return QString::fromStdString(roles[m_role]);
 }
 
 uint DBPerson::InsertDB(MSqlQuery &query, uint chanid,
@@ -466,12 +478,19 @@ static int score_match(const QString &a, const QString &b)
     if (A == B)
         return 1000;
 
-    QStringList al, bl;
-    al = A.split(" ", QString::SkipEmptyParts);
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
+    QStringList al = A.split(" ", QString::SkipEmptyParts);
+#else
+    QStringList al = A.split(" ", Qt::SkipEmptyParts);
+#endif
     if (al.isEmpty())
         return 0;
 
-    bl = B.split(" ", QString::SkipEmptyParts);
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
+    QStringList bl = B.split(" ", QString::SkipEmptyParts);
+#else
+    QStringList bl = B.split(" ", Qt::SkipEmptyParts);
+#endif
     if (bl.isEmpty())
         return 0;
 
@@ -501,7 +520,7 @@ int DBEvent::GetMatch(const vector<DBEvent> &programs, int &bestmatch) const
 
         /* determine overlap of both programs
          * we don't know which one starts first */
-        int overlap;
+        int overlap = 0;
         if (m_starttime < programs[i].m_starttime)
             overlap = programs[i].m_starttime.secsTo(m_endtime);
         else if (m_starttime > programs[i].m_starttime)
@@ -608,6 +627,54 @@ uint DBEvent::UpdateDB(
     return UpdateDB(q, chanid, p[match]);
 }
 
+// Update starttime in table record for single recordings
+// when the starttime of a program is changed.
+//
+// Return the number of rows affected:
+// 0    if program is not found in table record
+// 1    if program is found and updated
+//
+static int change_record(MSqlQuery &query, uint chanid,
+                          const QDateTime &old_starttime,
+                          const QDateTime &new_starttime)
+{
+    query.prepare("UPDATE record "
+                   "SET starttime = :NEWSTARTTIME, "
+                   "    startdate = :NEWSTARTDATE "
+                   "WHERE chanid  = :CHANID "
+                   "AND type      = :TYPE "
+                   "AND search    = :SEARCH "
+                   "AND starttime = :OLDSTARTTIME "
+                   "AND startdate = :OLDSTARTDATE ");
+    query.bindValue(":CHANID",       chanid);
+    query.bindValue(":TYPE",         kSingleRecord);
+    query.bindValue(":SEARCH",       kNoSearch);
+    query.bindValue(":OLDSTARTTIME", old_starttime.time());
+    query.bindValue(":OLDSTARTDATE", old_starttime.date());
+    query.bindValue(":NEWSTARTTIME", new_starttime.time());
+    query.bindValue(":NEWSTARTDATE", new_starttime.date());
+
+    int rows = 0;
+    if (!query.exec() || !query.isActive())
+    {
+        MythDB::DBError("Updating record", query);
+    }
+    else
+    {
+        rows = query.numRowsAffected();
+    }
+    if (rows > 0)
+    {
+        LOG(VB_EIT, LOG_DEBUG,
+            QString("EIT: Updated record: chanid:%1 old:%3 new:%4 rows:%5")
+            .arg(chanid)
+            .arg(old_starttime.toString(Qt::ISODate))
+            .arg(new_starttime.toString(Qt::ISODate))
+            .arg(rows));
+    }
+    return rows;
+}
+
 // Update matched item with current data.
 //
 uint DBEvent::UpdateDB(
@@ -622,6 +689,22 @@ uint DBEvent::UpdateDB(
     QString  lseriesId        = m_seriesId;
     QString  linetref         = m_inetref;
     QDate    loriginalairdate = m_originalairdate;
+
+    // Update starttime also in database table record so that
+    // tables program and record remain consistent.
+    if (m_starttime != match.m_starttime)
+    {
+        QDateTime const &old_starttime = match.m_starttime;
+        QDateTime const &new_starttime = m_starttime;
+        change_record(query, chanid, old_starttime, new_starttime);
+
+        LOG(VB_EIT, LOG_DEBUG,
+            QString("EIT: (U) change starttime from %1 to %2 for chanid:%3 program '%4' ")
+                    .arg(old_starttime.toString(Qt::ISODate))
+                    .arg(new_starttime.toString(Qt::ISODate))
+                    .arg(chanid)
+                    .arg(m_title.left(35)));
+    }
 
     if (ltitle.isEmpty() && !match.m_title.isEmpty())
         ltitle = match.m_title;
@@ -748,21 +831,20 @@ uint DBEvent::UpdateDB(
 
     if (m_credits)
     {
-        for (size_t i = 0; i < m_credits->size(); i++)
-            (*m_credits)[i].InsertDB(query, chanid, m_starttime);
+        for (auto & credit : *m_credits)
+            credit.InsertDB(query, chanid, m_starttime);
     }
 
-    QList<EventRating>::const_iterator j = m_ratings.begin();
-    for (; j != m_ratings.end(); ++j)
+    for (const auto & rating : qAsConst(m_ratings))
     {
         query.prepare(
             "INSERT IGNORE INTO programrating "
-            "       ( chanid, starttime, system, rating) "
+            "       ( chanid, starttime, `system`, rating) "
             "VALUES (:CHANID, :START,    :SYS,  :RATING)");
         query.bindValue(":CHANID", chanid);
         query.bindValue(":START",  m_starttime);
-        query.bindValue(":SYS",    (*j).m_system);
-        query.bindValue(":RATING", (*j).m_rating);
+        query.bindValue(":SYS",    rating.m_system);
+        query.bindValue(":RATING", rating.m_rating);
 
         if (!query.exec())
             MythDB::DBError("programrating insert", query);
@@ -970,10 +1052,14 @@ bool DBEvent::MoveOutOfTheWayDB(
             return delete_program(query, chanid, prog.m_starttime);
         }
         LOG(VB_EIT, LOG_DEBUG,
-            QString("EIT: change '%1' starttime to %2")
-                    .arg(prog.m_title.left(35))
-                    .arg(m_endtime.toString(Qt::ISODate)));
+            QString("EIT: (M) change starttime from %1 to %2 for chanid:%3 program '%4' ")
+                    .arg(prog.m_starttime.toString(Qt::ISODate))
+                    .arg(m_endtime.toString(Qt::ISODate))
+                    .arg(chanid)
+                    .arg(prog.m_title.left(35)));
 
+        // Update starttime in tables record and program so they stay consistent.
+        change_record(query, chanid, prog.m_starttime, m_endtime);
         return change_program(query, chanid, prog.m_starttime,
                               m_endtime,        // New start time is our endtime
                               prog.m_endtime);  // Keep the end time
@@ -1051,17 +1137,16 @@ uint DBEvent::InsertDB(MSqlQuery &query, uint chanid) const
         return 0;
     }
 
-    QList<EventRating>::const_iterator j = m_ratings.begin();
-    for (; j != m_ratings.end(); ++j)
+    for (const auto & rating : qAsConst(m_ratings))
     {
         query.prepare(
             "INSERT IGNORE INTO programrating "
-            "       ( chanid, starttime, system, rating) "
+            "       ( chanid, starttime, `system`, rating) "
             "VALUES (:CHANID, :START,    :SYS,  :RATING)");
         query.bindValue(":CHANID", chanid);
         query.bindValue(":START",  m_starttime);
-        query.bindValue(":SYS",    (*j).m_system);
-        query.bindValue(":RATING", (*j).m_rating);
+        query.bindValue(":SYS",    rating.m_system);
+        query.bindValue(":RATING", rating.m_rating);
 
         if (!query.exec())
             MythDB::DBError("programrating insert", query);
@@ -1069,8 +1154,8 @@ uint DBEvent::InsertDB(MSqlQuery &query, uint chanid) const
 
     if (m_credits)
     {
-        for (size_t i = 0; i < m_credits->size(); i++)
-            (*m_credits)[i].InsertDB(query, chanid, m_starttime);
+        for (auto & credit : *m_credits)
+            credit.InsertDB(query, chanid, m_starttime);
     }
 
     add_genres(query, m_genres, chanid, m_starttime);
@@ -1220,17 +1305,16 @@ uint ProgInfo::InsertDB(MSqlQuery &query, uint chanid) const
         return 0;
     }
 
-    QList<EventRating>::const_iterator j = m_ratings.begin();
-    for (; j != m_ratings.end(); ++j)
+    for (const auto & rating : m_ratings)
     {
         query.prepare(
             "INSERT IGNORE INTO programrating "
-            "       ( chanid, starttime, system, rating) "
+            "       ( chanid, starttime, `system`, rating) "
             "VALUES (:CHANID, :START,    :SYS,  :RATING)");
         query.bindValue(":CHANID", chanid);
         query.bindValue(":START",  m_starttime);
-        query.bindValue(":SYS",    (*j).m_system);
-        query.bindValue(":RATING", (*j).m_rating);
+        query.bindValue(":SYS",    rating.m_system);
+        query.bindValue(":RATING", rating.m_rating);
 
         if (!query.exec())
             MythDB::DBError("programrating insert", query);
@@ -1238,8 +1322,8 @@ uint ProgInfo::InsertDB(MSqlQuery &query, uint chanid) const
 
     if (m_credits)
     {
-        for (size_t i = 0; i < m_credits->size(); ++i)
-            (*m_credits)[i].InsertDB(query, chanid, m_starttime);
+        for (auto & credit : *m_credits)
+            credit.InsertDB(query, chanid, m_starttime);
     }
 
     add_genres(query, m_genres, chanid, m_starttime);
@@ -1301,8 +1385,8 @@ bool ProgramData::ClearDataBySource(
     vector<uint> chanids = ChannelUtil::GetChanIDs(sourceid);
 
     bool ok = true;
-    for (size_t i = 0; i < chanids.size(); i++)
-        ok &= ClearDataByChannel(chanids[i], from, to, use_channel_time_offset);
+    for (uint chanid : chanids)
+        ok &= ClearDataByChannel(chanid, from, to, use_channel_time_offset);
 
     return ok;
 }
@@ -1341,12 +1425,13 @@ void ProgramData::FixProgramList(QList<ProgInfo*> &fixlist)
         // remove overlapping programs
         if ((*cur)->HasTimeConflict(**it))
         {
-            QList<ProgInfo*>::iterator tokeep, todelete;
+            QList<ProgInfo*>::iterator tokeep;
+            QList<ProgInfo*>::iterator todelete;
 
             if ((*cur)->m_endtime <= (*cur)->m_starttime)
-                tokeep = it, todelete = cur;
+                tokeep = it, todelete = cur;    // NOLINT(bugprone-branch-clone)
             else if ((*it)->m_endtime <= (*it)->m_starttime)
-                tokeep = cur, todelete = it;
+                tokeep = cur, todelete = it;    // NOLINT(bugprone-branch-clone)
             else if (!(*cur)->m_subtitle.isEmpty() &&
                      (*it)->m_subtitle.isEmpty())
                 tokeep = cur, todelete = it;
@@ -1393,7 +1478,8 @@ void ProgramData::FixProgramList(QList<ProgInfo*> &fixlist)
 void ProgramData::HandlePrograms(
     uint sourceid, QMap<QString, QList<ProgInfo> > &proglist)
 {
-    uint unchanged = 0, updated = 0;
+    uint unchanged = 0;
+    uint updated = 0;
 
     MSqlQuery query(MSqlQuery::InitCon());
 
@@ -1406,7 +1492,8 @@ void ProgramData::HandlePrograms(
         query.prepare(
             "SELECT chanid "
             "FROM channel "
-            "WHERE sourceid = :ID AND "
+            "WHERE deleted  IS NULL AND "
+            "      sourceid = :ID AND "
             "      xmltvid  = :XMLTVID");
         query.bindValue(":ID",      sourceid);
         query.bindValue(":XMLTVID", mapiter.key());
@@ -1431,16 +1518,14 @@ void ProgramData::HandlePrograms(
 
         QList<ProgInfo> &list = proglist[mapiter.key()];
         QList<ProgInfo*> sortlist;
-        QList<ProgInfo>::iterator it = list.begin();
-        for (; it != list.end(); ++it)
+        // NOLINTNEXTLINE(modernize-loop-convert)
+        for (auto it = list.begin(); it != list.end(); ++it)
             sortlist.push_back(&(*it));
 
         FixProgramList(sortlist);
 
-        for (size_t i = 0; i < chanids.size(); ++i)
-        {
-            HandlePrograms(query, chanids[i], sortlist, unchanged, updated);
-        }
+        for (uint chanid : chanids)
+            HandlePrograms(query, chanid, sortlist, unchanged, updated);
     }
 
     LOG(VB_GENERAL, LOG_INFO,
@@ -1465,27 +1550,30 @@ void ProgramData::HandlePrograms(MSqlQuery             &query,
                                  uint &unchanged,
                                  uint &updated)
 {
-    QList<ProgInfo*>::const_iterator it = sortlist.begin();
-    for (; it != sortlist.end(); ++it)
+    for (auto *pinfo : qAsConst(sortlist))
     {
-        if (IsUnchanged(query, chanid, **it))
+        if (IsUnchanged(query, chanid, *pinfo))
         {
             unchanged++;
             continue;
         }
 
-        if (!DeleteOverlaps(query, chanid, **it))
+        if (!DeleteOverlaps(query, chanid, *pinfo))
             continue;
 
-        updated += (*it)->InsertDB(query, chanid);
+        updated += pinfo->InsertDB(query, chanid);
     }
 }
 
 int ProgramData::fix_end_times(void)
 {
     int count = 0;
-    QString chanid, starttime, endtime, querystr;
-    MSqlQuery query1(MSqlQuery::InitCon()), query2(MSqlQuery::InitCon());
+    QString chanid;
+    QString starttime;
+    QString endtime;
+    QString querystr;
+    MSqlQuery query1(MSqlQuery::InitCon());
+    MSqlQuery query2(MSqlQuery::InitCon());
 
     querystr = "SELECT chanid, starttime, endtime FROM program "
                "WHERE endtime = '0000-00-00 00:00:00' "
@@ -1570,6 +1658,9 @@ bool ProgramData::IsUnchanged(
         "      colorcode       = :COLORCODE  AND "
         "      syndicatedepisodenumber = :SYNDICATEDEPISODENUMBER AND "
         "      programid       = :PROGRAMID  AND "
+        "      season          = :SEASON     AND "
+        "      episode         = :EPISODE    AND "
+        "      totalepisodes   = :TOTALEPISODES AND "
         "      inetref         = :INETREF");
 
     QString cattype = myth_category_type_to_string(pi.m_categoryType);
@@ -1598,6 +1689,9 @@ bool ProgramData::IsUnchanged(
     query.bindValue(":SYNDICATEDEPISODENUMBER",
                     denullify(pi.m_syndicatedepisodenumber));
     query.bindValue(":PROGRAMID",  denullify(pi.m_programId));
+    query.bindValue(":SEASON",     pi.m_season);
+    query.bindValue(":EPISODE",    pi.m_episode);
+    query.bindValue(":TOTALEPISODES", pi.m_totalepisodes);
     query.bindValue(":INETREF",    pi.m_inetref);
 
     if (query.exec() && query.next())

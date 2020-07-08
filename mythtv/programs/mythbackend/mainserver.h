@@ -1,6 +1,11 @@
 #ifndef MAINSERVER_H_
 #define MAINSERVER_H_
 
+#include <utility>
+#include <vector>
+using namespace std;
+
+// Qt headers
 #include <QReadWriteLock>
 #include <QStringList>
 #include <QRunnable>
@@ -9,9 +14,7 @@
 #include <QHash>
 #include <QMap>
 
-#include <vector>
-using namespace std;
-
+// MythTV headers
 #include "tv.h"
 #include "playbacksock.h"
 #include "mthreadpool.h"
@@ -40,19 +43,19 @@ class DeleteStruct
 {
     friend class MainServer;
   public:
-    DeleteStruct(MainServer *ms, const QString& filename, const QString& title,
+    DeleteStruct(MainServer *ms, QString  filename, QString  title,
                  uint chanid, QDateTime recstartts, QDateTime recendts,
                  uint recordedId,
                  bool forceMetadataDelete) : 
-        m_ms(ms), m_filename(filename), m_title(title), 
-        m_chanid(chanid), m_recstartts(recstartts), 
-        m_recendts(recendts), m_recordedid(recordedId),
+        m_ms(ms), m_filename(std::move(filename)), m_title(std::move(title)),
+        m_chanid(chanid), m_recstartts(std::move(recstartts)),
+        m_recendts(std::move(recendts)), m_recordedid(recordedId),
         m_forceMetadataDelete(forceMetadataDelete)
     {
     }
 
-    DeleteStruct(MainServer *ms, const QString& filename, int fd, off_t size) :
-        m_ms(ms), m_filename(filename), m_fd(fd), m_size(size)
+    DeleteStruct(MainServer *ms, QString  filename, int fd, off_t size) :
+        m_ms(ms), m_filename(std::move(filename)), m_fd(fd), m_size(size)
     {
     }
 
@@ -75,8 +78,8 @@ class DeleteThread : public QRunnable, public DeleteStruct
     DeleteThread(MainServer *ms, const QString& filename, const QString& title, uint chanid,
                  QDateTime recstartts, QDateTime recendts, uint recordingId,
                  bool forceMetadataDelete) :
-                     DeleteStruct(ms, filename, title, chanid, recstartts,
-                                  recendts, recordingId, forceMetadataDelete)  {}
+                     DeleteStruct(ms, filename, title, chanid, std::move(recstartts),
+                                  std::move(recendts), recordingId, forceMetadataDelete)  {}
     void start(void)
         { MThreadPool::globalInstance()->startReserved(this, "DeleteThread"); }
     void run(void) override; // QRunnable
@@ -96,8 +99,8 @@ class RenameThread : public QRunnable
 {
 public:
     RenameThread(MainServer &ms, PlaybackSock &pbs,
-                 const QString& src, const QString& dst)
-        : m_ms(ms), m_pbs(pbs), m_src(src), m_dst(dst) {}
+                 QString  src, QString  dst)
+        : m_ms(ms), m_pbs(pbs), m_src(std::move(src)), m_dst(std::move(dst)) {}
     void run(void) override; // QRunnable
 
 private:
@@ -121,7 +124,7 @@ class MainServer : public QObject, public MythSocketCBs
                QMap<int, EncoderLink *> *tvList,
                Scheduler *sched, AutoExpire *expirer);
 
-    ~MainServer();
+    ~MainServer() override;
 
     void Stop(void);
 
@@ -154,7 +157,7 @@ class MainServer : public QObject, public MythSocketCBs
   protected slots:
     void reconnectTimeout(void);
     void deferredDeleteSlot(void);
-    void autoexpireUpdate(void);
+    static void autoexpireUpdate(void);
 
   private slots:
     void NewConnection(qt_socket_fd_t socketDescriptor);
@@ -271,10 +274,10 @@ class MainServer : public QObject, public MythSocketCBs
     void SendResponse(MythSocket *sock, QStringList &commands);
     void SendErrorResponse(MythSocket *sock, const QString &error);
     void SendErrorResponse(PlaybackSock *pbs, const QString &error);
-    void SendSlaveDisconnectedEvent(const QList<uint> &offlineEncoderIDs,
+    static void SendSlaveDisconnectedEvent(const QList<uint> &offlineEncoderIDs,
                                     bool needsReschedule);
 
-    void getGuideDataThrough(QDateTime &GuideDataThrough);
+    static void getGuideDataThrough(QDateTime &GuideDataThrough);
 
     PlaybackSock *GetSlaveByHostname(const QString &hostname);
     PlaybackSock *GetMediaServerByHostname(const QString &hostname);
@@ -282,17 +285,17 @@ class MainServer : public QObject, public MythSocketCBs
     FileTransfer *GetFileTransferByID(int id);
     FileTransfer *GetFileTransferBySock(MythSocket *socket);
 
-    QString LocalFilePath(const QString &path, const QString &wantgroup);
+    static QString LocalFilePath(const QString &path, const QString &wantgroup);
 
     int GetfsID(const QList<FileSystemInfo>::iterator& fsInfo);
 
     void DoTruncateThread(DeleteStruct *ds);
     void DoDeleteThread(DeleteStruct *ds);
-    void DeleteRecordedFiles(DeleteStruct *ds);
-    void DoDeleteInDB(DeleteStruct *ds);
+    static void DeleteRecordedFiles(DeleteStruct *ds);
+    static void DoDeleteInDB(DeleteStruct *ds);
 
     LiveTVChain *GetExistingChain(const QString &id);
-    LiveTVChain *GetExistingChain(const MythSocket *sock);
+    LiveTVChain *GetExistingChain(MythSocket *sock);
     LiveTVChain *GetChainWithRecording(const ProgramInfo &pginfo);
     void AddToChains(LiveTVChain *chain);
     void DeleteChain(LiveTVChain *chain);
@@ -341,7 +344,7 @@ class MainServer : public QObject, public MythSocketCBs
 
     struct DeferredDeleteStruct
     {
-        PlaybackSock *sock;
+        PlaybackSock *sock{};
         QDateTime ts;
     };
 
@@ -362,7 +365,7 @@ class MainServer : public QObject, public MythSocketCBs
 
     int m_exitCode                           {GENERIC_EXIT_OK};
 
-    typedef QHash<QString,QString> RequestedBy;
+    using RequestedBy = QHash<QString,QString>;
     RequestedBy                m_previewRequestedBy;
 
     bool m_stopped                           {false};

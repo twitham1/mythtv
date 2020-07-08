@@ -10,8 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __UPNPTASKCACHE_H__
-#define __UPNPTASKCACHE_H__
+#ifndef UPNPTASKCACHE_H
+#define UPNPTASKCACHE_H
 
 #include <QString>
 
@@ -35,7 +35,7 @@ class SSDPCacheTask : public Task
 
         // Destructor protected to force use of Release Method
 
-        virtual ~SSDPCacheTask() = default;
+        ~SSDPCacheTask() override = default;
 
     public:
 
@@ -58,9 +58,11 @@ class SSDPCacheTask : public Task
             int nCount = SSDPCache::Instance()->RemoveStale();
 
             if (nCount > 0)
+            {
                 LOG(VB_UPNP, LOG_INFO,
                     QString("SSDPCacheTask - Removed %1 stale entries.")
                         .arg(nCount));
+            }
 
             if ((m_nExecuteCount % 60) == 0)
                 SSDPCache::Instance()->Dump();
@@ -70,4 +72,4 @@ class SSDPCacheTask : public Task
 
 };
 
-#endif
+#endif // UPNPTASKCACHE_H

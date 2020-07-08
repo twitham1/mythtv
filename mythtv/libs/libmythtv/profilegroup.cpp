@@ -33,20 +33,19 @@ void ProfileGroup::HostName::fillSelections()
 {
     QStringList hostnames;
     ProfileGroup::getHostNames(&hostnames);
-    for(QStringList::Iterator it = hostnames.begin();
-                 it != hostnames.end(); it++)
-        this->addSelection(*it);
+    for (const auto & hostname : qAsConst(hostnames))
+        this->addSelection(hostname);
 }
 
 ProfileGroup::ProfileGroup()
 {
     // This must be first because it is needed to load/save the other settings
     addChild(m_id = new ID());
-    addChild(m_is_default = new Is_default(*this));
+    addChild(m_isDefault = new Is_default(*this));
 
     setLabel(tr("Profile Group"));
     addChild(m_name = new Name(*this));
-    CardInfo *cardInfo = new CardInfo(*this);
+    auto *cardInfo = new CardInfo(*this);
     addChild(cardInfo);
     CardType::fillSelections(cardInfo);
     m_host = new HostName(*this);
@@ -76,15 +75,13 @@ bool ProfileGroup::addMissingDynamicProfiles(void)
         existing.push_back(query.value(0).toString());
 
 
-    const uint num_profiles = 4;
-    const QString profile_names[num_profiles] = { "Default", "Live TV",
-                                                  "High Quality",
-                                                  "Low Quality" };
+    const std::array<const QString,4> profile_names {
+        "Default", "Live TV", "High Quality", "Low Quality" };
 
     CardUtil::InputTypes cardtypes = CardUtil::GetInputTypes();
 
-    CardUtil::InputTypes::iterator Itype = cardtypes.begin();
-    for ( ; Itype != cardtypes.end(); ++Itype)
+    for (auto Itype = cardtypes.begin();
+         Itype != cardtypes.end(); ++Itype)
     {
         if (Itype.key().startsWith("V4L2:") && existing.indexOf(Itype.key()) == -1)
         {
@@ -102,12 +99,12 @@ bool ProfileGroup::addMissingDynamicProfiles(void)
             // get the id of the new profile group
             int groupid = query.lastInsertId().toInt();
 
-            for (uint idx = 0 ; idx < num_profiles; ++idx)
+            for (const auto & name : profile_names)
             {
                 // insert the recording profiles
                 query.prepare("INSERT INTO recordingprofiles SET name = "
                               ":NAME, profilegroup = :GROUPID;");
-                query.bindValue(":NAME", profile_names[idx]);
+                query.bindValue(":NAME", name);
                 query.bindValue(":GROUPID", groupid);
                 if (!query.exec())
                 {
@@ -164,7 +161,7 @@ void ProfileGroup::fillSelections(GroupSetting* setting)
             }
             else
             {
-                ProfileGroup *profileGroup = new ProfileGroup();
+                auto *profileGroup = new ProfileGroup();
                 profileGroup->loadByID(id.toInt());
                 profileGroup->setLabel(name);
                 profileGroup->addChild(

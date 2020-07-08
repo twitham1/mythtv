@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef _PANE_EXISTING_SCAN_IMPORT_H_
-#define _PANE_EXISTING_SCAN_IMPORT_H_
+#ifndef PANE_EXISTING_SCAN_IMPORT_H
+#define PANE_EXISTING_SCAN_IMPORT_H
 
 // Qt headers
 #include <QString>
@@ -57,20 +57,16 @@ class PaneExistingScanImport : public GroupSetting
         if (!m_sourceid)
             return;
 
-        vector<ScanInfo> scans = LoadScanList();
-        for (uint i = 0; i < scans.size(); i++)
+        vector<ScanInfo> scans = LoadScanList(m_sourceid);
+        for (auto it = scans.rbegin(); it != scans.rend(); ++it)
         {
-            if (scans[i].m_sourceid != m_sourceid)
-                continue;
-
-            QString scanDate = MythDate::toString(
-                scans[i].m_scandate, MythDate::kDateTimeFull);
-            QString proc     = (scans[i].m_processed) ?
-                tr("processed") : tr("unprocessed");
+            ScanInfo &scan   = *it;
+            QString scanDate = MythDate::toString(scan.m_scandate, MythDate::kDateTimeFull);
+            QString proc     = (scan.m_processed) ? tr("processed") : tr("unprocessed");
 
             m_scanSelect->addSelection(
                 QString("%1 %2").arg(scanDate).arg(proc),
-                QString::number(scans[i].m_scanid));
+                QString::number(scan.m_scanid));
         }
     }
 
@@ -87,4 +83,4 @@ class PaneExistingScanImport : public GroupSetting
     TransMythUIComboBoxSetting *m_scanSelect {nullptr};
 };
 
-#endif // _PANE_EXISTING_SCAN_IMPORT_H_
+#endif // PANE_EXISTING_SCAN_IMPORT_H

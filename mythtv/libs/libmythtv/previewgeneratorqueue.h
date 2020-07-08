@@ -1,6 +1,6 @@
 // -*- Mode: c++ -*-
-#ifndef _PREVIEW_GENERATOR_QUEUE_H_
-#define _PREVIEW_GENERATOR_QUEUE_H_
+#ifndef PREVIEW_GENERATOR_QUEUE_H
+#define PREVIEW_GENERATOR_QUEUE_H
 
 #include <QStringList>
 #include <QDateTime>
@@ -46,7 +46,7 @@ class PreviewGenState
     /// this preview.
     QSet<QString>     m_tokens;
 };
-typedef QMap<QString,PreviewGenState> PreviewMap;
+using PreviewMap = QMap<QString,PreviewGenState>;
 
 /**
  * This class implements a queue of preview generation requests.  It
@@ -89,19 +89,19 @@ class MTV_PUBLIC PreviewGeneratorQueue : public QObject, public MThread
     {
         GetPreviewImage(pginfo, QSize(0,0), "", -1, true, token);
     }
-    static void GetPreviewImage(const ProgramInfo&, const QSize&,
+    static void GetPreviewImage(const ProgramInfo &pginfo, const QSize &outputsize,
                                 const QString &outputfile,
                                 long long time, bool in_seconds,
                                 const QString& token);
-    static void AddListener(QObject*);
-    static void RemoveListener(QObject*);
+    static void AddListener(QObject *listener);
+    static void RemoveListener(QObject *listener);
 
   private:
     PreviewGeneratorQueue(PreviewGenerator::Mode mode,
                           uint maxAttempts, uint minBlockSeconds);
-    ~PreviewGeneratorQueue();
+    ~PreviewGeneratorQueue() override;
 
-    QString GeneratePreviewImage(ProgramInfo &pginfo, const QSize&,
+    QString GeneratePreviewImage(ProgramInfo &pginfo, const QSize &size,
                                  const QString &outputfile,
                                  long long time, bool in_seconds,
                                  const QString& token);
@@ -156,4 +156,4 @@ class MTV_PUBLIC PreviewGeneratorQueue : public QObject, public MThread
     uint                   m_minBlockSeconds;
 };
 
-#endif // _PREVIEW_GENERATOR_QUEUE_H_
+#endif // PREVIEW_GENERATOR_QUEUE_H

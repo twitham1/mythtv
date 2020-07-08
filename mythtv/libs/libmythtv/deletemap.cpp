@@ -8,6 +8,7 @@
 #include "mythplayer.h"
 #include "programinfo.h"
 #include "mythcorecontext.h"            // for MythCoreContext, etc
+#include "mythmiscutil.h"
 #include "mythtypes.h"                  // for InfoMap
 #include "mythuiactions.h"              // for ACTION_DOWN, ACTION_UP
 #include "playercontext.h"              // for PlayerContext
@@ -114,14 +115,22 @@ bool DeleteMap::HandleAction(QString &action, uint64_t frame)
     else if (action == "NEWCUT")
         NewCut(frame);
     else if (action == "DELETE")
+    {
         //: Delete the current cut or preserved region
         Delete(frame, tr("Delete"));
+    }
     else if (action == "UNDO")
+    {
         Undo();
+    }
     else if (action == "REDO")
+    {
         Redo();
+    }
     else
+    {
         handled = false;
+    }
     return handled;
 }
 
@@ -155,18 +164,10 @@ QString DeleteMap::CreateTimeString(uint64_t frame, bool use_cutlist,
     const
 {
     uint64_t ms = TranslatePositionFrameToMs(frame, frame_rate, use_cutlist);
-    int secs = (int)(ms / 1000);
-    int remainder = (int)(ms % 1000);
-    int totalSecs = (int)
-        (TranslatePositionFrameToMs(frame, frame_rate, use_cutlist) / 1000);
-    QString timestr;
-    if (totalSecs >= 3600)
-        timestr = QString::number(secs / 3600) + ":";
-    timestr += QString("%1").arg((secs / 60) % 60, 2, 10, QChar(48)) +
-        QString(":%1").arg(secs % 60, 2, 10, QChar(48));
+    QString fmt = (ms >= ONEHOURINMS) ? "H:mm:ss" : "mm:ss";
     if (full_resolution)
-        timestr += QString(".%1").arg(remainder, 3, 10, QChar(48));
-    return timestr;
+        fmt += ".zzz";
+    return MythFormatTimeMs(ms, fmt);
 }
 
  /**
@@ -274,8 +275,7 @@ void DeleteMap::ReverseAll(void)
 {
     EDIT_CHECK;
     Push(tr("Reverse Cuts"));
-    frm_dir_map_t::Iterator it = m_deleteMap.begin();
-    for ( ; it != m_deleteMap.end(); ++it)
+    for (auto it = m_deleteMap.begin(); it != m_deleteMap.end(); ++it)
         Add(it.key(), it.value() == MARK_CUT_END ? MARK_CUT_START :
                                                    MARK_CUT_END);
     CleanMap();
@@ -413,13 +413,13 @@ void DeleteMap::NewCut(uint64_t frame)
     if (existing > -1)
     {
         uint64_t total = m_ctx->m_player->GetTotalFrameCount();
-        uint64_t otherframe = static_cast<uint64_t>(existing);
+        auto otherframe = static_cast<uint64_t>(existing);
         if (otherframe == frame)
             Delete(otherframe);
         else
         {
-            uint64_t startframe;
-            uint64_t endframe;
+            uint64_t startframe = 0;
+            uint64_t endframe = 0;
             int64_t cut_start = -1;
             int64_t cut_end = -1;
             if (IsInDelete(frame))
@@ -610,7 +610,7 @@ bool DeleteMap::IsTemporaryMark(uint64_t frame) const
 uint64_t DeleteMap::GetNearestMark(uint64_t frame, bool right, bool *hasMark)
     const
 {
-    uint64_t result;
+    uint64_t result = 0;
     if (hasMark)
         *hasMark = true;
     frm_dir_map_t::const_iterator it = m_deleteMap.begin();
@@ -643,8 +643,7 @@ bool DeleteMap::HasTemporaryMark(void) const
 {
     if (!m_deleteMap.isEmpty())
     {
-        frm_dir_map_t::const_iterator it = m_deleteMap.begin();
-        for ( ; it != m_deleteMap.end(); ++it)
+        for (auto it = m_deleteMap.cbegin(); it != m_deleteMap.cend(); ++it)
             if (MARK_PLACEHOLDER == it.value())
                 return true;
     }
@@ -674,8 +673,7 @@ void DeleteMap::CleanMap(void)
         int64_t lastframe = -1;
         int64_t tempframe = -1;
         QList<int64_t> deleteList;
-        frm_dir_map_t::iterator it = m_deleteMap.begin();
-        for ( ; it != m_deleteMap.end(); ++it)
+        for (auto it = m_deleteMap.begin(); it != m_deleteMap.end(); ++it)
         {
             int      thistype  = it.value();
             uint64_t thisframe = it.key();
@@ -705,10 +703,9 @@ void DeleteMap::CleanMap(void)
 
         // Delete the unwanted frame marks safely, and not while iterating over
         // the map which would lead to a crash
-        QList<int64_t>::iterator dit = deleteList.begin();
-        for (; dit != deleteList.end(); ++dit)
+        for (const long & dit : qAsConst(deleteList))
         {
-            Delete(*dit);
+            Delete(dit);
         }
         deleteList.clear();
     }
@@ -730,8 +727,7 @@ void DeleteMap::LoadCommBreakMap(frm_dir_map_t &map)
 {
     Push(tr("Load Detected Commercials"));
     Clear();
-    frm_dir_map_t::Iterator it = map.begin();
-    for ( ; it != map.end(); ++it)
+    for (auto it = map.begin(); it != map.end(); ++it)
         Add(it.key(), it.value() == MARK_COMM_START ?
                 MARK_CUT_START : MARK_CUT_END);
     CleanMap();
@@ -841,7 +837,7 @@ void DeleteMap::TrackerReset(uint64_t frame)
  * \brief Returns true if the given frame has passed the last cut point start
  *        and provides the frame number of the next jump.
  */
-bool DeleteMap::TrackerWantsToJump(uint64_t frame, uint64_t &to)
+bool DeleteMap::TrackerWantsToJump(uint64_t frame, uint64_t &to) const
 {
     if (IsEmpty() || !m_nextCutStartIsValid || frame < m_nextCutStart)
         return false;

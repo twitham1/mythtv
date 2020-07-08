@@ -1,14 +1,14 @@
-#ifndef __VOLUME_BASE__
-#define __VOLUME_BASE__
+#ifndef VOLUME_BASE_H
+#define VOLUME_BASE_H
 
 #include "mythexp.h"
 
-typedef enum {
+enum MuteState {
     kMuteOff = 0,
     kMuteLeft,
     kMuteRight,
     kMuteAll,
-} MuteState;
+};
 
 class MPUBLIC VolumeBase
 {
@@ -38,16 +38,16 @@ class MPUBLIC VolumeBase
     void UpdateVolume(void);
     void SyncVolume(void);
     void SetChannels(int new_channels);
-    bool internal_vol            {false};
+    bool      m_internalVol        {false};
 
  private:
 
     int       m_volume             {80};
-    MuteState m_current_mute_state {kMuteOff};
+    MuteState m_currentMuteState   {kMuteOff};
     bool      m_swvol              {false};
-    bool      m_swvol_setting      {false};
+    bool      m_swvolSetting       {false};
     int       m_channels           {0};
 
 };
 
-#endif // __VOLUME_BASE__
+#endif // VOLUME_BASE_H

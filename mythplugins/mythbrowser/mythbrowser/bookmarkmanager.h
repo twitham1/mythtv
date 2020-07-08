@@ -36,12 +36,12 @@ class BrowserConfig : public MythScreenType
 
   public:
 
-    BrowserConfig(MythScreenStack *parent, const char *name = nullptr)
+    explicit BrowserConfig(MythScreenStack *parent, const char *name = nullptr)
         : MythScreenType(parent, name) {}
-    ~BrowserConfig() = default;
+    ~BrowserConfig() override = default;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
   private:
     MythUITextEdit   *m_commandEdit        {nullptr};
@@ -66,10 +66,10 @@ class BookmarkManager : public MythScreenType
   public:
     BookmarkManager(MythScreenStack *parent, const char *name)
         : MythScreenType(parent, name) {}
-    ~BookmarkManager();
+    ~BookmarkManager() override;
 
     bool Create(void) override; // MythScreenType
-    bool keyPressEvent(QKeyEvent *) override; // MythScreenType
+    bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
 
   private slots:
     void slotGroupSelected(MythUIButtonListItem *item);
@@ -79,7 +79,7 @@ class BookmarkManager : public MythScreenType
     void slotDoDeleteMarked(bool doDelete);
     void slotBrowserClosed(void);
 
-    void slotSettings(void);
+    static void slotSettings(void);
     void slotSetHomepage(void);
     void slotAddBookmark(void);
     void slotEditBookmark(void);

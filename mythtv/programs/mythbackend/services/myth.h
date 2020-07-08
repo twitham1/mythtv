@@ -129,6 +129,8 @@ class Myth : public MythServices
 
         bool                CheckDatabase       ( bool Repair ) override; // MythServices
 
+        bool                DelayShutdown       ( void ) override; // MythServices
+
         bool                ProfileSubmit       ( void ) override; // MythServices
 
         bool                ProfileDelete       ( void ) override; // MythServices
@@ -177,7 +179,7 @@ class ScriptableMyth : public QObject
 
     public:
 
-        Q_INVOKABLE ScriptableMyth( QScriptEngine *pEngine, QObject *parent = nullptr ) : QObject( parent )
+        Q_INVOKABLE explicit ScriptableMyth( QScriptEngine *pEngine, QObject *parent = nullptr ) : QObject( parent )
         {
             m_pEngine = pEngine;
         }
@@ -363,6 +365,13 @@ class ScriptableMyth : public QObject
             )
         }
 
+        bool DelayShutdown( void )
+        {
+            SCRIPT_CATCH_EXCEPTION( false,
+                return m_obj.DelayShutdown();
+            )
+        }
+
         bool ProfileSubmit( void )
         {
             SCRIPT_CATCH_EXCEPTION( false,
@@ -427,6 +436,7 @@ class ScriptableMyth : public QObject
         }
 };
 
+// NOLINTNEXTLINE(modernize-use-auto)
 Q_SCRIPT_DECLARE_QMETAOBJECT_MYTHTV( ScriptableMyth, QObject*);
 
 #endif

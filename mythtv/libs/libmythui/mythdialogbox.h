@@ -1,17 +1,21 @@
 #ifndef MYTHDIALOGBOX_H_
 #define MYTHDIALOGBOX_H_
 
+#include <functional>
+#include <utility>
+
+// Qt headers
 #include <QDir>
 #include <QEvent>
 #include <QString>
 #include <QStringList>
 
+// MythTV headers
 #include "mythscreentype.h"
 #include "mythuitextedit.h"
 #include "mythmainwindow.h"
 #include "mythlogging.h"
 
-#include <functional>
 
 class QTimer;
 
@@ -37,13 +41,16 @@ class MythMenu;
 class MUI_PUBLIC DialogCompletionEvent : public QEvent
 {
   public:
-    DialogCompletionEvent(const QString &id, int result, QString text,
+    DialogCompletionEvent(QString id, int result, QString text,
                           QVariant data)
         : QEvent(kEventType),
-          m_id(id), m_result(result), m_resultText(text), m_resultData(data) { }
+          m_id(std::move(id)), m_result(result),
+          m_resultText(std::move(text)),
+          m_resultData(std::move(data)) { }
+    ~DialogCompletionEvent() override;
 
     QString GetId() { return m_id; }
-    int GetResult() { return m_result; }
+    int GetResult() const { return m_result; }
     QString GetResultText() { return m_resultText; }
     QVariant GetData() { return m_resultData; }
 
@@ -62,12 +69,15 @@ using MythUIButtonCallback = std::function<void(void)>;
 class MUI_PUBLIC MythMenuItem
 {
   public:
-    MythMenuItem(const QString &text, QVariant data = 0, bool checked = false, MythMenu *subMenu = nullptr) :
-        m_text(text), m_data(data), m_checked(checked), m_subMenu(subMenu), m_useSlot(false) { Init(); }
-    MythMenuItem(const QString &text, const char *slot, bool checked = false, MythMenu *subMenu = nullptr) :
-        m_text(text), m_data(qVariantFromValue(slot)), m_checked(checked), m_subMenu(subMenu) { Init(); }
-    MythMenuItem(const QString &text, const MythUIButtonCallback &slot, bool checked = false, MythMenu *subMenu = nullptr) :
-        m_text(text), m_data(qVariantFromValue(slot)), m_checked(checked), m_subMenu(subMenu) { Init(); }
+    explicit MythMenuItem(QString text, QVariant data = 0, bool checked = false, MythMenu *subMenu = nullptr) :
+        m_text(std::move(text)), m_data(std::move(data)),
+        m_checked(checked), m_subMenu(subMenu), m_useSlot(false) { Init(); }
+    MythMenuItem(QString text, const char *slot, bool checked = false, MythMenu *subMenu = nullptr) :
+        m_text(std::move(text)), m_data(QVariant::fromValue(slot)),
+        m_checked(checked), m_subMenu(subMenu) { Init(); }
+    MythMenuItem(QString text, const MythUIButtonCallback &slot, bool checked = false, MythMenu *subMenu = nullptr) :
+        m_text(std::move(text)), m_data(QVariant::fromValue(slot)),
+        m_checked(checked), m_subMenu(subMenu) { Init(); }
 
     QString   m_text;
     QVariant  m_data    {0};
@@ -84,8 +94,8 @@ class MUI_PUBLIC MythMenu
   friend class MythDialogBox;
 
   public:
-    MythMenu(const QString &text, QObject *retobject, const QString &resultid);
-    MythMenu(const QString &title, const QString &text, QObject *retobject, const QString &resultid);
+    MythMenu(QString text, QObject *retobject, QString resultid);
+    MythMenu(QString title, QString text, QObject *retobject, QString resultid);
     ~MythMenu(void);
 
     void AddItem(const QString &title, QVariant data = 0, MythMenu *subMenu = nullptr,
@@ -105,7 +115,7 @@ class MUI_PUBLIC MythMenu
 
   private:
     void Init(void) {}
-    void AddItem(MythMenuItem *, bool selected, MythMenu *subMenu);
+    void AddItem(MythMenuItem *item, bool selected, MythMenu *subMenu);
 
     MythMenu *m_parentMenu   {nullptr};
     QString   m_title;
@@ -128,21 +138,21 @@ class MUI_PUBLIC MythDialogBox : public MythScreenType
 {
     Q_OBJECT
   public:
-    MythDialogBox(const QString &text,
+    MythDialogBox(QString text,
                   MythScreenStack *parent, const char *name,
                   bool fullscreen = false, bool osd = false)
         : MythScreenType(parent, name, false), m_fullscreen(fullscreen),
-          m_osdDialog(osd), m_text(text) {}
-    MythDialogBox(const QString &title, const QString &text,
+          m_osdDialog(osd), m_text(std::move(text)) {}
+    MythDialogBox(QString title, QString text,
                   MythScreenStack *parent, const char *name,
                   bool fullscreen = false, bool osd = false)
         : MythScreenType(parent, name, false), m_fullscreen(fullscreen),
-          m_osdDialog(osd), m_title(title),m_text(text) {}
+          m_osdDialog(osd), m_title(std::move(title)),m_text(std::move(text)) {}
     MythDialogBox(MythMenu* menu, MythScreenStack *parent, const char *name,
                    bool fullscreen = false, bool osd = false)
         : MythScreenType(parent, name, false), m_fullscreen(fullscreen),
           m_osdDialog(osd), m_menu(menu), m_currentMenu(menu) {}
-    ~MythDialogBox(void);
+    ~MythDialogBox(void) override;
 
     bool Create(void) override; // MythScreenType
 
@@ -213,14 +223,14 @@ class MUI_PUBLIC MythConfirmationDialog : public MythScreenType
     Q_OBJECT
 
   public:
-    MythConfirmationDialog(MythScreenStack *parent, const QString &message,
+    MythConfirmationDialog(MythScreenStack *parent, QString message,
                            bool showCancel = true)
         : MythScreenType(parent, "mythconfirmpopup"),
-          m_message(message), m_showCancel(showCancel) {}
+          m_message(std::move(message)), m_showCancel(showCancel) {}
 
     bool Create(void) override; // MythScreenType
     void SetReturnEvent(QObject *retobject, const QString &resultid);
-    void SetData(QVariant data) { m_resultData = data; }
+    void SetData(QVariant data) { m_resultData = std::move(data); }
     void SetMessage(const QString &message);
 
     bool keyPressEvent(QKeyEvent *event) override; // MythScreenType
@@ -229,7 +239,7 @@ class MUI_PUBLIC MythConfirmationDialog : public MythScreenType
      void haveResult(bool);
 
   private:
-    void sendResult(bool);
+    void sendResult(bool ok);
     MythUIText *m_messageText {nullptr};
     QString     m_message;
     bool        m_showCancel  {true};
@@ -255,12 +265,12 @@ class MUI_PUBLIC MythTextInputDialog : public MythScreenType
     Q_OBJECT
 
   public:
-    MythTextInputDialog(MythScreenStack *parent, const QString &message,
+    MythTextInputDialog(MythScreenStack *parent, QString message,
                         InputFilter filter = FilterNone,
                         bool isPassword = false,
-                        const QString &defaultValue = "")
+                        QString defaultValue = "")
         : MythScreenType(parent, "mythtextinputpopup"),
-          m_message(message), m_defaultValue(defaultValue),
+          m_message(std::move(message)), m_defaultValue(std::move(defaultValue)),
           m_filter(filter), m_isPassword(isPassword) {}
 
     bool Create(void) override; // MythScreenType
@@ -296,7 +306,7 @@ class MUI_PUBLIC MythSpinBoxDialog : public MythScreenType
     Q_OBJECT
 
   public:
-    MythSpinBoxDialog(MythScreenStack *parent, const QString &message);
+    MythSpinBoxDialog(MythScreenStack *parent, QString message);
 
     bool Create(void) override; // MythScreenType
     void SetReturnEvent(QObject *retobject, const QString &resultid);
@@ -403,7 +413,7 @@ class MUI_PUBLIC MythTimeInputDialog : public MythScreenType
         kAllDates     = 0x300
     };
 
-    MythTimeInputDialog(MythScreenStack *parent, const QString &message,
+    MythTimeInputDialog(MythScreenStack *parent, QString message,
                         int resolutionFlags,
                         QDateTime startTime = QDateTime::currentDateTime(),
                         int rangeLimit = 14);
@@ -439,7 +449,6 @@ MUI_PUBLIC MythConfirmationDialog  *ShowOkPopup(const QString &message, QObject 
                                              Func slot, bool showCancel = false)
 {
     QString                  LOC = "ShowOkPopup('" + message + "') - ";
-    MythConfirmationDialog  *pop;
     MythScreenStack         *stk = nullptr;
 
     MythMainWindow *win = GetMythMainWindow();
@@ -459,7 +468,7 @@ MUI_PUBLIC MythConfirmationDialog  *ShowOkPopup(const QString &message, QObject 
         return nullptr;
     }
 
-    pop = new MythConfirmationDialog(stk, message, showCancel);
+    auto *pop = new MythConfirmationDialog(stk, message, showCancel);
     if (pop->Create())
     {
         stk->AddScreen(pop);

@@ -42,7 +42,7 @@ using namespace std;
     F(JOB_CANCELLED,    0x0140, JobQueue::tr("Cancelled")) \
 
 enum JobStatus {
-#define JOBSTATUS_ENUM(A,B,C)   A = B ,
+#define JOBSTATUS_ENUM(A,B,C)   A = (B) ,
     JOBSTATUS_MAP(JOBSTATUS_ENUM)
 };
 
@@ -96,31 +96,31 @@ static QMap< QString, int > JobNameToType {
     { "UserJob4",  JOB_USERJOB4 }
 };
 
-typedef struct jobqueueentry {
-    int id;
-    uint chanid;
+struct JobQueueEntry {
+    int       id           {0};
+    uint      chanid       {0};
     QDateTime recstartts;
     QDateTime schedruntime;
     QString startts;
     QDateTime inserttime;
-    int type;
-    int cmds;
-    int flags;
-    int status;
+    int       type         {0};
+    int       cmds         {0};
+    int       flags        {0};
+    int       status       {0};
     QDateTime statustime;
     QString hostname;
     QString args;
     QString comment;
-} JobQueueEntry;
+};
 
-typedef struct runningjobinfo {
-    int          id;
-    int          type;
-    int          flag;
+struct RunningJobInfo {
+    int          id      {0};
+    int          type    {0};
+    int          flag    {0};
     QString      desc;
     QString      command;
-    ProgramInfo *pginfo;
-} RunningJobInfo;
+    ProgramInfo *pginfo  {nullptr};
+};
 
 class JobQueue;
 
@@ -131,11 +131,11 @@ class MTV_PUBLIC JobQueue : public QObject, public QRunnable
     friend class QueueProcessorThread;
   public:
     explicit JobQueue(bool master);
-    ~JobQueue(void);
+    ~JobQueue(void) override;
     void customEvent(QEvent *e)  override; // QObject
 
     static bool QueueRecordingJobs(
-        const RecordingInfo&, int jobTypes = JOB_NONE);
+        const RecordingInfo &recinfo, int jobTypes = JOB_NONE);
     static bool QueueJob(int jobType, uint chanid,
                          const QDateTime &recstartts, const QString& args = "",
                          const QString& comment = "", QString host = "",
@@ -216,11 +216,11 @@ class MTV_PUBLIC JobQueue : public QObject, public QRunnable
     static bool InJobRunWindow(QDateTime jobstarttsRaw);
 
   private:
-    typedef struct jobthreadstruct
+    struct JobThreadStruct
     {
         JobQueue *jq;
         int jobID;
-    } JobThreadStruct;
+    };
 
     void run(void) override; // QRunnable
     void ProcessQueue(void);
@@ -233,8 +233,8 @@ class MTV_PUBLIC JobQueue : public QObject, public QRunnable
 
     void StartChildJob(void *(*ChildThreadRoutine)(void *), int jobID);
 
-    QString GetJobDescription(int jobType);
-    QString GetJobCommand(int id, int jobType, ProgramInfo *tmpInfo);
+    static QString GetJobDescription(int jobType);
+    static QString GetJobCommand(int id, int jobType, ProgramInfo *tmpInfo);
     void RemoveRunningJob(int id);
 
     static QString PrettyPrint(off_t bytes);

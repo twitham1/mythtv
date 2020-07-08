@@ -44,13 +44,13 @@ QString MythRAOPConnection::g_rsaLastError;
 // anything lower than 50ms on windows, isn't reliable
 #define AUDIO_BUFFER     100
 
-class _NetStream : public QTextStream
+class RaopNetStream : public QTextStream
 {
 public:
-    explicit _NetStream(QIODevice *device) : QTextStream(device)
+    explicit RaopNetStream(QIODevice *device) : QTextStream(device)
     {
     };
-    _NetStream &operator<<(const QString &str)
+    RaopNetStream &operator<<(const QString &str)
     {
         LOG(VB_PLAYBACK, LOG_DEBUG,
             LOC + QString("Sending(%1): ").arg(str.length()) + str);
@@ -75,7 +75,7 @@ MythRAOPConnection::~MythRAOPConnection()
 {
     CleanUp();
 
-    foreach (QTcpSocket *client, m_eventClients)
+    for (QTcpSocket *client : qAsConst(m_eventClients))
     {
         client->close();
         client->deleteLater();
@@ -175,7 +175,7 @@ void MythRAOPConnection::CleanUp(void)
 bool MythRAOPConnection::Init(void)
 {
     // connect up the request socket
-    m_textStream = new _NetStream(m_socket);
+    m_textStream = new RaopNetStream(m_socket);
     m_textStream->setCodec("UTF-8");
     if (!connect(m_socket, SIGNAL(readyRead()), this, SLOT(readClient())))
     {
@@ -232,12 +232,12 @@ void MythRAOPConnection::udpDataReady(QByteArray buf, const QHostAddress& /*peer
     if (m_watchdogTimer)
         m_watchdogTimer->start(10000);
 
-    if (!m_audio || !m_codec || !m_codeccontext)
+    if (!m_audio || !m_codec || !m_codecContext)
         return;
 
-    uint8_t  type;
-    uint16_t seq;
-    uint64_t timestamp;
+    uint8_t  type = 0;
+    uint16_t seq = 0;
+    uint64_t timestamp = 0;
 
     if (!GetPacketType(buf, type, seq, timestamp))
     {
@@ -312,14 +312,16 @@ void MythRAOPConnection::udpDataReady(QByteArray buf, const QHostAddress& /*peer
             m_resends.remove(seq);
         }
         else
+        {
             LOG(VB_PLAYBACK, LOG_WARNING, LOC +
                 QString("Received unexpected resent packet %1")
                 .arg(seq));
+        }
     }
 
     // Check that the audio packet is valid, do so by decoding it. If an error
     // occurs, ask to resend it
-    QList<AudioData> *decoded = new QList<AudioData>();
+    auto *decoded = new QList<AudioData>();
     int numframes = decodeAudioPacket(type, &buf, decoded);
     if (numframes < 0)
     {
@@ -329,9 +331,7 @@ void MythRAOPConnection::udpDataReady(QByteArray buf, const QHostAddress& /*peer
         delete decoded;
         return;
     }
-    AudioPacket frames;
-    frames.seq    = seq;
-    frames.data   = decoded;
+    AudioPacket frames { seq, decoded };
     m_audioQueue.insert(timestamp, frames);
     ProcessAudio();
 }
@@ -365,7 +365,8 @@ void MythRAOPConnection::ProcessSync(const QByteArray &buf)
         LOG(VB_PLAYBACK, LOG_DEBUG, LOC + QString("Receiving SYNC packet"));
     }
 
-    timeval  t; gettimeofday(&t, nullptr);
+    timeval  t {};
+    gettimeofday(&t, nullptr);
     m_timeLastSync = t.tv_sec * 1000 + t.tv_usec / 1000;
 
     LOG(VB_PLAYBACK, LOG_DEBUG, LOC + QString("SYNC: cur:%1 next:%2 time:%3")
@@ -493,7 +494,7 @@ void MythRAOPConnection::SendTimeRequest(void)
     if (!m_clientControlSocket) // should never happen
         return;
 
-    timeval t;
+    timeval t {};
     gettimeofday(&t, nullptr);
 
     unsigned char req[32];
@@ -528,16 +529,16 @@ void MythRAOPConnection::SendTimeRequest(void)
  */
 void MythRAOPConnection::ProcessTimeResponse(const QByteArray &buf)
 {
-    timeval t1, t2;
+    timeval t1 {};
+    timeval t2 {};
     const char *req = buf.constData();
 
     t1.tv_sec  = qFromBigEndian(*(uint32_t *)(req + 8));
     t1.tv_usec = qFromBigEndian(*(uint32_t *)(req + 12));
 
     gettimeofday(&t2, nullptr);
-    uint64_t time1, time2;
-    time1 = t1.tv_sec * 1000 + t1.tv_usec / 1000;
-    time2 = t2.tv_sec * 1000 + t2.tv_usec / 1000;
+    uint64_t time1 = t1.tv_sec * 1000 + t1.tv_usec / 1000;
+    uint64_t time2 = t2.tv_sec * 1000 + t2.tv_usec / 1000;
     LOG(VB_PLAYBACK, LOG_DEBUG, LOC + QString("Read back time (Local %1.%2)")
         .arg(t1.tv_sec).arg(t1.tv_usec));
     // network latency equal time difference in ms between request and response
@@ -614,24 +615,24 @@ uint32_t MythRAOPConnection::decodeAudioPacket(uint8_t type,
     int aeslen = len & ~0xf;
     unsigned char iv[16];
     unsigned char decrypted_data[MAX_PACKET_SIZE];
-    memcpy(iv, m_AESIV.constData(), sizeof(iv));
+    memcpy(iv, m_aesIV.constData(), sizeof(iv));
     AES_cbc_encrypt((const unsigned char *)data_in,
                     decrypted_data, aeslen,
                     &m_aesKey, iv, AES_DECRYPT);
     memcpy(decrypted_data + aeslen, data_in + aeslen, len - aeslen);
 
     AVPacket tmp_pkt;
-    AVCodecContext *ctx = m_codeccontext;
+    AVCodecContext *ctx = m_codecContext;
 
     av_init_packet(&tmp_pkt);
     tmp_pkt.data = decrypted_data;
     tmp_pkt.size = len;
 
     uint32_t frames_added = 0;
-    uint8_t *samples = (uint8_t *)av_mallocz(AudioOutput::MAX_SIZE_BUFFER);
+    auto *samples = (uint8_t *)av_mallocz(AudioOutput::kMaxSizeBuffer);
     while (tmp_pkt.size > 0)
     {
-        int data_size;
+        int data_size = 0;
         int ret = AudioOutputUtil::DecodeAudio(ctx, samples,
                                                data_size, &tmp_pkt);
         if (ret < 0)
@@ -646,10 +647,7 @@ uint32_t MythRAOPConnection::decodeAudioPacket(uint8_t type,
                 (ctx->channels * av_get_bytes_per_sample(ctx->sample_fmt));
 
             frames_added += num_samples;
-            AudioData block;
-            block.data    = samples;
-            block.length  = data_size;
-            block.frames  = num_samples;
+            AudioData block {samples, data_size, num_samples};
             dest->append(block);
         }
         tmp_pkt.data += ret;
@@ -669,7 +667,8 @@ void MythRAOPConnection::ProcessAudio()
         // packets, so unpause as early as possible
         m_audio->Pause(false);
     }
-    timeval  t; gettimeofday(&t, nullptr);
+    timeval  t {};
+    gettimeofday(&t, nullptr);
     uint64_t dtime    = (t.tv_sec * 1000 + t.tv_usec / 1000) - m_timeLastSync;
     uint64_t rtp      = dtime + m_currentTimestamp;
     uint64_t buffered = m_audioStarted ? m_audio->GetAudioBufferedTime() : 0;
@@ -716,10 +715,8 @@ void MythRAOPConnection::ProcessAudio()
             }
             m_lastSequence++;
 
-            QList<AudioData>::iterator it = frames.data->begin();
-            for (; it != frames.data->end(); ++it)
+            for (const auto & data : qAsConst(*frames.data))
             {
-                AudioData *data = &(*it);
                 int offset = 0;
                 int framecnt = 0;
 
@@ -728,8 +725,8 @@ void MythRAOPConnection::ProcessAudio()
                         // calculate how many frames we have to drop to catch up
                     offset = (m_adjustedLatency * m_frameRate / 1000) *
                         m_audio->GetBytesPerFrame();
-                    if (offset > data->length)
-                        offset = data->length;
+                    if (offset > data.length)
+                        offset = data.length;
                     framecnt = offset / m_audio->GetBytesPerFrame();
                     m_adjustedLatency -= framesToMs(framecnt+1);
                     LOG(VB_PLAYBACK, LOG_DEBUG, LOC +
@@ -738,8 +735,8 @@ void MythRAOPConnection::ProcessAudio()
                         .arg(framecnt).arg(m_adjustedLatency));
                     timestamp += framesToMs(framecnt);
                 }
-                m_audio->AddData((char *)data->data + offset,
-                                 data->length - offset,
+                m_audio->AddData((char *)data.data + offset,
+                                 data.length - offset,
                                  timestamp, framecnt);
                 timestamp += m_audio->LengthLastData();
             }
@@ -770,11 +767,8 @@ int MythRAOPConnection::ExpireAudio(uint64_t timestamp)
             AudioPacket frames = packet_it.value();
             if (frames.data)
             {
-                QList<AudioData>::iterator it = frames.data->begin();
-                for (; it != frames.data->end(); ++it)
-                {
-                    av_free(it->data);
-                }
+                for (const auto & data : qAsConst(*frames.data))
+                    av_free(data.data);
                 delete frames.data;
             }
             m_audioQueue.remove(packet_it.key());
@@ -808,7 +802,7 @@ void MythRAOPConnection::audioRetry(void)
         CreateDecoder();
     }
 
-    if (m_audio && m_codec && m_codeccontext)
+    if (m_audio && m_codec && m_codecContext)
     {
         StopAudioTimer();
     }
@@ -820,7 +814,7 @@ void MythRAOPConnection::audioRetry(void)
  */
 void MythRAOPConnection::readClient(void)
 {
-    QTcpSocket *socket = (QTcpSocket *)sender();
+    auto *socket = dynamic_cast<QTcpSocket *>(sender());
     if (!socket)
         return;
 
@@ -909,7 +903,7 @@ void MythRAOPConnection::ProcessRequest(const QStringList &header,
         gotRTP = true;
         QString data = tags["RTP-Info"];
         QStringList items = data.split(";");
-        foreach (QString item, items)
+        for (const QString& item : qAsConst(items))
         {
             if (item.startsWith("seq"))
             {
@@ -962,7 +956,7 @@ void MythRAOPConnection::ProcessRequest(const QStringList &header,
         if (!LoadKey())
             return;
         int tosize = RSA_size(LoadKey());
-        uint8_t *to = new uint8_t[tosize];
+        auto *to = new uint8_t[tosize];
 
         QByteArray challenge =
         QByteArray::fromBase64(tags["Apple-Challenge"].toLatin1());
@@ -1046,7 +1040,7 @@ void MythRAOPConnection::ProcessRequest(const QStringList &header,
     else if (option == "ANNOUNCE")
     {
         QStringList lines = splitLines(content);
-        foreach (QString line, lines)
+        for (const QString& line : qAsConst(lines))
         {
             if (line.startsWith("a=rsaaeskey:"))
             {
@@ -1081,20 +1075,20 @@ void MythRAOPConnection::ProcessRequest(const QStringList &header,
             else if (line.startsWith("a=aesiv:"))
             {
                 QString aesiv = line.mid(8).trimmed();
-                m_AESIV = QByteArray::fromBase64(aesiv.toLatin1());
+                m_aesIV = QByteArray::fromBase64(aesiv.toLatin1());
                 LOG(VB_PLAYBACK, LOG_DEBUG, LOC +
                     QString("AESIV: %1 (decoded size %2)")
-                    .arg(aesiv).arg(m_AESIV.size()));
+                    .arg(aesiv).arg(m_aesIV.size()));
             }
             else if (line.startsWith("a=fmtp:"))
             {
                 m_audioFormat.clear();
                 QString format = line.mid(7).trimmed();
                 QList<QString> formats = format.split(' ');
-                foreach (QString fmt, formats)
+                for (const QString& fmt : qAsConst(formats))
                     m_audioFormat.append(fmt.toInt());
 
-                foreach (int fmt, m_audioFormat)
+                for (int fmt : qAsConst(m_audioFormat))
                     LOG(VB_PLAYBACK, LOG_DEBUG, LOC +
                         QString("Audio parameter: %1").arg(fmt));
                 m_framesPerPacket = m_audioFormat[1];
@@ -1109,7 +1103,9 @@ void MythRAOPConnection::ProcessRequest(const QStringList &header,
         if (tags.contains("Transport"))
         {
             // New client is trying to play audio, disconnect all the other clients
-            ((MythRAOPDevice*)parent())->DeleteAllClients(this);
+            auto *dev = dynamic_cast<MythRAOPDevice*>(parent());
+            if (dev != nullptr)
+                dev->DeleteAllClients(this);
             gCoreContext->WantingPlayback(parent());
             m_playbackStarted = true;
 
@@ -1119,7 +1115,7 @@ void MythRAOPConnection::ProcessRequest(const QStringList &header,
             QStringList items = data.split(";");
             bool events = false;
 
-            foreach (QString item, items)
+            for (const QString& item : qAsConst(items))
             {
                 if (item.startsWith("control_port"))
                     control_port = item.mid(item.indexOf("=") + 1).trimmed().toUInt();
@@ -1200,8 +1196,7 @@ void MythRAOPConnection::ProcessRequest(const QStringList &header,
             if (m_eventServer)
             {
                 // Should never get here, but just in case
-                QTcpSocket *client;
-                foreach (client, m_eventClients)
+                for (auto *client : qAsConst(m_eventClients))
                 {
                     client->disconnect();
                     client->abort();
@@ -1251,7 +1246,7 @@ void MythRAOPConnection::ProcessRequest(const QStringList &header,
             // Recreate transport line with new ports value
             QString newdata;
             bool first = true;
-            foreach (QString item, items)
+            for (const QString& item : qAsConst(items))
             {
                 if (!first)
                 {
@@ -1399,7 +1394,7 @@ void MythRAOPConnection::ProcessRequest(const QStringList &header,
             {
                 QStringList lines = splitLines(content);
                 *m_textStream << "Content-Type: text/parameters\r\n";
-                foreach (QString line, lines)
+                for (const QString& line : qAsConst(lines))
                 {
                     if (line == "volume")
                     {
@@ -1425,7 +1420,7 @@ void MythRAOPConnection::ProcessRequest(const QStringList &header,
     FinishResponse(m_textStream, m_socket, option, tags["CSeq"], responseData);
 }
 
-void MythRAOPConnection::FinishAuthenticationResponse(_NetStream *stream,
+void MythRAOPConnection::FinishAuthenticationResponse(RaopNetStream *stream,
                                                       QTcpSocket *socket,
                                                       QString &cseq)
 {
@@ -1443,7 +1438,7 @@ void MythRAOPConnection::FinishAuthenticationResponse(_NetStream *stream,
         .arg(cseq).arg(socket->flush()));
 }
 
-void MythRAOPConnection::FinishResponse(_NetStream *stream, QTcpSocket *socket,
+void MythRAOPConnection::FinishResponse(RaopNetStream *stream, QTcpSocket *socket,
                                         QString &option, QString &cseq, QString &responseData)
 {
     if (!stream)
@@ -1466,8 +1461,8 @@ void MythRAOPConnection::FinishResponse(_NetStream *stream, QTcpSocket *socket,
  */
 RSA *MythRAOPConnection::LoadKey(void)
 {
-    static QMutex lock;
-    QMutexLocker locker(&lock);
+    static QMutex s_lock;
+    QMutexLocker locker(&s_lock);
 
     if (g_rsa)
         return g_rsa;
@@ -1573,7 +1568,7 @@ QString MythRAOPConnection::stringFromSeconds(int timeInSeconds)
  * Description: return the duration in ms of frames
  *
  */
-uint64_t MythRAOPConnection::framesToMs(uint64_t frames)
+uint64_t MythRAOPConnection::framesToMs(uint64_t frames) const
 {
     return (frames * 1000ULL) / m_frameRate;
 }
@@ -1616,10 +1611,10 @@ bool MythRAOPConnection::CreateDecoder(void)
         return false;
     }
 
-    m_codeccontext = avcodec_alloc_context3(m_codec);
-    if (m_codeccontext)
+    m_codecContext = avcodec_alloc_context3(m_codec);
+    if (m_codecContext)
     {
-        unsigned char *extradata = new unsigned char[36];
+        auto *extradata = new unsigned char[36];
         memset(extradata, 0, 36);
         if (m_audioFormat.size() < 12)
         {
@@ -1639,10 +1634,10 @@ bool MythRAOPConnection::CreateDecoder(void)
             extradata[19] = m_audioFormat[5]; // rice_initialhistory
             extradata[20] = m_audioFormat[6]; // rice_kmodifier
         }
-        m_codeccontext->extradata = extradata;
-        m_codeccontext->extradata_size = 36;
-        m_codeccontext->channels = m_channels;
-        if (avcodec_open2(m_codeccontext, m_codec, nullptr) < 0)
+        m_codecContext->extradata = extradata;
+        m_codecContext->extradata_size = 36;
+        m_codecContext->channels = m_channels;
+        if (avcodec_open2(m_codecContext, m_codec, nullptr) < 0)
         {
             LOG(VB_PLAYBACK, LOG_ERR, LOC +
                 "Failed to open ALAC decoder - going silent...");
@@ -1657,9 +1652,9 @@ bool MythRAOPConnection::CreateDecoder(void)
 
 void MythRAOPConnection::DestroyDecoder(void)
 {
-    if (m_codeccontext)
+    if (m_codecContext)
     {
-        avcodec_free_context(&m_codeccontext);
+        avcodec_free_context(&m_codecContext);
     }
     m_codec = nullptr;
 }
@@ -1735,7 +1730,7 @@ int64_t MythRAOPConnection::AudioCardLatency(void)
     if (!m_audio)
         return 0;
 
-    int16_t *samples = (int16_t *)av_mallocz(AudioOutput::MAX_SIZE_BUFFER);
+    auto *samples = (int16_t *)av_mallocz(AudioOutput::kMaxSizeBuffer);
     int frames = AUDIOCARD_BUFFER * m_frameRate / 1000;
     m_audio->AddData((char *)samples,
                      frames * (m_sampleSize>>3) * m_channels,
@@ -1761,11 +1756,16 @@ void MythRAOPConnection::newEventClient(QTcpSocket *client)
 
 void MythRAOPConnection::deleteEventClient(void)
 {
-    QTcpSocket *client = static_cast<QTcpSocket *>(sender());
+    auto *client = dynamic_cast<QTcpSocket *>(sender());
+    QString label;
+
+    if (client != nullptr)
+        label = QString("%1:%2").arg(client->peerAddress().toString()).arg(client->peerPort());
+    else
+        label = QString("unknown");
 
     LOG(VB_PLAYBACK, LOG_DEBUG, LOC +
-        QString("%1:%2 disconnected from RAOP events server.")
-        .arg(client->peerAddress().toString()).arg(client->peerPort()));
+        QString("%1 disconnected from RAOP events server.").arg(label));
 }
 
 void MythRAOPConnection::SendNotification(bool update)
@@ -1776,9 +1776,9 @@ void MythRAOPConnection::SendNotification(bool update)
     int position =
         (m_progressCurrent-m_progressStart) / m_frameRate;
 
-    MythNotification *n;
+    MythNotification *n = nullptr;
 
-    if (!update || !m_firstsend)
+    if (!update || !m_firstSend)
     {
         n = new MythMediaNotification(MythNotification::New,
                                       image, m_dmap, duration, position);
@@ -1793,6 +1793,6 @@ void MythRAOPConnection::SendNotification(bool update)
     n->SetDuration(5);
     n->SetFullScreen(gCoreContext->GetBoolSetting("AirPlayFullScreen"));
     GetNotificationCenter()->Queue(*n);
-    m_firstsend = true;
+    m_firstSend = true;
     delete n;
 }

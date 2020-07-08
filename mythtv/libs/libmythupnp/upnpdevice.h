@@ -10,13 +10,17 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef __UPNPDEVICE_H__
-#define __UPNPDEVICE_H__
+#ifndef UPNPDEVICE_H
+#define UPNPDEVICE_H
 
+#include <utility>
+
+// Qt headers
 #include <QDomDocument>
 #include <QUrl>
 #include <QUrlQuery>
 
+// MythTV headers
 #include "compat.h"
 #include "upnpexp.h"
 #include "upnputil.h"
@@ -33,9 +37,9 @@ class QTextStream;
 // Typedefs
 /////////////////////////////////////////////////////////////////////////////
 
-typedef QList< UPnpDevice*  >  UPnpDeviceList;
-typedef QList< UPnpService* >  UPnpServiceList;
-typedef QList< UPnpIcon*    >  UPnpIconList;
+using UPnpDeviceList  = QList< UPnpDevice*  >;
+using UPnpServiceList = QList< UPnpService* >;
+using UPnpIconList    = QList< UPnpIcon*    >;
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -46,11 +50,11 @@ class UPNP_PUBLIC UPnpIcon
   public:
     QString     m_sURL;
     QString     m_sMimeType;
-    int         m_nWidth;
-    int         m_nHeight;
-    int         m_nDepth;
+    int         m_nWidth    { 0 };
+    int         m_nHeight   { 0 };
+    int         m_nDepth    { 0 };
 
-    UPnpIcon() : m_nWidth(0), m_nHeight(0), m_nDepth(0) {}
+    UPnpIcon() = default;
 
     QString toString(uint padding) const
     {
@@ -112,7 +116,7 @@ class UPNP_PUBLIC UPnpDevice
         NameValues      m_lstExtra;
 
         /// MythTV specific information
-        bool            m_securityPin;
+        bool            m_securityPin     { false };
         QString         m_protocolVersion;
 
         UPnpIconList    m_listIcons;
@@ -125,7 +129,7 @@ class UPNP_PUBLIC UPnpDevice
 
         QString GetUDN(void) const;
 
-        void toMap(InfoMap &map);
+        void toMap(InfoMap &map) const;
 
         UPnpService GetService(const QString &urn, bool *found = nullptr) const;
 
@@ -147,29 +151,29 @@ class UPNP_PUBLIC UPnpDeviceDesc
 
         UPnpDevice      m_rootDevice;
         QString         m_sHostName;
-        QUrl            m_HostUrl;
+        QUrl            m_hostUrl;
 
     protected:
 
-        void    _InternalLoad( QDomNode  oNode, UPnpDevice *pCurDevice );
+        void    InternalLoad( QDomNode  oNode, UPnpDevice *pCurDevice );
 
-        void     ProcessIconList   ( const QDomNode& oListNode, UPnpDevice *pDevice );
-        void     ProcessServiceList( const QDomNode& oListNode, UPnpDevice *pDevice );
+        static void     ProcessIconList   ( const QDomNode& oListNode, UPnpDevice *pDevice );
+        static void     ProcessServiceList( const QDomNode& oListNode, UPnpDevice *pDevice );
         void     ProcessDeviceList ( const QDomNode& oListNode, UPnpDevice *pDevice );
 
         void     OutputDevice( QTextStream &os,
                                UPnpDevice *pDevice,
                                const QString &sUserAgent = "" );
 
-        void     SetStrValue ( const QDomNode &n, QString &sValue );
-        void     SetNumValue ( const QDomNode &n, int     &nValue );
-        void     SetBoolValue( const QDomNode &n, bool    &nValue );
+        static void     SetStrValue ( const QDomNode &n, QString &sValue );
+        static void     SetNumValue ( const QDomNode &n, int     &nValue );
+        static void     SetBoolValue( const QDomNode &n, bool    &nValue );
 
-        QString  FormatValue ( const NameValue &node );
-        QString  FormatValue ( const QString &sName, const QString &sValue );
-        QString  FormatValue ( const QString &sName, int nValue );
+        static QString  FormatValue ( const NameValue &node );
+        static QString  FormatValue ( const QString &sName, const QString &sValue );
+        static QString  FormatValue ( const QString &sName, int nValue );
 
-        QString  GetHostName ();
+        QString  GetHostName () const;
 
     public:
 
@@ -189,7 +193,7 @@ class UPNP_PUBLIC UPnpDeviceDesc
         static UPnpDevice     *FindDevice( UPnpDevice *pDevice, const QString &sURI );
         static UPnpDeviceDesc *Retrieve  ( QString &sURL );
 
-        void toMap(InfoMap &map)
+        void toMap(InfoMap &map) const
         {
             map["hostname"] = m_sHostName;
             m_rootDevice.toMap(map);
@@ -212,13 +216,12 @@ class UPNP_PUBLIC DeviceLocation : public ReferenceCounter
         // Destructor protected to force use of Release Method
         // ==================================================================
 
-        virtual        ~DeviceLocation()
+        ~DeviceLocation() override
         {
             // Should be atomic decrement
             g_nAllocated--;
 
-            if (m_pDeviceDesc != nullptr)
-                delete m_pDeviceDesc;
+            delete m_pDeviceDesc;
         }
 
         UPnpDeviceDesc *m_pDeviceDesc;  // We take ownership of this pointer.
@@ -235,15 +238,15 @@ class UPNP_PUBLIC DeviceLocation : public ReferenceCounter
 
         // ==================================================================
 
-        DeviceLocation( const QString &sURI,
-                        const QString &sUSN,
-                        const QString &sLocation,
+        DeviceLocation( QString sURI,
+                        QString sUSN,
+                        QString sLocation,
                         TaskTime       ttExpires ) : ReferenceCounter(
                                                          "DeviceLocation"     ),
                                                      m_pDeviceDesc( nullptr   ),
-                                                     m_sURI       ( sURI      ),
-                                                     m_sUSN       ( sUSN      ),
-                                                     m_sLocation  ( sLocation ),
+                                                     m_sURI       (std::move( sURI      )),
+                                                     m_sUSN       (std::move( sUSN      )),
+                                                     m_sLocation  (std::move( sLocation )),
                                                      m_ttExpires  ( ttExpires )
         {
             // Should be atomic increment
@@ -328,4 +331,4 @@ class UPNP_PUBLIC DeviceLocation : public ReferenceCounter
         }
 };
 
-#endif
+#endif // UPNPDEVICE_H

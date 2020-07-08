@@ -21,13 +21,13 @@ class RemoteFileDownloadThread;
 void ShutdownMythDownloadManager(void);
 
 // TODO : Overlap/Clash with RequestType in libupnp/httprequest.h
-typedef enum MRequestType {
+enum MRequestType {
     kRequestGet,
     kRequestHead,
     kRequestPost
-} MRequestType;
+};
 
-typedef void (*AuthCallback)(QNetworkReply*, QAuthenticator*, void*);
+using AuthCallback = void (*)(QNetworkReply*, QAuthenticator*, void*);
 
 class MBASE_PUBLIC MythDownloadManager : public QObject, public MThread
 {
@@ -41,28 +41,28 @@ class MBASE_PUBLIC MythDownloadManager : public QObject, public MThread
         : MThread("DownloadManager"),
           m_infoLock(new QMutex(QMutex::Recursive)) {}
 
-   ~MythDownloadManager();
+   ~MythDownloadManager() override;
 
     // Methods for starting the queue manager thread
     void run(void) override; // MThread
     void setRunThread(void) { m_runThread = true; }
     QThread *getQueueThread(void) { return m_queueThread; }
-    bool isRunning(void) { return m_isRunning; }
+    bool isRunning(void) const { return m_isRunning; }
 
     // Methods to GET a URL
     void preCache(const QString &url);
     void queueDownload(const QString &url, const QString &dest,
-                       QObject *caller, const bool reload = false);
+                       QObject *caller, bool reload = false);
     void queueDownload(QNetworkRequest *req, QByteArray *data,
                        QObject *caller);
     bool download(const QString &url, const QString &dest,
-                  const bool reload = false);
+                  bool reload = false);
     bool download(const QString &url, QByteArray *data,
-                  const bool reload = false);
-    QNetworkReply *download(const QString &url, const bool reload = false);
+                  bool reload = false, QString *finalUrl = nullptr);
+    QNetworkReply *download(const QString &url, bool reload = false);
     bool download(QNetworkRequest *req, QByteArray *data);
     bool downloadAuth(const QString &url, const QString &dest,
-                      const bool reload = false,
+                      bool reload = false,
                       AuthCallback authCallback = nullptr,
                       void *authArg = nullptr,
                       const QHash<QByteArray, QByteArray> *headers = nullptr);
@@ -93,7 +93,7 @@ class MBASE_PUBLIC MythDownloadManager : public QObject, public MThread
     void updateCookieJar(void);
 
     QString getHeader(const QUrl &url, const QString &header);
-    QString getHeader(const QNetworkCacheMetaData &cacheData, const QString &header);
+    static QString getHeader(const QNetworkCacheMetaData &cacheData, const QString &header);
 
   private slots:
     // QNetworkAccessManager signals
@@ -111,30 +111,31 @@ class MBASE_PUBLIC MythDownloadManager : public QObject, public MThread
     // Helper methods for initializing and performing requests
     void queueItem(const QString &url, QNetworkRequest *req,
                    const QString &dest, QByteArray *data, QObject *caller,
-                   const MRequestType reqType = kRequestGet,
-                   const bool reload = false);
+                   MRequestType reqType = kRequestGet,
+                   bool reload = false);
 
     bool processItem(const QString &url, QNetworkRequest *req,
                      const QString &dest, QByteArray *data,
-                     const MRequestType reqType = kRequestGet,
-                     const bool reload = false,
+                     MRequestType reqType = kRequestGet,
+                     bool reload = false,
                      AuthCallback authCallback = nullptr,
                      void *authArg = nullptr,
-                     const QHash<QByteArray, QByteArray> *headers = nullptr);
+                     const QHash<QByteArray, QByteArray> *headers = nullptr,
+                     QString *finalUrl = nullptr);
 
     void downloadRemoteFile(MythDownloadInfo *dlInfo);
     void downloadQNetworkRequest(MythDownloadInfo *dlInfo);
     bool downloadNow(MythDownloadInfo *dlInfo, bool deleteInfo = true);
 #ifndef _WIN32
-    bool downloadNowLinkLocal(MythDownloadInfo *dlInfo, bool deleteInfo);
+    static bool downloadNowLinkLocal(MythDownloadInfo *dlInfo, bool deleteInfo);
 #endif
     void downloadCanceled(void);
 
-    QUrl redirectUrl(const QUrl& possibleRedirectUrl,
-                     const QUrl& oldRedirectUrl) const;
+    static QUrl redirectUrl(const QUrl& possibleRedirectUrl,
+                            const QUrl& oldRedirectUrl) ;
 
-    bool saveFile(const QString &outFile, const QByteArray &data,
-                  const bool append = false);
+    static bool saveFile(const QString &outFile, const QByteArray &data,
+                         bool append = false);
 
     void updateCookieJar(QNetworkCookieJar *jar);
 

@@ -16,14 +16,13 @@
 
 #include <algorithm>
 
-typedef vector<ProgramInfo*> *VPI_ptr;
+using VPI_ptr = vector<ProgramInfo *> *;
 static void free_vec(VPI_ptr &v)
 {
     if (v)
     {
-        vector<ProgramInfo*>::iterator it = v->begin();
-        for (; it != v->end(); ++it)
-            delete *it;
+        for (auto & it : *v)
+            delete it;
         delete v;
         v = nullptr;
     }
@@ -48,20 +47,20 @@ ProgramInfoCache::~ProgramInfoCache()
 {
     QMutexLocker locker(&m_lock);
 
-    while (m_loads_in_progress)
-        m_load_wait.wait(&m_lock);
+    while (m_loadsInProgress)
+        m_loadWait.wait(&m_lock);
 
     Clear();
-    free_vec(m_next_cache);
+    free_vec(m_nextCache);
 }
 
 void ProgramInfoCache::ScheduleLoad(const bool updateUI)
 {
     QMutexLocker locker(&m_lock);
-    if (!m_load_is_queued)
+    if (!m_loadIsQueued)
     {
-        m_load_is_queued = true;
-        m_loads_in_progress++;
+        m_loadIsQueued = true;
+        m_loadsInProgress++;
         MThreadPool::globalInstance()->start(
             new ProgramInfoLoader(*this, updateUI), "ProgramInfoLoader");
     }
@@ -70,7 +69,7 @@ void ProgramInfoCache::ScheduleLoad(const bool updateUI)
 void ProgramInfoCache::Load(const bool updateUI)
 {
     QMutexLocker locker(&m_lock);
-    m_load_is_queued = false;
+    m_loadIsQueued = false;
 
     locker.unlock();
     /**/
@@ -80,28 +79,28 @@ void ProgramInfoCache::Load(const bool updateUI)
     /**/
     locker.relock();
 
-    free_vec(m_next_cache);
-    m_next_cache = tmp;
+    free_vec(m_nextCache);
+    m_nextCache = tmp;
 
     if (updateUI)
         QCoreApplication::postEvent(
             m_listener, new MythEvent("UPDATE_UI_LIST"));
 
-    m_loads_in_progress--;
-    m_load_wait.wakeAll();
+    m_loadsInProgress--;
+    m_loadWait.wakeAll();
 }
 
 bool ProgramInfoCache::IsLoadInProgress(void) const
 {
     QMutexLocker locker(&m_lock);
-    return m_loads_in_progress != 0U;
+    return m_loadsInProgress != 0U;
 }
 
 void ProgramInfoCache::WaitForLoadToComplete(void) const
 {
     QMutexLocker locker(&m_lock);
-    while (m_loads_in_progress)
-        m_load_wait.wait(&m_lock);
+    while (m_loadsInProgress)
+        m_loadWait.wait(&m_lock);
 }
 
 /** \brief Refreshed the cache.
@@ -117,19 +116,18 @@ void ProgramInfoCache::WaitForLoadToComplete(void) const
 void ProgramInfoCache::Refresh(void)
 {
     QMutexLocker locker(&m_lock);
-    if (m_next_cache)
+    if (m_nextCache)
     {
         Clear();
-        vector<ProgramInfo*>::iterator it = m_next_cache->begin();
-        for (; it != m_next_cache->end(); ++it)
+        for (auto & it : *m_nextCache)
         {
-            if (!(*it)->GetChanID())
+            if (!it->GetChanID())
                 continue;
 
-            m_cache[(*it)->GetRecordingID()] = *it;
+            m_cache[it->GetRecordingID()] = it;
         }
-        delete m_next_cache;
-        m_next_cache = nullptr;
+        delete m_nextCache;
+        m_nextCache = nullptr;
         return;
     }
     locker.unlock();
@@ -247,8 +245,8 @@ namespace {
 
 void ProgramInfoCache::GetOrdered(vector<ProgramInfo*> &list, bool newest_first)
 {
-    for (Cache::iterator it = m_cache.begin(); it != m_cache.end(); ++it)
-            list.push_back(*it);
+    for (const auto & pi : qAsConst(m_cache))
+        list.push_back(pi);
 
     if (newest_first)
         std::sort(list.begin(), list.end(), reversePISort);
@@ -270,7 +268,7 @@ ProgramInfo *ProgramInfoCache::GetRecordingInfo(uint recordingID) const
 /// Clears the cache, m_lock must be held when this is called.
 void ProgramInfoCache::Clear(void)
 {
-    for (Cache::iterator it = m_cache.begin(); it != m_cache.end(); ++it)
-        delete (*it);
+    for (const auto & pi : qAsConst(m_cache))
+        delete pi;
     m_cache.clear();
 }

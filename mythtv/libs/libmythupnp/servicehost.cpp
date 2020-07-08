@@ -18,13 +18,13 @@
 #include "xsd.h"
 //#include "services/rtti.h"
 
-#define _MAX_PARAMS 256
+static constexpr int MAX_PARAMS = 256;
 
 //////////////////////////////////////////////////////////////////////////////
 //
 //////////////////////////////////////////////////////////////////////////////
 
-QVariant MethodInfo::Invoke( Service *pService, const QStringMap &reqParams )
+QVariant MethodInfo::Invoke( Service *pService, const QStringMap &reqParams ) const
 {
     HttpRedirectException exception;
     bool                  bExceptionThrown = false;
@@ -34,8 +34,7 @@ QVariant MethodInfo::Invoke( Service *pService, const QStringMap &reqParams )
         throw;
 
      // Change params to lower case for case-insensitive comparison
-    QStringMap::const_iterator it = reqParams.begin();
-    for (; it != reqParams.end(); ++it)
+    for (auto it = reqParams.cbegin(); it != reqParams.cend(); ++it)
     {
         lowerParams[it.key().toLower()] = *it;
     }
@@ -51,15 +50,15 @@ QVariant MethodInfo::Invoke( Service *pService, const QStringMap &reqParams )
     QList<QByteArray> paramTypes = m_oMethod.parameterTypes();
 
     // ----------------------------------------------------------------------
-    // Create Parameter array (Can't have more than _MAX_PARAMS parameters)....
+    // Create Parameter array (Can't have more than MAX_PARAMS parameters)....
     // switched to static array for performance.
     // ----------------------------------------------------------------------
 
-    void *param[ _MAX_PARAMS ];
-    int   types[ _MAX_PARAMS ];
+    void *param[ MAX_PARAMS ];
+    int   types[ MAX_PARAMS ];
 
-    memset( param, 0, _MAX_PARAMS * sizeof(void *));
-    memset( types, 0, _MAX_PARAMS * sizeof(int));
+    memset( param, 0, MAX_PARAMS * sizeof(void *));
+    memset( types, 0, MAX_PARAMS * sizeof(int));
 
     try
     {
@@ -174,7 +173,7 @@ QVariant MethodInfo::Invoke( Service *pService, const QStringMap &reqParams )
     // --------------------------------------------------------------
 
     if (bExceptionThrown)
-        throw exception;
+        throw HttpRedirectException(exception);
 
     return vReturn;
 }
@@ -475,7 +474,7 @@ bool ServiceHost::FormatResponse( HTTPRequest *pRequest, QObject *pResults )
 //
 /////////////////////////////////////////////////////////////////////////////
 
-bool ServiceHost::FormatResponse( HTTPRequest *pRequest, QFileInfo oInfo )
+bool ServiceHost::FormatResponse( HTTPRequest *pRequest, const QFileInfo& oInfo )
 {
     QString sName = oInfo.absoluteFilePath();
 
@@ -500,7 +499,7 @@ bool ServiceHost::FormatResponse( HTTPRequest *pRequest, QFileInfo oInfo )
 //
 /////////////////////////////////////////////////////////////////////////////
 
-bool ServiceHost::FormatResponse( HTTPRequest *pRequest, QVariant vValue )
+bool ServiceHost::FormatResponse( HTTPRequest *pRequest, const QVariant& vValue )
 {
     if ( vValue.canConvert< QObject* >()) 
     { 
@@ -511,7 +510,7 @@ bool ServiceHost::FormatResponse( HTTPRequest *pRequest, QVariant vValue )
 
     if ( vValue.canConvert< QFileInfo >()) 
     {
-        const QFileInfo oFileInfo = vValue.value< QFileInfo >(); 
+        const auto oFileInfo = vValue.value< QFileInfo >();
 
         return FormatResponse( pRequest, oFileInfo );
     }

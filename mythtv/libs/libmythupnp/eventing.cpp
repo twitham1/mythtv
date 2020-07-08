@@ -12,9 +12,9 @@
 
 #include <cmath>
 
+#include <QStringList>
 #include <QTextCodec>
 #include <QTextStream>
-#include <QStringList>
 
 #include "upnp.h"
 #include "eventing.h"
@@ -33,17 +33,16 @@ uint StateVariables::BuildNotifyBody(
     ts << "<?xml version=\"1.0\"?>" << endl
        << "<e:propertyset xmlns:e=\"urn:schemas-upnp-org:event-1-0\">" << endl;
 
-    SVMap::const_iterator it = m_map.begin();
-    for (; it != m_map.end(); ++it)
+    for (auto *prop : qAsConst(m_map))
     {
-        if ( ttLastNotified < (*it)->m_ttLastChanged )
+        if ( ttLastNotified < prop->m_ttLastChanged )
         {
             nCount++;
 
             ts << "<e:property>" << endl;
-            ts <<   "<" << (*it)->m_sName << ">";
-            ts <<     (*it)->ToString();
-            ts <<   "</" << (*it)->m_sName << ">";
+            ts <<   "<" << prop->m_sName << ">";
+            ts <<     prop->ToString();
+            ts <<   "</" << prop->m_sName << ">";
             ts << "</e:property>" << endl;
         }
     }
@@ -59,10 +58,10 @@ uint StateVariables::BuildNotifyBody(
 /////////////////////////////////////////////////////////////////////////////
 
 Eventing::Eventing(const QString &sExtensionName,
-                   const QString &sEventMethodName,
+                   QString sEventMethodName,
                    const QString &sSharePath) :
     HttpServerExtension(sExtensionName, sSharePath),
-    m_sEventMethodName(sEventMethodName),
+    m_sEventMethodName(std::move(sEventMethodName)),
     m_nSubscriptionDuration(
         UPnp::GetConfiguration()->GetValue("UPnP/SubscriptionDuration", 1800))
 {
@@ -75,9 +74,8 @@ Eventing::Eventing(const QString &sExtensionName,
 
 Eventing::~Eventing()
 {
-    Subscribers::iterator it = m_Subscribers.begin();
-    for (; it != m_Subscribers.end(); ++it)
-        delete *it;
+    for (const auto *subscriber : qAsConst(m_Subscribers))
+        delete subscriber;
     m_Subscribers.clear();
 }
 
@@ -90,11 +88,9 @@ inline short Eventing::HoldEvents()
     // -=>TODO: Should use an Atomic increment... 
     //          need to research available functions.
 
-    short nVal;
-
     m_mutex.lock();
     bool err = (m_nHoldCount >= 127);
-    nVal = (m_nHoldCount++);
+    short nVal = (m_nHoldCount++);
     m_mutex.unlock();
 
     if (err)
@@ -116,10 +112,8 @@ inline short Eventing::ReleaseEvents()
 {
     // -=>TODO: Should use an Atomic decrement... 
 
-    short nVal;
-
     m_mutex.lock();
-    nVal = (m_nHoldCount--);
+    short nVal = (m_nHoldCount--);
     m_mutex.unlock();
 
     if (nVal == 0)
@@ -378,7 +372,7 @@ void Eventing::NotifySubscriber( SubscriberInfo *pInfo )
 
         // -=>TODO: Need to add support for more than one CallBack URL.
 
-        QByteArray  *pBuffer = new QByteArray();    // UPnpEventTask will delete this pointer.
+        auto *pBuffer = new QByteArray();    // UPnpEventTask will delete this pointer.
         QTextStream  tsMsg( pBuffer, QIODevice::WriteOnly );
 
         tsMsg.setCodec(QTextCodec::codecForName("UTF-8"));
@@ -411,9 +405,8 @@ void Eventing::NotifySubscriber( SubscriberInfo *pInfo )
             QString("UPnp::Eventing::NotifySubscriber( %1 ) : %2 Variables")
                 .arg( sHost ).arg(nCount));
 
-        UPnpEventTask *pEventTask = 
-            new UPnpEventTask(QHostAddress( pInfo->m_qURL.host() ),
-                              nPort, pBuffer );
+        auto *pEventTask = new UPnpEventTask(QHostAddress(pInfo->m_qURL.host()),
+                                             nPort, pBuffer);
 
         TaskQueue::Instance()->AddTask( 250, pEventTask );
 

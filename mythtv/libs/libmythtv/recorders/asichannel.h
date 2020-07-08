@@ -1,7 +1,7 @@
 /// -*- Mode: c++ -*-
 
-#ifndef _ASI_CHANNEL_H_
-#define _ASI_CHANNEL_H_
+#ifndef ASI_CHANNEL_H
+#define ASI_CHANNEL_H
 
 #include <vector>
 using namespace std;
@@ -15,34 +15,34 @@ using namespace std;
 class ASIChannel : public DTVChannel
 {
   public:
-    ASIChannel(TVRec *parent, const QString &device);
-    ~ASIChannel(void);
+    ASIChannel(TVRec *parent, QString device);
+    ~ASIChannel(void) override;
 
     // Commands
     bool Open(void) override; // ChannelBase
     void Close(void) override; // ChannelBase
 
     using DTVChannel::Tune;
-    bool Tune(const DTVMultiplex&) override // DTVChannel
+    bool Tune(const DTVMultiplex &/*tuning*/) override // DTVChannel
         { return true; }
-    bool Tune(const QString&, int) override // ChannelBase
+    bool Tune(const QString &/*freqid*/, int /*finetune*/) override // ChannelBase
         { return true; }
-    bool Tune(uint64_t) override // DTVChannel
+    bool Tune(uint64_t /*frequency*/) override // DTVChannel
         { return true; }
     // Gets
     bool IsOpen(void) const  override // ChannelBase
-        { return m_isopen; }
+        { return m_isOpen; }
     QString GetDevice(void) const override // ChannelBase
         { return m_device; }
     vector<DTVTunerType> GetTunerTypes(void) const override // DTVChannel
-        { return m_tuner_types; }
+        { return m_tunerTypes; }
     bool IsPIDTuningSupported(void) const override // DTVChannel
         { return true; }
 
   private:
-    vector<DTVTunerType>     m_tuner_types;
+    vector<DTVTunerType>     m_tunerTypes;
     QString                  m_device;
-    bool                     m_isopen {false};
+    bool                     m_isOpen {false};
 };
 
-#endif // _ASI_CHANNEL_H_
+#endif // ASI_CHANNEL_H

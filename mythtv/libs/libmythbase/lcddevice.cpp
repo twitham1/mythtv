@@ -16,7 +16,6 @@
 
 // Qt headers
 #include <QApplication>
-#include <QRegExp>
 #include <QTextStream>
 #include <QTextCodec>
 #include <QByteArray>
@@ -38,7 +37,7 @@
 #define LOC QString("LCDdevice: ")
 
 LCD::LCD()
-    : m_retryTimer(new QTimer(this)), m_LEDTimer(new QTimer(this))
+    : m_retryTimer(new QTimer(this)), m_ledTimer(new QTimer(this))
 {
     m_sendBuffer.clear(); m_lastCommand.clear();
     m_lcdShowMusicItems.clear(); m_lcdKeyString.clear();
@@ -54,7 +53,7 @@ LCD::LCD()
         "An LCD object now exists (LCD() was called)");
 
     connect(m_retryTimer, SIGNAL(timeout()),   this, SLOT(restartConnection()));
-    connect(m_LEDTimer,   SIGNAL(timeout()),   this, SLOT(outputLEDs()));
+    connect(m_ledTimer,   SIGNAL(timeout()),   this, SLOT(outputLEDs()));
     connect(this, &LCD::sendToServer, this, &LCD::sendToServerSlot, Qt::QueuedConnection);
 }
 
@@ -72,7 +71,6 @@ LCD *LCD::Get(void)
 void LCD::SetupLCD (void)
 {
     QString lcd_host;
-    int lcd_port;
 
     if (m_lcd)
     {
@@ -82,7 +80,7 @@ void LCD::SetupLCD (void)
     }
 
     lcd_host = GetMythDB()->GetSetting("LCDServerHost", "localhost");
-    lcd_port = GetMythDB()->GetNumSetting("LCDServerPort", 6545);
+    int lcd_port = GetMythDB()->GetNumSetting("LCDServerPort", 6545);
     m_enabled = GetMythDB()->GetBoolSetting("LCDEnable", false);
 
     // workaround a problem with Ubuntu not resolving localhost properly
@@ -254,7 +252,6 @@ void LCD::ReadyRead(void)
 
     QString lineFromServer;
     QStringList aList;
-    QStringList::Iterator it;
 
     // This gets activated automatically by the MythSocket class whenever
     // there's something to read.
@@ -262,14 +259,12 @@ void LCD::ReadyRead(void)
     // We currently spend most of our time (except for the first line sent
     // back) ignoring it.
 
-    int dataSize = m_socket->bytesAvailable() + 1;
+    int dataSize = static_cast<int>(m_socket->bytesAvailable() + 1);
     QByteArray data(dataSize + 1, 0);
 
     m_socket->read(data.data(), dataSize);
 
     lineFromServer = data;
-    lineFromServer = lineFromServer.replace( QRegExp("\n"), " " );
-    lineFromServer = lineFromServer.replace( QRegExp("\r"), " " );
     lineFromServer = lineFromServer.simplified();
 
     // Make debugging be less noisy
@@ -288,7 +283,7 @@ void LCD::ReadyRead(void)
                                            "CONNECTED response from LCDServer");
         }
 
-        bool bOK;
+        bool bOK = false;
         m_lcdWidth = aList[1].toInt(&bOK);
         if (!bOK)
         {
@@ -528,10 +523,10 @@ void LCD::setVolumeLevel(float value)
 
 void LCD::setupLEDs(int(*LedMaskFunc)(void))
 {
-    GetLEDMask = LedMaskFunc;
+    m_getLEDMask = LedMaskFunc;
     // update LED status every 10 seconds
-    m_LEDTimer->setSingleShot(false);
-    m_LEDTimer->start(10000);
+    m_ledTimer->setSingleShot(false);
+    m_ledTimer->start(10000);
 }
 
 void LCD::outputLEDs()
@@ -543,8 +538,8 @@ void LCD::outputLEDs()
 
     QString aString;
     int mask = 0;
-    if (0 && GetLEDMask)
-        mask = GetLEDMask();
+    if (0 && m_getLEDMask)
+        mask = m_getLEDMask();
     aString = "UPDATE_LEDS ";
     aString += QString::number(mask);
     sendToServer(aString);
@@ -727,7 +722,7 @@ LCD::~LCD()
 QString LCD::quotedString(const QString &string)
 {
     QString sRes = string;
-    sRes.replace(QRegExp("\""), QString("\"\""));
+    sRes.replace(QString("\""), QString("\"\""));
     sRes = "\"" + sRes + "\"";
 
     return(sRes);
