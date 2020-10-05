@@ -110,9 +110,15 @@ MythSocket::MythSocket(
     connect(m_tcpSocket,  SIGNAL(connected()),
             this, SLOT(ConnectHandler()),
             Qt::DirectConnection);
+#if QT_VERSION < QT_VERSION_CHECK(5,15,0)
     connect(m_tcpSocket,  SIGNAL(error(QAbstractSocket::SocketError)),
             this, SLOT(ErrorHandler(QAbstractSocket::SocketError)),
             Qt::DirectConnection);
+#else
+    connect(m_tcpSocket,  SIGNAL(errorOccurred(QAbstractSocket::SocketError)),
+            this, SLOT(ErrorHandler(QAbstractSocket::SocketError)),
+            Qt::DirectConnection);
+#endif
     connect(m_tcpSocket,  SIGNAL(aboutToClose()),
             this, SLOT(AboutToCloseHandler()));
     connect(m_tcpSocket,  SIGNAL(disconnected()),
@@ -396,7 +402,7 @@ bool MythSocket::ConnectToHost(const QString &host, quint16 port)
             QHostInfo info = QHostInfo::fromName(host);
             if (!info.addresses().isEmpty())
             {
-                hadr = info.addresses().first();
+                hadr = info.addresses().constFirst();
             }
             else
             {

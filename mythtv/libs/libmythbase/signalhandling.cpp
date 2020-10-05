@@ -7,20 +7,19 @@
 #include <cstdint>
 #include <cstdlib> // for free
 #include <iostream>
+#include <string>
 #include <sys/types.h>
 #include <unistd.h>
 #ifndef _WIN32
 #include <sys/socket.h>
 #endif
 
-using namespace std;
-
 #include "compat.h"
 #include "mythlogging.h"
 #include "exitcodes.h"
 #include "signalhandling.h"
 
-int SignalHandler::s_sigFd[2];
+std::array<int,2> SignalHandler::s_sigFd;
 volatile bool SignalHandler::s_exit_program = false;
 QMutex SignalHandler::s_singletonLock;
 SignalHandler *SignalHandler::s_singleton;
@@ -28,31 +27,20 @@ SignalHandler *SignalHandler::s_singleton;
 // We may need to write out signal info using just the write() function
 // so we create an array of C strings + measure their lengths.
 #define SIG_STR_COUNT 256
-char *sig_str[SIG_STR_COUNT];
-uint sig_str_len[SIG_STR_COUNT];
+std::array<std::string,SIG_STR_COUNT> sig_str;
 
-static void sig_str_init(int sig, const char *name)
+static void sig_str_init(size_t sig, const char *name)
 {
-    if (sig < SIG_STR_COUNT)
-    {
-        char line[128];
+    if (sig >= sig_str.size())
+        return;
 
-        if (sig_str[sig])
-            free(sig_str[sig]);
-        snprintf(line, 128, "Handling %s\n", name);
-        line[127] = '\0';
-        sig_str[sig]     = strdup(line);
-        sig_str_len[sig] = strlen(line);
-    }
+    sig_str[sig] = qPrintable(QString("Handling %1\n").arg(name));
 }
 
 static void sig_str_init(void)
 {
-    for (int i = 0; i < SIG_STR_COUNT; i++)
-    {
-        sig_str[i] = nullptr;
+    for (size_t i = 0; i < sig_str.size(); i++)
         sig_str_init(i, qPrintable(QString("Signal %1").arg(i)));
-    }
 }
 
 QList<int> SignalHandler::s_defaultHandlerList;
@@ -73,7 +61,7 @@ SignalHandler::SignalHandler(QList<int> &signallist, QObject *parent) :
     // Carry on without the signal stack if it fails
     if (sigaltstack(&stack, nullptr) == -1)
     {
-        cerr << "Couldn't create signal stack!" << endl;
+        std::cerr << "Couldn't create signal stack!" << std::endl;
         delete [] m_sigStack;
         m_sigStack = nullptr;
     }
@@ -88,9 +76,9 @@ SignalHandler::SignalHandler(QList<int> &signallist, QObject *parent) :
     s_defaultHandlerList << SIGRTMIN;
 #endif
 
-    if (::socketpair(AF_UNIX, SOCK_STREAM, 0, s_sigFd))
+    if (::socketpair(AF_UNIX, SOCK_STREAM, 0, s_sigFd.data()))
     {
-        cerr << "Couldn't create socketpair" << endl;
+        std::cerr << "Couldn't create socketpair" << std::endl;
         return;
     }
     m_notifier = new QSocketNotifier(s_sigFd[1], QSocketNotifier::Read, this);
@@ -100,7 +88,7 @@ SignalHandler::SignalHandler(QList<int> &signallist, QObject *parent) :
     {
         if (!s_defaultHandlerList.contains(signum))
         {
-            cerr << "No default handler for signal " << signum << endl;
+            std::cerr << "No default handler for signal " << signum << std::endl;
             continue;
         }
 
@@ -216,7 +204,7 @@ void SignalHandler::signalHandler(int signum, siginfo_t *info, void *context)
     signalInfo.m_code   = (info ? info->si_code : 0);
     signalInfo.m_pid    = (info ? (int)info->si_pid : 0);
     signalInfo.m_uid    = (info ? (int)info->si_uid : 0);
-    signalInfo.m_value  = (info ? *(uint64_t *)&info->si_value : 0);
+    signalInfo.m_value  = (info ? info->si_value.sival_int : 0);
 #endif
 
     // Keep trying if there's no room to write, but stop on error (-1)
@@ -266,8 +254,8 @@ void SignalHandler::signalHandler(int signum, siginfo_t *info, void *context)
             //        we need to stick to system calls that are known to be
             //        signal-safe.  write is, the other two aren't.
             int d = 0;
-            if (signum < SIG_STR_COUNT)
-                d+=::write(STDERR_FILENO, sig_str[signum], sig_str_len[signum]);
+            if (signum < static_cast<int>(sig_str.size()))
+                d+=::write(STDERR_FILENO, sig_str[signum].c_str(), sig_str[signum].size());
             (void) d; // quiet ignoring return value warning.
         }
 

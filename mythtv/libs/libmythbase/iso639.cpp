@@ -7,13 +7,11 @@
 
 #include <QStringList>
 
-using namespace std;
-
 QMap<int, QString>    iso639_key_to_english_name;
 static QMap<int, int> s_iso639_key2_to_key3;
 static QMap<int, int> s_iso639_key3_to_canonical_key3;
 static QStringList    s_languages;
-static vector<int>    s_language_keys;
+static std::vector<int> s_language_keys;
 
 /* Note: this file takes a long time to compile. **/
 
@@ -55,7 +53,7 @@ QStringList iso639_get_language_list(void)
     return s_languages;
 }
 
-vector<int> iso639_get_language_key_list(void)
+std::vector<int> iso639_get_language_key_list(void)
 {
     if (s_language_keys.empty())
     {
@@ -110,9 +108,8 @@ QString iso639_str_toName(const unsigned char *iso639)
 
 QString iso639_key_toName(int iso639_2)
 {
-    QMap<int, QString>::const_iterator it;
-    it = iso639_key_to_english_name.find(iso639_2);
-    if (it != iso639_key_to_english_name.end())
+    auto it = iso639_key_to_english_name.constFind(iso639_2);
+    if (it != iso639_key_to_english_name.constEnd())
         return *it;
 
     return "Unknown";
@@ -120,10 +117,8 @@ QString iso639_key_toName(int iso639_2)
 
 int iso639_key_to_canonical_key(int iso639_2)
 {
-    QMap<int, int>::const_iterator it;
-    it = s_iso639_key3_to_canonical_key3.find(iso639_2);
-
-    if (it != s_iso639_key3_to_canonical_key3.end())
+    auto it = s_iso639_key3_to_canonical_key3.constFind(iso639_2);
+    if (it != s_iso639_key3_to_canonical_key3.constEnd())
         return *it;
     return iso639_2;
 }

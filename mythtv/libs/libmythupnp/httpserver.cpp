@@ -43,9 +43,6 @@
 
 #include "serviceHosts/rttiServiceHost.h"
 
-using namespace std;
-
-
 /**
  * \brief Handle an OPTIONS request
  */
@@ -119,7 +116,7 @@ HttpServer::HttpServer() :
     m_privateToken(QUuid::createUuid().toString()) // Cryptographically random and sufficiently long enough to act as a secure token
 {
     // Number of connections processed concurrently
-    int maxHttpWorkers = max(QThread::idealThreadCount() * 2, 2); // idealThreadCount can return -1
+    int maxHttpWorkers = std::max(QThread::idealThreadCount() * 2, 2); // idealThreadCount can return -1
     // Don't allow more connections than we can process, it causes browsers
     // to open lots of new connections instead of reusing existing ones
     setMaxPendingConnections(maxHttpWorkers);
@@ -287,7 +284,7 @@ QString HttpServer::GetPlatform(void)
 
 QString HttpServer::GetServerVersion(void)
 {
-    QString mythVersion = MYTH_SOURCE_VERSION;
+    QString mythVersion = GetMythSourceVersion();
     if (mythVersion.startsWith("v"))
         mythVersion = mythVersion.right(mythVersion.length() - 1); // Trim off the leading 'v'
     return QString("MythTV/%2 %1 UPnP/1.0").arg(HttpServer::GetPlatform())
@@ -301,7 +298,7 @@ QString HttpServer::GetServerVersion(void)
 void HttpServer::newTcpConnection(qt_socket_fd_t socket)
 {
     PoolServerType type = kTCPServer;
-    auto *server = dynamic_cast<PrivTcpServer *>(QObject::sender());
+    auto *server = qobject_cast<PrivTcpServer *>(QObject::sender());
     if (server)
         type = server->GetServerType();
 
@@ -508,7 +505,7 @@ void HttpWorker::run(void)
         }
 
         if (pSslSocket)
-            pSocket = dynamic_cast<QTcpSocket *>(pSslSocket);
+            pSocket = pSslSocket;
         else
             return;
 #else

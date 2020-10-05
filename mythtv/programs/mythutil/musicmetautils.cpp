@@ -272,7 +272,7 @@ static int CalcTrackLength(const MythUtilCommandLineParser &cmdline)
     for (uint i = 0; i < inputFC->nb_streams; i++)
     {
         AVStream *st = inputFC->streams[i];
-        char buf[256];
+        std::array<char,256> buf {};
 
         const AVCodec *pCodec = avcodec_find_decoder(st->codecpar->codec_id);
         if (!pCodec)
@@ -285,7 +285,7 @@ static int CalcTrackLength(const MythUtilCommandLineParser &cmdline)
         avcodec_parameters_to_context(avctx, st->codecpar);
         avctx->pkt_timebase = st->time_base;
 
-        avcodec_string(buf, sizeof(buf), avctx, static_cast<int>(false));
+        avcodec_string(buf.data(), buf.size(), avctx, static_cast<int>(false));
 
         switch (inputFC->streams[i]->codecpar->codec_type)
         {
@@ -476,14 +476,11 @@ static int FindLyrics(const MythUtilCommandLineParser &cmdline)
     }
 
     QStringList scripts;
-    QFileInfoList::const_iterator it = list.begin();
 
-    while (it != list.end())
+    for (const auto& fi : qAsConst(list))
     {
-        const QFileInfo *fi = &(*it);
-        ++it;
-        LOG(VB_GENERAL, LOG_NOTICE, QString("Found lyric script at: %1").arg(fi->filePath()));
-        scripts.append(fi->filePath());
+        LOG(VB_GENERAL, LOG_NOTICE, QString("Found lyric script at: %1").arg(fi.filePath()));
+        scripts.append(fi.filePath());
     }
 
     QMap<int, LyricsGrabber> grabberMap;

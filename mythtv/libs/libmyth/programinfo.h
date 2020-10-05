@@ -67,6 +67,9 @@ class PMapDBReplacement;
 class MPUBLIC ProgramInfo
 {
     friend int pginfo_init_statics(void);
+  private:
+    // Must match the number of items in CategoryType below
+    static const std::array<const QString,5> kCatName;
   public:
     static constexpr int kNumCatTypes = 5;
     enum CategoryType { kCategoryNone, kCategoryMovie, kCategorySeries,
@@ -892,10 +895,10 @@ bool LoadFromScheduler(
 
     hasConflicts = slist[0].toInt();
 
-    QStringList::const_iterator sit = slist.begin()+2;
-    while (sit != slist.end())
+    QStringList::const_iterator sit = slist.cbegin()+2;
+    while (sit != slist.cend())
     {
-        TYPE *p = new TYPE(sit, slist.end());
+        TYPE *p = new TYPE(sit, slist.cend());
         destination.push_back(p);
 
         if (!p->HasPathname() && !p->GetChanID())

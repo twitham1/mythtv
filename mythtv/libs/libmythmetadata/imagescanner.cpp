@@ -189,11 +189,11 @@ void ImageScanThread<DBFS>::run()
             // Adding or updating directories has been completed.
             // The maps now only contain old directories & files that are not
             // in the filesystem anymore. Remove them from the database
-            m_dbfs.RemoveFromDB(m_dbDirMap.values());
-            m_dbfs.RemoveFromDB(m_dbFileMap.values());
+            m_dbfs.RemoveFromDB(QVector<ImagePtr>::fromList(m_dbDirMap.values()));
+            m_dbfs.RemoveFromDB(QVector<ImagePtr>::fromList(m_dbFileMap.values()));
 
             // Cleanup thumbnails
-            QStringList mesg(m_thumb.DeleteThumbs(m_dbFileMap.values()));
+            QStringList mesg(m_thumb.DeleteThumbs(QVector<ImagePtr>::fromList(m_dbFileMap.values())));
             mesg << m_changedImages.join(",");
 
             // Cleanup dirs
@@ -259,9 +259,16 @@ void ImageScanThread<DBFS>::SyncSubTree(const QFileInfo &dirInfo, int parentId,
 
     // Create directory node
     int id = SyncDirectory(dirInfo, devId, base, parentId);
+    if (id == -1)
+    {
+        LOG(VB_FILE, LOG_INFO,
+            QString("Failed to sync dir %1").arg(dirInfo.absoluteFilePath()));
+        return;
+    }
 
     // Sync its contents
-    for (const auto& fileInfo : dir.entryInfoList())
+    QFileInfoList entries = dir.entryInfoList();
+    for (const auto & fileInfo : qAsConst(entries))
     {
         if (!IsScanning())
         {
@@ -317,6 +324,8 @@ template <class DBFS>
     if (m_dbDirMap.contains(dir->m_filePath))
     {
         ImagePtr dbDir = m_dbDirMap.value(dir->m_filePath);
+        if (dbDir == nullptr)
+            return -1;
 
         // The directory already exists in the db. Retain its id
         dir->m_id = dbDir->m_id;
@@ -344,6 +353,8 @@ template <class DBFS>
     else if (m_seenDir.contains(dir->m_filePath))
     {
         ImagePtr cloneDir = m_seenDir.value(dir->m_filePath);
+        if (cloneDir == nullptr)
+            return -1;
 
         // All clones point to same Db dir. Use latest
         if (cloneDir->m_modTime >= dir->m_modTime )
@@ -529,7 +540,8 @@ void ImageScanThread<DBFS>::SyncFile(const QFileInfo &fileInfo, int devId,
 template <class DBFS>
 void ImageScanThread<DBFS>::CountTree(QDir &dir)
 {
-    for (const auto& fileInfo : dir.entryInfoList())
+    QFileInfoList entries = dir.entryInfoList();
+    for (const auto & fileInfo : qAsConst(entries))
     {
         // Ignore excluded dirs/files
         if (MATCHES(m_exclusions, fileInfo.fileName()))

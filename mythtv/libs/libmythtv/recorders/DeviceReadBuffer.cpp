@@ -1,9 +1,7 @@
 #include <algorithm>
-using namespace std;
 
 #include "DeviceReadBuffer.h"
 #include "mythcorecontext.h"
-#include "mythbaseutil.h"
 #include "mythlogging.h"
 #include "tspacket.h"
 #include "mthread.h"
@@ -71,10 +69,10 @@ bool DeviceReadBuffer::Setup(const QString &streamName, int streamfd,
     m_used          = 0;
     m_devReadSize = m_readQuanta * (m_usingPoll ? 256 : 48);
     m_devReadSize = (deviceBufferSize) ?
-        min(m_devReadSize, (size_t)deviceBufferSize) : m_devReadSize;
+        std::min(m_devReadSize, (size_t)deviceBufferSize) : m_devReadSize;
     m_readThreshold = m_readQuanta * 128;
 
-    m_buffer        = new (nothrow) unsigned char[m_size + m_devReadSize];
+    m_buffer        = new (std::nothrow) unsigned char[m_size + m_devReadSize];
     m_readPtr       = m_buffer;
     m_writePtr      = m_buffer;
 
@@ -180,12 +178,11 @@ void DeviceReadBuffer::SetPaused(bool val)
 // The WakePoll code is copied from MythSocketThread::WakeReadyReadThread()
 void DeviceReadBuffer::WakePoll(void) const
 {
-    char buf[1];
-    buf[0] = '0';
+    std::string buf(1,'\0');
     ssize_t wret = 0;
     while (isRunning() && (wret <= 0) && (m_wakePipe[1] >= 0))
     {
-        wret = ::write(m_wakePipe[1], &buf, 1);
+        wret = ::write(m_wakePipe[1], buf.data(), buf.size());
         if ((wret < 0) && (EAGAIN != errno) && (EINTR != errno))
         {
             LOG(VB_GENERAL, LOG_ERR, LOC + "WakePoll failed.");
@@ -348,7 +345,7 @@ void DeviceReadBuffer::run(void)
         {
             // Limit read size for faster return from read
             auto unused = static_cast<size_t>(WaitForUnused(m_readQuanta));
-            size_t read_size = min(m_devReadSize, unused);
+            size_t read_size = std::min(m_devReadSize, unused);
 
             // if read_size > 0 do the read...
             if (read_size)
@@ -424,8 +421,7 @@ bool DeviceReadBuffer::Poll(void) const
     timer.start();
 
     int poll_cnt = 1;
-    struct pollfd polls[2];
-    memset(polls, 0, sizeof(polls));
+    std::array<struct pollfd,2> polls {};
 
     polls[0].fd      = m_streamFd;
     polls[0].events  = POLLIN | POLLPRI;
@@ -450,9 +446,9 @@ bool DeviceReadBuffer::Poll(void) const
             timeout = 10;
         else if (m_pollTimeoutIsError)
             // subtract a bit to allow processing time.
-            timeout = max((int)m_maxPollWait - timer.elapsed() - 15, 10);
+            timeout = std::max((int)m_maxPollWait - timer.elapsed() - 15, 10);
 
-        int ret = poll(polls, poll_cnt, timeout);
+        int ret = poll(polls.data(), poll_cnt, timeout);
 
         if (polls[0].revents & POLLHUP)
         {
@@ -507,9 +503,9 @@ bool DeviceReadBuffer::Poll(void) const
         // Clear out any pending pipe reads
         if ((poll_cnt > 1) && (polls[1].revents & POLLIN))
         {
-            char dummy[128];
+            std::array<char,128> dummy {};
             int cnt = (m_wakePipeFlags[0] & O_NONBLOCK) ? 128 : 1;
-            ::read(m_wakePipe[0], dummy, cnt);
+            ::read(m_wakePipe[0], dummy.data(), cnt);
         }
 
         if (m_pollTimeoutIsError && (timer.elapsed() >= (int)m_maxPollWait))
@@ -617,8 +613,8 @@ bool DeviceReadBuffer::CheckForErrors(
  */
 uint DeviceReadBuffer::Read(unsigned char *buf, const uint count)
 {
-    uint avail = WaitForUsed(min(count, (uint)m_readThreshold), 20);
-    size_t cnt = min(count, avail);
+    uint avail = WaitForUsed(std::min(count, (uint)m_readThreshold), 20);
+    size_t cnt = std::min(count, avail);
 
     if (!cnt)
         return 0;

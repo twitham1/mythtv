@@ -22,7 +22,6 @@
 // Std C++ headers
 #include <algorithm>
 #include <vector>
-using namespace std;
 
 // MythTV headers
 #include "darwinfirewiredevice.h"
@@ -231,7 +230,7 @@ bool DarwinFirewireDevice::OpenPort(void)
 
     if (GetInfoPtr() && GetInfoPtr()->IsPortOpen())
     {
-        m_open_port_cnt++;
+        m_openPortCnt++;
         return true;
     }
 
@@ -288,7 +287,7 @@ bool DarwinFirewireDevice::OpenPort(void)
         }
     }
 
-    m_open_port_cnt++;
+    m_openPortCnt++;
 
     return true;
 }
@@ -299,12 +298,12 @@ bool DarwinFirewireDevice::ClosePort(void)
 
     LOG(VB_RECORD, LOG_INFO, LOC + "ClosePort()");
 
-    if (m_open_port_cnt < 1)
+    if (m_openPortCnt < 1)
         return false;
 
-    m_open_port_cnt--;
+    m_openPortCnt--;
 
-    if (m_open_port_cnt != 0)
+    if (m_openPortCnt != 0)
         return true;
 
     if (GetInfoPtr() && GetInfoPtr()->IsPortOpen())
@@ -329,7 +328,7 @@ bool DarwinFirewireDevice::OpenAVStream(void)
     int max_speed = GetMaxSpeed();
     LOG(VB_GENERAL, LOG_INFO, LOC + QString("Max Speed: %1, Our speed: %2")
                           .arg(max_speed).arg(m_speed));
-    m_speed = min((uint)max_speed, m_speed);
+    m_speed = std::min((uint)max_speed, m_speed);
 
     uint fwchan = 0;
     bool streaming = IsSTBStreaming(&fwchan);
@@ -499,8 +498,8 @@ bool DarwinFirewireDevice::StopStreaming(void)
     return true;
 }
 
-bool DarwinFirewireDevice::SendAVCCommand(const vector<uint8_t> &cmd,
-                                          vector<uint8_t>       &result,
+bool DarwinFirewireDevice::SendAVCCommand(const std::vector<uint8_t> &cmd,
+                                          std::vector<uint8_t>       &result,
                                           int                   retry_cnt)
 {
     return GetInfoPtr()->SendAVCCommand(cmd, result, retry_cnt);
@@ -606,9 +605,9 @@ void DarwinFirewireDevice::ProcessStreamingMessage(
     }
 }
 
-vector<AVCInfo> DarwinFirewireDevice::GetSTBList(void)
+std::vector<AVCInfo> DarwinFirewireDevice::GetSTBList(void)
 {
-    vector<AVCInfo> list;
+    std::vector<AVCInfo> list;
 
     {
         DarwinFirewireDevice dev(0,0,0);
@@ -627,7 +626,7 @@ vector<AVCInfo> DarwinFirewireDevice::GetSTBList(void)
     return list;
 }
 
-vector<AVCInfo> DarwinFirewireDevice::GetSTBListPrivate(void)
+std::vector<AVCInfo> DarwinFirewireDevice::GetSTBListPrivate(void)
 {
 #if 0
     LOG(VB_GENERAL, LOG_DEBUG, LOC + "GetSTBListPrivate -- begin");
@@ -637,7 +636,7 @@ vector<AVCInfo> DarwinFirewireDevice::GetSTBListPrivate(void)
     LOG(VB_GENERAL, LOG_DEBUG, LOC + "GetSTBListPrivate -- got lock");
 #endif
 
-    vector<AVCInfo> list;
+    std::vector<AVCInfo> list;
 
     for (auto dev : qAsConst(m_priv->m_devices))
     {

@@ -42,18 +42,17 @@ ExternalSignalMonitor::ExternalSignalMonitor(int db_cardnum,
                                              uint64_t _flags)
     : DTVSignalMonitor(db_cardnum, _channel, _release_stream, _flags)
 {
-    QString result;
-
     LOG(VB_CHANNEL, LOG_INFO, LOC + "ctor");
-    m_stream_handler = ExternalStreamHandler::Get(m_channel->GetDevice(),
+    m_streamHandler = ExternalStreamHandler::Get(m_channel->GetDevice(),
                                                   m_channel->GetInputID(),
                                                   m_channel->GetMajorID());
-    if (!m_stream_handler || m_stream_handler->HasError())
+    if (!m_streamHandler || m_streamHandler->HasError())
         LOG(VB_GENERAL, LOG_ERR, LOC + "Open failed");
     else
-        m_lock_timeout = GetLockTimeout() * 1000;
+        m_lockTimeout = GetLockTimeout() * 1000;
 
-    if (GetExternalChannel()->IsBackgroundTuning())
+    ExternalChannel *channel = GetExternalChannel();
+    if (channel && channel->IsBackgroundTuning())
         m_scriptStatus.SetValue(1);
 }
 
@@ -64,7 +63,7 @@ ExternalSignalMonitor::~ExternalSignalMonitor()
 {
     LOG(VB_CHANNEL, LOG_INFO, LOC + "dtor");
     ExternalSignalMonitor::Stop();
-    ExternalStreamHandler::Return(m_stream_handler, m_inputid);
+    ExternalStreamHandler::Return(m_streamHandler, m_inputid);
 }
 
 /** \fn ExternalSignalMonitor::Stop(void)
@@ -72,17 +71,15 @@ ExternalSignalMonitor::~ExternalSignalMonitor()
  */
 void ExternalSignalMonitor::Stop(void)
 {
-    QString result;
-
     LOG(VB_CHANNEL, LOG_INFO, LOC + "Stop() -- begin");
 
     SignalMonitor::Stop();
     if (GetStreamData())
     {
-        m_stream_handler->StopStreaming();
-        m_stream_handler->RemoveListener(GetStreamData());
+        m_streamHandler->StopStreaming();
+        m_streamHandler->RemoveListener(GetStreamData());
     }
-    m_stream_handler_started = false;
+    m_streamHandlerStarted = false;
 
     LOG(VB_CHANNEL, LOG_INFO, LOC + "Stop() -- end");
 }
@@ -98,7 +95,11 @@ void ExternalSignalMonitor::UpdateValues(void)
     if (!m_running || m_exit)
         return;
 
-    if (GetExternalChannel()->IsExternalChannelChangeInUse())
+    ExternalChannel *channel = GetExternalChannel();
+    if (channel == nullptr)
+        return;
+
+    if (channel->IsExternalChannelChangeInUse())
     {
         SignalMonitor::UpdateValues();
 
@@ -107,23 +108,23 @@ void ExternalSignalMonitor::UpdateValues(void)
             return;
     }
 
-    if (GetExternalChannel()->IsBackgroundTuning())
+    if (channel->IsBackgroundTuning())
     {
         QMutexLocker locker(&m_statusLock);
         if (m_scriptStatus.GetValue() < 2)
-            m_scriptStatus.SetValue(GetExternalChannel()->GetTuneStatus());
+            m_scriptStatus.SetValue(channel->GetTuneStatus());
 
         if (!m_scriptStatus.IsGood())
             return;
     }
 
-    if (m_stream_handler_started)
+    if (m_streamHandlerStarted)
     {
-        if (!m_stream_handler->IsRunning())
+        if (!m_streamHandler->IsRunning())
         {
             m_error = QObject::tr("Error: stream handler died");
             LOG(VB_CHANNEL, LOG_ERR, LOC + m_error);
-            m_update_done = true;
+            m_updateDone = true;
             return;
         }
 
@@ -131,7 +132,7 @@ void ExternalSignalMonitor::UpdateValues(void)
         if (IsAllGood())
             SendMessageAllGood();
 
-        m_update_done = true;
+        m_updateDone = true;
         return;
     }
 
@@ -158,22 +159,22 @@ void ExternalSignalMonitor::UpdateValues(void)
                    kDTVSigMon_WaitForMGT | kDTVSigMon_WaitForVCT |
                    kDTVSigMon_WaitForNIT | kDTVSigMon_WaitForSDT))
     {
-        if (!m_stream_handler_started)
+        if (!m_streamHandlerStarted)
         {
-            m_stream_handler->AddListener(GetStreamData());
-            m_stream_handler->StartStreaming();
-            m_stream_handler_started = true;
+            m_streamHandler->AddListener(GetStreamData());
+            m_streamHandler->StartStreaming();
+            m_streamHandlerStarted = true;
         }
     }
 
-    m_update_done = true;
+    m_updateDone = true;
 }
 
 bool ExternalSignalMonitor::HasLock(void)
 {
     QString result;
 
-    m_stream_handler->ProcessCommand("HasLock?", result);
+    m_streamHandler->ProcessCommand("HasLock?", result);
     if (result.startsWith("OK:"))
     {
         return result.mid(3, 3) == "Yes";
@@ -189,11 +190,11 @@ int ExternalSignalMonitor::GetSignalStrengthPercent(void)
 {
     QString result;
 
-    m_stream_handler->ProcessCommand("SignalStrengthPercent?", result);
+    m_streamHandler->ProcessCommand("SignalStrengthPercent?", result);
     if (result.startsWith("OK:"))
     {
         bool ok = false;
-        int percent = result.mid(3).toInt(&ok);
+        int percent = result.midRef(3).toInt(&ok);
         if (!ok)
         {
             LOG(VB_CHANNEL, LOG_ERR, LOC + QString
@@ -215,11 +216,11 @@ int ExternalSignalMonitor::GetLockTimeout(void)
 {
     QString result;
 
-    m_stream_handler->ProcessCommand("LockTimeout?", result, 10000);
+    m_streamHandler->ProcessCommand("LockTimeout?", result, 10000);
     if (result.startsWith("OK:"))
     {
         bool ok = false;
-        int timeout = result.mid(3).toInt(&ok);
+        int timeout = result.midRef(3).toInt(&ok);
         if (!ok)
         {
             LOG(VB_CHANNEL, LOG_ERR, LOC + QString

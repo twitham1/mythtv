@@ -3,7 +3,6 @@
 
 #include <algorithm> // For std::sort()
 #include <vector> // For std::vector
-using namespace std;
 
 #include "tv.h"
 
@@ -183,6 +182,8 @@ void ChannelRecPriority::changeRecPriority(int howMuch)
         return;
 
     auto *chanInfo = item->GetData().value<ChannelInfo *>();
+    if (chanInfo == nullptr)
+        return;
 
     // inc/dec recording priority
     int tempRecPriority = chanInfo->m_recPriority + howMuch;
@@ -348,9 +349,9 @@ void ChannelRecPriority::SortList()
 
     int i = 0;
     int j = 0;
-    vector<RecPriorityInfo> sortingList;
+    std::vector<RecPriorityInfo> sortingList;
     QMap<QString, ChannelInfo>::iterator pit;
-    vector<RecPriorityInfo>::iterator sit;
+    std::vector<RecPriorityInfo>::iterator sit;
 
     // copy m_channelData into sortingList
     for (i = 0, pit = m_channelData.begin(); pit != m_channelData.end();
@@ -364,12 +365,12 @@ void ChannelRecPriority::SortList()
     switch(m_sortType)
     {
         case byRecPriority:
-            sort(sortingList.begin(), sortingList.end(),
+            std::sort(sortingList.begin(), sortingList.end(),
             channelRecPrioritySort());
             break;
         case byChannel:
         default:
-            sort(sortingList.begin(), sortingList.end(),
+            std::sort(sortingList.begin(), sortingList.end(),
             channelSort());
             break;
     }
@@ -398,7 +399,6 @@ void ChannelRecPriority::updateInfo(MythUIButtonListItem *item)
     auto *channelItem = item->GetData().value<ChannelInfo *>();
     if (!m_channelData.isEmpty() && channelItem)
     {
-        QString rectype;
         if (m_iconImage)
         {
             QString iconUrl = gCoreContext->GetMasterHostPrefix("ChannelIcons", channelItem->m_icon);

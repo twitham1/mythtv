@@ -11,7 +11,6 @@
 // C++ includes
 #include <iostream>
 #include <memory>
-using namespace std;
 
 // Qt includes
 #include <QApplication>
@@ -309,21 +308,21 @@ void CDRipperThread::run(void)
                     if (encodertype == "mp3")
                     {
                         outfile = QString("track%1.mp3").arg(trackno);
-                        encoder.reset(new LameEncoder(saveDir + outfile, m_quality,
-                                                      titleTrack, mp3usevbr));
+                        encoder = std::make_unique<LameEncoder>(saveDir + outfile, m_quality,
+                                                      titleTrack, mp3usevbr);
                     }
                     else // ogg
                     {
                         outfile = QString("track%1.ogg").arg(trackno);
-                        encoder.reset(new VorbisEncoder(saveDir + outfile, m_quality,
-                                                        titleTrack));
+                        encoder = std::make_unique<VorbisEncoder>(saveDir + outfile, m_quality,
+                                                        titleTrack);
                     }
                 }
                 else
                 {
                     outfile = QString("track%1.flac").arg(trackno);
-                    encoder.reset(new FlacEncoder(saveDir + outfile, m_quality,
-                                                  titleTrack));
+                    encoder = std::make_unique<FlacEncoder>(saveDir + outfile, m_quality,
+                                                  titleTrack);
                 }
 
                 if (!encoder->isValid())
@@ -1289,8 +1288,8 @@ void Ripper::searchGenre()
     QStringList searchList = MusicMetadata::fillFieldList("genre");
     // load genre list
     m_searchList.clear();
-    for (int x = 0; x < genre_table_size; x++)
-        m_searchList.push_back(QString(genre_table[x]));
+    for (const auto & genre : genre_table)
+        m_searchList.push_back(QString::fromStdString(genre));
     m_searchList.sort();
 
     MythScreenStack *popupStack = GetMythMainWindow()->GetStack("popup stack");

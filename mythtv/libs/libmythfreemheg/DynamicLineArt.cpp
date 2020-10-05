@@ -40,7 +40,7 @@ void MHDynamicLineArt::Initialise(MHParseNode *p, MHEngine *engine)
 {
     MHLineArt::Initialise(p, engine);
     m_picture =
-        engine->GetContext()->CreateDynamicLineArt(m_fBorderedBBox, GetColour(m_OrigLineColour), GetColour(m_OrigFillColour));
+        engine->GetContext()->CreateDynamicLineArt(m_fBorderedBBox, GetColour(m_origLineColour), GetColour(m_origFillColour));
 }
 
 void MHDynamicLineArt::PrintMe(FILE *fd, int nTabs) const
@@ -57,8 +57,8 @@ void MHDynamicLineArt::Preparation(MHEngine *engine)
     MHLineArt::Preparation(engine);
     m_picture->SetSize(m_nBoxWidth, m_nBoxHeight);
     m_picture->SetLineSize(m_nLineWidth);
-    m_picture->SetLineColour(GetColour(m_LineColour));
-    m_picture->SetFillColour(GetColour(m_FillColour));
+    m_picture->SetLineColour(GetColour(m_lineColour));
+    m_picture->SetFillColour(GetColour(m_fillColour));
 }
 
 void MHDynamicLineArt::Display(MHEngine * /*engine*/)
@@ -69,7 +69,7 @@ void MHDynamicLineArt::Display(MHEngine * /*engine*/)
 // Get the opaque area.  This is only opaque if the background is opaque.
 QRegion MHDynamicLineArt::GetOpaqueArea()
 {
-    if ((GetColour(m_OrigFillColour)).alpha() == 255)
+    if ((GetColour(m_origFillColour)).alpha() == 255)
     {
         return GetVisibleArea();
     }
@@ -95,14 +95,14 @@ void MHDynamicLineArt::SetBoxSize(int nWidth, int nHeight, MHEngine *engine)
 
 void MHDynamicLineArt::SetFillColour(const MHColour &colour, MHEngine * /*engine*/)
 {
-    m_FillColour.Copy(colour);
-    m_picture->SetFillColour(GetColour(m_FillColour));
+    m_fillColour.Copy(colour);
+    m_picture->SetFillColour(GetColour(m_fillColour));
 }
 
 void MHDynamicLineArt::SetLineColour(const MHColour &colour, MHEngine * /*engine*/)
 {
-    m_LineColour.Copy(colour);
-    m_picture->SetLineColour(GetColour(m_LineColour));
+    m_lineColour.Copy(colour);
+    m_picture->SetLineColour(GetColour(m_lineColour));
 }
 
 void MHDynamicLineArt::SetLineWidth(int nWidth, MHEngine * /*engine*/)
@@ -114,32 +114,32 @@ void MHDynamicLineArt::SetLineWidth(int nWidth, MHEngine * /*engine*/)
 // We don't actually use this at the moment.
 void MHDynamicLineArt::SetLineStyle(int nStyle, MHEngine * /*engine*/)
 {
-    m_LineStyle = nStyle;
+    m_lineStyle = nStyle;
 }
 
 
 void MHDynamicLineArt::GetLineColour(MHRoot *pResult)
 {
     // Returns the palette index as an integer if it is an index or the colour as a string if not.
-    if (m_LineColour.m_nColIndex >= 0)
+    if (m_lineColour.m_nColIndex >= 0)
     {
-        pResult->SetVariableValue(m_LineColour.m_nColIndex);
+        pResult->SetVariableValue(m_lineColour.m_nColIndex);
     }
     else
     {
-        pResult->SetVariableValue(m_LineColour.m_ColStr);
+        pResult->SetVariableValue(m_lineColour.m_colStr);
     }
 }
 
 void MHDynamicLineArt::GetFillColour(MHRoot *pResult)
 {
-    if (m_FillColour.m_nColIndex >= 0)
+    if (m_fillColour.m_nColIndex >= 0)
     {
-        pResult->SetVariableValue(m_FillColour.m_nColIndex);
+        pResult->SetVariableValue(m_fillColour.m_nColIndex);
     }
     else
     {
-        pResult->SetVariableValue(m_FillColour.m_ColStr);
+        pResult->SetVariableValue(m_fillColour.m_colStr);
     }
 }
 
@@ -168,9 +168,9 @@ void MHDynamicLineArt::DrawArcSector(bool fIsSector, int x, int y, int width, in
     engine->Redraw(GetVisibleArea());
 }
 
-void MHDynamicLineArt::DrawPoly(bool fIsPolygon, int nPoints, const int xArray[], const int yArray[], MHEngine *engine)
+void MHDynamicLineArt::DrawPoly(bool fIsPolygon, const MHPointVec& xArray, const MHPointVec& yArray, MHEngine *engine)
 {
-    m_picture->DrawPoly(fIsPolygon, nPoints, xArray, yArray);
+    m_picture->DrawPoly(fIsPolygon, xArray, yArray);
     engine->Redraw(GetVisibleArea());
 }
 
@@ -185,36 +185,34 @@ void MHDrawPoly::Initialise(MHParseNode *p, MHEngine *engine)
     for (int i = 0; i < args->GetSeqCount(); i++)
     {
         auto *pPoint = new MHPointArg;
-        m_Points.Append(pPoint);
+        m_points.Append(pPoint);
         pPoint->Initialise(args->GetSeqN(i), engine);
     }
 }
 
 void MHDrawPoly::Perform(MHEngine *engine)
 {
-    int nPoints = m_Points.Size();
-    int *xArray = new int[nPoints];
-    int *yArray = new int[nPoints];
+    int nPoints = m_points.Size();
+    MHPointVec xArray; xArray.reserve(nPoints);
+    MHPointVec yArray; yArray.reserve(nPoints);
 
     for (int i = 0; i < nPoints; i++)
     {
-        MHPointArg *pPoint = m_Points[i];
+        MHPointArg *pPoint = m_points[i];
         xArray[i] = pPoint->m_x.GetValue(engine);
         yArray[i] = pPoint->m_y.GetValue(engine);
     }
 
-    Target(engine)->DrawPoly(m_fIsPolygon, nPoints, xArray, yArray, engine);
-    delete[](xArray);
-    delete[](yArray);
+    Target(engine)->DrawPoly(m_fIsPolygon, xArray, yArray, engine);
 }
 
 void MHDrawPoly::PrintArgs(FILE *fd, int /*nTabs*/) const
 {
     fprintf(fd, " ( ");
 
-    for (int i = 0; i < m_Points.Size(); i++)
+    for (int i = 0; i < m_points.Size(); i++)
     {
-        m_Points[i]->PrintMe(fd, 0);
+        m_points[i]->PrintMe(fd, 0);
     }
 
     fprintf(fd, " )\n");

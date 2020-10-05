@@ -185,7 +185,6 @@ void BackendSelection::AddItem(DeviceLocation *dev)
  */
 bool BackendSelection::ConnectBackend(DeviceLocation *dev)
 {
-    QString          error;
     QString          message;
 
     m_usn   = dev->m_sUSN;
@@ -255,11 +254,10 @@ void BackendSelection::Init(void)
         pEntries->GetEntryMap(ourMap);
         pEntries->DecrRef();
 
-        EntryMap::const_iterator it;
-        for (it = ourMap.begin(); it != ourMap.end(); ++it)
+        for (auto * devLoc : qAsConst(ourMap))
         {
-            AddItem(*it);
-            (*it)->DecrRef();
+            AddItem(devLoc);
+            devLoc->DecrRef();
         }
     }
 }
@@ -285,15 +283,18 @@ void BackendSelection::RemoveItem(const QString& USN)
     m_mutex.unlock();
 }
 
-bool BackendSelection::TryDBfromURL(const QString &error, QString URL)
+bool BackendSelection::TryDBfromURL(const QString &error, const QString& URL)
 {
     if (ShowOkPopup(error + tr("Shall I attempt to connect to this"
                     " host with default database parameters?")))
     {
-        URL.remove("http://");
-        URL.remove(QRegExp("[:/].*"));
-        m_dbParams->m_dbHostName = URL;
-        return true;
+        QRegularExpression re {"http[s]?://([^:/]+)", QRegularExpression::CaseInsensitiveOption};
+        QRegularExpressionMatch match = re.match(URL);
+        if (match.hasMatch())
+        {
+            m_dbParams->m_dbHostName = match.captured(1);
+            return true;
+        }
     }
 
     return false;

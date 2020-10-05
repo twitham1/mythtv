@@ -3,7 +3,6 @@
 
 // C++ headers
 #include <iostream>
-using namespace std;
 
 // Qt headers
 #include <QCoreApplication>
@@ -82,12 +81,16 @@ int main(int argc, char *argv[])
     if (retval != GENERIC_EXIT_OK)
         return retval;
 
+    if (cmdline.toBool("ddgraball"))
+        LOG(VB_GENERAL, LOG_WARNING,
+            "Invalid option, see: mythfilldatabase --help dd-grab-all");
+
     if (cmdline.toBool("manual"))
     {
-        cout << "###\n";
-        cout << "### Running in manual channel configuration mode.\n";
-        cout << "### This will ask you questions about every channel.\n";
-        cout << "###\n";
+        std::cout << "###\n";
+        std::cout << "### Running in manual channel configuration mode.\n";
+        std::cout << "### This will ask you questions about every channel.\n";
+        std::cout << "###\n";
         fill_data.m_chanData.m_interactive = true;
     }
 
@@ -100,11 +103,11 @@ int main(int argc, char *argv[])
 
     if (cmdline.toBool("preset"))
     {
-        cout << "###\n";
-        cout << "### Running in preset channel configuration mode.\n";
-        cout << "### This will assign channel ";
-        cout << "preset numbers to every channel.\n";
-        cout << "###\n";
+        std::cout << "###\n";
+        std::cout << "### Running in preset channel configuration mode.\n";
+        std::cout << "### This will assign channel ";
+        std::cout << "preset numbers to every channel.\n";
+        std::cout << "###\n";
         fill_data.m_chanData.m_channelPreset = true;
     }
 
@@ -114,8 +117,8 @@ int main(int argc, char *argv[])
         if (!cmdline.toBool("sourceid") ||
             !cmdline.toBool("xmlfile"))
         {
-            cerr << "The --file option must be used in combination" << endl
-                 << "with both --sourceid and --xmlfile." << endl;
+            std::cerr << "The --file option must be used in combination" << std::endl
+                      << "with both --sourceid and --xmlfile." << std::endl;
             return GENERIC_EXIT_INVALID_CMDLINE;
         }
 
@@ -139,8 +142,8 @@ int main(int argc, char *argv[])
     {
         if (!cmdline.toBool("sourceid"))
         {
-            cerr << "The --cardtype option must be used in combination" << endl
-                 << "with a --sourceid option." << endl;
+            std::cerr << "The --cardtype option must be used in combination" << std::endl
+                      << "with a --sourceid option." << std::endl;
             return GENERIC_EXIT_INVALID_CMDLINE;
         }
 
@@ -199,20 +202,20 @@ int main(int argc, char *argv[])
                 uint lower = r[0].toUInt(&ok);
                 if (!ok)
                 {
-                    cerr << warn.toLocal8Bit().constData() << endl;
+                    std::cerr << warn.toLocal8Bit().constData() << std::endl;
                     return 0;
                 }
 
                 uint upper = r[1].toUInt(&ok);
                 if (!ok)
                 {
-                    cerr << warn.toLocal8Bit().constData() << endl;
+                    std::cerr << warn.toLocal8Bit().constData() << std::endl;
                     return 0;
                 }
 
                 if (lower > upper)
                 {
-                    cerr << warn.toLocal8Bit().constData() << endl;
+                    std::cerr << warn.toLocal8Bit().constData() << std::endl;
                     return 0;
                 }
 
@@ -225,7 +228,7 @@ int main(int argc, char *argv[])
                 uint day = item.toUInt(&ok);
                 if (!ok)
                 {
-                    cerr << warn.toLocal8Bit().constData() << endl;
+                    std::cerr << warn.toLocal8Bit().constData() << std::endl;
                     return 0;
                 }
 

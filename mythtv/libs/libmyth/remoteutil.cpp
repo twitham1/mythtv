@@ -36,7 +36,7 @@ vector<ProgramInfo *> *RemoteGetRecordedList(int sort)
     return info;
 }
 
-bool RemoteGetLoad(double load[3])
+bool RemoteGetLoad(system_load_array& load)
 {
     QStringList strlist(QString("QUERY_LOAD"));
 
@@ -189,10 +189,10 @@ uint RemoteGetRecordingList(
     }
 
     uint reclist_initial_size = (uint) reclist.size();
-    QStringList::const_iterator it = strList.begin() + 1;
+    QStringList::const_iterator it = strList.cbegin() + 1;
     for (int i = 0; i < numrecordings; i++)
     {
-        auto *pginfo = new ProgramInfo(it, strList.end());
+        auto *pginfo = new ProgramInfo(it, strList.cend());
         reclist.push_back(pginfo);
     }
 

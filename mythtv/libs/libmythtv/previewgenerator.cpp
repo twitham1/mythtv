@@ -361,7 +361,7 @@ bool PreviewGenerator::RemotePreviewRun(void)
     if (m_token.isEmpty())
     {
         m_token = QString("%1:%2")
-            .arg(m_programInfo.MakeUniqueKey()).arg(random());
+            .arg(m_programInfo.MakeUniqueKey()).arg(MythRandom());
     }
     strlist.push_back(m_token);
     m_programInfo.ToStringList(strlist);
@@ -566,8 +566,8 @@ bool PreviewGenerator::SavePreview(const QString &filename,
     const QImage img((unsigned char*) data,
                      width, height, QImage::Format_RGB32);
 
-    float ppw = max(desired_width, 0);
-    float pph = max(desired_height, 0);
+    float ppw = std::max(desired_width, 0);
+    float pph = std::max(desired_height, 0);
     bool desired_size_exactly_specified = true;
     if ((ppw < 1.0F) && (pph < 1.0F))
     {
@@ -588,8 +588,8 @@ bool PreviewGenerator::SavePreview(const QString &filename,
             ppw = (pph * aspect);
     }
 
-    ppw = max(1.0F, ppw);
-    pph = max(1.0F, pph);;
+    ppw = std::max(1.0F, ppw);
+    pph = std::max(1.0F, pph);;
 
     QImage small_img = img.scaled((int) ppw, (int) pph,
         Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
@@ -672,7 +672,10 @@ bool PreviewGenerator::LocalPreviewRun(void)
         }
         if (programDuration > 0)
         {
-            captime = startEarly + (programDuration / 3);
+            captime = programDuration / 3;
+            if (captime > 600)
+                captime = 600;
+            captime += startEarly;
         }
         if (captime < 0)
             captime = 600;

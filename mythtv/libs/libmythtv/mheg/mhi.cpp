@@ -158,7 +158,7 @@ void MHIContext::StopEngine(void)
 
     m_stop = true;
     m_runLock.lock();
-    m_engine_wait.wakeAll();
+    m_engineWait.wakeAll();
     m_runLock.unlock();
 
     m_engineThread->wait();
@@ -265,7 +265,7 @@ void MHIContext::run(void)
         toWait = (toWait > 1000 || toWait <= 0) ? 1000 : toWait;
 
         if (!m_stop && (toWait > 0))
-            m_engine_wait.wait(locker.mutex(), toWait);
+            m_engineWait.wait(locker.mutex(), toWait);
     }
 }
 
@@ -305,7 +305,7 @@ void MHIContext::QueueDSMCCPacket(
                                              componentTag, carouselId,
                                              dataBroadcastId));
     }
-    m_engine_wait.wakeAll();
+    m_engineWait.wakeAll();
 }
 
 // A NetworkBootInfo sub-descriptor is present in the PMT.
@@ -330,7 +330,7 @@ void MHIContext::SetNetBootInfo(const unsigned char *data, uint length)
     if (m_lastNbiVersion == NBI_VERSION_UNSET)
         m_lastNbiVersion = data[0];
     else
-        m_engine_wait.wakeAll();
+        m_engineWait.wakeAll();
 }
 
 // Called only by m_engineThread
@@ -510,7 +510,7 @@ bool MHIContext::GetCarouselData(QString objectPath, QByteArray &result)
         // some more packets.  We should eventually find out if this item is
         // present.
         ProcessDSMCCQueue();
-        m_engine_wait.wait(&m_runLock, 300);
+        m_engineWait.wait(&m_runLock, 300);
     }
     return false; // Stop has been set.  Say the object isn't present.
 }
@@ -625,7 +625,7 @@ bool MHIContext::OfferKey(const QString& key)
         .arg(key).arg(action).arg(m_keyQueue.size()) );
     { QMutexLocker locker(&m_keyLock);
     m_keyQueue.enqueue(action);}
-    m_engine_wait.wakeAll();
+    m_engineWait.wakeAll();
     return true;
 }
 
@@ -645,7 +645,7 @@ void MHIContext::Reinit(const QRect &videoRect, const QRect &dispRect, float asp
     enum { kNone, kHoriz, kBoth };
     int mode = gCoreContext->GetNumSetting("MhegAspectCorrection", kNone);
     auto const aspectd = static_cast<double>(aspect);
-    double const vz = (mode == kBoth) ? min(1.15, 1. / sqrt(aspectd)) : 1.;
+    double const vz = (mode == kBoth) ? std::min(1.15, 1. / sqrt(aspectd)) : 1.;
     double const hz = (mode > kNone) ? vz * aspectd : 1.;
 
     m_displayRect = QRect( int(dispRect.width() * (1 - hz) / 2),
@@ -886,7 +886,7 @@ bool MHIContext::LoadChannelCache()
         int sid = query.value(1).toInt();
         int tid = query.value(2).toInt();
         int cid = query.value(3).toInt();
-        m_channelCache.insertMulti( Key_t(nid, sid), Val_t(tid, cid) );
+        m_channelCache.insert( Key_t(nid, sid), Val_t(tid, cid) );
     }
     return true;
 }
@@ -925,9 +925,9 @@ int MHIContext::GetChannelIndex(const QString &str)
             if (m_channelCache.isEmpty())
                 LoadChannelCache();
 
-            ChannelCache_t::const_iterator it = m_channelCache.find(
+            ChannelCache_t::const_iterator it = m_channelCache.constFind(
                 Key_t(netID,serviceID) );
-            if (it == m_channelCache.end())
+            if (it == m_channelCache.constEnd())
                 break;
             if (transportID < 0)
                 nResult = Cid(it);
@@ -941,14 +941,14 @@ int MHIContext::GetChannelIndex(const QString &str)
                         break;
                     }
                 }
-                while (++it != m_channelCache.end());
+                while (++it != m_channelCache.constEnd());
             }
         }
         else if (str.startsWith("rec://svc/lcn/"))
         {
             // I haven't seen this yet so this is untested.
             bool ok = false;
-            int channelNo = str.mid(14).toInt(&ok); // Decimal integer
+            int channelNo = str.midRef(14).toInt(&ok); // Decimal integer
             if (!ok)
                 break;
             MSqlQuery query(MSqlQuery::InitCon());
@@ -989,8 +989,7 @@ bool MHIContext::GetServiceInfo(int channelId, int &netId, int &origNetId,
     if (m_channelCache.isEmpty())
         LoadChannelCache();
 
-    for ( ChannelCache_t::const_iterator it = m_channelCache.begin();
-        it != m_channelCache.end(); ++it)
+    for (auto it = m_channelCache.cbegin(); it != m_channelCache.cend(); ++it)
     {
         if (Cid(it) == channelId)
         {
@@ -1701,8 +1700,9 @@ void MHIDLA::DrawArcSector(int /*x*/, int /*y*/, int /*width*/, int /*height*/,
 // a result of rounding when drawing ellipses.
 struct lineSeg { int m_yBottom, m_yTop, m_xBottom; float m_slope; };
 
-void MHIDLA::DrawPoly(bool isFilled, int nPoints, const int *xArray, const int *yArray)
+void MHIDLA::DrawPoly(bool isFilled, const MHPointVec& xArray, const MHPointVec& yArray)
 {
+    int nPoints = xArray.size();
     if (nPoints < 2)
         return;
 

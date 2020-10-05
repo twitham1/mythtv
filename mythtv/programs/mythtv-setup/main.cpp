@@ -47,8 +47,6 @@
 #include "cleanupguard.h"
 #include "mythdisplay.h"
 
-using namespace std;
-
 ExitPrompter   *exitPrompt  = nullptr;
 StartPrompter  *startPrompt = nullptr;
 
@@ -204,7 +202,6 @@ static bool resetTheme(QString themedir, const QString &badtheme)
     themedir = GetMythUI()->FindThemeDir(themename);
 
     MythTranslation::reload();
-    GetMythUI()->LoadQtConfig();
     GetMythMainWindow()->Init();
     GetMythMainWindow()->ReinitDone();
 
@@ -225,8 +222,6 @@ static int reloadTheme(void)
     MythTranslation::reload();
 
     GetMythMainWindow()->SetEffectsEnabled(false);
-
-    GetMythUI()->LoadQtConfig();
 
     if (menu)
     {
@@ -381,9 +376,7 @@ int main(int argc, char *argv[])
         scanInputName = cmdline.toString("inputname");
 
     if (!geometry.isEmpty())
-    {
-        MythUIHelper::ParseGeometryOverride(geometry);
-    }
+        MythMainWindow::ParseGeometryOverride(geometry);
 
     gContext = new MythContext(MYTH_BINARY_VERSION);
 
@@ -406,10 +399,7 @@ int main(int argc, char *argv[])
 
     if (use_display)
     {
-        GetMythUI()->LoadQtConfig();
-
         QString fileprefix = GetConfDir();
-
         QDir dir(fileprefix);
         if (!dir.exists())
             dir.mkdir(fileprefix);
@@ -429,15 +419,15 @@ int main(int argc, char *argv[])
 
         if (!okCardID)
         {
-            cerr << "You must enter a valid cardid to scan." << endl;
+            std::cerr << "You must enter a valid cardid to scan." << std::endl;
             vector<uint> cardids = CardUtil::GetInputIDs();
             if (cardids.empty())
             {
-                cerr << "But no cards have been defined on this host"
-                     << endl;
+                std::cerr << "But no cards have been defined on this host"
+                          << std::endl;
                 return GENERIC_EXIT_INVALID_CMDLINE;
             }
-            cerr << "Valid cards: " << endl;
+            std::cerr << "Valid cards: " << std::endl;
             for (uint id : cardids)
             {
                 fprintf(stderr, "%5u: %s %s\n", id,
@@ -449,11 +439,11 @@ int main(int argc, char *argv[])
 
         if (!okInputName)
         {
-            cerr << "You must enter a valid input to scan this card."
-                 << endl;
-            cerr << "Valid input: "
-                 << CardUtil::GetInputName(scanCardId).toLatin1().constData()
-                 << endl;
+            std::cerr << "You must enter a valid input to scan this card."
+                      << std::endl;
+            std::cerr << "Valid input: "
+                      << CardUtil::GetInputName(scanCardId).toLatin1().constData()
+                      << std::endl;
             return GENERIC_EXIT_INVALID_CMDLINE;
         }
     }
@@ -467,7 +457,7 @@ int main(int argc, char *argv[])
         {
             ChannelScannerCLI scanner(doScanSaveOnly, scanInteractive);
 
-            int scantype = ScanTypeSetting::FullScan_ATSC;
+            int scantype { ScanTypeSetting::FullScan_ATSC };
             if (frequencyStandard == "atsc")
                 scantype = ScanTypeSetting::FullScan_ATSC; // NOLINT(bugprone-branch-clone)
             else if (frequencyStandard == "dvbt")
@@ -510,7 +500,7 @@ int main(int argc, char *argv[])
     {
         vector<ScanInfo> scans = LoadScanList();
 
-        cout<<" scanid cardid sourceid processed        date"<<endl;
+        std::cout<<" scanid cardid sourceid processed        date"<<std::endl;
         for (auto & scan : scans)
         {
             printf("%5i %6i %8i %8s    %20s\n",
@@ -519,14 +509,14 @@ int main(int argc, char *argv[])
                    scan.m_scandate.toString(Qt::ISODate)
                    .toLatin1().constData());
         }
-        cout<<endl;
+        std::cout<<std::endl;
 
         return GENERIC_EXIT_OK;
     }
 
     if (scanImport)
     {
-        cout<<"*** SCAN IMPORT START ***"<<endl;
+        std::cout<<"*** SCAN IMPORT START ***"<<std::endl;
         {
             ScanDTVTransportList list = LoadScan(scanImport);
             ChannelImporter ci(false, true, true, true, false,
@@ -537,7 +527,7 @@ int main(int argc, char *argv[])
                                scanServiceRequirements);
             ci.Process(list);
         }
-        cout<<"*** SCAN IMPORT END ***"<<endl;
+        std::cout<<"*** SCAN IMPORT END ***"<<std::endl;
         return GENERIC_EXIT_OK;
     }
 

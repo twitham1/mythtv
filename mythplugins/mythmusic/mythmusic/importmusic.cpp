@@ -57,7 +57,7 @@ void FileCopyThread::run()
 
 ImportMusicDialog::ImportMusicDialog(MythScreenStack *parent) :
     MythScreenType(parent, "musicimportfiles"),
-    m_tracks(new vector<TrackInfo*>)
+    m_tracks(new std::vector<TrackInfo*>)
 {
     QString lastHost = gCoreContext->GetSetting("MythMusicLastImportHost", gCoreContext->GetMasterHostName());
     QStringList dirs = StorageGroup::getGroupDirs("Music", lastHost);
@@ -483,7 +483,8 @@ bool ImportMusicDialog::copyFile(const QString &src, const QString &dst)
 
     while (!copy->isFinished())
     {
-        usleep(500);
+        const struct timespec halfms {0, 500000};
+        nanosleep(&halfms, nullptr);
         QCoreApplication::processEvents();
     }
 
@@ -522,7 +523,8 @@ void ImportMusicDialog::startScan()
 
     while (!scanner->isFinished())
     {
-        usleep(500);
+        const struct timespec halfms {0, 500000};
+        nanosleep(&halfms, nullptr);
         QCoreApplication::processEvents();
     }
 
@@ -543,7 +545,7 @@ void ImportMusicDialog::doScan()
     scanDirectory(location, m_tracks);
 }
 
-void ImportMusicDialog::scanDirectory(QString &directory, vector<TrackInfo*> *tracks)
+void ImportMusicDialog::scanDirectory(QString &directory, std::vector<TrackInfo*> *tracks)
 {
     QDir d(directory);
 
@@ -1033,13 +1035,10 @@ void ImportCoverArtDialog::scanDirectory()
     if (list.isEmpty())
         return;
 
-    QFileInfoList::const_iterator it = list.begin();
-    while (it != list.end())
+    for (const auto & fi : qAsConst(list))
     {
-        const QFileInfo *fi = &(*it);
-        ++it;
-        QString filename = fi->absoluteFilePath();
-        if (!fi->isDir())
+        QString filename = fi.absoluteFilePath();
+        if (!fi.isDir())
         {
             m_filelist.append(filename);
         }

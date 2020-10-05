@@ -8,27 +8,22 @@
 class MUI_PUBLIC MythDebugVulkan : protected MythVulkanObject
 {
   public:
-    static float s_DebugRed[4];
-    static float s_DebugGreen[4];
-    static float s_DebugBlue[4];
-    static float s_DebugGray[4];
-    static float s_DebugBlack[4];
+    static const MythVulkan4F s_DebugRed;
+    static const MythVulkan4F s_DebugGreen;
+    static const MythVulkan4F s_DebugBlue;
+    static const MythVulkan4F s_DebugGray;
+    static const MythVulkan4F s_DebugBlack;
 
-    static MythDebugVulkan* Create(MythRenderVulkan* Render, VkDevice Device,
-                                   QVulkanDeviceFunctions* Functions,
-                                   MythWindowVulkan* Window);
+    static MythDebugVulkan* Create(MythVulkanObject* Vulkan);
 
-    void BeginRegion (VkCommandBuffer CmdBuffer, const char* Name, const float *Color);
+    void BeginRegion (VkCommandBuffer CmdBuffer, const char* Name, const MythVulkan4F& Color);
     void EndRegion   (VkCommandBuffer CmdBuffer);
     void NameObject  (uint64_t Object, VkDebugReportObjectTypeEXT Type, const char *Name);
 
   protected:
-    MythDebugVulkan(MythRenderVulkan* Render, VkDevice Device,
-                    QVulkanDeviceFunctions* Functions,
-                    MythWindowVulkan* Window);
+    MythDebugVulkan(MythVulkanObject *Vulkan);
 
   private:
-    MythWindowVulkan*                 m_window      { nullptr };
     PFN_vkCmdDebugMarkerBeginEXT      m_beginRegion { nullptr };
     PFN_vkCmdDebugMarkerEndEXT        m_endRegion   { nullptr };
     PFN_vkDebugMarkerSetObjectNameEXT m_nameObject  { nullptr };

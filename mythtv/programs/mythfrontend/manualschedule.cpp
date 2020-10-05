@@ -30,10 +30,10 @@
 #include "scheduleeditor.h"
 
 ManualSchedule::ManualSchedule(MythScreenStack *parent)
-               : MythScreenType(parent, "ManualSchedule")
+    : MythScreenType(parent, "ManualSchedule"),
+      m_nowDateTime(MythDate::current()),
+      m_startDateTime(m_nowDateTime)
 {
-    m_nowDateTime = MythDate::current();
-    m_startDateTime = m_nowDateTime;
 }
 
 bool ManualSchedule::Create(void)
@@ -204,7 +204,7 @@ void ManualSchedule::dateChanged(void)
 void ManualSchedule::recordClicked(void)
 {
     QDateTime endts = m_startDateTime
-        .addSecs(max(m_durationSpin->GetIntValue() * 60, 60));
+        .addSecs(std::max(m_durationSpin->GetIntValue() * 60, 60));
 
     if (m_channelList->GetCurrentPos() >= m_chanids.size())
     {
@@ -219,6 +219,7 @@ void ManualSchedule::recordClicked(void)
     auto *record = new RecordingRule();
     record->LoadByProgram(&p);
     record->m_searchType = kManualSearch;
+    record->m_dupMethod = kDupCheckNone;
 
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
     auto *schededit = new ScheduleEditor(mainStack, record);

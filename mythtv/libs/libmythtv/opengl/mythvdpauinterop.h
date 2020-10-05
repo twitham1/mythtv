@@ -30,7 +30,7 @@ class MythVDPAUInterop : public MythOpenGLInterop
 
   public:
     static MythVDPAUInterop* Create(MythRenderOpenGL *Context, MythCodecID CodecId);
-    vector<MythVideoTexture*> Acquire(MythRenderOpenGL *Context, VideoColourSpace *ColourSpace,
+    vector<MythVideoTexture*> Acquire(MythRenderOpenGL *Context, MythVideoColourSpace *ColourSpace,
                                       VideoFrame *Frame, FrameScanType Scan) override;
 
   public slots:
@@ -51,7 +51,7 @@ class MythVDPAUInterop : public MythOpenGLInterop
     void  CleanupDeinterlacer(void);
     void  RotateReferenceFrames(AVBufferRef *Buffer);
 
-    VideoColourSpace   *m_colourSpace       { nullptr };
+    MythVideoColourSpace   *m_colourSpace       { nullptr };
     MythVDPAUHelper    *m_helper            { nullptr };
     VdpOutputSurface    m_outputSurface     { 0       };
     MythVDPAUSurfaceNV  m_outputSurfaceReg  { 0       };
@@ -65,6 +65,7 @@ class MythVDPAUInterop : public MythOpenGLInterop
     MYTH_VDPAUREGOUTSURFNV m_registerNV     { nullptr };
     MYTH_VDPAUSURFACCESSNV m_accessNV       { nullptr };
     MYTH_VDPAUMAPSURFNV m_mapNV             { nullptr };
+    MYTH_VDPAUMAPSURFNV m_unmapNV           { nullptr };
     MythCodecID         m_codec             { kCodec_NONE };
     bool                m_preempted         { false   };
     bool                m_preemptedWarning  { false   };

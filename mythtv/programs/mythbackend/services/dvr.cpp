@@ -659,9 +659,9 @@ DTC::ProgramList* Dvr::GetExpiringList( int nStartIndex,
 
     auto *pPrograms = new DTC::ProgramList();
 
-    nStartIndex   = (nStartIndex > 0) ? min( nStartIndex, (int)infoList.size() ) : 0;
-    nCount        = (nCount > 0) ? min( nCount, (int)infoList.size() ) : infoList.size();
-    int nEndIndex = min((nStartIndex + nCount), (int)infoList.size() );
+    nStartIndex   = (nStartIndex > 0) ? std::min( nStartIndex, (int)infoList.size() ) : 0;
+    nCount        = (nCount > 0) ? std::min( nCount, (int)infoList.size() ) : infoList.size();
+    int nEndIndex = std::min((nStartIndex + nCount), (int)infoList.size() );
 
     for( int n = nStartIndex; n < nEndIndex; n++)
     {
@@ -998,9 +998,9 @@ DTC::ProgramList* Dvr::GetUpcomingList( int  nStartIndex,
 
     auto *pPrograms = new DTC::ProgramList();
 
-    nStartIndex   = (nStartIndex > 0) ? min( nStartIndex, (int)recordingList.size() ) : 0;
-    nCount        = (nCount > 0) ? min( nCount, (int)recordingList.size() ) : recordingList.size();
-    int nEndIndex = min((nStartIndex + nCount), (int)recordingList.size() );
+    nStartIndex   = (nStartIndex > 0) ? std::min( nStartIndex, (int)recordingList.size() ) : 0;
+    nCount        = (nCount > 0) ? std::min( nCount, (int)recordingList.size() ) : recordingList.size();
+    int nEndIndex = std::min((nStartIndex + nCount), (int)recordingList.size() );
 
     for( int n = nStartIndex; n < nEndIndex; n++)
     {
@@ -1062,9 +1062,9 @@ DTC::ProgramList* Dvr::GetConflictList( int  nStartIndex,
 
     auto *pPrograms = new DTC::ProgramList();
 
-    nStartIndex   = (nStartIndex > 0) ? min( nStartIndex, (int)recordingList.size() ) : 0;
-    nCount        = (nCount > 0) ? min( nCount, (int)recordingList.size() ) : recordingList.size();
-    int nEndIndex = min((nStartIndex + nCount), (int)recordingList.size() );
+    nStartIndex   = (nStartIndex > 0) ? std::min( nStartIndex, (int)recordingList.size() ) : 0;
+    nCount        = (nCount > 0) ? std::min( nCount, (int)recordingList.size() ) : recordingList.size();
+    int nEndIndex = std::min((nStartIndex + nCount), (int)recordingList.size() );
 
     for( int n = nStartIndex; n < nEndIndex; n++)
     {
@@ -1114,6 +1114,7 @@ uint Dvr::AddRecordSchedule   (
                                QDateTime lastrectsRaw,
                                QString   sDupMethod,
                                QString   sDupIn,
+                               bool      bNewEpisOnly,
                                uint      nFilter,
                                QString   sRecProfile,
                                QString   sRecGroup,
@@ -1160,8 +1161,11 @@ uint Dvr::AddRecordSchedule   (
 
     rule.m_type = recTypeFromString(sType);
     rule.m_searchType = searchTypeFromString(sSearchType);
-    rule.m_dupMethod = dupMethodFromString(sDupMethod);
-    rule.m_dupIn = dupInFromString(sDupIn);
+    if (rule.m_searchType == kManualSearch)
+        rule.m_dupMethod = kDupCheckNone;
+    else
+        rule.m_dupMethod = dupMethodFromString(sDupMethod);
+    rule.m_dupIn = dupInFromStringAndBool(sDupIn, bNewEpisOnly);
 
     if (sRecProfile.isEmpty())
         sRecProfile = "Default";
@@ -1188,7 +1192,11 @@ uint Dvr::AddRecordSchedule   (
     rule.m_recProfile = sRecProfile;
     rule.m_recGroupID = RecordingInfo::GetRecgroupID(sRecGroup);
     if (rule.m_recGroupID == 0)
-        rule.m_recGroupID = RecordingInfo::kDefaultRecGroup;
+    {
+        rule.m_recGroupID = CreateRecordingGroup(sRecGroup);
+        if (rule.m_recGroupID <= 0)
+            rule.m_recGroupID = RecordingInfo::kDefaultRecGroup;
+    }
     rule.m_storageGroup = sStorageGroup;
     rule.m_playGroup = sPlayGroup;
 
@@ -1258,6 +1266,7 @@ bool Dvr::UpdateRecordSchedule ( uint      nRecordId,
                                  int       nEndOffset,
                                  QString   sDupMethod,
                                  QString   sDupIn,
+                                 bool      bNewEpisOnly,
                                  uint      nFilter,
                                  QString   sRecProfile,
                                  QString   sRecGroup,
@@ -1303,8 +1312,11 @@ bool Dvr::UpdateRecordSchedule ( uint      nRecordId,
 
     pRule.m_type = recTypeFromString(sType);
     pRule.m_searchType = searchTypeFromString(sSearchType);
-    pRule.m_dupMethod = dupMethodFromString(sDupMethod);
-    pRule.m_dupIn = dupInFromString(sDupIn);
+    if (pRule.m_searchType == kManualSearch)
+        pRule.m_dupMethod = kDupCheckNone;
+    else
+        pRule.m_dupMethod = dupMethodFromString(sDupMethod);
+    pRule.m_dupIn = dupInFromStringAndBool(sDupIn, bNewEpisOnly);
 
     if (sRecProfile.isEmpty())
         sRecProfile = "Default";
@@ -1352,7 +1364,11 @@ bool Dvr::UpdateRecordSchedule ( uint      nRecordId,
     pRule.m_recProfile = sRecProfile;
     pRule.m_recGroupID = RecordingInfo::GetRecgroupID(sRecGroup);
     if (pRule.m_recGroupID == 0)
-        pRule.m_recGroupID = RecordingInfo::kDefaultRecGroup;
+    {
+        pRule.m_recGroupID = CreateRecordingGroup(sRecGroup);
+        if (pRule.m_recGroupID <= 0)
+            pRule.m_recGroupID = RecordingInfo::kDefaultRecGroup;
+    }
     pRule.m_storageGroup = sStorageGroup;
     pRule.m_playGroup = sPlayGroup;
 
@@ -1463,9 +1479,9 @@ DTC::RecRuleList* Dvr::GetRecordScheduleList( int nStartIndex,
 
     auto *pRecRules = new DTC::RecRuleList();
 
-    nStartIndex   = (nStartIndex > 0) ? min( nStartIndex, (int)recList.size() ) : 0;
-    nCount        = (nCount > 0) ? min( nCount, (int)recList.size() ) : recList.size();
-    int nEndIndex = min((nStartIndex + nCount), (int)recList.size() );
+    nStartIndex   = (nStartIndex > 0) ? std::min( nStartIndex, (int)recList.size() ) : 0;
+    nCount        = (nCount > 0) ? std::min( nCount, (int)recList.size() ) : recList.size();
+    int nEndIndex = std::min((nStartIndex + nCount), (int)recList.size() );
 
     for( int n = nStartIndex; n < nEndIndex; n++)
     {

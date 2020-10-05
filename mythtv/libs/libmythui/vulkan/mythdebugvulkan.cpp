@@ -5,17 +5,16 @@
 
 #define LOC QString("VulkanMarker: ")
 
-float MythDebugVulkan::s_DebugRed[4]   = { 1.0, 0.0, 0.0, 1.0 };
-float MythDebugVulkan::s_DebugGreen[4] = { 0.0, 1.0, 0.0, 1.0 };
-float MythDebugVulkan::s_DebugBlue[4]  = { 0.0, 0.0, 1.0, 1.0 };
-float MythDebugVulkan::s_DebugGray[4]  = { 0.5, 0.5, 0.5, 1.0 };
-float MythDebugVulkan::s_DebugBlack[4] = { 0.0, 0.0, 0.0, 1.0 };
+MythVulkan4F const MythDebugVulkan::s_DebugRed   { 1.0, 0.0, 0.0, 1.0 };
+MythVulkan4F const MythDebugVulkan::s_DebugGreen { 0.0, 1.0, 0.0, 1.0 };
+MythVulkan4F const MythDebugVulkan::s_DebugBlue  { 0.0, 0.0, 1.0, 1.0 };
+MythVulkan4F const MythDebugVulkan::s_DebugGray  { 0.5, 0.5, 0.5, 1.0 };
+MythVulkan4F const MythDebugVulkan::s_DebugBlack { 0.0, 0.0, 0.0, 1.0 };
 
-MythDebugVulkan* MythDebugVulkan::Create(MythRenderVulkan *Render, VkDevice Device,
-                                         QVulkanDeviceFunctions *Functions, MythWindowVulkan *Window)
+MythDebugVulkan* MythDebugVulkan::Create(MythVulkanObject *Vulkan)
 {
-    auto* result = new MythDebugVulkan(Render, Device, Functions, Window);
-    if (result && !result->m_valid)
+    auto * result = new MythDebugVulkan(Vulkan);
+    if (result && !result->IsValidVulkan())
     {
         delete result;
         result = nullptr;
@@ -23,32 +22,33 @@ MythDebugVulkan* MythDebugVulkan::Create(MythRenderVulkan *Render, VkDevice Devi
     return result;
 }
 
-MythDebugVulkan::MythDebugVulkan(MythRenderVulkan *Render, VkDevice Device,
-                                 QVulkanDeviceFunctions *Functions,
-                                 MythWindowVulkan* Window)
-  : MythVulkanObject(Render, Device, Functions),
-    m_window(Window)
+MythDebugVulkan::MythDebugVulkan(MythVulkanObject* Vulkan)
+  : MythVulkanObject(Vulkan)
 {
-    auto extensions = m_window->supportedDeviceExtensions();
-    if (!extensions.contains(VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+    if (!m_vulkanValid)
+        return;
+
+    m_vulkanValid = false;
+    if (m_vulkanWindow->supportedDeviceExtensions().contains(VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+    {
+        m_beginRegion = reinterpret_cast<PFN_vkCmdDebugMarkerBeginEXT>(
+                    m_vulkanWindow->vulkanInstance()->getInstanceProcAddr("vkCmdDebugMarkerBeginEXT"));
+        m_endRegion = reinterpret_cast<PFN_vkCmdDebugMarkerEndEXT>(
+                    m_vulkanWindow->vulkanInstance()->getInstanceProcAddr("vkCmdDebugMarkerEndEXT"));
+        m_nameObject = reinterpret_cast<PFN_vkDebugMarkerSetObjectNameEXT>(
+                    m_vulkanWindow->vulkanInstance()->getInstanceProcAddr("vkDebugMarkerSetObjectNameEXT"));
+        if (m_beginRegion && m_endRegion && m_nameObject)
+            m_vulkanValid = true;
+        else
+            LOG(VB_GENERAL, LOG_INFO, LOC + "Failed to load procs");
+    }
+    else
     {
         LOG(VB_GENERAL, LOG_INFO, LOC + "Extension not found");
-        return;
     }
-
-    m_beginRegion = reinterpret_cast<PFN_vkCmdDebugMarkerBeginEXT>(
-                m_window->vulkanInstance()->getInstanceProcAddr("vkCmdDebugMarkerBeginEXT"));
-    m_endRegion = reinterpret_cast<PFN_vkCmdDebugMarkerEndEXT>(
-                m_window->vulkanInstance()->getInstanceProcAddr("vkCmdDebugMarkerEndEXT"));
-    m_nameObject = reinterpret_cast<PFN_vkDebugMarkerSetObjectNameEXT>(
-                m_window->vulkanInstance()->getInstanceProcAddr("vkDebugMarkerSetObjectNameEXT"));
-
-    m_valid = m_beginRegion && m_endRegion && m_nameObject;
-    if (!m_valid)
-        LOG(VB_GENERAL, LOG_INFO, LOC + "Failed to load procs");
 }
 
-void MythDebugVulkan::BeginRegion(VkCommandBuffer CmdBuffer, const char *Name, const float *Color)
+void MythDebugVulkan::BeginRegion(VkCommandBuffer CmdBuffer, const char *Name, const MythVulkan4F& Color)
 {
     VkDebugMarkerMarkerInfoEXT begin =
         { VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT, nullptr, Name,
@@ -68,5 +68,5 @@ void MythDebugVulkan::NameObject(uint64_t Object, VkDebugReportObjectTypeEXT Typ
     info.objectType  = Type;
     info.object      = Object;
     info.pObjectName = Name;
-    m_nameObject(m_device, &info);
+    m_nameObject(m_vulkanDevice, &info);
 }

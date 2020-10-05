@@ -1,7 +1,6 @@
 // c/c++
 #include <unistd.h>
 #include <iostream>
-using namespace std;
 
 // qt
 #include <QKeyEvent>
@@ -40,8 +39,8 @@ struct SmartPLField
     int              m_defaultValue;
 };
 
-static SmartPLField SmartPLFields[] =
-{
+static const std::array<const SmartPLField,13> SmartPLFields
+{{
     { "",              "",                               ftString,   0,    0,    0 },
     { "Artist",        "music_artists.artist_name",      ftString,   0,    0,    0 },
     { "Album",         "music_albums.album_name",        ftString,   0,    0,    0 },
@@ -57,7 +56,7 @@ static SmartPLField SmartPLFields[] =
                                                          ftDate,     0,    0,    0 },
     { "Date Imported", "FROM_DAYS(TO_DAYS(music_songs.date_entered))",
                                                          ftDate,     0,    0,    0 },
-};
+}};
 
 struct SmartPLOperator
 {
@@ -67,8 +66,8 @@ struct SmartPLOperator
     bool    m_validForBoolean;
 };
 
-static SmartPLOperator SmartPLOperators[] =
-{
+static const std::array<const SmartPLOperator,11> SmartPLOperators
+{{
     { "is equal to",      1,  false, true },
     { "is not equal to",  1,  false, true },
     { "is greater than",  1,  false, false },
@@ -80,27 +79,24 @@ static SmartPLOperator SmartPLOperators[] =
     { "is between",       2,  false, false },
     { "is set",           0,  false, false },
     { "is not set",       0,  false, false },
-};
+}};
 
-static int SmartPLOperatorsCount = sizeof(SmartPLOperators) / sizeof(SmartPLOperators[0]);
-static int SmartPLFieldsCount = sizeof(SmartPLFields) / sizeof(SmartPLFields[0]);
-
-static SmartPLOperator *lookupOperator(const QString& name)
+static const SmartPLOperator *lookupOperator(const QString& name)
 {
-    for (int x = 0; x < SmartPLOperatorsCount; x++)
+    for (const auto & oper : SmartPLOperators)
     {
-        if (SmartPLOperators[x].m_name == name)
-            return &SmartPLOperators[x];
+        if (oper.m_name == name)
+            return &oper;
     }
     return nullptr;
 }
 
-static SmartPLField *lookupField(const QString& name)
+static const SmartPLField *lookupField(const QString& name)
 {
-    for (int x = 0; x < SmartPLFieldsCount; x++)
+    for (const auto & field : SmartPLFields)
     {
-        if (SmartPLFields[x].m_name == name)
-            return &SmartPLFields[x];
+        if (field.m_name == name)
+            return &field;
     }
     return nullptr;
 }
@@ -133,7 +129,7 @@ static QString evaluateDateValue(QString sDate)
             if (sDate.endsWith(" days"))
                 sDate = sDate.left(sDate.length() - 5);
 
-            int nDays = sDate.mid(8).toInt();
+            int nDays = sDate.midRef(8).toInt();
             if (bNegative)
                 nDays = -nDays;
 
@@ -154,7 +150,7 @@ QString getCriteriaSQL(const QString& fieldName, const QString &operatorName,
     if (fieldName.isEmpty())
         return result;
 
-    SmartPLField *Field = lookupField(fieldName);
+    const SmartPLField *Field = lookupField(fieldName);
     if (!Field)
     {
         return "";
@@ -162,7 +158,7 @@ QString getCriteriaSQL(const QString& fieldName, const QString &operatorName,
 
     result = Field->m_sqlName;
 
-    SmartPLOperator *Operator = lookupOperator(operatorName);
+    const SmartPLOperator *Operator = lookupOperator(operatorName);
     if (!Operator)
     {
         return QString();
@@ -251,7 +247,7 @@ QString getOrderBySQL(const QString& orderByFields)
     for (int x = 0; x < list.count(); x++)
     {
         fieldName = list[x].trimmed();
-        SmartPLField *Field = lookupField(fieldName.left(fieldName.length() - 4));
+        const SmartPLField *Field = lookupField(fieldName.left(fieldName.length() - 4));
         if (Field)
         {
             if (fieldName.right(3) == "(D)")
@@ -274,7 +270,7 @@ QString getOrderBySQL(const QString& orderByFields)
 
 QString getSQLFieldName(const QString &fieldName)
 {
-    SmartPLField *Field = lookupField(fieldName);
+    const SmartPLField *Field = lookupField(fieldName);
     if (!Field)
     {
         return "";
@@ -328,7 +324,7 @@ bool SmartPLCriteriaRow::saveToDatabase(int smartPlaylistID) const
 
 QString SmartPLCriteriaRow::toString(void) const
 {
-    SmartPLOperator *PLOperator = lookupOperator(m_operator);
+    const SmartPLOperator *PLOperator = lookupOperator(m_operator);
     if (PLOperator)
     {
         QString result;
@@ -397,12 +393,12 @@ bool SmartPlaylistEditor::Create(void)
     new MythUIButtonListItem(m_matchSelector, tr("Any"));
     connect(m_matchSelector, SIGNAL(itemSelected(MythUIButtonListItem*)), SLOT(updateMatches()));
 
-    for (int x = 0; x < SmartPLFieldsCount; x++)
+    for (const auto & field : SmartPLFields)
     {
-        if (SmartPLFields[x].m_name == "")
-            new MythUIButtonListItem(m_orderBySelector, SmartPLFields[x].m_name);
+        if (field.m_name == "")
+            new MythUIButtonListItem(m_orderBySelector, field.m_name);
         else
-            new MythUIButtonListItem(m_orderBySelector, SmartPLFields[x].m_name + " (A)");
+            new MythUIButtonListItem(m_orderBySelector, field.m_name + " (A)");
     }
 
     m_limitSpin->SetRange(0, 9999, 10);
@@ -1257,16 +1253,16 @@ bool CriteriaRowEditor::Create(void)
 
 void CriteriaRowEditor::updateFields(void)
 {
-    for (int x = 0; x < SmartPLFieldsCount; x++)
-        new MythUIButtonListItem(m_fieldSelector, SmartPLFields[x].m_name);
+    for (const auto & field : SmartPLFields)
+        new MythUIButtonListItem(m_fieldSelector, field.m_name);
 
     m_fieldSelector->SetValue(m_criteriaRow->m_field);
 }
 
 void CriteriaRowEditor::updateOperators(void)
 {
-    for (int x = 0; x < SmartPLOperatorsCount; x++)
-        new MythUIButtonListItem(m_operatorSelector, SmartPLOperators[x].m_name);
+    for (const auto & oper : SmartPLOperators)
+        new MythUIButtonListItem(m_operatorSelector, oper.m_name);
 
     m_operatorSelector->SetValue(m_criteriaRow->m_operator);
 }
@@ -1300,7 +1296,7 @@ void CriteriaRowEditor::updateValues(void)
 
 void CriteriaRowEditor::saveClicked()
 {
-    SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
+    const SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
     if (!Field)
         return;
 
@@ -1333,9 +1329,9 @@ void CriteriaRowEditor::enableSaveButton()
 {
     bool enabled = false;
 
-    SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
+    const SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
 
-    SmartPLOperator *Operator = lookupOperator(m_operatorSelector->GetValue());
+    const SmartPLOperator *Operator = lookupOperator(m_operatorSelector->GetValue());
 
     if (Field && Operator)
     {
@@ -1364,7 +1360,7 @@ void CriteriaRowEditor::enableSaveButton()
 
 void CriteriaRowEditor::fieldChanged(void)
 {
-    SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
+    const SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
     if (!Field)
         return;
 
@@ -1415,11 +1411,11 @@ void CriteriaRowEditor::fieldChanged(void)
 
 void CriteriaRowEditor::operatorChanged(void)
 {
-    SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
+    const SmartPLField *Field = lookupField(m_fieldSelector->GetValue());
     if (!Field)
         return;
 
-    SmartPLOperator *Operator = lookupOperator(m_operatorSelector->GetValue());
+    const SmartPLOperator *Operator = lookupOperator(m_operatorSelector->GetValue());
     if (!Operator)
         return;
 
@@ -1499,17 +1495,17 @@ void CriteriaRowEditor::getOperatorList(SmartPLFieldType fieldType)
 
     m_operatorSelector->Reset();
 
-    for (int x = 0; x < SmartPLOperatorsCount; x++)
+    for (const auto & oper : SmartPLOperators)
     {
         // don't add operators that only work with string fields
-        if (fieldType != ftString && SmartPLOperators[x].m_stringOnly)
+        if (fieldType != ftString && oper.m_stringOnly)
             continue;
 
         // don't add operators that only work with boolean fields
-        if (fieldType == ftBoolean && !SmartPLOperators[x].m_validForBoolean)
+        if (fieldType == ftBoolean && !oper.m_validForBoolean)
             continue;
 
-        new MythUIButtonListItem(m_operatorSelector, SmartPLOperators[x].m_name);
+        new MythUIButtonListItem(m_operatorSelector, oper.m_name);
     }
 
     // try to set the operatorCombo to the same operator or else the first item
@@ -1959,8 +1955,8 @@ void SmartPLOrderByDialog::orderByChanged(void)
 void SmartPLOrderByDialog::getOrderByFields(void)
 {
     m_orderSelector->Reset();
-    for (int x = 1; x < SmartPLFieldsCount; x++)
-        new MythUIButtonListItem(m_orderSelector, SmartPLFields[x].m_name);
+    for (const auto & field : SmartPLFields)
+        new MythUIButtonListItem(m_orderSelector, field.m_name);
 }
 
 /*
@@ -2056,7 +2052,7 @@ void SmartPLDateDialog::setDate(QString date)
             if (date.endsWith(" days"))
                 date = date.left(date.length() - 5);
 
-            int nDays = date.mid(8).toInt();
+            int nDays = date.midRef(8).toInt();
             if (bNegative)
                 nDays = -nDays;
 
@@ -2069,9 +2065,9 @@ void SmartPLDateDialog::setDate(QString date)
     }
     else
     {
-        int nYear = date.mid(0, 4).toInt();
-        int nMonth = date.mid(5, 2).toInt();
-        int nDay = date.mid(8, 2).toInt();
+        int nYear = date.midRef(0, 4).toInt();
+        int nMonth = date.midRef(5, 2).toInt();
+        int nDay = date.midRef(8, 2).toInt();
 
         m_daySpin->SetValue(nDay);
         m_monthSpin->SetValue(nMonth);

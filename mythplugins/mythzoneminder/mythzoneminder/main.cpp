@@ -33,8 +33,6 @@
 #include "zmminiplayer.h"
 #include "alarmnotifythread.h"
 
-using namespace std;
-
 static bool checkConnection(void)
 {
     if (!ZMClient::get()->connected())
@@ -137,7 +135,7 @@ static int runMenu(const QString& which_menu)
 
     while (parentObject)
     {
-        mainMenu = dynamic_cast<MythThemedMenu *>(parentObject);
+        mainMenu = qobject_cast<MythThemedMenu *>(parentObject);
 
         if (mainMenu && mainMenu->objectName() == "mainmenu")
             break;

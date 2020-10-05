@@ -23,7 +23,6 @@
 #include <algorithm>
 #include <deque>                        // for _Deque_iterator, operator-, etc
 #include <iterator>                     // for reverse_iterator
-using namespace std;
 
 // QT
 #include <QDateTime>
@@ -615,7 +614,7 @@ void PrevRecordedList::customEvent(QEvent *event)
         auto *dce = (DialogCompletionEvent*)(event);
 
         QString resultid   = dce->GetId();
-        QString resulttext = dce->GetResultText();
+//      QString resulttext = dce->GetResultText();
         int     buttonnum  = dce->GetResult();
 
         if (resultid == "sortmenu")

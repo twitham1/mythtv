@@ -17,8 +17,6 @@
 //mythfrontend
 #include "viewschedulediff.h"
 
-using namespace std;
-
 bool ViewScheduleDiff::Create()
 {
     if (!LoadWindowFromXML("schedule-ui.xml", "schedulediff", this))
@@ -176,9 +174,6 @@ void ViewScheduleDiff::fillList(void)
 {
     m_inFill = true;
 
-    QString callsign;
-    QDateTime startts;
-    QDateTime recstartts;
     bool dummy = false;
 
     LoadFromScheduler(m_recListBefore, dummy);

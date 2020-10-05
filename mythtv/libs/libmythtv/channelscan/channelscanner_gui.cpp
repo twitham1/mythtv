@@ -32,7 +32,6 @@
 
 // Std C++
 #include <algorithm>
-using namespace std;
 
 // MythTV headers
 #include "mythdialogbox.h"
@@ -87,7 +86,7 @@ void ChannelScannerGUI::HandleEvent(const ScannerEvent *scanEvent)
         success |= (m_vboxScanner != nullptr);
 #endif
 #if !defined( USING_MINGW ) && !defined( _MSC_VER )
-        success |= (m_ExternRecScanner != nullptr);
+        success |= (m_externRecScanner != nullptr);
 #endif
 
         Teardown();

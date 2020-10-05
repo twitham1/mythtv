@@ -5,7 +5,6 @@
 // C++ headers
 #include <cstdint>
 #include <vector>
-using namespace std;
 
 // Qt headers
 #include <QList>
@@ -67,6 +66,7 @@ class MTV_PUBLIC CardUtil
         VBOX      = 19,
         DVBT2     = 20,
         V4L2ENC   = 21,
+        SATIP     = 22
     };
 
     static enum INPUT_TYPES toInputType(const QString &name)
@@ -121,6 +121,8 @@ class MTV_PUBLIC CardUtil
             return DVBT2;
         if ("V4L2ENC" == name)
             return V4L2ENC;
+        if ("SATIP" == name)
+            return SATIP;
         return ERROR_UNKNOWN;
     }
 
@@ -131,7 +133,7 @@ class MTV_PUBLIC CardUtil
             (rawtype != "HDHOMERUN") && (rawtype != "FREEBOX")  &&
             (rawtype != "IMPORT")    && (rawtype != "DEMO")     &&
             (rawtype != "ASI")       && (rawtype != "CETON")    &&
-            (rawtype != "VBOX");
+            (rawtype != "VBOX")      && (rawtype != "SATIP");
     }
 
     static bool         IsV4L(const QString &rawtype)
@@ -162,7 +164,8 @@ class MTV_PUBLIC CardUtil
     static bool         IsEITCapable(const QString &rawtype)
     {
         return
-            (rawtype == "DVB")       || (rawtype == "HDHOMERUN");
+            (rawtype == "DVB")       || (rawtype == "HDHOMERUN") ||
+            (rawtype == "SATIP");
     }
 
     static bool         IsTunerSharingCapable(const QString &rawtype)
@@ -171,7 +174,8 @@ class MTV_PUBLIC CardUtil
             (rawtype == "DVB")       || (rawtype == "HDHOMERUN") ||
             (rawtype == "ASI")       || (rawtype == "FREEBOX")   ||
             (rawtype == "CETON")     || (rawtype == "EXTERNAL")  ||
-            (rawtype == "VBOX")      || (rawtype == "V4L2ENC");
+            (rawtype == "VBOX")      || (rawtype == "V4L2ENC")   ||
+            (rawtype == "SATIP");
     }
 
     static bool         HasTuner(const QString &rawtype, const QString & device);
@@ -182,7 +186,7 @@ class MTV_PUBLIC CardUtil
         return
             (rawtype == "DVB")       || (rawtype == "HDHOMERUN") ||
             (rawtype == "ASI")       || (rawtype == "CETON")     ||
-            (rawtype == "EXTERNAL");
+            (rawtype == "EXTERNAL")  || (rawtype == "SATIP");
     }
 
     static bool         IsTuningAnalog(const QString &rawtype)
@@ -206,7 +210,7 @@ class MTV_PUBLIC CardUtil
             (rawtype == "FREEBOX")   || (rawtype == "ASI")       ||
             (rawtype == "IMPORT")    || (rawtype == "DEMO")      ||
             (rawtype == "CETON")     || (rawtype == "EXTERNAL")  ||
-            (rawtype == "VBOX");
+            (rawtype == "VBOX")      || (rawtype == "SATIP");
     }
 
     static bool         IsChannelReusable(const QString &rawtype)
@@ -245,26 +249,26 @@ class MTV_PUBLIC CardUtil
 
     static bool         DeleteInput(uint inputid);
     static bool         DeleteAllInputs(void);
-    static vector<uint> GetInputList(void);
-    static vector<uint> GetSchedInputList(void);
-    static vector<uint> GetLiveTVInputList(void);
+    static std::vector<uint> GetInputList(void);
+    static std::vector<uint> GetSchedInputList(void);
+    static std::vector<uint> GetLiveTVInputList(void);
 
     /// Convenience function for GetInputIDs()
     static uint         GetFirstInputID(const QString &videodevice)
     {
-        vector<uint> list = GetInputIDs(videodevice);
+        std::vector<uint> list = GetInputIDs(videodevice);
         if (list.empty())
             return 0;
         return list[0];
     }
 
-    static vector<uint> GetInputIDs(const QString& videodevice = QString(),
+    static std::vector<uint> GetInputIDs(const QString& videodevice = QString(),
                                     const QString& rawtype     = QString(),
                                     const QString& inputname   = QString(),
                                     QString hostname    = QString());
 
     static uint         GetChildInputCount(uint inputid);
-    static vector<uint> GetChildInputIDs(uint inputid);
+    static std::vector<uint> GetChildInputIDs(uint inputid);
 
     static bool         IsInputTypePresent(const QString &rawtype,
                                            QString hostname = QString());
@@ -319,9 +323,9 @@ class MTV_PUBLIC CardUtil
 
     // Other input functions
 
-    static vector<uint> GetInputIDs(uint sourceid);
+    static std::vector<uint> GetInputIDs(uint sourceid);
     static bool         GetInputInfo(InputInfo &input,
-                                     vector<uint> *groupids = nullptr);
+                                     std::vector<uint> *groupids = nullptr);
     static QList<InputInfo> GetAllInputInfo();
     static QString      GetInputName(uint inputid);
     static QString      GetStartingChannel(uint inputid);
@@ -339,9 +343,9 @@ class MTV_PUBLIC CardUtil
     static uint         GetDeviceInputGroup(uint inputid);
     static bool         LinkInputGroup(uint inputid, uint inputgroupid);
     static bool         UnlinkInputGroup(uint inputid, uint inputgroupid);
-    static vector<uint> GetInputGroups(uint inputid);
-    static vector<uint> GetGroupInputIDs(uint inputgroupid);
-    static vector<uint> GetConflictingInputs(uint inputid);
+    static std::vector<uint> GetInputGroups(uint inputid);
+    static std::vector<uint> GetGroupInputIDs(uint inputgroupid);
+    static std::vector<uint> GetConflictingInputs(uint inputid);
 
     static QString      GetDeviceLabel(const QString &inputtype,
                                        const QString &videodevice);

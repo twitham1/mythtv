@@ -152,9 +152,9 @@ bool AudioOutputPulseAudio::OpenDevice()
         VBERROR(fn_log_tag + "invalid sample spec");
         return false;
     }
-    char spec[PA_SAMPLE_SPEC_SNPRINT_MAX];
-    pa_sample_spec_snprint(spec, sizeof(spec), &m_sampleSpec);
-    VBAUDIO(fn_log_tag + QString("using sample spec %1").arg(spec));
+    std::string spec(PA_SAMPLE_SPEC_SNPRINT_MAX,'\0');
+    pa_sample_spec_snprint(spec.data(), spec.size(), &m_sampleSpec);
+    VBAUDIO(fn_log_tag + "using sample spec " + spec.data());
 
     if(!pa_channel_map_init_auto(&m_channelMap, m_channels, PA_CHANNEL_MAP_WAVEEX))
     {
@@ -567,14 +567,14 @@ bool AudioOutputPulseAudio::ConnectPlaybackStream(void)
     pa_stream_connect_playback(m_pstream, nullptr, &m_bufferSettings,
                                (pa_stream_flags_t)flags, nullptr, nullptr);
 
-    pa_context_state_t cstate = PA_CONTEXT_UNCONNECTED;
     pa_stream_state_t sstate = PA_STREAM_UNCONNECTED;
     bool connected = false;
     bool failed = false;
 
     while (!(connected || failed))
     {
-        switch (cstate = pa_context_get_state(m_pcontext))
+        pa_context_state_t cstate = pa_context_get_state(m_pcontext);
+        switch (cstate)
         {
             case PA_CONTEXT_FAILED:
             case PA_CONTEXT_TERMINATED:
@@ -626,7 +626,6 @@ void AudioOutputPulseAudio::FlushStream(const char *caller)
 
 void AudioOutputPulseAudio::ContextStateCallback(pa_context *c, void *arg)
 {
-    QString fn_log_tag = "_ContextStateCallback, ";
     auto *audoutP = static_cast<AudioOutputPulseAudio*>(arg);
     switch (pa_context_get_state(c))
     {
@@ -645,7 +644,6 @@ void AudioOutputPulseAudio::ContextStateCallback(pa_context *c, void *arg)
 
 void AudioOutputPulseAudio::StreamStateCallback(pa_stream *s, void *arg)
 {
-    QString fn_log_tag = "StreamStateCallback, ";
     auto *audoutP = static_cast<AudioOutputPulseAudio*>(arg);
     switch (pa_stream_get_state(s))
     {

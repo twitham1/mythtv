@@ -11,8 +11,6 @@
 #include "mythsocket.h"
 #include "mythlogging.h"
 
-using namespace std;
-
 #define LOC QString("RemoteEncoder(%1): ").arg(m_recordernum)
 
 #define MAX_SIZE_CHECK 500  // in ms
@@ -281,7 +279,7 @@ void RemoteEncoder::FillPositionMap(int64_t start, int64_t end,
     {
         bool ok = false;
         uint64_t index = (*it).toLongLong(&ok);
-        if (++it == strlist.end() || !ok)
+        if (++it == strlist.cend() || !ok)
             break;
 
         uint64_t pos = (*it).toLongLong(&ok);
@@ -307,7 +305,7 @@ void RemoteEncoder::FillDurationMap(int64_t start, int64_t end,
     {
         bool ok = false;
         uint64_t index = (*it).toLongLong(&ok);
-        if (++it == strlist.end() || !ok)
+        if (++it == strlist.cend() || !ok)
             break;
 
         uint64_t pos = (*it).toLongLong(&ok);
@@ -508,8 +506,8 @@ uint RemoteEncoder::GetSignalLockTimeout(const QString& input)
 {
     QMutexLocker locker(&m_lock);
 
-    QMap<QString,uint>::const_iterator it = m_cachedTimeout.find(input);
-    if (it != m_cachedTimeout.end())
+    QMap<QString,uint>::const_iterator it = m_cachedTimeout.constFind(input);
+    if (it != m_cachedTimeout.constEnd())
         return *it;
 
     uint cardid  = m_recordernum;
@@ -526,7 +524,7 @@ uint RemoteEncoder::GetSignalLockTimeout(const QString& input)
         MythDB::DBError("Getting timeout", query);
     else if (query.next() &&
              SignalMonitor::IsRequired(query.value(1).toString()))
-        timeout = max(query.value(0).toInt(), 500);
+        timeout = std::max(query.value(0).toInt(), 500);
 
 #if 0
     LOG(VB_PLAYBACK, LOG_DEBUG, "RemoteEncoder: " +

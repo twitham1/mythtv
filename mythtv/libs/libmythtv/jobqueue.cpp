@@ -6,7 +6,6 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <pthread.h>
-using namespace std;
 
 #include <QDateTime>
 #include <QFileInfo>
@@ -177,7 +176,6 @@ void JobQueue::ProcessQueue(void)
     QString message;
     QMap<int, JobQueueEntry> jobs;
     bool atMax = false;
-    bool inTimeWindow = true;
     QMap<int, RunningJobInfo>::Iterator rjiter;
 
     QMutexLocker locker(&m_queueThreadCondLock);
@@ -208,7 +206,7 @@ void JobQueue::ProcessQueue(void)
 
         if (!jobs.empty())
         {
-            inTimeWindow = InJobRunWindow();
+            bool inTimeWindow = InJobRunWindow();
             for (const auto & job : qAsConst(jobs))
             {
                 int status = job.status;
@@ -1880,7 +1878,7 @@ QString JobQueue::PrettyPrint(off_t bytes)
         unsigned int  m_max;
         int           m_precision;
     };
-    static constexpr array<const PpTab_t,9> kPpTab {{
+    static constexpr std::array<const PpTab_t,9> kPpTab {{
         { "bytes", 9999, 0 },
         { "kB", 999, 0 },
         { "MB", 999, 1 },
@@ -2191,7 +2189,6 @@ void JobQueue::DoMetadataLookupThread(int jobID)
         return;
     }
 
-    QString msg = tr("Metadata Lookup Starting");
     LOG(VB_GENERAL, LOG_INFO,
         LOC + "Metadata Lookup Starting for " + detailstr);
 
@@ -2247,7 +2244,7 @@ void JobQueue::DoMetadataLookupThread(int jobID)
         program_info->SendUpdateEvent();
     }
 
-    msg = tr("Metadata Lookup %1", "Job ID")
+    QString msg = tr("Metadata Lookup %1", "Job ID")
         .arg(StatusText(GetJobStatus(jobID)));
 
     if (!comment.isEmpty())
@@ -2316,7 +2313,6 @@ void JobQueue::DoFlagCommercialsThread(int jobID)
         return;
     }
 
-    QString msg = tr("Commercial Detection Starting");
     LOG(VB_GENERAL, LOG_INFO,
         LOC + "Commercial Detection Starting for " + detailstr);
 
@@ -2398,7 +2394,7 @@ void JobQueue::DoFlagCommercialsThread(int jobID)
         }
     }
 
-    msg = tr("Commercial Detection %1", "Job ID")
+    QString msg = tr("Commercial Detection %1", "Job ID")
         .arg(StatusText(GetJobStatus(jobID)));
 
     if (!comment.isEmpty())

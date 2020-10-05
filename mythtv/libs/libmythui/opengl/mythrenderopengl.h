@@ -1,17 +1,28 @@
 #ifndef MYTHRENDER_OPENGL_H_
 #define MYTHRENDER_OPENGL_H_
 
+// C++
+#include <vector>
+
 // Qt
 #include <QObject>
 #include <QtGlobal>
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
 #include <QOpenGLExtraFunctions>
+#if QT_VERSION < QT_VERSION_CHECK(6,0,0)
 #include <QOpenGLShaderProgram>
 #include <QOpenGLFramebufferObject>
 #include <QOpenGLTexture>
 #include <QOpenGLBuffer>
 #include <QOpenGLDebugLogger>
+#else
+#include <QtOpenGL/QOpenGLTexture>
+#include <QtOpenGL/QOpenGLShaderProgram>
+#include <QtOpenGL/QOpenGLFramebufferObject>
+#include <QtOpenGL/QOpenGLBuffer>
+#include <QtOpenGL/QOpenGLDebugLogger>
+#endif
 #include <QHash>
 #include <QMutex>
 #include <QMatrix4x4>
@@ -61,7 +72,7 @@ class MUI_PUBLIC MythGLTexture
     bool            m_crop                    { false };
     QRect           m_source                  { QRect() };
     QRect           m_destination             { QRect() };
-    GLfloat         m_vertexData[16]          { 0.0F };
+    std::array<GLfloat,16> m_vertexData       { 0.0F };
     GLenum          m_target                  { QOpenGLTexture::Target2D };
     int             m_rotation                { 0 };
 
@@ -107,13 +118,13 @@ class MUI_PUBLIC MythRenderOpenGL : public QOpenGLContext, public QOpenGLFunctio
     int   GetExtraFeatures(void) const;
     QOpenGLFunctions::OpenGLFeatures GetFeatures(void) const;
     bool  IsRecommendedRenderer(void);
-    void  SetViewPort(const QRect &Rect, bool ViewportOnly = false);
+    void  SetViewPort(const QRect &Rect, bool ViewportOnly = false) override;
     QRect GetViewPort(void) { return m_viewport; }
     void  PushTransformation(const UIEffects &Fx, QPointF &Center);
     void  PopTransformation(void);
     void  Flush(void);
     void  SetBlend(bool Enable);
-    void  SetBackground(int Red, int Green, int Blue, int Alpha);
+    void  SetBackground(uint8_t Red, uint8_t Green, uint8_t Blue, uint8_t Alpha);
     QFunctionPointer GetProcAddress(const QString &Proc) const;
 
     static const GLuint kVertexSize;
@@ -144,7 +155,7 @@ class MUI_PUBLIC MythRenderOpenGL : public QOpenGLContext, public QOpenGLFunctio
     void  DrawBitmap(MythGLTexture *Texture, QOpenGLFramebufferObject *Target,
                      const QRect &Source, const QRect &Destination,
                      QOpenGLShaderProgram *Program, int Alpha = 255, qreal Scale = 1.0);
-    void  DrawBitmap(MythGLTexture **Textures, uint TextureCount,
+    void  DrawBitmap(std::vector<MythGLTexture *> &Textures,
                      QOpenGLFramebufferObject *Target,
                      const QRect &Source, const QRect &Destination,
                      QOpenGLShaderProgram *Program, int Rotation);
@@ -195,7 +206,7 @@ class MUI_PUBLIC MythRenderOpenGL : public QOpenGLContext, public QOpenGLFunctio
     GLuint                       m_fence { 0 };
 
     // Shaders
-    QOpenGLShaderProgram*        m_defaultPrograms[kShaderCount] { nullptr };
+    std::array<QOpenGLShaderProgram*,kShaderCount> m_defaultPrograms { nullptr };
     QOpenGLShaderProgram*        m_activeProgram { nullptr };
 
     // Vertices

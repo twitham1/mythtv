@@ -96,8 +96,7 @@ void AVCParser::Reset(void)
     m_bottomFieldFlag     = -1;
     m_deltaPicOrderAlwaysZeroFlag = 0;
     m_deltaPicOrderCntBottom     = 0;
-    m_deltaPicOrderCnt[0]     = 0;
-    m_deltaPicOrderCnt[1]     = 0;
+    m_deltaPicOrderCnt.fill(0);
     m_fieldPicFlag     = -1;
     m_frameMbsOnlyFlag = -1;
     m_frameNum = -1;
@@ -114,8 +113,7 @@ void AVCParser::Reset(void)
     m_picParameterSetId = -1;
     m_prevBottomFieldFlag = -1;
     m_prevDeltaPicOrderCntBottom = 0;
-    m_prevDeltaPicOrderCnt[0] = 0;
-    m_prevDeltaPicOrderCnt[1] = 0;
+    m_prevDeltaPicOrderCnt.fill(0);
     m_prevFieldPicFlag = -1;
     m_prevFrameNum = -1;
     m_prevIdrPicId = 65536;
@@ -596,8 +594,6 @@ bool AVCParser::decode_Header(GetBitContext *gb)
         m_fieldPicFlag = 0;
         m_bottomFieldFlag = -1;
     }
-
-    m_scanType = m_fieldPicFlag ? SCAN_t::INTERLACED : SCAN_t::PROGRESSIVE;
 
     /*
       m_idrPicId identifies an IDR picture. The values of m_idrPicId

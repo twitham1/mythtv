@@ -458,10 +458,10 @@ static double AngleToFloat(const QString &angle, bool translated = true)
     QChar postfix = angle.at(angle.length() - 1);
     if (postfix.isLetter())
     {
-        pos = angle.left(angle.length() - 1).toDouble();
+        pos = angle.leftRef(angle.length() - 1).toDouble();
         if ((translated &&
              (postfix.toUpper() ==
-              DeviceTree::tr("W", "Western Hemisphere")[0])) ||
+              DeviceTree::tr("W", "Western Hemisphere").at(0))) ||
             (!translated && (postfix.toUpper() == 'W')))
         {
             pos = -pos;
@@ -521,9 +521,9 @@ void RotorPosMap::PopulateList(void)
     uint num_pos = 64;
     for (uint pos = 1; pos < num_pos; pos++)
     {
-        uint_to_dbl_t::const_iterator it = m_posmap.find(pos);
+        uint_to_dbl_t::const_iterator it = m_posmap.constFind(pos);
         QString posval;
-        if (it != m_posmap.end())
+        if (it != m_posmap.constEnd())
             posval = AngleToString(*it);
 
         auto *posEdit =
@@ -1246,9 +1246,8 @@ class RotorSetting : public MythUIComboBoxSetting
     {
         clearSelections();
 
-        uint_to_dbl_t::const_iterator it;
-        for (it = m_posmap.begin(); it != m_posmap.end(); ++it)
-            addSelection(AngleToString(*it), QString::number(*it));
+        for (double d : qAsConst(m_posmap))
+            addSelection(AngleToString(d), QString::number(d));
 
         double angle = m_settings.GetValue(m_node.GetDeviceID());
         setValue(getValueIndex(QString::number(angle)));

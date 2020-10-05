@@ -190,36 +190,46 @@ void OSD::SetPainter(MythPainter *Painter)
 
 void OSD::OverrideUIScale(bool Log)
 {
-    QRect uirect = GetMythMainWindow()->GetUIScreenRect();
+    // Avoid unnecessary switches
+    MythMainWindow* window = GetMythMainWindow();
+    QRect uirect = window->GetUIScreenRect();
     if (uirect == m_rect)
         return;
 
-    m_savedFontStretch = GetMythUI()->GetFontStretch();
-    GetMythUI()->SetFontStretch(m_fontStretch);
-    GetMythUI()->GetScreenSettings(m_savedWMult, m_savedHMult);
-    QSize theme_size = GetMythUI()->GetBaseSize();
+    // Save current data
     m_savedUIRect = uirect;
-    float tmp_wmult = static_cast<float>(m_rect.size().width()) / static_cast<float>(theme_size.width());
-    float tmp_hmult = static_cast<float>(m_rect.size().height()) / static_cast<float>(theme_size.height());
+    m_savedFontStretch = window->GetFontStretch();
+    window->GetScalingFactors(m_savedWMult, m_savedHMult);
+
+    // Calculate new
+    QSize themesize = window->GetThemeSize();
+    float wmult = static_cast<float>(m_rect.size().width()) / static_cast<float>(themesize.width());
+    float mult = static_cast<float>(m_rect.size().height()) / static_cast<float>(themesize.height());
     if (Log)
     {
         LOG(VB_GENERAL, LOG_INFO, LOC + QString("Base theme size: %1x%2")
-            .arg(theme_size.width()).arg(theme_size.height()));
+            .arg(themesize.width()).arg(themesize.height()));
         LOG(VB_GENERAL, LOG_INFO, LOC + QString("Scaling factors: %1x%2")
-            .arg(static_cast<double>(tmp_wmult)).arg(static_cast<double>(tmp_hmult)));
+            .arg(static_cast<double>(wmult)).arg(static_cast<double>(mult)));
+        LOG(VB_GENERAL, LOG_INFO, LOC + QString("Font stretch: saved %1 new %2")
+            .arg(m_savedFontStretch).arg(m_fontStretch));
     }
     m_uiScaleOverride = true;
-    GetMythMainWindow()->SetScalingFactors(tmp_wmult, tmp_hmult);
-    GetMythMainWindow()->SetUIScreenRect(m_rect);
+
+    // Apply new
+    window->SetFontStretch(m_fontStretch);
+    window->SetScalingFactors(wmult, mult);
+    window->SetUIScreenRect(m_rect);
 }
 
 void OSD::RevertUIScale(void)
 {
     if (m_uiScaleOverride)
     {
-        GetMythUI()->SetFontStretch(m_savedFontStretch);
-        GetMythMainWindow()->SetScalingFactors(m_savedWMult, m_savedHMult);
-        GetMythMainWindow()->SetUIScreenRect(m_savedUIRect);
+        MythMainWindow* window = GetMythMainWindow();
+        window->SetFontStretch(m_savedFontStretch);
+        window->SetScalingFactors(m_savedWMult, m_savedHMult);
+        window->SetUIScreenRect(m_savedUIRect);
     }
     m_uiScaleOverride = false;
 }
@@ -251,17 +261,13 @@ bool OSD::IsVisible(void)
     if (GetNotificationCenter()->DisplayedNotifications() > 0)
         return true;
 
-    for (MythScreenType* child : qAsConst(m_children))
-    {
-        if (child->IsVisible() &&
-            child->objectName() != OSD_WIN_SUBTITLE &&
-            child->objectName() != OSD_WIN_TELETEXT &&
-            child->objectName() != OSD_WIN_BDOVERLAY &&
-            child->objectName() != OSD_WIN_INTERACT)
-            return true;
-    }
-
-    return false;
+    return std::any_of(m_children.cbegin(), m_children.cend(),
+                       [](MythScreenType* child)
+                           { return child->IsVisible() &&
+                                    child->objectName() != OSD_WIN_SUBTITLE &&
+                                    child->objectName() != OSD_WIN_TELETEXT &&
+                                    child->objectName() != OSD_WIN_BDOVERLAY &&
+                                    child->objectName() != OSD_WIN_INTERACT; } );
 }
 
 void OSD::HideAll(bool KeepSubs, MythScreenType* Except, bool DropNotification)
@@ -527,7 +533,7 @@ void OSD::SetText(const QString &Window, const InfoMap &Map, OSDTimeout Timeout)
 
     if (win == m_dialog)
     {
-        auto *edit = dynamic_cast<ChannelEditor*>(m_dialog);
+        auto *edit = qobject_cast<ChannelEditor*>(m_dialog);
         if (edit)
             edit->SetText(Map);
         else
@@ -631,21 +637,20 @@ bool OSD::Draw(MythPainter* Painter, QSize Size, bool Repaint)
     QTime now = MythDate::current().time();
 
     CheckExpiry();
-    QMap<QString,MythScreenType*>::const_iterator it;
-    for (it = m_children.begin(); it != m_children.end(); ++it)
+    for (auto * screen : qAsConst(m_children))
     {
-        if ((*it)->IsVisible())
+        if (screen->IsVisible())
         {
             visible = true;
-            (*it)->Pulse();
-            if (m_expireTimes.contains((*it)))
+            screen->Pulse();
+            if (m_expireTimes.contains(screen))
             {
-                QTime expires = m_expireTimes.value((*it)).time();
+                QTime expires = m_expireTimes.value(screen).time();
                 int left = now.msecsTo(expires);
                 if (left < m_fadeTime)
-                    (*it)->SetAlpha((255 * left) / m_fadeTime);
+                    screen->SetAlpha((255 * left) / m_fadeTime);
             }
-            if ((*it)->NeedsRedraw())
+            if (screen->NeedsRedraw())
                 redraw = true;
         }
     }
@@ -703,22 +708,22 @@ bool OSD::Draw(MythPainter* Painter, QSize Size, bool Repaint)
     {
         QRect cliprect = QRect(QPoint(0, 0), Size);
         Painter->Begin(nullptr);
-        for (it = m_children.begin(); it != m_children.end(); ++it)
+        for (auto * screen : qAsConst(m_children))
         {
-            if ((*it)->IsVisible())
+            if (screen->IsVisible())
             {
-                (*it)->Draw(Painter, 0, 0, 255, cliprect);
-                (*it)->SetAlpha(255);
-                (*it)->ResetNeedsRedraw();
+                screen->Draw(Painter, 0, 0, 255, cliprect);
+                screen->SetAlpha(255);
+                screen->ResetNeedsRedraw();
             }
         }
-        for (it2 = notifications.begin(); it2 != notifications.end(); ++it2)
+        for (auto * notif : qAsConst(notifications))
         {
-            if ((*it2)->IsVisible())
+            if (notif->IsVisible())
             {
-                (*it2)->Draw(Painter, 0, 0, 255, cliprect);
-                (*it2)->SetAlpha(255);
-                (*it2)->ResetNeedsRedraw();
+                notif->Draw(Painter, 0, 0, 255, cliprect);
+                notif->SetAlpha(255);
+                notif->ResetNeedsRedraw();
             }
         }
         Painter->End();
@@ -751,7 +756,7 @@ void OSD::CheckExpiry(void)
             if (!m_pulsedDialogText.isEmpty() && now > m_nextPulseUpdate)
             {
                 QString newtext = m_pulsedDialogText;
-                auto *dialog = dynamic_cast<MythDialogBox*>(m_dialog);
+                auto *dialog = qobject_cast<MythDialogBox*>(m_dialog);
                 if (dialog)
                 {
                     // The disambiguation string must be an empty string
@@ -761,7 +766,7 @@ void OSD::CheckExpiry(void)
                                           static_cast<int>(now.secsTo(it.value())));
                     dialog->SetText(newtext.replace("%d", replace));
                 }
-                auto *cdialog = dynamic_cast<MythConfirmationDialog*>(m_dialog);
+                auto *cdialog = qobject_cast<MythConfirmationDialog*>(m_dialog);
                 if (cdialog)
                 {
                     QString replace = QString::number(now.secsTo(it.value()));
@@ -827,7 +832,9 @@ void OSD::ResetWindow(const QString &Window)
     if (!m_children.contains(Window))
         return;
 
-    m_children.value(Window)->Reset();
+    MythScreenType *screen = m_children.value(Window);
+    if (screen != nullptr)
+        screen->Reset();
 }
 
 void OSD::PositionWindow(MythScreenType *Window)
@@ -900,15 +907,20 @@ void OSD::HideWindow(const QString &Window)
 {
     if (!m_children.contains(Window))
         return;
-    m_children.value(Window)->SetVisible(false);
-    m_children.value(Window)->Close(); // for InteractiveScreen
+    MythScreenType *screen = m_children.value(Window);
+    if (screen != nullptr)
+    {
+        screen->SetVisible(false);
+        screen->Close(); // for InteractiveScreen
+    }
     SetExpiry(Window, kOSDTimeout_None);
     m_refresh = true;
 
     if (m_functionalType != kOSDFunctionalType_Default)
     {
         bool valid   = m_children.contains(m_functionalWindow);
-        bool visible = valid && m_children.value(m_functionalWindow)->IsVisible(false);
+        screen = m_children.value(m_functionalWindow);
+        bool visible = valid && screen && screen->IsVisible(false);
         if (!valid || !visible)
         {
             SendHideEvent();
@@ -971,7 +983,7 @@ void OSD::DialogShow(const QString &Window, const QString &Text, int UpdateFor)
         }
         else
         {
-            auto *dialog = dynamic_cast<MythDialogBox*>(m_dialog);
+            auto *dialog = qobject_cast<MythDialogBox*>(m_dialog);
             if (dialog)
                 dialog->Reset();
 
@@ -998,10 +1010,10 @@ void OSD::DialogShow(const QString &Window, const QString &Text, int UpdateFor)
         {
             PositionWindow(dialog);
             m_dialog = dialog;
-            auto *dbox = dynamic_cast<MythDialogBox*>(m_dialog);
+            auto *dbox = qobject_cast<MythDialogBox*>(m_dialog);
             if (dbox)
                 dbox->SetReturnEvent(m_parentObject, Window);
-            auto *cbox = dynamic_cast<MythConfirmationDialog*>(m_dialog);
+            auto *cbox = qobject_cast<MythConfirmationDialog*>(m_dialog);
             if (cbox)
             {
                 cbox->SetReturnEvent(m_parentObject, Window);
@@ -1033,14 +1045,14 @@ void OSD::DialogShow(const QString &Window, const QString &Text, int UpdateFor)
 
 void OSD::DialogSetText(const QString &Text)
 {
-    auto *dialog = dynamic_cast<MythDialogBox*>(m_dialog);
+    auto *dialog = qobject_cast<MythDialogBox*>(m_dialog);
     if (dialog)
         dialog->SetText(Text);
 }
 
 void OSD::DialogBack(const QString& Text, const QVariant& Data, bool Exit)
 {
-    auto *dialog = dynamic_cast<MythDialogBox*>(m_dialog);
+    auto *dialog = qobject_cast<MythDialogBox*>(m_dialog);
     if (dialog)
     {
         dialog->SetBackAction(Text, Data);
@@ -1051,14 +1063,14 @@ void OSD::DialogBack(const QString& Text, const QVariant& Data, bool Exit)
 
 void OSD::DialogAddButton(const QString& Text, QVariant Data, bool Menu, bool Current)
 {
-    auto *dialog = dynamic_cast<MythDialogBox*>(m_dialog);
+    auto *dialog = qobject_cast<MythDialogBox*>(m_dialog);
     if (dialog)
         dialog->AddButton(Text, std::move(Data), Menu, Current);
 }
 
 void OSD::DialogGetText(InfoMap &Map)
 {
-    auto *edit = dynamic_cast<ChannelEditor*>(m_dialog);
+    auto *edit = qobject_cast<ChannelEditor*>(m_dialog);
     if (edit)
         edit->GetText(Map);
 }
@@ -1068,7 +1080,7 @@ TeletextScreen* OSD::InitTeletext(void)
     TeletextScreen *tt = nullptr;
     if (m_children.contains(OSD_WIN_TELETEXT))
     {
-        tt = dynamic_cast<TeletextScreen*>(m_children.value(OSD_WIN_TELETEXT));
+        tt = qobject_cast<TeletextScreen*>(m_children.value(OSD_WIN_TELETEXT));
     }
     else
     {
@@ -1123,7 +1135,7 @@ bool OSD::TeletextAction(const QString &Action)
     if (!HasWindow(OSD_WIN_TELETEXT))
         return false;
 
-    TeletextScreen* tt = dynamic_cast<TeletextScreen*>(m_children.value(OSD_WIN_TELETEXT));
+    auto* tt = qobject_cast<TeletextScreen*>(m_children.value(OSD_WIN_TELETEXT));
     if (tt)
         return tt->KeyPress(Action);
     return false;
@@ -1144,7 +1156,7 @@ void OSD::TeletextClear(void)
     if (!HasWindow(OSD_WIN_TELETEXT))
         return;
 
-    TeletextScreen* tt = dynamic_cast<TeletextScreen*>(m_children.value(OSD_WIN_TELETEXT));
+    auto* tt = qobject_cast<TeletextScreen*>(m_children.value(OSD_WIN_TELETEXT));
     if (tt)
         tt->ClearScreen();
 }
@@ -1154,7 +1166,7 @@ SubtitleScreen* OSD::InitSubtitles(void)
     SubtitleScreen *sub = nullptr;
     if (m_children.contains(OSD_WIN_SUBTITLE))
     {
-        sub = dynamic_cast<SubtitleScreen*>(m_children.value(OSD_WIN_SUBTITLE));
+        sub = qobject_cast<SubtitleScreen*>(m_children.value(OSD_WIN_SUBTITLE));
     }
     else
     {
@@ -1226,7 +1238,7 @@ void OSD::DisplayBDOverlay(MythBDOverlay* Overlay)
     if (!Overlay)
         return;
 
-    MythBDOverlayScreen* bd = dynamic_cast<MythBDOverlayScreen*>(GetWindow(OSD_WIN_BDOVERLAY));
+    auto* bd = qobject_cast<MythBDOverlayScreen*>(GetWindow(OSD_WIN_BDOVERLAY));
     if (bd)
         bd->DisplayBDOverlay(Overlay);
 }
@@ -1366,14 +1378,16 @@ void OsdNavigation::More(void)
 
     MythUIGroup *group = nullptr;
     UIUtilW::Assign(this, group, QString("grp%1").arg(m_visibleGroup));
-    group->SetVisible (false);
+    if (group != nullptr)
+        group->SetVisible (false);
 
     // wrap around after last group displayed
     if (++m_visibleGroup > m_maxGroupNum)
         m_visibleGroup = 0;
 
     UIUtilW::Assign(this, group, QString("grp%1").arg(m_visibleGroup));
-    group->SetVisible (true);
+    if (group != nullptr)
+        group->SetVisible (true);
 }
 
 void OsdNavigation::SetTextFromMap(const InfoMap &Map)

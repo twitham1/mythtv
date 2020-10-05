@@ -6,7 +6,6 @@
 
 // C++ headers
 #include <algorithm>
-using namespace std;
 
 // Qt headers
 #include <QCoreApplication>
@@ -18,7 +17,7 @@ using namespace std;
 #include "mythdb.h"
 #include "mythlogging.h"
 #include "mythmiscutil.h"
-#include "mythplayer.h"
+#include "mythcommflagplayer.h"
 #include "programinfo.h"
 #include "channelutil.h"
 
@@ -282,7 +281,7 @@ CommDetector2::CommDetector2(
     SkipType           commDetectMethod_in,
     bool               showProgress_in,
     bool               fullSpeed_in,
-    MythPlayer        *player_in,
+    MythCommFlagPlayer *player_in,
     int                chanid,
     QDateTime          startts_in,
     QDateTime          endts_in,
@@ -383,7 +382,7 @@ void CommDetector2::reportState(int elapsedms, long long frameno,
     /* Assume that 0-th pass is negligible in terms of computational cost. */
     int percentage = (passno == 0 || npasses == 1 || nframes == 0) ? 0 :
         (passno - 1) * 100 / (npasses - 1) +
-        min((long long)100, (frameno * 100 / nframes) / (npasses - 1));
+        std::min((long long)100, (frameno * 100 / nframes) / (npasses - 1));
 
     if (m_showProgress)
     {
@@ -395,8 +394,8 @@ void CommDetector2::reportState(int elapsedms, long long frameno,
             tmp = QString("\r%1/ %2fps").arg(frameno,6).arg(fps,6,'f',2);
 
         QByteArray tmp2 = tmp.toLocal8Bit();
-        cerr << tmp2.constData() << "          \r";
-        cerr.flush();
+        std::cerr << tmp2.constData() << "          \r";
+        std::cerr.flush();
     }
 
     if (nframes)
@@ -497,10 +496,10 @@ bool CommDetector2::go(void)
     if (m_showProgress)
     {
         if (nframes)
-            cerr << "  0%/      ";
+            std::cerr << "  0%/      ";
         else
-            cerr << "     0/      ";
-        cerr.flush();
+            std::cerr << "     0/      ";
+        std::cerr.flush();
     }
 
     frm_dir_map_t lastBreakMap;
@@ -645,7 +644,7 @@ bool CommDetector2::go(void)
                     ++ii;
                     ++jj;
                 }
-                bool same = ii == breakMap.end() && jj == lastBreakMap.end();
+                bool same = ii == breakMap.cend() && jj == lastBreakMap.cend();
                 lastBreakMap = breakMap;
 
                 if (m_breakMapUpdateRequested || !same)
@@ -681,11 +680,11 @@ bool CommDetector2::go(void)
     if (m_showProgress)
     {
         if (nframes)
-            cerr << "\b\b\b\b\b\b      \b\b\b\b\b\b";
+            std::cerr << "\b\b\b\b\b\b      \b\b\b\b\b\b";
         else
-            cerr << "\b\b\b\b\b\b\b\b\b\b\b\b\b             "
-                    "\b\b\b\b\b\b\b\b\b\b\b\b\b";
-        cerr.flush();
+            std::cerr << "\b\b\b\b\b\b\b\b\b\b\b\b\b             "
+                         "\b\b\b\b\b\b\b\b\b\b\b\b\b";
+        std::cerr.flush();
     }
 
     m_finished = true;
@@ -733,14 +732,12 @@ void CommDetector2::GetCommercialBreakList(frm_dir_map_t &marks)
 
     /* Report results. */
     const float fps = m_player->GetFrameRate();
-    for (frm_dir_map_t::const_iterator iimark = marks.begin();
-            iimark != marks.end();
-            ++iimark)
+    for (auto iimark = marks.cbegin(); iimark != marks.cend(); ++iimark)
     {
         /* Display as 1-based frame numbers. */
         long long markstart = iimark.key() + 1;   /* MARK_COMM_BEGIN */
         ++iimark;                       /* MARK_COMM_END */
-        if (iimark == marks.end())
+        if (iimark == marks.cend())
             break;
         long long markend = iimark.key() + 1;
 
@@ -786,7 +783,7 @@ void CommDetector2::requestCommBreakMapUpdate(void)
     m_breakMapUpdateRequested = true;
 }
 
-static void PrintReportMap(ostream &out,
+static void PrintReportMap(std::ostream &out,
                            const FrameAnalyzer::FrameMap &frameMap)
 {
     FrameAnalyzer::FrameMap::const_iterator it = frameMap.begin();
@@ -803,11 +800,11 @@ static void PrintReportMap(ostream &out,
 
         out << qPrintable(tmp) << "\n";
     }
-    out << flush;
+    out << std::flush;
 }
 
 void CommDetector2::PrintFullMap(
-    ostream &out, const frm_dir_map_t */*comm_breaks*/, bool /*verbose*/) const
+    std::ostream &out, const frm_dir_map_t */*comm_breaks*/, bool /*verbose*/) const
 {
     FrameAnalyzer::FrameMap logoMap;
     FrameAnalyzer::FrameMap blankMap;
@@ -825,13 +822,13 @@ void CommDetector2::PrintFullMap(
     if (m_sceneChangeDetector)
         sceneMap = m_sceneChangeDetector->GetMap(0);
 
-    out << "Logo Break Map" << endl;
+    out << "Logo Break Map" << std::endl;
     PrintReportMap(out, logoMap);
-    out << "Blank Break Map" << endl;
+    out << "Blank Break Map" << std::endl;
     PrintReportMap(out, blankBreakMap);
-    out << "Blank Map" << endl;
+    out << "Blank Map" << std::endl;
     PrintReportMap(out, blankMap);
-    out << "Scene Break Map" << endl;
+    out << "Scene Break Map" << std::endl;
     PrintReportMap(out, sceneMap);
 }
 

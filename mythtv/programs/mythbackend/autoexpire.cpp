@@ -18,7 +18,6 @@
 // C++ headers
 #include <iostream>
 #include <algorithm>
-using namespace std;
 
 // Qt headers
 #include <QDateTime>
@@ -158,8 +157,8 @@ void AutoExpire::CalcParams()
     // that every encoder writes only to one fs.
     // Copying the data minimizes the time the lock is held.
     m_instanceLock.lock();
-    QMap<int, int>::const_iterator ueit = m_usedEncoders.begin();
-    while (ueit != m_usedEncoders.end())
+    QMap<int, int>::const_iterator ueit = m_usedEncoders.cbegin();
+    while (ueit != m_usedEncoders.cend())
     {
         fsEncoderMap[*ueit].push_back(ueit.key());
         ++ueit;
@@ -234,7 +233,7 @@ void AutoExpire::CalcParams()
     if (maxKBperMin > 0)
     {
         expireFreq = SPACE_TOO_BIG_KB / (maxKBperMin + maxKBperMin/3);
-        expireFreq = max(3U, min(expireFreq, 15U));
+        expireFreq = std::max(3U, std::min(expireFreq, 15U));
     }
 
     double expireMinGB = ((maxKBperMin + maxKBperMin/3)
@@ -499,7 +498,7 @@ void AutoExpire::ExpireRecordings(void)
             continue;
         }
 
-        if (max((int64_t)0LL, fsit->getFreeSpace()) <
+        if (std::max((int64_t)0LL, fsit->getFreeSpace()) <
             m_desiredSpace[fsit->getFSysID()])
         {
             LOG(VB_FILE, LOG_INFO,
@@ -528,7 +527,7 @@ void AutoExpire::ExpireRecordings(void)
             QString myHostName = gCoreContext->GetHostName();
             auto it = expireList.begin();
             while ((it != expireList.end()) &&
-                   (max((int64_t)0LL, fsit->getFreeSpace()) <
+                   (std::max((int64_t)0LL, fsit->getFreeSpace()) <
                     m_desiredSpace[fsit->getFSysID()]))
             {
                 ProgramInfo *p = *it;
@@ -652,8 +651,6 @@ void AutoExpire::ExpireEpisodesOverMax(void)
     QMap<QString, int>::Iterator maxIter;
     QMap<QString, int> episodeParts;
     QString episodeKey;
-
-    QString fileprefix = gCoreContext->GetFilePrefix();
 
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare("SELECT recordid, maxepisodes, title "
@@ -798,7 +795,7 @@ void AutoExpire::PrintExpireList(const QString& expHost)
     if (expHost != "ALL")
         msg += QString("for '%1' ").arg(expHost);
     msg += "(programs listed in order of expiration)";
-    cout << msg.toLocal8Bit().constData() << endl;
+    std::cout << msg.toLocal8Bit().constData() << std::endl;
 
     for (auto *first : expireList)
     {
@@ -818,7 +815,7 @@ void AutoExpire::PrintExpireList(const QString& expHost)
                  .rightJustified(3, ' ', true));
         QByteArray out = outstr.toLocal8Bit();
 
-        cout << out.constData() << endl;
+        std::cout << out.constData() << std::endl;
     }
 
     ClearExpireList(expireList);
@@ -1113,15 +1110,10 @@ bool AutoExpire::IsInDontExpireSet(
 bool AutoExpire::IsInExpireList(
     const pginfolist_t &expireList, uint chanid, const QDateTime &recstartts)
 {
-    for (auto *info : expireList)
-    {
-        if ((info->GetChanID()             == chanid) &&
-            (info->GetRecordingStartTime() == recstartts))
-        {
-            return true;
-        }
-    }
-    return false;
+    return std::any_of(expireList.cbegin(), expireList.cend(),
+                       [chanid,&recstartts](auto *info)
+                           { return ((info->GetChanID()             == chanid) &&
+                                     (info->GetRecordingStartTime() == recstartts)); } );
 }
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

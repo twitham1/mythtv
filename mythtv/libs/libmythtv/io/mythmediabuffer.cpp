@@ -45,10 +45,6 @@ const int  MythMediaBuffer::kLiveTVOpenTimeout  = 10000;
 
 #define LOC      QString("RingBuf(%1): ").arg(m_filename)
 
-QMutex      MythMediaBuffer::s_subExtLock;
-QStringList MythMediaBuffer::s_subExt;
-QStringList MythMediaBuffer::s_subExtNoCheck;
-
 
 /*
   Locking relations:
@@ -204,23 +200,6 @@ MythMediaBuffer::MythMediaBuffer(MythBufferType Type)
   : MThread("RingBuffer"),
     m_type(Type)
 {
-    s_subExtLock.lock();
-    if (s_subExt.empty())
-    {
-        // Possible subtitle file extensions '.srt', '.sub', '.txt'
-        // since #9294 also .ass and .ssa
-        s_subExt += ".ass";
-        s_subExt += ".srt";
-        s_subExt += ".ssa";
-        s_subExt += ".sub";
-        s_subExt += ".txt";
-
-        // Extensions for which a subtitle file should not exist
-        s_subExtNoCheck = s_subExt;
-        s_subExtNoCheck += ".gif";
-        s_subExtNoCheck += ".png";
-    }
-    s_subExtLock.unlock();
 }
 
 MythBufferType MythMediaBuffer::GetType(void) const
@@ -385,8 +364,8 @@ void MythMediaBuffer::CalcReadAheadThresh(void)
     const uint KB256 = 256*1024;
     const uint KB512 = 512*1024;
 
-    estbitrate     = static_cast<uint>(max(abs(m_rawBitrate * m_playSpeed), 0.5F * m_rawBitrate));
-    estbitrate     = min(m_rawBitrate * 3, estbitrate);
+    estbitrate     = static_cast<uint>(std::max(abs(m_rawBitrate * m_playSpeed), 0.5F * m_rawBitrate));
+    estbitrate     = std::min(m_rawBitrate * 3, estbitrate);
     int const rbs  = (estbitrate > 18000) ? KB512 :
                      (estbitrate >  9000) ? KB256 :
                      (estbitrate >  5000) ? KB128 :
@@ -398,7 +377,7 @@ void MythMediaBuffer::CalcReadAheadThresh(void)
     if (rbs < DEFAULT_CHUNK_SIZE)
         m_readBlockSize = rbs;
     else
-        m_readBlockSize = m_bitrateInitialized ? max(rbs, m_readBlockSize) : rbs;
+        m_readBlockSize = m_bitrateInitialized ? std::max(rbs, m_readBlockSize) : rbs;
 
     // minimum seconds of buffering before allowing read
     float secs_min = 0.3F;
@@ -411,7 +390,7 @@ void MythMediaBuffer::CalcReadAheadThresh(void)
             LOG(VB_GENERAL, LOG_INFO, LOC + "Buffering optimisations disabled.");
         m_lowBuffers = false;
         m_fillMin = ((m_fillMin / DEFAULT_CHUNK_SIZE) + 1) * DEFAULT_CHUNK_SIZE;
-        m_fillMin = min(m_fillMin, static_cast<int>(m_bufferSize / 2));
+        m_fillMin = std::min(m_fillMin, static_cast<int>(m_bufferSize / 2));
     }
     else
     {
@@ -440,8 +419,8 @@ bool MythMediaBuffer::IsNearEnd(double /*Framerate*/, uint Frames) const
     m_posLock.unlock();
 
     // telecom kilobytes (i.e. 1000 per k not 1024)
-    uint tmp = static_cast<uint>(max(abs(m_rawBitrate * m_playSpeed), 0.5F * m_rawBitrate));
-    uint kbitspersec = min(m_rawBitrate * 3, tmp);
+    uint tmp = static_cast<uint>(std::max(abs(m_rawBitrate * m_playSpeed), 0.5F * m_rawBitrate));
+    uint kbitspersec = std::min(m_rawBitrate * 3, tmp);
     if (kbitspersec == 0)
         return false;
 
@@ -976,7 +955,7 @@ void MythMediaBuffer::run(void)
 
             if (m_internalReadPos == 0)
             {
-                totfree = max(m_fillMin, m_readBlockSize);
+                totfree = std::max(m_fillMin, m_readBlockSize);
                 LOG(VB_FILE, LOG_DEBUG, LOC + "Reading enough data to start playback");
             }
 
@@ -1199,6 +1178,11 @@ int MythMediaBuffer::Peek(void *Buffer, int Count)
     return result;
 }
 
+int MythMediaBuffer::Peek(std::vector<char>& Buffer)
+{
+    return Peek(Buffer.data(), Buffer.size());
+};
+
 bool MythMediaBuffer::WaitForReadsAllowed(void)
 {
     // Wait up to 30000 ms for reads allowed (or readsdesired if post seek/open)
@@ -1391,7 +1375,7 @@ int MythMediaBuffer::ReadPriv(void *Buffer, int Count, bool Peek)
     while (!m_readInternalMode && !m_ateof && (timer.elapsed() < timeout_ms) && m_readAheadRunning &&
            !m_stopReads && !m_requestPause && !m_commsError)
     {
-        available = WaitForAvail(Count, min(timeout_ms - timer.elapsed(), 100));
+        available = WaitForAvail(Count, std::min(timeout_ms - timer.elapsed(), 100));
         if (m_liveTVChain && m_setSwitchToNext && available < Count)
         {
             LOG(VB_GENERAL, LOG_INFO, LOC + "Checking to see if there's a new livetv program to switch to..");
@@ -1412,7 +1396,7 @@ int MythMediaBuffer::ReadPriv(void *Buffer, int Count, bool Peek)
         LOG(VB_FILE, LOG_DEBUG, LOC + QString("ReadPriv: %1 bytes available, %2 left")
             .arg(available).arg(available-m_readOffset));
     }
-    Count = min(available - m_readOffset, Count);
+    Count = std::min(available - m_readOffset, Count);
 
     if ((Count <= 0) && (m_ateof || m_readInternalMode))
     {

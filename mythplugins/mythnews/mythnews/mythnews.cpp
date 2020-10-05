@@ -171,7 +171,7 @@ void MythNews::loadSites(void)
     {
         QString name = query.value(0).toString();
         QString url  = query.value(1).toString();
-        QString icon = query.value(2).toString();
+//      QString icon = query.value(2).toString();
         QDateTime time = MythDate::fromSecsSinceEpoch(query.value(3).toLongLong());
         bool podcast = query.value(4).toBool();
         m_newsSites.push_back(new NewsSite(name, url, time, podcast));
@@ -552,9 +552,9 @@ void MythNews::slotViewArticle(MythUIButtonListItem *articlesListItem)
     QMutexLocker locker(&m_lock);
 
     QMap<MythUIButtonListItem*,NewsArticle>::const_iterator it =
-        m_articles.find(articlesListItem);
+        m_articles.constFind(articlesListItem);
 
-    if (it == m_articles.end())
+    if (it == m_articles.constEnd())
         return;
 
     const NewsArticle article = *it;

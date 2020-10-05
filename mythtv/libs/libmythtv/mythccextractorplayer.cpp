@@ -23,8 +23,6 @@
 #include <iostream>
 #include <utility>
 
-using namespace std;
-
 #include <QFileInfo>
 #include <QPainter>
 
@@ -156,13 +154,11 @@ bool MythCCExtractorPlayer::run(void)
 
     m_curTime = 0;
 
-    QString currDir = QFileInfo(m_fileName).path();
-
     if (DecoderGetFrame(kDecodeVideo))
         OnGotNewFrame();
 
     if (m_showProgress)
-        cout << "\r                                      \r" << flush;
+        std::cout << "\r                                      \r" << std::flush;
 
     while (!m_killDecoder && !IsErrored())
     {
@@ -180,7 +176,7 @@ bool MythCCExtractorPlayer::run(void)
             ui_timer.restart();
             QString str = progress_string(
                 flagTime, m_myFramesPlayed, m_totalFrames);
-            cout << qPrintable(str) << '\r' << flush;
+            std::cout << qPrintable(str) << '\r' << std::flush;
         }
 
         if (!DecoderGetFrame(kDecodeVideo))
@@ -197,7 +193,7 @@ bool MythCCExtractorPlayer::run(void)
             m_myFramesPlayed = m_totalFrames;
         }
         QString str = progress_string(flagTime, m_myFramesPlayed, m_totalFrames);
-        cout << qPrintable(str) << endl;
+        std::cout << qPrintable(str) << std::endl;
     }
 
     Process608Captions(kProcessFinalize);
@@ -328,7 +324,7 @@ void MythCCExtractorPlayer::Ingest608Captions(void)
 
             textlist->m_lock.lock();
 
-            const int ccIdx = kCcIndexTbl[min(streamRawIdx,6)];
+            const int ccIdx = kCcIndexTbl[std::min(streamRawIdx,6)];
 
             if (ccIdx >= 4)
             {
@@ -461,11 +457,8 @@ void MythCCExtractorPlayer::Ingest708Caption(
     }
 
     QStringList screenContent;
-    for (QMap<uint, QStringList>::const_iterator oit = orderedContent.begin();
-         oit != orderedContent.end(); ++oit)
-    {
-        screenContent += *oit;
-    }
+    for (const auto & ordered : qAsConst(orderedContent))
+        screenContent += ordered;
     IngestSubtitle(m_cc708Info[streamId].m_subs[serviceIdx], screenContent);
 }
 
@@ -500,8 +493,6 @@ void MythCCExtractorPlayer::Process708Captions(uint flags)
 
                 QString service_key = QString("service-%1")
                     .arg(idx, 2, 10, QChar('0'));
-                QString id = iso639_is_key_undefined(langCode) ?
-                    service_key : lang;
                 QString filename = QString("%1.%2%3-%4.%5.srt")
                     .arg(m_baseName).arg(stream_id_str).arg("708")
                     .arg(service_key).arg(lang);
@@ -535,7 +526,7 @@ static QStringList to_string_list(const TeletextSubPage &subPage)
 {
     QStringList content;
     // Skip the page header (line 0)
-    for (int i = 1; i < 25; ++i)
+    for (size_t i = 1; i < subPage.data.size(); ++i)
     {
         QString str = decode_teletext(subPage.lang, subPage.data[i]).trimmed();
         if (!str.isEmpty())
@@ -693,10 +684,10 @@ void MythCCExtractorPlayer::IngestDVBSubtitles(void)
 
                     painter.drawImage(x, y, img);
 
-                    min_x = min(min_x, x);
-                    min_y = min(min_y, y);
-                    max_x = max(max_x, x + w);
-                    max_y = max(max_y, y + h);
+                    min_x = std::min(min_x, x);
+                    min_y = std::min(min_y, y);
+                    max_x = std::max(max_x, x + w);
+                    max_y = std::max(max_y, y + h);
                 }
             }
             painter.end();

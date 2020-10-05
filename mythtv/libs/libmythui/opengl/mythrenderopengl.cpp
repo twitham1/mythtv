@@ -17,7 +17,10 @@ using std::min;
 #include "mythrenderopenglshaders.h"
 #include "mythlogging.h"
 #include "mythuitype.h"
+#ifdef USING_X11
 #include "mythxdisplay.h"
+#endif
+
 #define LOC QString("OpenGL: ")
 
 #ifdef Q_OS_ANDROID
@@ -81,27 +84,17 @@ MythRenderOpenGL* MythRenderOpenGL::Create(QWidget *Widget)
     if (!Widget)
         return nullptr;
 
-    QString display = getenv("DISPLAY");
-    // Determine if we are running a remote X11 session
-    // DISPLAY=:x or DISPLAY=unix:x are local
-    // DISPLAY=hostname:x is remote
-    // DISPLAY=/xxx/xxx/.../org.macosforge.xquartz:x is local OS X
-    // x can be numbers n or n.n
-    // Anything else including DISPLAY not set is assumed local,
-    // in that case we are probably not running under X11
-    if (!display.isEmpty()
-     && !display.startsWith(":")
-     && !display.startsWith("unix:")
-     && !display.startsWith("/")
-     &&  display.contains(':'))
+#ifdef USING_X11
+    if (MythXDisplay::DisplayIsRemote())
     {
         LOG(VB_GENERAL, LOG_WARNING, LOC + "OpenGL is disabled for Remote X Session");
         return nullptr;
     }
+#endif
 
     // N.B the core profiles below are designed to target compute shader availability
-    bool opengles = !qgetenv("MYTHTV_OPENGL_ES").isEmpty();
-    bool core     = !qgetenv("MYTHTV_OPENGL_CORE").isEmpty();
+    bool opengles = !qEnvironmentVariableIsEmpty("MYTHTV_OPENGL_ES");
+    bool core     = !qEnvironmentVariableIsEmpty("MYTHTV_OPENGL_CORE");
     QSurfaceFormat format = QSurfaceFormat::defaultFormat();
     if (core)
     {
@@ -237,7 +230,7 @@ bool MythRenderOpenGL::Init(void)
             QOpenGLDebugLogger::LoggingMode mode = QOpenGLDebugLogger::AsynchronousLogging;
 
             // this will impact performance but can be very useful
-            if (!qgetenv("MYTHTV_OPENGL_SYNCHRONOUS").isEmpty())
+            if (!qEnvironmentVariableIsEmpty("MYTHTV_OPENGL_SYNCHRONOUS"))
                 mode = QOpenGLDebugLogger::SynchronousLogging;
 
             m_openglDebugger->startLogging(mode);
@@ -542,7 +535,7 @@ void MythRenderOpenGL::SetWidget(QWidget *Widget)
         return;
     }
 
-#ifdef ANDROID
+#ifdef Q_OS_ANDROID
     // Ensure surface type is always OpenGL
     m_window->setSurfaceType(QWindow::OpenGLSurface);
     if (native && native->windowHandle())
@@ -607,7 +600,7 @@ void MythRenderOpenGL::SetBlend(bool Enable)
     doneCurrent();
 }
 
-void MythRenderOpenGL::SetBackground(int Red, int Green, int Blue, int Alpha)
+void MythRenderOpenGL::SetBackground(uint8_t Red, uint8_t Green, uint8_t Blue, uint8_t Alpha)
 {
     int32_t tmp = (Red << 24) + (Green << 16) + (Blue << 8) + Alpha;
     if (tmp == m_background)
@@ -670,7 +663,7 @@ int MythRenderOpenGL::GetTextureDataSize(MythGLTexture *Texture)
 
 void MythRenderOpenGL::SetTextureFilters(MythGLTexture *Texture, QOpenGLTexture::Filter Filter, QOpenGLTexture::WrapMode Wrap)
 {
-    if (!Texture || (Texture && !(Texture->m_texture || Texture->m_textureId)))
+    if (!Texture || !(Texture->m_texture || Texture->m_textureId))
         return;
 
     makeCurrent();
@@ -806,7 +799,7 @@ void MythRenderOpenGL::DrawBitmap(MythGLTexture *Texture, QOpenGLFramebufferObje
 {
     makeCurrent();
 
-    if (!Texture || (Texture && !((Texture->m_texture || Texture->m_textureId) && Texture->m_vbo)))
+    if (!Texture || !((Texture->m_texture || Texture->m_textureId) && Texture->m_vbo))
         return;
 
     if (Program == nullptr)
@@ -831,12 +824,16 @@ void MythRenderOpenGL::DrawBitmap(MythGLTexture *Texture, QOpenGLFramebufferObje
         {
             void* target = buffer->map(QOpenGLBuffer::WriteOnly);
             if (target)
-                memcpy(target, Texture->m_vertexData, kVertexSize);
+            {
+                std::copy(Texture->m_vertexData.cbegin(),
+                          Texture->m_vertexData.cend(),
+                          static_cast<GLfloat*>(target));
+            }
             buffer->unmap();
         }
         else
         {
-            buffer->write(0, Texture->m_vertexData, kVertexSize);
+            buffer->write(0, Texture->m_vertexData.data(), kVertexSize);
         }
     }
 
@@ -852,13 +849,13 @@ void MythRenderOpenGL::DrawBitmap(MythGLTexture *Texture, QOpenGLFramebufferObje
     doneCurrent();
 }
 
-void MythRenderOpenGL::DrawBitmap(MythGLTexture **Textures, uint TextureCount,
+void MythRenderOpenGL::DrawBitmap(std::vector<MythGLTexture *> &Textures,
                                   QOpenGLFramebufferObject *Target,
                                   const QRect &Source, const QRect &Destination,
                                   QOpenGLShaderProgram *Program,
                                   int Rotation)
 {
-    if (!Textures || !TextureCount)
+    if (Textures.empty())
         return;
 
     makeCurrent();
@@ -868,13 +865,13 @@ void MythRenderOpenGL::DrawBitmap(MythGLTexture **Textures, uint TextureCount,
         Program = m_defaultPrograms[kShaderDefault];
 
     MythGLTexture* first = Textures[0];
-    if (!first || (first && !((first->m_texture || first->m_textureId) && first->m_vbo)))
+    if (!first || !((first->m_texture || first->m_textureId) && first->m_vbo))
         return;
 
     SetShaderProjection(Program);
 
     GLenum textarget = first->m_target;
-    for (uint i = 0; i < TextureCount; i++)
+    for (uint i = 0; i < Textures.size(); i++)
     {
         QString uniform = QString("s_texture%1").arg(i);
         Program->setUniformValue(qPrintable(uniform), i);
@@ -893,12 +890,16 @@ void MythRenderOpenGL::DrawBitmap(MythGLTexture **Textures, uint TextureCount,
         {
             void* target = buffer->map(QOpenGLBuffer::WriteOnly);
             if (target)
-                memcpy(target, first->m_vertexData, kVertexSize);
+            {
+                std::copy(first->m_vertexData.cbegin(),
+                          first->m_vertexData.cend(),
+                          static_cast<GLfloat*>(target));
+            }
             buffer->unmap();
         }
         else
         {
-            buffer->write(0, first->m_vertexData, kVertexSize);
+            buffer->write(0, first->m_vertexData.data(), kVertexSize);
         }
     }
 
@@ -1262,7 +1263,7 @@ QStringList MythRenderOpenGL::GetDescription(void)
 bool MythRenderOpenGL::UpdateTextureVertices(MythGLTexture *Texture, const QRect &Source,
                                              const QRect &Destination, int Rotation, qreal Scale)
 {
-    if (!Texture || (Texture && Texture->m_size.isEmpty()))
+    if (!Texture || Texture->m_size.isEmpty())
         return false;
 
     if ((Texture->m_source == Source) && (Texture->m_destination == Destination) &&
@@ -1273,7 +1274,7 @@ bool MythRenderOpenGL::UpdateTextureVertices(MythGLTexture *Texture, const QRect
     Texture->m_destination = Destination;
     Texture->m_rotation    = Rotation;
 
-    GLfloat *data = Texture->m_vertexData;
+    GLfloat *data = Texture->m_vertexData.data();
     QSize    size = Texture->m_size;
 
     int width  = Texture->m_crop ? min(Source.width(),  size.width())  : Source.width();
@@ -1309,10 +1310,9 @@ bool MythRenderOpenGL::UpdateTextureVertices(MythGLTexture *Texture, const QRect
 
     if (Texture->m_rotation != 0)
     {
-        GLfloat temp = NAN;
         if (Texture->m_rotation == 90)
         {
-            temp = data[(Texture->m_flip ? 7 : 1) + TEX_OFFSET];
+            GLfloat temp = data[(Texture->m_flip ? 7 : 1) + TEX_OFFSET];
             data[(Texture->m_flip ? 7 : 1) + TEX_OFFSET] = data[(Texture->m_flip ? 1 : 7) + TEX_OFFSET];
             data[(Texture->m_flip ? 1 : 7) + TEX_OFFSET] = temp;
             data[2 + TEX_OFFSET] = data[6 + TEX_OFFSET];
@@ -1320,7 +1320,7 @@ bool MythRenderOpenGL::UpdateTextureVertices(MythGLTexture *Texture, const QRect
         }
         else if (Texture->m_rotation == -90)
         {
-            temp = data[0 + TEX_OFFSET];
+            GLfloat temp = data[0 + TEX_OFFSET];
             data[0 + TEX_OFFSET] = data[6 + TEX_OFFSET];
             data[6 + TEX_OFFSET] = temp;
             data[3 + TEX_OFFSET] = data[1 + TEX_OFFSET];
@@ -1328,7 +1328,7 @@ bool MythRenderOpenGL::UpdateTextureVertices(MythGLTexture *Texture, const QRect
         }
         else if (abs(Texture->m_rotation) == 180)
         {
-            temp = data[(Texture->m_flip ? 7 : 1) + TEX_OFFSET];
+            GLfloat temp = data[(Texture->m_flip ? 7 : 1) + TEX_OFFSET];
             data[(Texture->m_flip ? 7 : 1) + TEX_OFFSET] = data[(Texture->m_flip ? 1 : 7) + TEX_OFFSET];
             data[(Texture->m_flip ? 1 : 7) + TEX_OFFSET] = temp;
             data[3 + TEX_OFFSET] = data[7 + TEX_OFFSET];

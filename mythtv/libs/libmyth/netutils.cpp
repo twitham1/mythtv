@@ -435,11 +435,11 @@ bool insertTreeArticleInDB(const QString &feedtitle, const QString &path,
     query.bindValue(":RATING", item->GetRating());
     query.bindValue(":FILESIZE", (qulonglong)item->GetFilesize());
     query.bindValue(":PLAYER", item->GetPlayer().isNull() ? "" : item->GetPlayer());
-    query.bindValue(":PLAYERARGS", !item->GetPlayerArguments().count() ? "" :
+    query.bindValue(":PLAYERARGS", item->GetPlayerArguments().isEmpty() ? "" :
                                    item->GetPlayerArguments().join(" "));
     query.bindValue(":DOWNLOAD", item->GetDownloader().isNull() ? "" :
                                  item->GetDownloader());
-    query.bindValue(":DOWNLOADARGS", !item->GetDownloaderArguments().count() ? "" :
+    query.bindValue(":DOWNLOADARGS", item->GetDownloaderArguments().isEmpty() ? "" :
                                      item->GetDownloaderArguments().join(" "));
     query.bindValue(":WIDTH", item->GetWidth());
     query.bindValue(":HEIGHT", item->GetHeight());
@@ -447,7 +447,7 @@ bool insertTreeArticleInDB(const QString &feedtitle, const QString &path,
     query.bindValue(":PODCAST", false);
     query.bindValue(":DOWNLOADABLE", item->GetDownloadable());
     query.bindValue(":CUSTOMHTML", item->GetCustomHTML());
-    query.bindValue(":COUNTRIES", !item->GetCountries().count() ? "" :
+    query.bindValue(":COUNTRIES", item->GetCountries().isEmpty() ? "" :
                                   item->GetCountries().join(" "));
     query.bindValue(":SEASON", item->GetSeason());
     query.bindValue(":EPISODE", item->GetEpisode());
@@ -489,7 +489,7 @@ QMultiMap<QPair<QString,QString>, ResultItem*> getTreeArticles(const QString &fe
         QString     subtitle = query.value(1).toString();
         QString     desc = query.value(2).toString();
         QString     URL = query.value(3).toString();
-        QString     feedtype = query.value(4).toString();
+//      QString     feedtype = query.value(4).toString();
         QString     thumbnail = query.value(5).toString();
         QString     mediaURL = query.value(6).toString();
         QString     author = query.value(7).toString();
@@ -774,11 +774,11 @@ bool insertRSSArticleInDB(const QString &feedtitle, ResultItem *item,
     query.bindValue(":RATING", item->GetRating());
     query.bindValue(":FILESIZE", (qulonglong)item->GetFilesize());
     query.bindValue(":PLAYER", item->GetPlayer().isNull() ? "" : item->GetPlayer());
-    query.bindValue(":PLAYERARGS", !item->GetPlayerArguments().count() ? "" :
+    query.bindValue(":PLAYERARGS", item->GetPlayerArguments().isEmpty() ? "" :
                                    item->GetPlayerArguments().join(" "));
     query.bindValue(":DOWNLOAD", item->GetDownloader().isNull() ? "" :
                                  item->GetDownloader());
-    query.bindValue(":DOWNLOADARGS", !item->GetDownloaderArguments().count() ? "" :
+    query.bindValue(":DOWNLOADARGS", item->GetDownloaderArguments().isEmpty() ? "" :
                                      item->GetDownloaderArguments().join(" "));
     query.bindValue(":WIDTH", item->GetWidth());
     query.bindValue(":HEIGHT", item->GetHeight());

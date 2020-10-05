@@ -46,6 +46,10 @@
 #include "mythmiscutil.h"
 #endif
 
+#ifdef USING_SATIP
+#include "satiputils.h"
+#endif
+
 #ifdef USING_ASI
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -57,61 +61,51 @@
 
 QString CardUtil::GetScanableInputTypes(void)
 {
-    QString inputTypes = "";
+    QStringList inputTypes {};
 
 #ifdef USING_DVB
     inputTypes += "'DVB'";
 #endif // USING_DVB
 
 #ifdef USING_V4L2
-    if (!inputTypes.isEmpty())
-        inputTypes += ",";
     inputTypes += "'V4L'";
 # ifdef USING_IVTV
-    inputTypes += ",'MPEG'";
+    inputTypes += "'MPEG'";
 # endif // USING_IVTV
 #endif // USING_V4L2
 
 #ifdef USING_IPTV
-    if (!inputTypes.isEmpty())
-        inputTypes += ",";
     inputTypes += "'FREEBOX'";
 #endif // USING_IPTV
 
 #ifdef USING_VBOX
-    if (!inputTypes.isEmpty())
-        inputTypes += ",";
     inputTypes += "'VBOX'";
 #endif // USING_VBOX
 
 #ifdef USING_HDHOMERUN
-    if (!inputTypes.isEmpty())
-        inputTypes += ",";
     inputTypes += "'HDHOMERUN'";
 #endif // USING_HDHOMERUN
 
+#ifdef USING_SATIP
+    inputTypes += "'SATIP'";
+#endif // USING_SATIP
+
 #ifdef USING_ASI
-    if (!inputTypes.isEmpty())
-        inputTypes += ",";
     inputTypes += "'ASI'";
 #endif
 
 #ifdef USING_CETON
-    if (!inputTypes.isEmpty())
-        inputTypes += ",";
     inputTypes += "'CETON'";
 #endif // USING_CETON
 
 #if !defined( USING_MINGW ) && !defined( _MSC_VER )
-    if (!inputTypes.isEmpty())
-        inputTypes += ",";
     inputTypes += "'EXTERNAL'";
 #endif
 
     if (inputTypes.isEmpty())
-        inputTypes = "'DUMMY'";
+        return "('DUMMY')";
 
-    return QString("(%1)").arg(inputTypes);
+    return QString("(%1)").arg(inputTypes.join(','));
 }
 
 bool CardUtil::IsCableCardPresent(uint inputid,
@@ -228,7 +222,8 @@ bool CardUtil::IsCableCardPresent(uint inputid,
 bool CardUtil::HasTuner(const QString &rawtype, const QString & device)
 {
     if (rawtype == "DVB"     || rawtype == "HDHOMERUN" ||
-        rawtype == "FREEBOX" || rawtype == "CETON" || rawtype == "VBOX")
+        rawtype == "FREEBOX" || rawtype == "CETON" ||
+        rawtype == "VBOX"    || rawtype == "SATIP")
         return true;
 
 #ifdef USING_V4L2
@@ -467,7 +462,8 @@ QStringList CardUtil::ProbeVideoDevices(const QString &rawtype)
     if (rawtype.toUpper() == "DVB")
     {
         QDir dir("/dev/dvb", "adapter*", QDir::Name, QDir::Dirs);
-        for (const auto & it : dir.entryInfoList())
+        QFileInfoList entries = dir.entryInfoList();
+        for (const auto & it : qAsConst(entries))
         {
             QDir subdir(it.filePath(), "frontend*", QDir::Name, QDir::Files | QDir::System);
             const QFileInfoList subil = subdir.entryInfoList();
@@ -481,7 +477,8 @@ QStringList CardUtil::ProbeVideoDevices(const QString &rawtype)
     else if (rawtype.toUpper() == "ASI")
     {
         QDir dir("/dev/", "asirx*", QDir::Name, QDir::System);
-        for (const auto & it : dir.entryInfoList())
+        QFileInfoList entries = dir.entryInfoList();
+        for (const auto & it : qAsConst(entries))
         {
             if (GetASIDeviceNumber(it.filePath()) >= 0)
             {
@@ -498,14 +495,14 @@ QStringList CardUtil::ProbeVideoDevices(const QString &rawtype)
         uint32_t  device_type = HDHOMERUN_DEVICE_TYPE_TUNER;
         uint32_t  device_id   = HDHOMERUN_DEVICE_ID_WILDCARD;
         const int max_count   = 50;
-        hdhomerun_discover_device_t result_list[max_count];
+        std::array<hdhomerun_discover_device_t,max_count> result_list {};
 
 #ifdef HDHOMERUN_V2
         int result = hdhomerun_discover_find_devices_custom_v2(
-            target_ip, device_type, device_id, result_list, max_count);
+            target_ip, device_type, device_id, result_list.data(), result_list.size());
 #else
         int result = hdhomerun_discover_find_devices_custom(
-            target_ip, device_type, device_id, result_list, max_count);
+            target_ip, device_type, device_id, result_list.data(), result_list.size());
 #endif
 
         if (result == -1)
@@ -543,6 +540,12 @@ QStringList CardUtil::ProbeVideoDevices(const QString &rawtype)
         }
     }
 #endif // USING_HDHOMERUN
+#ifdef USING_SATIP
+    else if (rawtype.toUpper() == "SATIP")
+    {
+        devs = SatIP::probeDevices();
+    }
+#endif // USING_SATIP
 #ifdef USING_VBOX
     else if (rawtype.toUpper() == "VBOX")
     {
@@ -772,6 +775,9 @@ DTVTunerType CardUtil::ConvertToTunerType(DTVModulationSystem delsys)
         case DTVModulationSystem::kModulationSystem_DVBT2:
             tunertype = DTVTunerType::kTunerTypeDVBT2;
             break;
+        case DTVModulationSystem::kModulationSystem_DTMB:
+            tunertype = DTVTunerType::kTunerTypeDVBT;
+            break;
         case DTVModulationSystem::kModulationSystem_ATSC:
             tunertype = DTVTunerType::kTunerTypeATSC;
             break;
@@ -931,8 +937,6 @@ QString CardUtil::ProbeSubTypeName(uint inputid)
     QString type = GetRawInputType(inputid);
     if ("DVB" != type)
         return type;
-
-    QString device = GetVideoDevice(inputid);
 
     DTVTunerType tunertype;
     int fd_frontend = OpenVideoDevice(inputid);
@@ -1268,12 +1272,12 @@ bool set_on_input(const QString &to_set, uint inputid, const QString &value)
  *  \param hostname    Host on which device resides, only
  *                     required if said host is not the localhost
  */
-vector<uint> CardUtil::GetInputIDs(const QString& videodevice,
+std::vector<uint> CardUtil::GetInputIDs(const QString& videodevice,
                                    const QString& rawtype,
                                    const QString& inputname,
                                    QString hostname)
 {
-    vector<uint> list;
+    std::vector<uint> list;
 
     if (hostname.isEmpty())
         hostname = gCoreContext->GetHostName();
@@ -1336,9 +1340,9 @@ uint CardUtil::GetChildInputCount(uint inputid)
     return count;
 }
 
-vector<uint> CardUtil::GetChildInputIDs(uint inputid)
+std::vector<uint> CardUtil::GetChildInputIDs(uint inputid)
 {
-    vector<uint> list;
+    std::vector<uint> list;
 
     if (!inputid)
         return list;
@@ -1438,7 +1442,7 @@ static uint clone_capturecard(uint src_inputid, uint orig_dst_inputid)
         return 0;
     }
 
-    // Hangel schedgroup and schedorder specially.  If schedgroup is
+    // Handle schedgroup and schedorder specially.  If schedgroup is
     // set, schedgroup and schedorder should be false and 0,
     // respectively, for all children.
     bool schedgroup = query.value(26).toBool();
@@ -1498,8 +1502,8 @@ static uint clone_capturecard(uint src_inputid, uint orig_dst_inputid)
     }
 
     // copy input group linkages
-    vector<uint> src_grps = CardUtil::GetInputGroups(src_inputid);
-    vector<uint> dst_grps = CardUtil::GetInputGroups(dst_inputid);
+    std::vector<uint> src_grps = CardUtil::GetInputGroups(src_inputid);
+    std::vector<uint> dst_grps = CardUtil::GetInputGroups(dst_inputid);
     for (uint dst_grp : dst_grps)
         CardUtil::UnlinkInputGroup(dst_inputid, dst_grp);
     for (uint src_grp : src_grps)
@@ -1585,7 +1589,7 @@ QString CardUtil::GetFirewireChangerModel(uint inputid)
     return fwnode;
 }
 
-vector<uint> CardUtil::GetInputIDs(uint sourceid)
+std::vector<uint> CardUtil::GetInputIDs(uint sourceid)
 {
     MSqlQuery query(MSqlQuery::InitCon());
 
@@ -1595,7 +1599,7 @@ vector<uint> CardUtil::GetInputIDs(uint sourceid)
         "WHERE sourceid = :SOURCEID");
     query.bindValue(":SOURCEID", sourceid);
 
-    vector<uint> list;
+    std::vector<uint> list;
 
     if (!query.exec())
     {
@@ -1627,7 +1631,7 @@ bool CardUtil::SetStartChannel(uint inputid, const QString &channum)
     return true;
 }
 
-bool CardUtil::GetInputInfo(InputInfo &input, vector<uint> *groupids)
+bool CardUtil::GetInputInfo(InputInfo &input, std::vector<uint> *groupids)
 {
     if (!input.m_inputId)
         return false;
@@ -1893,9 +1897,9 @@ uint CardUtil::CreateDeviceInputGroup(uint inputid,
                                       const QString &device)
 {
     QString name = host + '|' + device;
-    if (type == "FREEBOX" || type == "IMPORT" ||
-        type == "DEMO"    || type == "EXTERNAL" ||
-        type == "HDHOMERUN")
+    if (type == "FREEBOX"   || type == "IMPORT"   ||
+        type == "DEMO"      || type == "EXTERNAL" ||
+        type == "HDHOMERUN" || type == "SATIP")
         name += QString("|%1").arg(inputid);
     return CreateInputGroup(name);
 }
@@ -1995,9 +1999,9 @@ bool CardUtil::UnlinkInputGroup(uint inputid, uint inputgroupid)
     return true;
 }
 
-vector<uint> CardUtil::GetInputGroups(uint inputid)
+std::vector<uint> CardUtil::GetInputGroups(uint inputid)
 {
-    vector<uint> list;
+    std::vector<uint> list;
 
     MSqlQuery query(MSqlQuery::InitCon());
 
@@ -2021,9 +2025,9 @@ vector<uint> CardUtil::GetInputGroups(uint inputid)
     return list;
 }
 
-vector<uint> CardUtil::GetGroupInputIDs(uint inputgroupid)
+std::vector<uint> CardUtil::GetGroupInputIDs(uint inputgroupid)
 {
-    vector<uint> list;
+    std::vector<uint> list;
 
     MSqlQuery query(MSqlQuery::InitCon());
 
@@ -2048,12 +2052,12 @@ vector<uint> CardUtil::GetGroupInputIDs(uint inputgroupid)
     return list;
 }
 
-vector<uint> CardUtil::GetConflictingInputs(uint inputid)
+std::vector<uint> CardUtil::GetConflictingInputs(uint inputid)
 {
     LOG(VB_RECORD, LOG_INFO,
         QString("CardUtil[%1]: GetConflictingInputs() input %1").arg(inputid));
 
-    vector<uint> inputids;
+    std::vector<uint> inputids;
 
     MSqlQuery query(MSqlQuery::InitCon());
 
@@ -2103,8 +2107,8 @@ bool CardUtil::GetTimeouts(uint inputid,
         MythDB::DBError("CardUtil::GetTimeouts()", query);
     else if (query.next())
     {
-        signal_timeout  = (uint) max(query.value(0).toInt(), 250);
-        channel_timeout = (uint) max(query.value(1).toInt(), 500);
+        signal_timeout  = (uint) std::max(query.value(0).toInt(), 250);
+        channel_timeout = (uint) std::max(query.value(1).toInt(), 500);
         return true;
     }
 
@@ -2189,7 +2193,7 @@ bool CardUtil::GetV4LInfo(
 #endif // USING_V4L2
 
     if (!driver.isEmpty())
-        driver.remove( QRegExp("\\[[0-9]\\]$") );
+        driver.remove( QRegularExpression(R"(\[[0-9]\]$)") );
 
     return !input.isEmpty();
 }
@@ -2435,7 +2439,6 @@ QString CardUtil::GetDeviceLabel(const QString &inputtype,
 
 QString CardUtil::GetDeviceLabel(uint inputid)
 {
-    QString devlabel;
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare("SELECT cardtype, videodevice "
                   "FROM capturecard WHERE cardid = :INPUTID ");
@@ -2560,7 +2563,7 @@ int CardUtil::CreateCaptureCard(const QString &videodevice,
 
 bool CardUtil::DeleteInput(uint inputid)
 {
-    vector<uint> childids = GetChildInputIDs(inputid);
+    std::vector<uint> childids = GetChildInputIDs(inputid);
     for (uint childid : childids)
     {
         if (!DeleteInput(childid))
@@ -2638,9 +2641,9 @@ bool CardUtil::DeleteAllInputs(void)
             query.exec("TRUNCATE TABLE iptv_channel"));
 }
 
-vector<uint> CardUtil::GetInputList(void)
+std::vector<uint> CardUtil::GetInputList(void)
 {
-    vector<uint> list;
+    std::vector<uint> list;
 
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare(
@@ -2659,9 +2662,9 @@ vector<uint> CardUtil::GetInputList(void)
     return list;
 }
 
-vector<uint> CardUtil::GetSchedInputList(void)
+std::vector<uint> CardUtil::GetSchedInputList(void)
 {
-    vector<uint> list;
+    std::vector<uint> list;
 
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare(
@@ -2681,9 +2684,9 @@ vector<uint> CardUtil::GetSchedInputList(void)
     return list;
 }
 
-vector<uint> CardUtil::GetLiveTVInputList(void)
+std::vector<uint> CardUtil::GetLiveTVInputList(void)
 {
-    vector<uint> list;
+    std::vector<uint> list;
 
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare(

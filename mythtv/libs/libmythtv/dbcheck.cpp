@@ -2,7 +2,6 @@
 
 #include <cstdio>
 #include <iostream>
-using namespace std;
 
 #include <QString>
 #include <QSqlError>
@@ -1589,7 +1588,7 @@ static bool doUpgradeTVDatabaseSchema(void)
             if (parts[1].contains("."))
                 continue; // already in new format, skip it..
 
-            int input = max(parts[1].toInt() - 1, 0);
+            int input = std::max(parts[1].toInt() - 1, 0);
             videodevice = parts[0] + QString("-0.%1").arg(input);
             update.bindValue(":CARDID", cardid);
             update.bindValue(":VIDDEV", videodevice);
@@ -1681,7 +1680,7 @@ static bool doUpgradeTVDatabaseSchema(void)
 " ADD COLUMN tid INT(11) NOT NULL DEFAULT '0' AFTER pid, "
 " ADD COLUMN filename VARCHAR(255) NOT NULL DEFAULT '' AFTER thread, "
 " ADD COLUMN line INT(11) NOT NULL DEFAULT '0' AFTER filename, "
-" ADD COLUMN function VARCHAR(255) NOT NULL DEFAULT '' AFTER line;"
+" ADD COLUMN `function` VARCHAR(255) NOT NULL DEFAULT '' AFTER line;"
 };
 
         if (!performActualUpdate("MythTV", "DBSchemaVer",
@@ -3426,7 +3425,7 @@ static bool doUpgradeTVDatabaseSchema(void)
     {
         // convert old VideoDisplayProfile settings to new format
         ProfileItem temp;
-        vector<ProfileItem> profiles;
+        std::vector<ProfileItem> profiles;
 
         MSqlQuery query(MSqlQuery::InitCon());
         query.prepare("SELECT profileid, value, data FROM displayprofiles "
@@ -3616,7 +3615,7 @@ static bool doUpgradeTVDatabaseSchema(void)
         // missed in 1357 - convert old vdpau and openglvaapi renderers to opengl
         // convert ancient quartz-blit to opengl as well
         ProfileItem temp;
-        vector<ProfileItem> profiles;
+        std::vector<ProfileItem> profiles;
 
         MSqlQuery query(MSqlQuery::InitCon());
         query.prepare("SELECT profileid, value, data FROM displayprofiles "
@@ -3724,6 +3723,80 @@ static bool doUpgradeTVDatabaseSchema(void)
 
         if (!performActualUpdate("MythTV", "DBSchemaVer",
                                  updates, "1363", dbver))
+            return false;
+    }
+
+    if (dbver == "1363")
+    {
+        MSqlQuery query(MSqlQuery::InitCon());
+
+        // insert a new profile group for the VBox
+        query.prepare("INSERT INTO profilegroups SET name = 'Sat>IP Recorder', "
+                       "cardtype = 'SATIP', is_default = 1;");
+        if (!query.exec())
+        {
+            MythDB::DBError("Unable to insert Sat>IP profilegroup.", query);
+            return false;
+        }
+
+        // get the id of the new profile group
+        int groupid = query.lastInsertId().toInt();
+
+        // insert the recording profiles
+        query.prepare("INSERT INTO recordingprofiles SET name = \"Default\", profilegroup = :GROUPID;");
+        query.bindValue(":GROUPID", groupid);
+        if (!query.exec())
+        {
+            MythDB::DBError("Unable to insert 'Default' recordingprofile.", query);
+            return false;
+        }
+
+        query.prepare("INSERT INTO recordingprofiles SET name = \"Live TV\", profilegroup = :GROUPID;");
+        query.bindValue(":GROUPID", groupid);
+        if (!query.exec())
+        {
+            MythDB::DBError("Unable to insert 'Live TV' recordingprofile.", query);
+            return false;
+        }
+
+        query.prepare("INSERT INTO recordingprofiles SET name = \"High Quality\", profilegroup = :GROUPID;");
+        query.bindValue(":GROUPID", groupid);
+        if (!query.exec())
+        {
+            MythDB::DBError("Unable to insert 'High Quality' recordingprofile.", query);
+            return false;
+        }
+
+        query.prepare("INSERT INTO recordingprofiles SET name = \"Low Quality\", profilegroup = :GROUPID;");
+        query.bindValue(":GROUPID", groupid);
+        if (!query.exec())
+        {
+            MythDB::DBError("Unable to insert 'Low Quality' recordingprofile.", query);
+            return false;
+        }
+
+        if (!UpdateDBVersionNumber("MythTV", "DBSchemaVer", "1364", dbver))
+            return false;
+    }
+
+    if (dbver == "1364")
+    {
+        // Set depmethod to none for all manual, recording rules.
+        DBUpdates updates {
+            "UPDATE record SET dupmethod = 1 WHERE search = 5"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1365", dbver))
+            return false;
+    }
+
+    if (dbver == "1365")
+    {
+        DBUpdates updates {
+            "ALTER TABLE channelscan_channel ADD COLUMN service_type INT UNSIGNED NOT NULL DEFAULT 0;"
+        };
+        if (!performActualUpdate("MythTV", "DBSchemaVer",
+                                 updates, "1366", dbver))
             return false;
     }
 

@@ -1,9 +1,9 @@
 #ifndef DECODERBASE_H_
 #define DECODERBASE_H_
 
+#include <array>
 #include <cstdint>
 #include <vector>
-using namespace std;
 
 #include "io/mythmediabuffer.h"
 #include "remoteencoder.h"
@@ -20,6 +20,7 @@ class AudioPlayer;
 class MythCodecContext;
 
 const int kDecoderProbeBufferSize = 256 * 1024;
+using TestBufferVec = std::vector<char>;
 
 /// Track types
 enum TrackType
@@ -107,7 +108,7 @@ class StreamInfo
         return (this->m_stream_id < b.m_stream_id);
     }
 };
-using sinfo_vec_t = vector<StreamInfo>;
+using sinfo_vec_t = std::vector<StreamInfo>;
 
 inline AVRational AVRationalInit(int num, int den = 1) {
     AVRational result;
@@ -120,14 +121,12 @@ class DecoderBase
 {
   public:
     DecoderBase(MythPlayer *parent, const ProgramInfo &pginfo);
-    DecoderBase(const DecoderBase& rhs);
     virtual ~DecoderBase();
 
     virtual void Reset(bool reset_video_data, bool seek_reset, bool reset_file);
 
     virtual int OpenFile(MythMediaBuffer *Buffer, bool novideo,
-                         char testbuf[kDecoderProbeBufferSize],
-                         int testbufsize = kDecoderProbeBufferSize) = 0;
+                         TestBufferVec & testbuf) = 0;
 
     virtual void SetEofState(EofState eof)  { m_atEof = eof;  }
     virtual void SetEof(bool eof)  {
@@ -323,7 +322,7 @@ class DecoderBase
     MarkTypes            m_positionMapType         {MARK_UNSET};
 
     mutable QMutex       m_positionMapLock         {QMutex::Recursive};
-    vector<PosMapEntry>  m_positionMap;
+    std::vector<PosMapEntry>  m_positionMap;
     frm_pos_map_t        m_frameToDurMap; // guarded by m_positionMapLock
     frm_pos_map_t        m_durToFrameMap; // guarded by m_positionMapLock
     mutable QDateTime    m_lastPositionMapUpdate; // guarded by m_positionMapLock
@@ -344,18 +343,22 @@ class DecoderBase
     bool                 m_justAfterChange         {false};
     long long            m_readAdjust              {0};
     int                  m_videoRotation           {0};
+    uint                 m_stereo3D                {0};
 
     // Audio/Subtitle/EIA-608/EIA-708 stream selection
     QMutex               m_trackLock                     { QMutex::Recursive };
     bool                 m_decodeAllSubtitles            { false };
-    int                  m_currentTrack[kTrackTypeCount] { -1    };
-    vector<StreamInfo>   m_tracks[kTrackTypeCount];
-    StreamInfo           m_wantedTrack[kTrackTypeCount];
-    StreamInfo           m_selectedTrack[kTrackTypeCount];
+    std::array<int,        kTrackTypeCount> m_currentTrack {};
+    std::array<sinfo_vec_t,kTrackTypeCount> m_tracks;
+    std::array<StreamInfo, kTrackTypeCount> m_wantedTrack;
+    std::array<StreamInfo, kTrackTypeCount> m_selectedTrack;
 
     /// language preferences for auto-selection of streams
-    vector<int>          m_languagePreference;
+    std::vector<int>     m_languagePreference;
     MythCodecContext    *m_mythCodecCtx         { nullptr };
     VideoDisplayProfile  m_videoDisplayProfile;
+
+  private:
+    Q_DISABLE_COPY(DecoderBase)
 };
 #endif

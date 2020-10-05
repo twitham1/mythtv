@@ -5,8 +5,6 @@
 #include <climits>
 #include <utility>
 
-using namespace std;
-
 // Qt includes
 #include <QtCore> // for qAbs
 
@@ -277,7 +275,7 @@ uint DBEvent::UpdateDB(
 
     // Get all programs already in the database that overlap
     // with our new program.
-    vector<DBEvent> programs;
+    std::vector<DBEvent> programs;
     uint count = GetOverlappingPrograms(query, chanid, programs);
     int  match = INT_MIN;
     int  i     = -1;
@@ -357,7 +355,7 @@ uint DBEvent::UpdateDB(
 //       This is the STIME3/ETIME3 comparison.
 //
 uint DBEvent::GetOverlappingPrograms(
-    MSqlQuery &query, uint chanid, vector<DBEvent> &programs) const
+    MSqlQuery &query, uint chanid, std::vector<DBEvent> &programs) const
 {
     uint count = 0;
     query.prepare(
@@ -447,7 +445,7 @@ static int score_words(const QStringList &al, const QStringList &bl)
         {
             if (*ait == *bit)
             {
-                bscore = max(1000, 2000 - (dist * 500));
+                bscore = std::max(1000, 2000 - (dist * 500));
                 // lower score for short words
                 if (ait->length() < 5)
                     bscore /= 5 - ait->length();
@@ -497,10 +495,10 @@ static int score_match(const QString &a, const QString &b)
     // score words symmetrically
     int score = (score_words(al, bl) + score_words(bl, al)) / 2;
 
-    return min(900, score);
+    return std::min(900, score);
 }
 
-int DBEvent::GetMatch(const vector<DBEvent> &programs, int &bestmatch) const
+int DBEvent::GetMatch(const std::vector<DBEvent> &programs, int &bestmatch) const
 {
     bestmatch = -1;
     int match_val = INT_MIN;
@@ -541,8 +539,8 @@ int DBEvent::GetMatch(const vector<DBEvent> &programs, int &bestmatch) const
             /* crappy providers apparently have events without duration
              * ensure that the minimal duration is 2 second to avoid
              * multiplying and more importantly dividing by zero */
-            int min_dur = max(2, min(duration, duration_loop));
-            overlap = min(overlap, min_dur/2);
+            int min_dur = std::max(2, std::min(duration, duration_loop));
+            overlap = std::min(overlap, min_dur/2);
             mv *= overlap * 2;
             mv /= min_dur;
         }
@@ -551,7 +549,7 @@ int DBEvent::GetMatch(const vector<DBEvent> &programs, int &bestmatch) const
             LOG(VB_GENERAL, LOG_ERR,
                 QString("Unexpected result: shows don't "
                         "overlap\n\t%1: %2 - %3\n\t%4: %5 - %6")
-                    .arg(m_title.left(35))
+                    .arg(m_title.left(35), 35)
                     .arg(m_starttime.toString(Qt::ISODate))
                     .arg(m_endtime.toString(Qt::ISODate))
                     .arg(programs[i].m_title.left(35), 35)
@@ -575,7 +573,7 @@ int DBEvent::GetMatch(const vector<DBEvent> &programs, int &bestmatch) const
 }
 
 uint DBEvent::UpdateDB(
-    MSqlQuery &q, uint chanid, const vector<DBEvent> &p, int match) const
+    MSqlQuery &q, uint chanid, const std::vector<DBEvent> &p, int match) const
 {
     // Adjust/delete overlaps;
     bool ok = true;
@@ -1100,7 +1098,6 @@ uint DBEvent::InsertDB(MSqlQuery &query, uint chanid) const
         " :INETREF ) ");
 
     QString cattype = myth_category_type_to_string(m_categoryType);
-    QString empty("");
     query.bindValue(":CHANID",      chanid);
     query.bindValue(":TITLE",       denullify(m_title));
     query.bindValue(":SUBTITLE",    denullify(m_subtitle));
@@ -1224,7 +1221,7 @@ void ProgInfo::Squeeze(void)
  */
 uint ProgInfo::InsertDB(MSqlQuery &query, uint chanid) const
 {
-    LOG(VB_XMLTV, LOG_INFO,
+    LOG(VB_XMLTV, LOG_DEBUG,
         QString("Inserting new program    : %1 - %2 %3 %4")
             .arg(m_starttime.toString(Qt::ISODate))
             .arg(m_endtime.toString(Qt::ISODate))
@@ -1382,7 +1379,7 @@ bool ProgramData::ClearDataBySource(
     uint sourceid, const QDateTime &from, const QDateTime &to,
     bool use_channel_time_offset)
 {
-    vector<uint> chanids = ChannelUtil::GetChanIDs(sourceid);
+    std::vector<uint> chanids = ChannelUtil::GetChanIDs(sourceid);
 
     bool ok = true;
     for (uint chanid : chanids)
@@ -1445,14 +1442,14 @@ void ProgramData::FixProgramList(QList<ProgInfo*> &fixlist)
                 tokeep = it, todelete = cur;
 
 
-            LOG(VB_XMLTV, LOG_INFO,
+            LOG(VB_XMLTV, LOG_DEBUG,
                 QString("Removing conflicting program: %1 - %2 %3 %4")
                     .arg((*todelete)->m_starttime.toString(Qt::ISODate))
                     .arg((*todelete)->m_endtime.toString(Qt::ISODate))
                     .arg((*todelete)->m_channel)
                     .arg((*todelete)->m_title));
 
-            LOG(VB_XMLTV, LOG_INFO,
+            LOG(VB_XMLTV, LOG_DEBUG,
                 QString("Conflicted with            : %1 - %2 %3 %4")
                     .arg((*tokeep)->m_starttime.toString(Qt::ISODate))
                     .arg((*tokeep)->m_endtime.toString(Qt::ISODate))
@@ -1484,7 +1481,7 @@ void ProgramData::HandlePrograms(
     MSqlQuery query(MSqlQuery::InitCon());
 
     QMap<QString, QList<ProgInfo> >::const_iterator mapiter;
-    for (mapiter = proglist.begin(); mapiter != proglist.end(); ++mapiter)
+    for (mapiter = proglist.cbegin(); mapiter != proglist.cend(); ++mapiter)
     {
         if (mapiter.key().isEmpty())
             continue;
@@ -1504,7 +1501,7 @@ void ProgramData::HandlePrograms(
             continue;
         }
 
-        vector<uint> chanids;
+        std::vector<uint> chanids;
         while (query.next())
             chanids.push_back(query.value(0).toUInt());
 
@@ -1703,7 +1700,7 @@ bool ProgramData::IsUnchanged(
 bool ProgramData::DeleteOverlaps(
     MSqlQuery &query, uint chanid, const ProgInfo &pi)
 {
-    if (VERBOSE_LEVEL_CHECK(VB_XMLTV, LOG_INFO))
+    if (VERBOSE_LEVEL_CHECK(VB_XMLTV, LOG_DEBUG))
     {
         // Get overlaps..
         query.prepare(
@@ -1724,7 +1721,7 @@ bool ProgramData::DeleteOverlaps(
 
         do
         {
-            LOG(VB_XMLTV, LOG_INFO,
+            LOG(VB_XMLTV, LOG_DEBUG,
                 QString("Removing existing program: %1 - %2 %3 %4")
                 .arg(MythDate::as_utc(query.value(1).toDateTime()).toString(Qt::ISODate))
                 .arg(MythDate::as_utc(query.value(2).toDateTime()).toString(Qt::ISODate))

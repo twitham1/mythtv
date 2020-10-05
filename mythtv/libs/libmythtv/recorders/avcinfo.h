@@ -2,9 +2,9 @@
 #define AVC_INFO_H
 
 // C++ headers
+#include <array>
 #include <cstdint>
 #include <vector>
-using namespace std;
 
 // Qt headers
 #include <QString>
@@ -23,13 +23,13 @@ class AVCInfo
 {
   public:
     AVCInfo();
-    AVCInfo(const AVCInfo &o);
+    AVCInfo(const AVCInfo &o) = default;
     AVCInfo &operator=(const AVCInfo &o);
     virtual ~AVCInfo() = default;
 
     virtual bool SendAVCCommand(
-        const vector<uint8_t> &/*cmd*/,
-        vector<uint8_t>       &/*result*/,
+        const std::vector<uint8_t> &/*cmd*/,
+        std::vector<uint8_t>       &/*result*/,
         int                   /*retry_cnt*/)
     {
         return false;
@@ -50,7 +50,7 @@ class AVCInfo
     uint     m_modelid           {0};
     uint     m_firmware_revision {0};
     QString  m_product_name;
-    uint8_t  m_unit_table[32]    {};
+    std::array<uint8_t,32>  m_unit_table {};
 };
 
 #endif // AVC_INFO_H

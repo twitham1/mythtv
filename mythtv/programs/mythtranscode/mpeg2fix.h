@@ -83,6 +83,10 @@ class PTSOffsetQueue
 };
 
 //container for all multiplex related variables
+using RingbufferArray = std::array<ringbuffer,N_AUDIO>;
+using ExtTypeIntArray = std::array<int,N_AUDIO>;
+using AudioFrameArray = std::array<audio_frame_t,N_AUDIO>;
+
 class MPEG2replex
 {
   public:
@@ -94,16 +98,16 @@ class MPEG2replex
     QString         m_outfile;
     int             m_otype                   {0};
     ringbuffer      m_vrBuf                   {};
-    ringbuffer      m_extrbuf[N_AUDIO]        {};
+    RingbufferArray m_extrbuf                 {};
     ringbuffer      m_indexVrbuf              {};
-    ringbuffer      m_indexExtrbuf[N_AUDIO]   {};
+    RingbufferArray m_indexExtrbuf            {};
     int             m_extCount                {0};
-    int             m_exttype[N_AUDIO]        {0};
-    int             m_exttypcnt[N_AUDIO]      {0};
+    ExtTypeIntArray m_exttype                 {0};
+    ExtTypeIntArray m_exttypcnt               {0};
 
     pthread_mutex_t m_mutex                   {};
     pthread_cond_t  m_cond                    {};
-    audio_frame_t   m_extframe[N_AUDIO]       {};
+    AudioFrameArray m_extframe                {};
     sequence_t      m_seq_head                {};
 
   private:
@@ -125,7 +129,7 @@ class MPEG2fixup
     int Start();
     void AddRangeList(const QStringList& rangelist, int type);
     static void ShowRangeMap(frm_dir_map_t *mapPtr, QString msg);
-    int BuildKeyframeIndex(QString &file, frm_pos_map_t &posMap, frm_pos_map_t &durMap);
+    int BuildKeyframeIndex(const QString &file, frm_pos_map_t &posMap, frm_pos_map_t &durMap);
 
     void SetAllAudio(bool keep) { m_allAudio = keep; }
 
@@ -259,15 +263,13 @@ class MPEG2fixup
     int             m_frameNum              {0};
     int             m_statusUpdateTime      {5};
     uint64_t        m_lastWrittenPos        {0};
-    uint16_t        m_invZigzagDirect16[64] {};
+    std::array<uint16_t,64> m_invZigzagDirect16 {};
     bool            m_zigzagInit            {false};
 };
 
 #ifdef NO_MYTH
     #include <QDateTime>
     #include <iostream>
-
-    using namespace std;
 
     extern int verboseMask;
     #undef LOG

@@ -14,9 +14,14 @@
 
 #define LOC (QString("%1: ").arg(m_deviceName))
 
+MythDRMPtr MythDRMDevice::Create(QScreen *qScreen, const QString &Device)
+{
+    // note - cannot use make_shared with a protected constructor
+    return std::shared_ptr<MythDRMDevice>(new MythDRMDevice(qScreen, Device));
+}
+
 MythDRMDevice::MythDRMDevice(QScreen *qScreen, const QString& Device)
-  : ReferenceCounter("DRMDev"),
-    m_screen(qScreen),
+  : m_screen(qScreen),
     m_deviceName(Device),
     m_verbose(Device.isEmpty() ? LOG_INFO : LOG_DEBUG)
 {
@@ -39,7 +44,7 @@ MythDRMDevice::~MythDRMDevice()
     Close();
 }
 
-bool MythDRMDevice::Open(void)
+bool MythDRMDevice::Open()
 {
     if (m_deviceName.isEmpty())
         m_deviceName = FindBestDevice();
@@ -58,7 +63,7 @@ bool MythDRMDevice::Open(void)
     return true;
 }
 
-void MythDRMDevice::Close(void)
+void MythDRMDevice::Close()
 {
     if (m_fd)
     {
@@ -77,42 +82,42 @@ void MythDRMDevice::Close(void)
     m_fd = 0;
 }
 
-bool MythDRMDevice::IsValid(void) const
+bool MythDRMDevice::IsValid() const
 {
     return m_valid;
 }
 
-QString MythDRMDevice::GetSerialNumber(void) const
+QString MythDRMDevice::GetSerialNumber() const
 {
     return m_serialNumber;
 }
 
-QScreen* MythDRMDevice::GetScreen(void) const
+QScreen* MythDRMDevice::GetScreen() const
 {
     return m_screen;
 }
 
-QSize MythDRMDevice::GetResolution(void) const
+QSize MythDRMDevice::GetResolution() const
 {
     return m_resolution;
 }
 
-QSize MythDRMDevice::GetPhysicalSize(void) const
+QSize MythDRMDevice::GetPhysicalSize() const
 {
     return m_physicalSize;
 }
 
-double MythDRMDevice::GetRefreshRate(void) const
+double MythDRMDevice::GetRefreshRate() const
 {
     return m_refreshRate;
 }
 
-bool MythDRMDevice::Authenticated(void) const
+bool MythDRMDevice::Authenticated() const
 {
     return m_authenticated;
 }
 
-MythEDID MythDRMDevice::GetEDID(void)
+MythEDID MythDRMDevice::GetEDID()
 {
     return m_edid;
 }
@@ -129,7 +134,7 @@ static QString GetConnectorName(drmModeConnector *Connector)
     return QString("%1%2").arg(QString::fromStdString(connectorNames[type])).arg(Connector->connector_type_id);
 }
 
-void MythDRMDevice::Authenticate(void)
+void MythDRMDevice::Authenticate()
 {
     if (!m_fd || m_authenticated)
         return;
@@ -144,14 +149,13 @@ void MythDRMDevice::Authenticate(void)
     }
 }
 
-bool MythDRMDevice::Initialise(void)
+bool MythDRMDevice::Initialise()
 {
     if (!m_fd)
         return false;
 
     // Find the serial number of the display we are connected to
-    auto serial = QString();
-    serial = m_screen->serialNumber();
+    auto serial = m_screen->serialNumber();
     if (serial.isEmpty())
     {
         // No serial number either means an older version of Qt or the EDID
@@ -275,8 +279,7 @@ bool MythDRMDevice::Initialise(void)
     }
 
     m_crtc = crtc;
-    m_resolution = QSize(static_cast<int>(m_crtc->width),
-                         static_cast<int>(m_crtc->height));
+    m_resolution = QSize(static_cast<int>(m_crtc->width), static_cast<int>(m_crtc->height));
     if (m_crtc->mode_valid)
     {
         drmModeModeInfo mode = m_crtc->mode;
@@ -289,7 +292,7 @@ bool MythDRMDevice::Initialise(void)
     return true;
 }
 
-QString MythDRMDevice::FindBestDevice(void)
+QString MythDRMDevice::FindBestDevice()
 {
     if (!m_screen)
         return QString();
@@ -318,8 +321,7 @@ QString MythDRMDevice::FindBestDevice(void)
         return root + devices.first();
 
     // Use the serial number from the current QScreen to select a suitable device
-    auto serial = QString();
-    serial = m_screen->serialNumber();
+    auto serial = m_screen->serialNumber();
     if (serial.isEmpty())
     {
         LOG(VB_GENERAL, m_verbose, LOC + "No serial number to search for");
@@ -357,11 +359,53 @@ bool MythDRMDevice::ConfirmDevice(const QString& Device)
     return result;
 }
 
+bool MythDRMDevice::SetEnumProperty(const QString &Property, uint64_t Value)
+{
+    bool result = false;
+    if (m_connector && !Property.isEmpty())
+    {
+        for (int i = 0; i < m_connector->count_props; ++i)
+        {
+            drmModePropertyPtr prop = drmModeGetProperty(m_fd, m_connector->props[i]);
+            if ((prop->flags & DRM_MODE_PROP_ENUM) && prop->name == Property)
+            {
+                int ret = drmModeConnectorSetProperty(m_fd, m_connector->connector_id, prop->prop_id, Value);
+                result = ret == 0;
+                if (ret != 0)
+                    LOG(VB_GENERAL, LOG_DEBUG, LOC + QString("drmModeConnectorSetProperty error: %1").arg(strerror(-ret)));
+            }
+            drmModeFreeProperty(prop);
+        }
+    }
+    if (!result)
+        LOG(VB_GENERAL, LOG_WARNING, LOC + QString("Failed to set property '%1'").arg(Property));
+    return result;
+}
+
+MythDRMDevice::DRMEnum MythDRMDevice::GetEnumProperty(const QString& Property)
+{
+    DRMEnum result{0};
+    if (!m_connector || Property.isEmpty())
+        return result;
+
+    for (int i = 0; i < m_connector->count_props; ++i)
+    {
+        drmModePropertyPtr prop = drmModeGetProperty(m_fd, m_connector->props[i]);
+        if ((prop->flags & DRM_MODE_PROP_ENUM) && prop->name == Property)
+        {
+            result.m_value = m_connector->prop_values[prop->prop_id];
+            for (int j = 0; j < prop->count_enums; ++j)
+                result.m_enums.insert({prop->enums[i].value, prop->enums[i].name});
+        }
+        drmModeFreeProperty(prop);
+    }
+    return result;
+}
+
 drmModePropertyBlobPtr MythDRMDevice::GetBlobProperty(drmModeConnectorPtr Connector, const QString& Property) const
 {
-    drmModePropertyBlobPtr result = nullptr;
     if (!Connector || Property.isEmpty())
-        return result;
+        return nullptr;
 
     for (int i = 0; i < Connector->count_props; ++i)
     {
@@ -369,11 +413,9 @@ drmModePropertyBlobPtr MythDRMDevice::GetBlobProperty(drmModeConnectorPtr Connec
         if ((propid->flags & DRM_MODE_PROP_BLOB) && propid->name == Property)
         {
             auto blobid = static_cast<uint32_t>(Connector->prop_values[i]);
-            result = drmModeGetPropertyBlob(m_fd, blobid);
+            return drmModeGetPropertyBlob(m_fd, blobid);
         }
         drmModeFreeProperty(propid);
-        if (result)
-            break;
     }
-    return result;
+    return nullptr;
 }

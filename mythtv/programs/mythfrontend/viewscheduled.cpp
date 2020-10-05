@@ -43,11 +43,13 @@ void *ViewScheduled::RunViewScheduled(void *player, bool showTV)
 }
 
 ViewScheduled::ViewScheduled(MythScreenStack *parent, TV* player, bool /*showTV*/)
-             : ScheduleCommon(parent, "ViewScheduled"),
-               m_showAll(!gCoreContext->GetBoolSetting("ViewSchedShowLevel", false)),
-               m_player(player)
+  : ScheduleCommon(parent, "ViewScheduled"),
+    m_showAll(!gCoreContext->GetBoolSetting("ViewSchedShowLevel", false)),
+    m_player(player)
 {
     gCoreContext->addListener(this);
+    if (m_player)
+        m_player->IncrRef();
 }
 
 ViewScheduled::~ViewScheduled()
@@ -58,8 +60,8 @@ ViewScheduled::~ViewScheduled()
     // if we have a player, we need to tell we are done
     if (m_player)
     {
-        QString message = QString("VIEWSCHEDULED_EXITING");
-        QCoreApplication::postEvent(m_player, new MythEvent(message));
+        emit m_player->RequestStopEmbedding();
+        m_player->DecrRef();
     }
 }
 
@@ -266,7 +268,6 @@ void ViewScheduled::LoadList(bool useExistingData)
         LoadFromScheduler(m_recList, m_conflictBool);
 
     auto pit = m_recList.begin();
-    QString currentDate;
     m_recgroupList[m_defaultGroup] = ProgramList(false);
     m_recgroupList[m_defaultGroup].setAutoDelete(false);
     while (pit != m_recList.end())
@@ -569,7 +570,7 @@ void ViewScheduled::viewInputs()
 void ViewScheduled::EmbedTVWindow(void)
 {
     if (m_player)
-        m_player->StartEmbedding(QRect());
+        emit m_player->RequestStartEmbedding(QRect());
 }
 
 void ViewScheduled::customEvent(QEvent *event)

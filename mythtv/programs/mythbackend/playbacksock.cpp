@@ -1,8 +1,6 @@
 #include <QStringList>
 #include <utility>
 
-using namespace std;
-
 #include "compat.h"
 #include "playbacksock.h"
 #include "programinfo.h"
@@ -221,8 +219,8 @@ bool PlaybackSock::FillProgramInfo(ProgramInfo &pginfo,
     return false;
 }
 
-QStringList PlaybackSock::GetSGFileList(QString &host, QString &groupname,
-                                        QString &directory, bool fileNamesOnly)
+QStringList PlaybackSock::GetSGFileList(const QString &host, const QString &groupname,
+                                        const QString &directory, bool fileNamesOnly)
 {
     QStringList strlist(QString("QUERY_SG_GETFILELIST"));
     strlist << host;
@@ -235,8 +233,8 @@ QStringList PlaybackSock::GetSGFileList(QString &host, QString &groupname,
     return strlist;
 }
 
-QStringList PlaybackSock::GetSGFileQuery(QString &host, QString &groupname,
-                                         QString &filename)
+QStringList PlaybackSock::GetSGFileQuery(const QString &host, const QString &groupname,
+                                         const QString &filename)
 {
     QStringList strlist(QString("QUERY_SG_FILEQUERY"));
     strlist << host;
@@ -354,13 +352,13 @@ bool PlaybackSock::IsBusy(int capturecardnum, InputInfo *busy_input,
 
     if (!strlist.isEmpty())
     {
-        QStringList::const_iterator it = strlist.begin();
+        QStringList::const_iterator it = strlist.cbegin();
         state = ((*it).toInt() != 0);
 
         if (busy_input)
         {
             ++it;
-            if (!busy_input->FromStringList(it, strlist.end()))
+            if (!busy_input->FromStringList(it, strlist.cend()))
             {
                 LOG(VB_GENERAL, LOG_ERR, LOC + "IsBusy: "
                     "Failed to parse response to " +

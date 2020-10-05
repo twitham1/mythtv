@@ -8,7 +8,6 @@
 
 class MythScreenStack;
 class MythSignalingTimer;
-class MythThemeBase;
 class MythUDPListener;
 class MythMediaDevice;
 
@@ -56,11 +55,6 @@ class MythMainWindowPrivate
 
     static int TranslateKeyNum(QKeyEvent *Event);
 
-    float                m_wmult                { 1.0F    };
-    float                m_hmult                { 1.0F    };
-    QRect                m_screenRect;
-    QRect                m_uiScreenRect;
-    bool                 m_doesFillScreen       { false   };
     bool                 m_exitingtomain        { false   };
     bool                 m_popwindows           { false   };
     /// To allow or prevent database access
@@ -87,11 +81,8 @@ class MythMainWindowPrivate
     QMutex           m_drawDisableLock;
     uint             m_drawDisabledDepth { 0       };
     bool             m_drawEnabled       { true    };
-    MythThemeBase   *m_themeBase         { nullptr };
     MythUDPListener *m_udpListener       { nullptr };
     MythNotificationCenter *m_nc         { nullptr };
-    QTimer          *m_idleTimer         { nullptr };
-    int              m_idleTime          { 0       };
     bool             m_standby           { false   };
     bool             m_enteringStandby   { false   };
     bool             m_disableIdle       { false   };

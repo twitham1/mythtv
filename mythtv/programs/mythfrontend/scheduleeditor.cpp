@@ -98,6 +98,9 @@ ScheduleEditor::ScheduleEditor(MythScreenStack *parent,
     FilterOptMixin::SetRule(m_recordingRule);
     StoreOptMixin::SetRule(m_recordingRule);
     PostProcMixin::SetRule(m_recordingRule);
+
+    if (m_player)
+        m_player->IncrRef();
 }
 
 ScheduleEditor::ScheduleEditor(MythScreenStack *parent,
@@ -110,6 +113,8 @@ ScheduleEditor::ScheduleEditor(MythScreenStack *parent,
             m_recordingRule(recRule),
             m_player(player)
 {
+    if (m_player)
+        m_player->IncrRef();
 }
 
 ScheduleEditor::~ScheduleEditor(void)
@@ -119,8 +124,8 @@ ScheduleEditor::~ScheduleEditor(void)
     // if we have a player, we need to tell we are done
     if (m_player)
     {
-        QString message = QString("VIEWSCHEDULED_EXITING");
-        qApp->postEvent(m_player, new MythEvent(message));
+        emit m_player->RequestStopEmbedding();
+        m_player->DecrRef();
     }
 }
 
@@ -217,7 +222,7 @@ bool ScheduleEditor::Create()
     }
 
     if (m_player)
-        m_player->StartEmbedding(QRect());
+        emit m_player->RequestStartEmbedding(QRect());
 
     return true;
 }
@@ -299,9 +304,6 @@ void ScheduleEditor::Load()
                 new MythUIButtonListItem(m_rulesList,
                                          toDescription(kWeeklyRecord),
                                          ENUM_TO_QVARIANT(kWeeklyRecord));
-            }
-            if (!hasChannel || isManual)
-            {
                 new MythUIButtonListItem(m_rulesList,
                                          toDescription(kDailyRecord),
                                          ENUM_TO_QVARIANT(kDailyRecord));
@@ -820,9 +822,10 @@ void ScheduleEditor::showMenu(void)
             m_view != kMetadataView)
             menuPopup->AddButton(tr("Metadata Options"));
         if (!m_recordingRule->m_isTemplate)
+        {
             menuPopup->AddButton(tr("Schedule Info"));
-        if (!m_recordingRule->m_isTemplate)
             menuPopup->AddButton(tr("Preview Changes"));
+        }
         menuPopup->AddButton(tr("Use Template"));
         popupStack->AddScreen(menuPopup);
     }
@@ -933,11 +936,11 @@ bool SchedEditChild::CreateEditChild(
     if (m_saveButton)
         connect(m_saveButton, SIGNAL(Clicked()), m_editor, SLOT(Save()));
     if (m_previewButton)
+    {
         connect(m_previewButton, SIGNAL(Clicked()),
                 m_editor, SLOT(ShowPreview()));
-
-    if (m_previewButton)
         m_previewButton->SetEnabled(!isTemplate);
+    }
 
     return true;
 }
@@ -1657,7 +1660,7 @@ void MetadataOptions::HandleDownloadedImages(MetadataLookup *lookup)
     if (map.isEmpty())
         return;
 
-    for (DownloadMap::const_iterator i = map.begin(); i != map.end(); ++i)
+    for (DownloadMap::const_iterator i = map.cbegin(); i != map.cend(); ++i)
     {
         VideoArtworkType type = i.key();
         const ArtworkInfo& info = i.value();
@@ -2057,7 +2060,7 @@ void SchedOptMixin::Load(void)
                                      QObject::tr("Use any available input"),
                                      QVariant::fromValue(0));
 
-            vector<uint> inputids = CardUtil::GetSchedInputList();
+            std::vector<uint> inputids = CardUtil::GetSchedInputList();
             for (uint id : inputids)
             {
                 new MythUIButtonListItem(m_inputList,
@@ -2138,6 +2141,7 @@ void SchedOptMixin::RuleChanged(void)
                         m_rule->m_type != kDontRecord);
     bool isSingle = (m_rule->m_type == kSingleRecord ||
                      m_rule->m_type == kOverrideRecord);
+    bool isManual = (m_rule->m_searchType == kManualSearch);
 
     if (m_prioritySpin)
         m_prioritySpin->SetEnabled(isScheduled);
@@ -2146,7 +2150,11 @@ void SchedOptMixin::RuleChanged(void)
     if (m_endoffsetSpin)
         m_endoffsetSpin->SetEnabled(isScheduled);
     if (m_dupmethodList)
-        m_dupmethodList->SetEnabled(isScheduled && !isSingle);
+    {
+        m_dupmethodList->SetEnabled(
+            isScheduled && !isSingle &&
+            (!isManual || m_rule->m_dupMethod != kDupCheckNone));
+    }
     if (m_dupscopeList)
         m_dupscopeList->SetEnabled(isScheduled && !isSingle &&
                                    m_rule->m_dupMethod != kDupCheckNone);

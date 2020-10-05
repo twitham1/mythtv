@@ -299,6 +299,7 @@ void FillRecRuleInfo( DTC::RecRule  *pRecRule,
     pRecRule->setEndOffset      (  pRule->m_endOffset              );
     pRecRule->setDupMethod      (  toRawString(pRule->m_dupMethod) );
     pRecRule->setDupIn          (  toRawString(pRule->m_dupIn)     );
+    pRecRule->setNewEpisOnly    (  newEpifromDupIn(pRule->m_dupIn) );
     pRecRule->setFilter         (  pRule->m_filter                 );
     pRecRule->setRecProfile     (  pRule->m_recProfile             );
     pRecRule->setRecGroup       (  RecordingInfo::GetRecgroupString(pRule->m_recGroupID) );
@@ -330,9 +331,7 @@ void FillArtworkInfoList( DTC::ArtworkInfoList *pArtworkInfoList,
                           uint                  nSeason )
 {
     ArtworkMap map = GetArtwork(sInetref, nSeason);
-
-    for (ArtworkMap::const_iterator i = map.begin();
-         i != map.end(); ++i)
+    for (auto i = map.cbegin(); i != map.cend(); ++i)
     {
         DTC::ArtworkInfo *pArtInfo = pArtworkInfoList->AddNewArtworkInfo();
         pArtInfo->setFileName(i.value().url);
@@ -342,23 +341,29 @@ void FillArtworkInfoList( DTC::ArtworkInfoList *pArtworkInfoList,
                 pArtInfo->setStorageGroup("Fanart");
                 pArtInfo->setType("fanart");
                 pArtInfo->setURL(QString("/Content/GetImageFile?StorageGroup=%1"
-                              "&FileName=%2").arg("Fanart")
-                              .arg(QUrl(i.value().url).path()));
+                    "&FileName=%2").arg("Fanart")
+                    .arg(QString(
+                        QUrl::toPercentEncoding(
+                            QUrl(i.value().url).path()))));
                 break;
             case kArtworkBanner:
                 pArtInfo->setStorageGroup("Banners");
                 pArtInfo->setType("banner");
                 pArtInfo->setURL(QString("/Content/GetImageFile?StorageGroup=%1"
-                              "&FileName=%2").arg("Banners")
-                              .arg(QUrl(i.value().url).path()));
+                    "&FileName=%2").arg("Banners")
+                    .arg(QString(
+                        QUrl::toPercentEncoding(
+                            QUrl(i.value().url).path()))));
                 break;
             case kArtworkCoverart:
             default:
                 pArtInfo->setStorageGroup("Coverart");
                 pArtInfo->setType("coverart");
                 pArtInfo->setURL(QString("/Content/GetImageFile?StorageGroup=%1"
-                              "&FileName=%2").arg("Coverart")
-                              .arg(QUrl(i.value().url).path()));
+                    "&FileName=%2").arg("Coverart")
+                    .arg(QString(
+                        QUrl::toPercentEncoding(
+                            QUrl(i.value().url).path()))));
                 break;
         }
     }
@@ -448,8 +453,9 @@ void FillVideoMetadataInfo (
             pArtInfo->setStorageGroup("Fanart");
             pArtInfo->setType("fanart");
             pArtInfo->setURL(QString("/Content/GetImageFile?StorageGroup=%1"
-                              "&FileName=%2").arg("Fanart")
-                              .arg(pMetadata->GetFanart()));
+                      "&FileName=%2").arg("Fanart")
+                      .arg(QString(
+                           QUrl::toPercentEncoding(pMetadata->GetFanart()))));
         }
         if (!pMetadata->GetCoverFile().isEmpty())
         {
@@ -458,8 +464,9 @@ void FillVideoMetadataInfo (
             pArtInfo->setStorageGroup("Coverart");
             pArtInfo->setType("coverart");
             pArtInfo->setURL(QString("/Content/GetImageFile?StorageGroup=%1"
-                              "&FileName=%2").arg("Coverart")
-                              .arg(pMetadata->GetCoverFile()));
+                      "&FileName=%2").arg("Coverart")
+                      .arg(QString(
+                           QUrl::toPercentEncoding(pMetadata->GetCoverFile()))));
         }
         if (!pMetadata->GetBanner().isEmpty())
         {
@@ -468,8 +475,9 @@ void FillVideoMetadataInfo (
             pArtInfo->setStorageGroup("Banners");
             pArtInfo->setType("banner");
             pArtInfo->setURL(QString("/Content/GetImageFile?StorageGroup=%1"
-                              "&FileName=%2").arg("Banners")
-                              .arg(pMetadata->GetBanner()));
+                      "&FileName=%2").arg("Banners")
+                      .arg(QString(
+                           QUrl::toPercentEncoding(pMetadata->GetBanner()))));
         }
         if (!pMetadata->GetScreenshot().isEmpty())
         {
@@ -478,8 +486,9 @@ void FillVideoMetadataInfo (
             pArtInfo->setStorageGroup("Screenshots");
             pArtInfo->setType("screenshot");
             pArtInfo->setURL(QString("/Content/GetImageFile?StorageGroup=%1"
-                              "&FileName=%2").arg("Screenshots")
-                              .arg(pMetadata->GetScreenshot()));
+                      "&FileName=%2").arg("Screenshots")
+                      .arg(QString(
+                           QUrl::toPercentEncoding(pMetadata->GetScreenshot()))));
         }
     }
 
@@ -623,7 +632,7 @@ void FillCutList(DTC::CutList* pCutList, RecordingInfo* rInfo, int marktype)
     {
         rInfo->QueryCutList(markMap);
 
-        for (it = markMap.begin(); it != markMap.end(); ++it)
+        for (it = markMap.cbegin(); it != markMap.cend(); ++it)
         {
             bool isend = (*it) == MARK_CUT_END || (*it) == MARK_COMM_END;
             if (marktype == 0)
@@ -669,7 +678,7 @@ void FillCommBreak(DTC::CutList* pCutList, RecordingInfo* rInfo, int marktype)
     {
         rInfo->QueryCommBreakList(markMap);
 
-        for (it = markMap.begin(); it != markMap.end(); ++it)
+        for (it = markMap.cbegin(); it != markMap.cend(); ++it)
         {
             bool isend = (*it) == MARK_CUT_END || (*it) == MARK_COMM_END;
             if (marktype == 0)
@@ -715,11 +724,31 @@ void FillSeek(DTC::CutList* pCutList, RecordingInfo* rInfo, MarkTypes marktype)
     {
         rInfo->QueryPositionMap(markMap, marktype);
 
-        for (it = markMap.begin(); it != markMap.end(); ++it)
+        for (it = markMap.cbegin(); it != markMap.cend(); ++it)
         {
             DTC::Cutting *pCutting = pCutList->AddNewCutting();
             pCutting->setMark(it.key());
             pCutting->setOffset(it.value());
         }
     }
+}
+
+int CreateRecordingGroup(const QString& groupName)
+{
+    int groupID = -1;
+    MSqlQuery query(MSqlQuery::InitCon());
+
+    query.prepare("INSERT INTO recgroups SET recgroup = :NAME, "
+                  "displayname = :DISPLAYNAME");
+    query.bindValue(":NAME", groupName);
+    query.bindValue(":DISPLAYNAME", groupName);
+
+    if (query.exec())
+        groupID = query.lastInsertId().toInt();
+
+    if (groupID <= 0)
+        LOG(VB_GENERAL, LOG_ERR, QString("Could not create recording group (%1). "
+                                         "Does it already exist?").arg(groupName));
+
+    return groupID;
 }

@@ -24,7 +24,6 @@
 #include <cstdarg>
 #include <queue>
 #include <unistd.h>       // for usleep()
-using namespace std;
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -219,7 +218,7 @@ bool MythCoreContextPrivate::WaitForWOL(int timeout_in_ms)
     {
         LOG(VB_GENERAL, LOG_INFO, LOC + "Wake-On-LAN in progress, waiting...");
 
-        int max_wait = min(1000, timeout_remaining);
+        int max_wait = std::min(1000, timeout_remaining);
         m_wolInProgressWaitCondition.wait(
             &m_wolInProgressLock, max_wait);
         timeout_remaining -= max_wait;
@@ -297,6 +296,21 @@ MythCoreContext::~MythCoreContext()
 {
     delete d;
     d = nullptr;
+}
+
+void MythCoreContext::setTestIntSettings(QMap<QString,int> &overrides)
+{
+    m_testOverrideInts = std::move(overrides);
+}
+
+void MythCoreContext::setTestFloatSettings(QMap<QString,double> &overrides)
+{
+    m_testOverrideFloats = std::move(overrides);
+}
+
+void MythCoreContext::setTestStringSettings(QMap<QString,QString> &overrides)
+{
+    m_testOverrideStrings = std::move(overrides);
 }
 
 bool MythCoreContext::SetupCommandSocket(MythSocket *serverSock,
@@ -443,15 +457,15 @@ MythSocket *MythCoreContext::ConnectCommandSocket(
         WOLcmd = GetSetting("WOLbackendCommand", "");
 
     if (maxConnTry < 1)
-        maxConnTry = max(GetNumSetting("BackendConnectRetry", 1), 1);
+        maxConnTry = std::max(GetNumSetting("BackendConnectRetry", 1), 1);
 
     int WOLsleepTime = 0;
     int WOLmaxConnTry = 0;
     if (!WOLcmd.isEmpty())
     {
         WOLsleepTime  = GetNumSetting("WOLbackendReconnectWaitTime", 0);
-        WOLmaxConnTry = max(GetNumSetting("WOLbackendConnectRetry", 1), 1);
-        maxConnTry    = max(maxConnTry, WOLmaxConnTry);
+        WOLmaxConnTry = std::max(GetNumSetting("WOLbackendConnectRetry", 1), 1);
+        maxConnTry    = std::max(maxConnTry, WOLmaxConnTry);
     }
 
     bool we_attempted_wol = false;
@@ -901,6 +915,8 @@ bool MythCoreContext::SaveSettingOnHost(const QString &key,
 QString MythCoreContext::GetSetting(const QString &key,
                                     const QString &defaultval)
 {
+    if (!m_testOverrideStrings.empty())
+        return m_testOverrideStrings[key];
     return d->m_database->GetSetting(key, defaultval);
 }
 
@@ -912,11 +928,15 @@ bool MythCoreContext::GetBoolSetting(const QString &key, bool defaultval)
 
 int MythCoreContext::GetNumSetting(const QString &key, int defaultval)
 {
+    if (!m_testOverrideInts.empty())
+        return m_testOverrideInts[key];
     return d->m_database->GetNumSetting(key, defaultval);
 }
 
 double MythCoreContext::GetFloatSetting(const QString &key, double defaultval)
 {
+    if (!m_testOverrideFloats.empty())
+        return m_testOverrideFloats[key];
     return d->m_database->GetFloatSetting(key, defaultval);
 }
 
@@ -924,6 +944,8 @@ QString MythCoreContext::GetSettingOnHost(const QString &key,
                                           const QString &host,
                                           const QString &defaultval)
 {
+    if (!m_testOverrideStrings.empty())
+        return m_testOverrideStrings[key];
     return d->m_database->GetSettingOnHost(key, host, defaultval);
 }
 
@@ -939,6 +961,8 @@ int MythCoreContext::GetNumSettingOnHost(const QString &key,
                                          const QString &host,
                                          int defaultval)
 {
+    if (!m_testOverrideInts.empty())
+        return m_testOverrideInts[key];
     return d->m_database->GetNumSettingOnHost(key, host, defaultval);
 }
 
@@ -946,6 +970,8 @@ double MythCoreContext::GetFloatSettingOnHost(const QString &key,
                                               const QString &host,
                                               double defaultval)
 {
+    if (!m_testOverrideFloats.empty())
+        return m_testOverrideFloats[key];
     return d->m_database->GetFloatSettingOnHost(key, host, defaultval);
 }
 
@@ -1285,22 +1311,20 @@ bool MythCoreContext::CheckSubnet(const QHostAddress &peer)
 
     // loop through all available interfaces
     QList<QNetworkInterface> IFs = QNetworkInterface::allInterfaces();
-    QList<QNetworkInterface>::const_iterator qni;
-    for (qni = IFs.begin(); qni != IFs.end(); ++qni)
+    for (const auto & qni : qAsConst(IFs))
     {
-        if ((qni->flags() & QNetworkInterface::IsRunning) == 0)
+        if ((qni.flags() & QNetworkInterface::IsRunning) == 0)
             continue;
 
-        QList<QNetworkAddressEntry> IPs = qni->addressEntries();
-        QList<QNetworkAddressEntry>::iterator qnai;
-        for (qnai = IPs.begin(); qnai != IPs.end(); ++qnai)
+        QList<QNetworkAddressEntry> IPs = qni.addressEntries();
+        for (const auto & qnai : qAsConst(IPs))
         {
-            int pfxlen = qnai->prefixLength();
+            int pfxlen = qnai.prefixLength();
             // Set this to test rejection without having an extra
             // network.
             if (GetBoolSetting("DebugSubnet"))
                 pfxlen += 4;
-            if (peer.isInSubnet(qnai->ip(),pfxlen))
+            if (peer.isInSubnet(qnai.ip(),pfxlen))
             {
                 d->m_approvedIps.append(peer);
                 return true;
@@ -1861,34 +1885,22 @@ MythScheduler *MythCoreContext::GetScheduler(void)
 }
 
 /**
- * \fn void MythCoreContext::WaitUntilSignals(const char *signal1, ...)
- * Wait until either of the provided signals have been received.
- * signal1 being declared as SIGNAL(SignalName(args,..))
+ * Wait until any of the provided signals have been received.
+ * signals being declared as SIGNAL(SignalName(args,..))
  */
-void MythCoreContext::WaitUntilSignals(const char *signal1, ...)
+void MythCoreContext::WaitUntilSignals(std::vector<const char *> & sigs)
 {
-    if (!signal1)
+    if (sigs.empty())
         return;
 
     QEventLoop eventLoop;
-    va_list vl;
-
-    LOG(VB_GENERAL, LOG_DEBUG, LOC +
-        QString("Waiting for signal %1")
-        .arg(signal1));
-    connect(this, signal1, &eventLoop, SLOT(quit()));
-
-    va_start(vl, signal1);
-    const char *s = va_arg(vl, const char *);
-    while (s)
+    for (const auto *s : sigs)
     {
         LOG(VB_GENERAL, LOG_DEBUG, LOC +
             QString("Waiting for signal %1")
             .arg(s));
         connect(this, s, &eventLoop, SLOT(quit()));
-        s = va_arg(vl, const char *);
     }
-    va_end(vl);
 
     eventLoop.exec(QEventLoop::ExcludeUserInputEvents | QEventLoop::ExcludeSocketNotifiers);
 }

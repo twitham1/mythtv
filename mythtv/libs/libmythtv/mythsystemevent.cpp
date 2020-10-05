@@ -112,7 +112,6 @@ void MythSystemEventHandler::SubstituteMatches(const QStringList &tokens,
     QString args;
     uint chanid = 0;
     QDateTime recstartts;
-    QString sender;
 
     QStringList::const_iterator it = tokens.begin();
     ++it;
@@ -141,9 +140,6 @@ void MythSystemEventHandler::SubstituteMatches(const QStringList &tokens,
 
             if (++it == tokens.end())
                 break;
-
-            if (token == "SENDER")
-                sender = *it;
 
             // The following string is broken up on purpose to indicate
             // what we're replacing is the token surrounded by percent signs
@@ -195,6 +191,7 @@ void MythSystemEventHandler::SubstituteMatches(const QStringList &tokens,
         // 2rd Try searching for RecordingInfo
         RecordingInfo::LoadStatus status = RecordingInfo::kNoProgram;
         RecordingInfo recinfo2(chanid, recstartts, false, 0, &status);
+        // cppcheck-suppress knownConditionTrueFalse
         if (status == RecordingInfo::kFoundProgram)
             recinfo2.SubstituteMatches(command);
         else
@@ -234,13 +231,10 @@ QString MythSystemEventHandler::EventNameToSetting(const QString &name)
     QStringList parts = name.toLower().split('_', Qt::SkipEmptyParts);
 #endif
 
-    QStringList::Iterator it = parts.begin();
-    while (it != parts.end())
+    for (const auto & part : qAsConst(parts))
     {
-        result += (*it).left(1).toUpper();
-        result += (*it).mid(1);
-
-        ++it;
+        result += part.at(0).toUpper();
+        result += part.midRef(1);
     }
 
     return result;

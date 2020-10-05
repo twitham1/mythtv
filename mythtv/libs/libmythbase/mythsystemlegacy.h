@@ -41,10 +41,9 @@
 // review and some cleanup.
 
 // C headers
+#include <array>
 #include <cstdint>
 #include <ctime>
-
-#ifdef __cplusplus
 
 #include "exitcodes.h"  // included for GENERIC_EXIT_OK
 #include "mythsystem.h" // included for MythSystemFlag and MythSignal
@@ -192,18 +191,12 @@ class MBASE_PUBLIC MythSystemLegacy : public QObject
     int         m_ioprio {0};
 
     Setting     m_settings;
-    QBuffer     m_stdbuff[3];
+    std::array<QBuffer,3> m_stdbuff;
 };
 
 MBASE_PUBLIC uint myth_system(const QString &command,
                               uint flags = kMSNone,
                               uint timeout = 0);
-#endif // __cplusplus
-
-#ifdef __cplusplus
-extern "C"
-#endif // __cplusplus
-MBASE_PUBLIC uint myth_system_c(char *command, uint flags, uint timeout);
 
 #endif // MYTHSYSTEMLEGACY_H
 /*

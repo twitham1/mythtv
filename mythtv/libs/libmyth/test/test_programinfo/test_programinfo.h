@@ -18,8 +18,10 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
+#include <iostream>
 #include <QtTest/QtTest>
 
+#include "mythcorecontext.h"
 #include "programinfo.h"
 #include "programtypes.h"
 
@@ -104,24 +106,30 @@ class TestProgramInfo : public QObject
     QString m_flash34List = "The Flash (2014)|The New Rogues|Barry continues to "
         "train Jesse ...|3|4|23|syndicatedepisode|Drama|1514|514|WNUVDT|"
         "WNUBDT (WNUV-DT)|/recordings/1514_20161025235800.ts|6056109800|"
-        "1477439880|1477443720|0|localhost|0|0|0|0|0|0|0|15|8|1477439880|"
+        "1477440000|1477443600|0|localhost|0|0|0|0|0|0|0|15|8|1477439880|"
         "1477443720|0|Default||EP01922936|EP019229360055|ttvdb.py_279121|"
-        "1477444354|0|2016-10-25|Default|0|0|Default|0|0|0|2016|0|0|4|715|"
+        "1477444354|0|2016-10-26|Default|0|0|Default|0|0|0|2016|0|0|4|715|"
         "Prime A-1|4294967295";
     QString m_supergirl23List = "Supergirl|Welcome to Earth|An attack is made "
         "on the President as hot-button...|2|3|23|syndicatedepisode|Drama|"
         "1514|514|WNUVDT|WNUBDT (WNUV-DT)|/recordings/1514_20161024235800.ts|"
-        "6056109670|1477353480|1477357320|0|localhost|0|0|0|0|0|0|0|15|8|"
+        "6056109670|1477353600|1477357200|0|localhost|0|0|0|0|0|0|0|15|8|"
         "1477353480|1477357320|0|Default||EP02185451|EP021854510025|"
-        "ttvdb.py_295759|1477444354|0|2016-10-24|Default|0|0|Default|0|0|0|"
+        "ttvdb.py_295759|1477444354|0|2016-10-25|Default|0|0|Default|0|0|0|"
         "2016|0|0|4|711|Prime A-0|4294967295";
     ProgramInfo m_dracula;
     ProgramInfo m_flash34;
     ProgramInfo m_supergirl23;
 
+    QMap<QString,int> m_intOverrides {};
+
   private slots:
     void initTestCase()
     {
+        gCoreContext = new MythCoreContext("test_programinfo_1.0", nullptr);
+        m_intOverrides["AlwaysStreamFiles"] = 0;
+        gCoreContext->setTestIntSettings(m_intOverrides);
+
         m_dracula = ProgramInfo(mockMovie ("11868", "tt0051554", "Dracula", 1958));
         m_flash34 = ProgramInfo
             (715,
@@ -135,11 +143,11 @@ class TestProgramInfo : public QObject
              "localhost", "Default",
              "EP01922936", "EP019229360055", "ttvdb.py_279121",
              ProgramInfo::kCategoryTVShow, 0, 6056109800,
+             MythDate::fromString("2016-10-26 00:00:00"),
+             MythDate::fromString("2016-10-26 01:00:00"),
              MythDate::fromString("2016-10-25 23:58:00"),
              MythDate::fromString("2016-10-26 01:02:00"),
-             MythDate::fromString("2016-10-25 23:58:00"),
-             MythDate::fromString("2016-10-26 01:02:00"),
-             0.0, 2016, 0, 0, QDate(2016,10,25),
+             0.0, 2016, 0, 0, QDate(2016,10,26),
              MythDate::fromString("2016-10-26 01:12:34"),
              RecStatus::Unknown, 0,
              kDupsInAll, kDupCheckSubThenDesc,
@@ -157,11 +165,11 @@ class TestProgramInfo : public QObject
              "localhost", "Default",
              "EP02185451", "EP021854510025", "ttvdb.py_295759",
              ProgramInfo::kCategoryTVShow, 0, 6056109670,
+             MythDate::fromString("2016-10-25 00:00:00"),
+             MythDate::fromString("2016-10-25 01:00:00"),
              MythDate::fromString("2016-10-24 23:58:00"),
              MythDate::fromString("2016-10-25 01:02:00"),
-             MythDate::fromString("2016-10-24 23:58:00"),
-             MythDate::fromString("2016-10-25 01:02:00"),
-             0.0, 2016, 0, 0, QDate(2016,10,24),
+             0.0, 2016, 0, 0, QDate(2016,10,25),
              MythDate::fromString("2016-10-26 01:12:34"),
              RecStatus::Unknown, 0,
              kDupsInAll, kDupCheckSubThenDesc,
@@ -304,5 +312,84 @@ class TestProgramInfo : public QObject
         QCOMPARE (m_flash34.GetSortTitle(), QString("flash (2014)"));
         QCOMPARE (m_flash34.GetSortSubtitle(), QString("new rogues"));
         QVERIFY (m_flash34.GetSortTitle() < m_supergirl23.GetSortTitle());
+    }
+
+    static void SubstituteMatches_compile_test(void)
+    {
+        QDateTime startTs    {MythDate::current(true)};
+        QDateTime endTs      {startTs};
+        QDateTime recStartTs {startTs};
+        QDateTime recEndTs   {startTs};
+
+        static const std::array<const QString,4> s_timeStr
+            { "STARTTIME", "ENDTIME", "PROGSTART", "PROGEND", };
+        static const std::array<const QDateTime *,4> time_dtr
+            { &recStartTs, &recEndTs, &startTs, &endTs, };
+        QCOMPARE(s_timeStr.size(), (size_t)4);
+        QCOMPARE(time_dtr.size(), (size_t)4);
+    }
+
+    static void SubstituteMatches_test_data(void)
+    {
+        QTest::addColumn<QString>("input");
+        QTest::addColumn<QString>("expected");
+
+        QTest::newRow("title")    << R"(%TITLE%)" << "The Flash (2014)";
+        QTest::newRow("subtitle") << R"(%SUBTITLE%)" << "The New Rogues";
+        QTest::newRow("episode")  << R"(S%SEASON%E%EPISODE%)" << "S3E4";
+        QTest::newRow("times1utc") << R"(%STARTTIMEUTC% to %ENDTIMEUTC%)"
+                                   << "20161025235800 to 20161026010200";
+        QTest::newRow("times1isoutc") << R"(%STARTTIMEISOUTC% to %ENDTIMEISOUTC%)"
+                                      << "2016-10-25T23:58:00Z to 2016-10-26T01:02:00Z";
+        QTest::newRow("times2utc") << R"(%PROGSTARTUTC% to %PROGENDUTC%)"
+                                   << "20161026000000 to 20161026010000";
+        QTest::newRow("times2isoutc") << R"(%PROGSTARTISOUTC% to %PROGENDISOUTC%)"
+                                      << "2016-10-26T00:00:00Z to 2016-10-26T01:00:00Z";
+        QTest::newRow("dirfile") << R"(%DIR% %FILE%)"
+                                 << "myth://localhost/1514_20161025235800.ts 1514_20161025235800.ts";
+
+
+    }
+
+    void SubstituteMatches_test(void)
+    {
+        QFETCH(QString, input);
+        QFETCH(QString, expected);
+
+        QString output = input;
+        m_flash34.SubstituteMatches(output);
+        QCOMPARE(output, expected);
+    }
+
+    static void SubstituteMatches2_test_data(void)
+    {
+        QTest::addColumn<QString>("input");
+        QTest::addColumn<QString>("expected");
+
+        QTest::newRow("title")    << R"(%TITLE%)" << "Supergirl";
+        QTest::newRow("subtitle") << R"(%SUBTITLE%)" << "Welcome to Earth";
+        QTest::newRow("episode")  << R"(S%SEASON%E%EPISODE%)" << "S2E3";
+        QTest::newRow("times1utc") << R"(%STARTTIMEUTC% to %ENDTIMEUTC%)"
+                                   << "20161024235800 to 20161025010200";
+        QTest::newRow("times1isoutc") << R"(%STARTTIMEISOUTC% to %ENDTIMEISOUTC%)"
+                                      << "2016-10-24T23:58:00Z to 2016-10-25T01:02:00Z";
+        QTest::newRow("times2utc") << R"(%PROGSTARTUTC% to %PROGENDUTC%)"
+                                   << "20161025000000 to 20161025010000";
+        QTest::newRow("times2isoutc") << R"(%PROGSTARTISOUTC% to %PROGENDISOUTC%)"
+                                      << "2016-10-25T00:00:00Z to 2016-10-25T01:00:00Z";
+        QTest::newRow("dirfile") << R"(%DIR% %FILE%)"
+                                 << "myth://localhost/1514_20161024235800.ts 1514_20161024235800.ts";
+
+
+    }
+
+    void SubstituteMatches2_test(void)
+    {
+        QFETCH(QString, input);
+        QFETCH(QString, expected);
+
+        QString output = input;
+        m_supergirl23.SubstituteMatches(output);
+        QCOMPARE(output, expected);
     }
 };

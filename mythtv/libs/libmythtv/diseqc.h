@@ -9,8 +9,8 @@
 
 // C++ headers
 #include <cinttypes>
+#include <climits>
 #include <vector>
-using namespace std;
 
 // Qt headers
 #include <QString>
@@ -30,7 +30,8 @@ class DiSEqCDevSCR;
 using uint_to_dbl_t           = QMap<uint, double>;
 using dbl_to_uint_t           = QMap<double, uint>;
 using cardid_to_diseqc_tree_t = QMap<uint, DiSEqCDevTree*>;
-using dvbdev_vec_t            = vector<DiSEqCDevDevice*>;
+using dvbdev_vec_t            = std::vector<DiSEqCDevDevice*>;
+using cmd_vec_t               = std::vector<uint8_t>;
 
 class DiSEqCDevSettings
 {
@@ -92,8 +93,13 @@ class DiSEqCDevTree
     DiSEqCDevDevice *Root(void) { return m_root; }
     void SetRoot(DiSEqCDevDevice *root);
 
-    bool SendCommand(uint adr, uint cmd, uint repeats = 0,
-                     uint data_len = 0, unsigned char *data = nullptr) const;
+    bool SendCommand(uint adr, uint cmd, uint repeats,
+                     cmd_vec_t &data) const;
+    bool SendCommand(uint adr, uint cmd, uint repeats = 0) const
+        {
+            cmd_vec_t nada;
+            return SendCommand(adr, cmd, repeats, nada);
+        }
 
     bool ResetDiseqc(bool hard_reset, bool is_SCR);
 
@@ -125,7 +131,7 @@ class DiSEqCDevTree
     DiSEqCDevDevice *m_root                   {nullptr};
     uint             m_lastVoltage            {UINT_MAX};
     uint             m_previousFakeDiseqcid   {kFirstFakeDiSEqCID};
-    vector<uint>     m_delete;
+    std::vector<uint> m_delete;
 
     static const uint kFirstFakeDiSEqCID;
 };
@@ -205,12 +211,13 @@ class DiSEqCDevDevice
     uint             m_repeat   {1};
 
     struct TypeTable { QString name; uint value; };
-    static QString TableToString(uint type, const TypeTable *table);
-    static uint    TableFromString(const QString   &type,
-                                   const TypeTable *table);
+    using TypeTableVec = std::vector<TypeTable>;
+    static QString TableToString(uint type, const TypeTableVec &table);
+    static uint    TableFromString(const QString  &type,
+                                   const TypeTableVec &table);
 
   private:
-    static const TypeTable kDvbdevLookup[5];
+    static const TypeTableVec kDvbdevLookup;
 };
 
 class DiSEqCDevSwitch : public DiSEqCDevDevice
@@ -289,7 +296,7 @@ class DiSEqCDevSwitch : public DiSEqCDevDevice
     uint            m_lastHorizontal  {UINT_MAX};
     dvbdev_vec_t    m_children;
 
-    static const TypeTable kSwitchTypeTable[9];
+    static const TypeTableVec kSwitchTypeTable;
 };
 
 class DiSEqCDevRotor : public DiSEqCDevDevice
@@ -369,7 +376,7 @@ class DiSEqCDevRotor : public DiSEqCDevDevice
     mutable double m_lastAzimuth        {0.0};
 
     // statics
-    static const TypeTable kRotorTypeTable[3];
+    static const TypeTableVec kRotorTypeTable;
 };
 
 class DiSEqCDevSCR : public DiSEqCDevDevice
@@ -424,8 +431,7 @@ class DiSEqCDevSCR : public DiSEqCDevDevice
         { return (dvbdev_pos_t) TableFromString(pos, kSCRPositionTable); }
 
   protected:
-    bool         SendCommand(uint cmd, uint repeats, uint data_len = 0,
-                             unsigned char *data = nullptr) const;
+    bool         SendCommand(uint cmd, uint repeats, cmd_vec_t &data) const;
 
   private:
     uint             m_scrUserband   {0};    /* 0-7 */
@@ -434,7 +440,7 @@ class DiSEqCDevSCR : public DiSEqCDevDevice
 
     DiSEqCDevDevice *m_child         {nullptr};
 
-    static const TypeTable kSCRPositionTable[3];
+    static const TypeTableVec kSCRPositionTable;
 };
 
 class DiSEqCDevLNB : public DiSEqCDevDevice
@@ -492,7 +498,7 @@ class DiSEqCDevLNB : public DiSEqCDevDevice
     /// of reflectors will need to set this value.
     bool         m_polInv     {false};
 
-    static const TypeTable kLNBTypeTable[5];
+    static const TypeTableVec kLNBTypeTable;
 };
 
 #endif // DISEQC_H

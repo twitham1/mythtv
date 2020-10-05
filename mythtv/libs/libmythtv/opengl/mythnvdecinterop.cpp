@@ -1,7 +1,7 @@
 // MythTV
 #include "mythconfig.h"
 #include "mythcorecontext.h"
-#include "videocolourspace.h"
+#include "mythvideocolourspace.h"
 #include "mythnvdecinterop.h"
 
 // Std
@@ -100,7 +100,7 @@ MythOpenGLInterop::Type MythNVDECInterop::GetInteropType(VideoFrameType Format)
  * EGL interopability may also be useful.
 */
 vector<MythVideoTexture*> MythNVDECInterop::Acquire(MythRenderOpenGL *Context,
-                                                    VideoColourSpace *ColourSpace,
+                                                    MythVideoColourSpace *ColourSpace,
                                                     VideoFrame *Frame,
                                                     FrameScanType Scan)
 {
@@ -290,10 +290,8 @@ vector<MythVideoTexture*> MythNVDECInterop::Acquire(MythRenderOpenGL *Context,
         }
 
         result = m_openglTextures[last];
-        for (MythVideoTexture* tex : qAsConst(m_openglTextures[current]))
-            result.push_back(tex);
-        for (MythVideoTexture* tex : qAsConst(m_openglTextures[next]))
-            result.push_back(tex);
+        std::copy(m_openglTextures[current].cbegin(), m_openglTextures[current].cend(), std::back_inserter(result));
+        std::copy(m_openglTextures[next].cbegin(), m_openglTextures[next].cend(), std::back_inserter(result));
         return result;
     }
     m_referenceFrames.clear();

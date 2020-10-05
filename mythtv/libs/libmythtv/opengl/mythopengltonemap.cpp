@@ -21,7 +21,7 @@
 #define GL_WRITE_ONLY                     0x88B9
 #endif
 
-MythOpenGLTonemap::MythOpenGLTonemap(MythRenderOpenGL *Render, VideoColourSpace *ColourSpace)
+MythOpenGLTonemap::MythOpenGLTonemap(MythRenderOpenGL *Render, MythVideoColourSpace *ColourSpace)
 {
     if (Render)
     {
@@ -34,7 +34,7 @@ MythOpenGLTonemap::MythOpenGLTonemap(MythRenderOpenGL *Render, VideoColourSpace 
     {
         ColourSpace->IncrRef();
         m_colourSpace = ColourSpace;
-        connect(m_colourSpace, &VideoColourSpace::Updated, this, &MythOpenGLTonemap::UpdateColourSpace);
+        connect(m_colourSpace, &MythVideoColourSpace::Updated, this, &MythOpenGLTonemap::UpdateColourSpace);
     }
 }
 
@@ -71,7 +71,7 @@ MythVideoTexture* MythOpenGLTonemap::GetTexture(void)
     return m_texture;
 }
 
-MythVideoTexture* MythOpenGLTonemap::Map(vector<MythVideoTexture *> &Inputs, QSize DisplaySize)
+MythVideoTexture* MythOpenGLTonemap::Map(std::vector<MythVideoTexture *> &Inputs, QSize DisplaySize)
 {
     size_t size = Inputs.size();
     if (!size || !m_render || !m_extra)
@@ -100,6 +100,7 @@ MythVideoTexture* MythOpenGLTonemap::Map(vector<MythVideoTexture *> &Inputs, QSi
             return nullptr;
         }
         m_render->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_storageBuffer);
+        // Data structure passed to kernel. NOLINTNEXTLINE(modernize-avoid-c-arrays)
         struct dummy { float a[2] {0.0F}; uint32_t b {0}; uint32_t c {0}; uint32_t d {0}; } buffer;
         m_render->glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(dummy), &buffer, GL_STREAM_COPY);
         m_render->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -166,6 +167,9 @@ bool MythOpenGLTonemap::CreateTexture(QSize Size)
         return false;
 
     m_texture = new MythVideoTexture(textureid);
+    if (!m_texture)
+        return false;
+
     m_texture->m_frameType   = FMT_RGBA32;
     m_texture->m_frameFormat = FMT_RGBA32;
     m_texture->m_target      = QOpenGLTexture::Target2D;
@@ -176,5 +180,5 @@ bool MythOpenGLTonemap::CreateTexture(QSize Size)
     m_extra->glTexStorage2D(m_texture->m_target, 1, QOpenGLTexture::RGBA16F,
                             static_cast<GLsizei>(Size.width()), static_cast<GLsizei>(Size.height()));
     m_render->SetTextureFilters(m_texture, QOpenGLTexture::Linear);
-    return m_texture != nullptr;
+    return true;
 }

@@ -649,8 +649,8 @@ void EditMetadataDialog::searchGenre()
     // load genre list
     /*
     searchList.clear();
-    for (int x = 0; x < genre_table_size; x++)
-        searchList.push_back(QString(genre_table[x]));
+    for (const auto &genre : genre_table)
+        searchList.push_back(QString::fromStdString(genre));
     searchList.sort();
     */
 
@@ -1356,7 +1356,8 @@ void EditAlbumartDialog::doCopyImageToTag(const AlbumArtImage *image)
     while (copyThread->isRunning())
     {
         qApp->processEvents();
-        usleep(1000);
+        const struct timespec onems {0, 1000000};
+        nanosleep(&onems, nullptr);
     }
 
     strList = copyThread->getResult();

@@ -3,8 +3,6 @@
 #include <cmath>
 #include <limits>
 
-using namespace std;
-
 // POSIX headers
 #include <unistd.h>
 #include <sys/time.h>
@@ -31,9 +29,12 @@ using namespace std;
 
 #define LOC QString("AOBase: ")
 
-#define WPOS (m_audioBuffer + org_waud)
-#define RPOS (m_audioBuffer + m_raud)
-#define ABUF m_audioBuffer
+// Replacing "m_audioBuffer + org_waud" with
+// "&m_audioBuffer[org_waud]" should provide bounds
+// checking with c++17 arrays.
+#define WPOS (&m_audioBuffer[org_waud])
+#define RPOS (&m_audioBuffer[m_raud])
+#define ABUF (&m_audioBuffer[0])
 #define STST soundtouch::SAMPLETYPE
 #define AOALIGN(x) (((long)&(x) + 15) & ~0xf);
 
@@ -61,7 +62,7 @@ AudioOutputBase::AudioOutputBase(const AudioSettings &settings) :
     m_source(settings.m_source),
     m_setInitialVol(settings.m_setInitialVol)
 {
-    m_srcIn = m_srcInBuf;
+    m_srcIn = m_srcInBuf.data();
 
     if (m_mainDevice.startsWith("AudioTrack:"))
         m_usesSpdif = false;
@@ -131,7 +132,7 @@ void AudioOutputBase::InitSettings(const AudioSettings &settings)
     m_outputSettings = GetOutputSettingsUsers(false);
     m_outputSettingsDigital = GetOutputSettingsUsers(true);
 
-    m_maxChannels = max(m_outputSettings->BestSupportedChannels(),
+    m_maxChannels = std::max(m_outputSettings->BestSupportedChannels(),
                        m_outputSettingsDigital->BestSupportedChannels());
     m_configuredChannels = m_maxChannels;
 
@@ -516,8 +517,8 @@ void AudioOutputBase::Reconfigure(const AudioSettings &orig_settings)
         // Make sure we never attempt to output more than what we can
         // the upmixer can only upmix to 6 channels when source < 6
         if (lsource_channels <= 6)
-            lconfigured_channels = min(lconfigured_channels, 6);
-        lconfigured_channels = min(lconfigured_channels, m_maxChannels);
+            lconfigured_channels = std::min(lconfigured_channels, 6);
+        lconfigured_channels = std::min(lconfigured_channels, m_maxChannels);
         /* Encode to AC-3 if we're allowed to passthru but aren't currently
            and we have more than 2 channels but multichannel PCM is not
            supported or if the device just doesn't support the number of
@@ -926,7 +927,7 @@ void AudioOutputBase::Reset()
     if (m_encoder)
     {
         m_waud = m_raud = 0;    // empty ring buffer
-        memset(m_audioBuffer, 0, kAudioRingBufferSize);
+        m_audioBuffer.fill(0);
     }
     else
     {
@@ -1398,7 +1399,7 @@ bool AudioOutputBase::AddData(void *in_buffer, int in_len,
         }
 
         // Final float conversion space requirement
-        len = sizeof(*m_srcInBuf) / sampleSize * len;
+        len = sizeof(m_srcInBuf[0]) / sampleSize * len;
 
         // Account for changes in number of channels
         if (m_needsDownmix)
@@ -1729,7 +1730,7 @@ int AudioOutputBase::GetAudioData(uchar *buffer, int size, bool full_buffer,
                                   volatile uint *local_raud)
 {
 
-#define LRPOS (m_audioBuffer + *local_raud)
+#define LRPOS (&m_audioBuffer[*local_raud])
     // re-check audioready() in case things changed.
     // for example, ClearAfterSeek() might have run
     int avail_size   = audioready();
@@ -1837,7 +1838,7 @@ void AudioOutputBase::run(void)
     RunEpilog();
 }
 
-int AudioOutputBase::readOutputData(unsigned char* /*read_buffer*/, int /*max_length*/)
+int AudioOutputBase::readOutputData(unsigned char* /*read_buffer*/, size_t /*max_length*/)
 {
     VBERROR("AudioOutputBase should not be getting asked to readOutputData()");
     return 0;

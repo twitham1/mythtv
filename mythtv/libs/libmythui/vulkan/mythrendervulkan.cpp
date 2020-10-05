@@ -5,6 +5,7 @@
 #include "mythlogging.h"
 #include "mythimage.h"
 #include "mythmainwindow.h"
+#include "vulkan/mythdebugvulkan.h"
 #include "vulkan/mythwindowvulkan.h"
 #include "vulkan/mythshadervulkan.h"
 #include "vulkan/mythtexturevulkan.h"
@@ -12,13 +13,76 @@
 
 #define LOC QString("VulkanRender: ")
 
-MythVulkanObject::MythVulkanObject(MythRenderVulkan *Render, VkDevice Device, QVulkanDeviceFunctions* Functions)
-  : m_render(Render),
-    m_device(Device),
-    m_devFuncs(Functions)
+MythVulkanObject* MythVulkanObject::Create(MythRenderVulkan* Render)
 {
-    if (!(Render && Device && Functions))
+    MythVulkanObject* result = nullptr;
+    result = new MythVulkanObject(Render);
+    if (result && !result->IsValidVulkan())
+    {
+        delete result;
+        result = nullptr;
+    }
+    return result;
+}
+
+MythVulkanObject::MythVulkanObject(MythRenderVulkan* Render)
+  : m_vulkanRender(Render)
+{
+    if (m_vulkanRender)
+    {
+        m_vulkanWindow = m_vulkanRender->GetVulkanWindow();
+        if (m_vulkanWindow)
+        {
+            m_vulkanDevice = m_vulkanWindow->device();
+            if (m_vulkanDevice)
+                m_vulkanFuncs = m_vulkanWindow->vulkanInstance()->deviceFunctions(m_vulkanDevice);
+        }
+    }
+
+    CheckValid();
+}
+
+MythVulkanObject::MythVulkanObject(MythVulkanObject* Other)
+  : m_vulkanRender(Other ? Other->Render() : nullptr),
+    m_vulkanDevice(Other ? Other->Device() : nullptr),
+    m_vulkanFuncs(Other  ? Other->Funcs()  : nullptr),
+    m_vulkanWindow(Other ? Other->Window() : nullptr)
+{
+    CheckValid();
+}
+
+void MythVulkanObject::CheckValid()
+{
+    if (!(m_vulkanRender && m_vulkanDevice && m_vulkanFuncs && m_vulkanWindow))
+    {
+        m_vulkanValid = false;
         LOG(VB_GENERAL, LOG_ERR, "VulkanBase: Invalid Myth vulkan object");
+    }
+}
+
+bool MythVulkanObject::IsValidVulkan()
+{
+    return m_vulkanValid;
+}
+
+MythRenderVulkan* MythVulkanObject::Render()
+{
+    return m_vulkanRender;
+}
+
+VkDevice MythVulkanObject::Device()
+{
+    return m_vulkanDevice;
+}
+
+QVulkanDeviceFunctions* MythVulkanObject::Funcs()
+{
+    return m_vulkanFuncs;
+}
+
+MythWindowVulkan* MythVulkanObject::Window()
+{
+    return m_vulkanWindow;
 }
 
 MythRenderVulkan* MythRenderVulkan::GetVulkanRender(void)
@@ -49,14 +113,9 @@ MythRenderVulkan::MythRenderVulkan()
 MythRenderVulkan::~MythRenderVulkan()
 {
 #ifdef USING_GLSLANG
-    MythShaderVulkan::InitGLSLang(false);
+    MythShaderVulkan::InitGLSLang(true);
 #endif
     LOG(VB_GENERAL, LOG_INFO, LOC + "Destroyed");
-}
-
-bool MythRenderVulkan::Init(void)
-{
-    return true;
 }
 
 void MythRenderVulkan::SetVulkanWindow(MythWindowVulkan *VulkanWindow)
@@ -86,6 +145,17 @@ void MythRenderVulkan::initResources(void)
     {
         s_debugged = true;
         DebugVulkan();
+    }
+
+    // retrieve physical device features and limits
+    m_window->vulkanInstance()->functions()
+            ->vkGetPhysicalDeviceFeatures(m_window->physicalDevice(), &m_phyDevFeatures);
+    m_phyDevLimits = m_window->physicalDeviceProperties()->limits;
+
+    if (VERBOSE_LEVEL_CHECK(VB_GPU, LOG_INFO))
+    {
+        MythVulkanObject temp(this);
+        m_debugMarker = MythDebugVulkan::Create(&temp);
     }
 }
 
@@ -199,13 +269,18 @@ void MythRenderVulkan::releaseSwapChainResources(void)
 
 void MythRenderVulkan::releaseResources(void)
 {
+    delete m_debugMarker;
+
     LOG(VB_GENERAL, LOG_INFO, LOC + __FUNCTION__);
     emit DoFreeResources();
     m_devFuncs      = nullptr;
     m_funcs         = nullptr;
     m_device        = nullptr;
+    m_debugMarker   = nullptr;
     m_frameStarted  = false;
     m_frameExpected = false;
+    m_phyDevLimits  = { };
+    m_phyDevFeatures = { };
 }
 
 void MythRenderVulkan::physicalDeviceLost(void)
@@ -258,8 +333,7 @@ void MythRenderVulkan::BeginFrame(void)
     // clear the framebuffer
     VkClearColorValue clearColor = {{ 0.0F, 0.0F, 0.0F, 1.0F }};
     VkClearDepthStencilValue clearDS = { 1.0F, 0 };
-    VkClearValue clearValues[2];
-    memset(clearValues, 0, sizeof(clearValues));
+    std::array<VkClearValue,2> clearValues {};
     clearValues[0].color        = clearColor;
     clearValues[1].depthStencil = clearDS;
 
@@ -272,7 +346,7 @@ void MythRenderVulkan::BeginFrame(void)
     rpBeginInfo.renderPass       = m_window->defaultRenderPass();
     rpBeginInfo.framebuffer      = m_window->currentFramebuffer();
     rpBeginInfo.clearValueCount  = 2;
-    rpBeginInfo.pClearValues     = clearValues;
+    rpBeginInfo.pClearValues     = clearValues.data();
     rpBeginInfo.renderArea.extent.width = static_cast<uint32_t>(size.width());
     rpBeginInfo.renderArea.extent.height = static_cast<uint32_t>(size.height());
     m_devFuncs->vkCmdBeginRenderPass(commandbuffer, &rpBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -418,7 +492,7 @@ bool MythRenderVulkan::CreateBuffer(VkDeviceSize          Size,
 
 VkSampler MythRenderVulkan::CreateSampler(VkFilter Min, VkFilter Mag)
 {
-    VkSampler result = nullptr;
+    VkSampler result = MYTH_NULL_DISPATCH;
     VkSamplerCreateInfo samplerinfo { };
     memset(&samplerinfo, 0, sizeof(samplerinfo));
     samplerinfo.sType            = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -439,6 +513,28 @@ VkSampler MythRenderVulkan::CreateSampler(VkFilter Min, VkFilter Mag)
     return result;
 }
 
+VkPhysicalDeviceFeatures MythRenderVulkan::GetPhysicalDeviceFeatures() const
+{
+    return m_phyDevFeatures;
+}
+
+VkPhysicalDeviceLimits MythRenderVulkan::GetPhysicalDeviceLimits() const
+{
+    return m_phyDevLimits;
+}
+
+void MythRenderVulkan::BeginDebugRegion(VkCommandBuffer CommandBuffer, const char *Name,
+                                        const MythVulkan4F &Color)
+{
+    if (m_debugMarker && CommandBuffer)
+        m_debugMarker->BeginRegion(CommandBuffer, Name, Color);
+}
+
+void MythRenderVulkan::EndDebugRegion(VkCommandBuffer CommandBuffer)
+{
+    if (m_debugMarker && CommandBuffer)
+        m_debugMarker->EndRegion(CommandBuffer);
+}
 
 bool MythRenderVulkan::CreateImage(QSize             Size,
                                    VkFormat          Format,
@@ -535,23 +631,25 @@ void MythRenderVulkan::FinishSingleUseCommandBuffer(VkCommandBuffer &Buffer)
     submitinfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitinfo.commandBufferCount = 1;
     submitinfo.pCommandBuffers = &Buffer;
-    m_devFuncs->vkQueueSubmit(m_window->graphicsQueue(), 1, &submitinfo, VK_NULL_HANDLE);
+    m_devFuncs->vkQueueSubmit(m_window->graphicsQueue(), 1, &submitinfo, MYTH_NULL_DISPATCH);
     m_devFuncs->vkQueueWaitIdle(m_window->graphicsQueue());
     m_devFuncs->vkFreeCommandBuffers(m_device, m_window->graphicsCommandPool(), 1, &Buffer);
 }
 
-VkPipeline MythRenderVulkan::CreatePipeline(MythShaderVulkan *Shader, VkPipelineLayout Layout, const QRect &Viewport)
+VkPipeline MythRenderVulkan::CreatePipeline(MythShaderVulkan* Shader,
+                                            const QRect& Viewport,
+                                            std::vector<VkDynamicState> Dynamic)
 {
-    if (!(Shader && Layout && Viewport.isValid()))
-        return nullptr;
+    if (!(Shader && Viewport.isValid()))
+        return MYTH_NULL_DISPATCH;
 
     // shaders
     const auto & shaderstages = Shader->Stages();
 
-    // primitives - triangle strip as for OpenGL
+    // primitives
     VkPipelineInputAssemblyStateCreateInfo inputassembly { };
     inputassembly.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputassembly.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    inputassembly.topology               = Shader->GetTopology();
     inputassembly.primitiveRestartEnable = VK_FALSE;
 
     // viewport - N.B. static
@@ -575,20 +673,24 @@ VkPipeline MythRenderVulkan::CreatePipeline(MythShaderVulkan *Shader, VkPipeline
     viewportstate.pScissors     = &scissor;
 
     // Vertex input - from the shader
-    //const auto & vertexattribs = Shader->GetVertexAttributes();
-    //VkPipelineVertexInputStateCreateInfo vertexinput { };
-    //vertexinput.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    //vertexinput.vertexBindingDescriptionCount   = 1;
-    //vertexinput.pVertexBindingDescriptions      = &Shader->GetVertexBindingDesc();
-    //vertexinput.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexattribs.size());
-    //vertexinput.pVertexAttributeDescriptions    = vertexattribs.data();
-
     VkPipelineVertexInputStateCreateInfo vertexinput { };
-    vertexinput.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexinput.vertexBindingDescriptionCount   = 0;
-    vertexinput.pVertexBindingDescriptions      = nullptr;
-    vertexinput.vertexAttributeDescriptionCount = 0;
-    vertexinput.pVertexAttributeDescriptions    = nullptr;
+    const auto & vertexattribs = Shader->GetVertexAttributes();
+    if (vertexattribs.empty())
+    {
+        vertexinput.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexinput.vertexBindingDescriptionCount   = 0;
+        vertexinput.pVertexBindingDescriptions      = nullptr;
+        vertexinput.vertexAttributeDescriptionCount = 0;
+        vertexinput.pVertexAttributeDescriptions    = nullptr;
+    }
+    else
+    {
+        vertexinput.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexinput.vertexBindingDescriptionCount   = 1;
+        vertexinput.pVertexBindingDescriptions      = &Shader->GetVertexBindingDesc();
+        vertexinput.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexattribs.size());
+        vertexinput.pVertexAttributeDescriptions    = vertexattribs.data();
+    }
 
     // multisampling - no thanks
     VkPipelineMultisampleStateCreateInfo multisampling { };
@@ -645,6 +747,12 @@ VkPipeline MythRenderVulkan::CreatePipeline(MythShaderVulkan *Shader, VkPipeline
     depthstencil.minDepthBounds        = 0.0F;
     depthstencil.maxDepthBounds        = 1.0F;
 
+    // setup dynamic state
+    VkPipelineDynamicStateCreateInfo dynamic { };
+    dynamic.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamic.dynamicStateCount = Dynamic.empty() ? 0 : static_cast<uint32_t>(Dynamic.size());
+    dynamic.pDynamicStates    = Dynamic.empty() ? nullptr : Dynamic.data();
+
     // and breathe
     VkGraphicsPipelineCreateInfo pipelinecreate { };
     pipelinecreate.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -660,17 +768,17 @@ VkPipeline MythRenderVulkan::CreatePipeline(MythShaderVulkan *Shader, VkPipeline
     pipelinecreate.pMultisampleState   = &multisampling;
     pipelinecreate.pDepthStencilState  = &depthstencil;
     pipelinecreate.pColorBlendState    = &colorBlending;
-    pipelinecreate.pDynamicState       = nullptr;
-    pipelinecreate.layout              = Layout;
+    pipelinecreate.pDynamicState       = &dynamic;
+    pipelinecreate.layout              = Shader->GetPipelineLayout();
     pipelinecreate.renderPass          = m_window->defaultRenderPass();
     pipelinecreate.subpass             = 0;
-    pipelinecreate.basePipelineHandle  = nullptr;
+    pipelinecreate.basePipelineHandle  = MYTH_NULL_DISPATCH;
     pipelinecreate.basePipelineIndex   = 0;
 
-    VkPipeline result = nullptr;
-    if (m_devFuncs->vkCreateGraphicsPipelines(m_device, nullptr, 1, &pipelinecreate, nullptr, &result) == VK_SUCCESS)
+    VkPipeline result = MYTH_NULL_DISPATCH;
+    if (m_devFuncs->vkCreateGraphicsPipelines(m_device, MYTH_NULL_DISPATCH, 1, &pipelinecreate, nullptr, &result) == VK_SUCCESS)
         return result;
 
     LOG(VB_GENERAL, LOG_ERR, LOC + "Failed to create graphics pipeline");
-    return nullptr;
+    return MYTH_NULL_DISPATCH;
 }

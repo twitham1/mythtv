@@ -460,11 +460,10 @@ UnZip::ErrorCode UnZip::extractFile(const QString& filename, QIODevice* dev, Ext
 UnZip::ErrorCode UnZip::extractFiles(const QStringList& filenames, const QString& dirname, ExtractionOptions options)
 {
 	QDir dir(dirname);
-	ErrorCode ec = Ok;
 
 	for (QStringList::ConstIterator itr = filenames.constBegin(); itr != filenames.constEnd(); ++itr)
 	{
-		ec = extractFile(*itr, dir, options);
+		ErrorCode ec = extractFile(*itr, dir, options);
 		if (ec == FileNotFound)
 			continue;
 		if (ec != Ok)
@@ -480,11 +479,10 @@ UnZip::ErrorCode UnZip::extractFiles(const QStringList& filenames, const QString
  */
 UnZip::ErrorCode UnZip::extractFiles(const QStringList& filenames, const QDir& dir, ExtractionOptions options)
 {
-	ErrorCode ec = Ok;
 
 	for (QStringList::ConstIterator itr = filenames.constBegin(); itr != filenames.constEnd(); ++itr)
 	{
-		ec = extractFile(*itr, dir, options);
+		ErrorCode ec = extractFile(*itr, dir, options);
 		if (ec == FileNotFound)
 			continue;
 		if (ec != Ok)
@@ -544,9 +542,7 @@ UnZip::ErrorCode UnzipPrivate::openArchive(QIODevice* dev)
 		return UnZip::OpenFailed;
 	}
 
-	UnZip::ErrorCode ec = UnZip::Ok;
-
-	ec = seekToCentralDirectory();
+	UnZip::ErrorCode ec = seekToCentralDirectory();
 	if (ec != UnZip::Ok)
 	{
 		closeArchive();
@@ -559,9 +555,7 @@ UnZip::ErrorCode UnzipPrivate::openArchive(QIODevice* dev)
 		return UnZip::Ok;
 	}
 
-	bool continueParsing = true;
-
-	while (continueParsing)
+	while (true)
 	{
 		if (device->read(buffer1, 4) != 4)
 			UNZIP_CHECK_FOR_VALID_DATA
@@ -625,10 +619,7 @@ UnZip::ErrorCode UnzipPrivate::parseLocalHeaderRecord(const QString& path, ZipEn
 	*/
 	bool hasDataDescriptor = entry.hasDataDescriptor();
 
-	bool checkFailed = false;
-
-	if (!checkFailed)
-		checkFailed = entry.compMethod != getUShort(uBuffer, UNZIP_LH_OFF_CMETHOD);
+	bool checkFailed = entry.compMethod != getUShort(uBuffer, UNZIP_LH_OFF_CMETHOD);
 	if (!checkFailed)
 		checkFailed = entry.gpFlag[0] != uBuffer[UNZIP_LH_OFF_GPFLAG];
 	if (!checkFailed)
@@ -1084,7 +1075,7 @@ UnZip::ErrorCode UnzipPrivate::extractFile(const QString& path, ZipEntryP& entry
 		return UnZip::SeekFailed;
 
 	// Encryption keys
-	quint32 keys[3];
+	keyset keys;
 
 	if (entry.isEncrypted())
 	{
@@ -1289,7 +1280,7 @@ int UnzipPrivate::decryptByte(quint32 key2)
 /*!
 	\internal Update the encryption keys with the next byte of plain text
  */
-void UnzipPrivate::updateKeys(quint32* keys, int c) const
+void UnzipPrivate::updateKeys(keyset keys, int c) const
 {
 	keys[0] = CRC32(keys[0], c);
 	keys[1] += keys[0] & 0xff;
@@ -1301,7 +1292,7 @@ void UnzipPrivate::updateKeys(quint32* keys, int c) const
 	\internal Initialize the encryption keys and the random header according to
 	the given password.
  */
-void UnzipPrivate::initKeys(const QString& pwd, quint32* keys) const
+void UnzipPrivate::initKeys(const QString& pwd, keyset keys) const
 {
 	keys[0] = 305419896L;
 	keys[1] = 591751049L;
@@ -1320,7 +1311,7 @@ void UnzipPrivate::initKeys(const QString& pwd, quint32* keys) const
 	The \p file parameter can be used in the user interface or for debugging purposes
 	as it is the name of the encrypted file for wich the password is being tested.
 */
-UnZip::ErrorCode UnzipPrivate::testPassword(quint32* keys, const QString& file, const ZipEntryP& header)
+UnZip::ErrorCode UnzipPrivate::testPassword(keyset keys, const QString& file, const ZipEntryP& header)
 {
 	Q_UNUSED(file);
 
@@ -1339,7 +1330,7 @@ UnZip::ErrorCode UnzipPrivate::testPassword(quint32* keys, const QString& file, 
 /*!
 	\internal Tests a set of keys on the encryption header.
 */
-bool UnzipPrivate::testKeys(const ZipEntryP& header, quint32* keys)
+bool UnzipPrivate::testKeys(const ZipEntryP& header, keyset keys)
 {
 	char lastByte = 0;
 
@@ -1358,7 +1349,7 @@ bool UnzipPrivate::testKeys(const ZipEntryP& header, quint32* keys)
 /*!
 	\internal Decrypts an array of bytes long \p read.
 */
-void UnzipPrivate::decryptBytes(quint32* keys, char* buffer, qint64 read) const
+void UnzipPrivate::decryptBytes(keyset keys, char* buffer, qint64 read) const
 {
 	for (int i=0; i<(int)read; ++i)
 		updateKeys(keys, buffer[i] ^= decryptByte(keys[2]));
@@ -1367,7 +1358,7 @@ void UnzipPrivate::decryptBytes(quint32* keys, char* buffer, qint64 read) const
 /*!
 	\internal Converts date and time values from ZIP format to a QDateTime object.
 */
-QDateTime UnzipPrivate::convertDateTime(const unsigned char date[2], const unsigned char time[2])
+QDateTime UnzipPrivate::convertDateTime(const std::array<uint8_t,2> &date, const std::array<uint8_t,2> &time)
 {
 	QDateTime dt;
 

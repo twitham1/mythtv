@@ -4,7 +4,7 @@
 // MythTV
 #include "mythplayer.h"
 #include "mythcorecontext.h"
-#include "videocolourspace.h"
+#include "mythvideocolourspace.h"
 #include "opengl/mythrenderopengl.h"
 #include "mythopenglinterop.h"
 
@@ -162,7 +162,7 @@ MythOpenGLInterop::Type MythOpenGLInterop::GetInteropType(VideoFrameType Format,
 }
 
 vector<MythVideoTexture*> MythOpenGLInterop::Retrieve(MythRenderOpenGL *Context,
-                                                      VideoColourSpace *ColourSpace,
+                                                      MythVideoColourSpace *ColourSpace,
                                                       VideoFrame       *Frame,
                                                       FrameScanType     Scan)
 {
@@ -187,19 +187,19 @@ vector<MythVideoTexture*> MythOpenGLInterop::Retrieve(MythRenderOpenGL *Context,
     {
         // Unpick
         auto* buffer = reinterpret_cast<AVBufferRef*>(Frame->priv[1]);
-        if (!buffer || (buffer && !buffer->data))
+        if (!buffer || !buffer->data)
             return result;
         if (Frame->codec == FMT_NVDEC)
         {
             auto* context = reinterpret_cast<AVHWDeviceContext*>(buffer->data);
-            if (!context || (context && !context->user_opaque))
+            if (!context || !context->user_opaque)
                 return result;
             interop = reinterpret_cast<MythOpenGLInterop*>(context->user_opaque);
         }
         else
         {
             auto* frames = reinterpret_cast<AVHWFramesContext*>(buffer->data);
-            if (!frames || (frames && !frames->user_opaque))
+            if (!frames || !frames->user_opaque)
                 return result;
             interop = reinterpret_cast<MythOpenGLInterop*>(frames->user_opaque);
         }
@@ -237,7 +237,7 @@ MythOpenGLInterop* MythOpenGLInterop::CreateDummy(void)
 }
 
 vector<MythVideoTexture*> MythOpenGLInterop::Acquire(MythRenderOpenGL* /*Context*/,
-                                                     VideoColourSpace* /*ColourSpace*/,
+                                                     MythVideoColourSpace* /*ColourSpace*/,
                                                      VideoFrame* /*Frame*/, FrameScanType /*Scan*/)
 {
     return vector<MythVideoTexture*>();

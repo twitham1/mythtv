@@ -10,22 +10,23 @@ using MythSPIRVStage  = std::pair<VkShaderStageFlags, const std::vector<uint32_t
 using MythVertexAttrs = std::vector<VkVertexInputAttributeDescription>;
 using MythSetLayout   = std::pair<int, VkDescriptorSetLayoutBinding>;
 using MythStageLayout = std::vector<MythSetLayout>;
-using MythBindingDesc = std::tuple<MythStageLayout,
+using MythBindingDesc = std::tuple<VkPrimitiveTopology,
+                                   MythStageLayout,
                                    VkVertexInputBindingDescription,
                                    MythVertexAttrs,
                                    VkPushConstantRange>;
 using MythBindingMap  = std::map<int, MythBindingDesc>;
 
-class MythShaderVulkan : protected MythVulkanObject
+class MUI_PUBLIC MythShaderVulkan : protected MythVulkanObject
 {
   public:
-    static MythShaderVulkan* Create(MythRenderVulkan* Render, VkDevice Device,
-                                    QVulkanDeviceFunctions* Functions,
+    static MythShaderVulkan* Create(MythVulkanObject* Vulkan,
                                     const std::vector<int> &Stages,
                                     const MythShaderMap *Sources = nullptr,
                                     const MythBindingMap *Bindings = nullptr);
    ~MythShaderVulkan();
 
+    VkPrimitiveTopology     GetTopology            () const;
     VkPipelineLayout        GetPipelineLayout      (void) const;
     const MythVertexAttrs&  GetVertexAttributes    (void) const;
     const VkVertexInputBindingDescription& GetVertexBindingDesc(void) const;
@@ -38,8 +39,7 @@ class MythShaderVulkan : protected MythVulkanObject
 #endif
 
   protected:
-    MythShaderVulkan(MythRenderVulkan* Render, VkDevice Device,
-                     QVulkanDeviceFunctions* Functions,
+    MythShaderVulkan(MythVulkanObject* Vulkan,
                      const std::vector<int> &Stages,
                      const MythShaderMap *Sources = nullptr,
                      const MythBindingMap *Bindings = nullptr);
@@ -51,11 +51,12 @@ class MythShaderVulkan : protected MythVulkanObject
 #endif
     bool CreateShaderFromSPIRV (const std::vector<MythSPIRVStage> &Stages);
 
-    VkVertexInputBindingDescription              m_vertexBindingDesc{};
+    VkPrimitiveTopology                          m_topology          { VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP };
+    VkVertexInputBindingDescription              m_vertexBindingDesc { };
     MythVertexAttrs                              m_vertexAttributes;
     std::vector<VkPipelineShaderStageCreateInfo> m_stages;
     std::vector<uint32_t*>                       m_spirv;
-    VkPipelineLayout                             m_pipelineLayout   { nullptr };
+    VkPipelineLayout                             m_pipelineLayout    { MYTH_NULL_DISPATCH };
 
     // these are per set
     std::vector<VkDescriptorSetLayout>           m_descriptorSetLayouts;

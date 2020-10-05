@@ -72,13 +72,13 @@ class SubtitleLoadHelper : public QRunnable
     const QString &m_fileName;
     TextSubtitles *m_target;
 
-    static QMutex                    s_lock;
-    static QWaitCondition            s_wait;
-    static QMap<TextSubtitles*,uint> s_loading;
+    static QMutex                     s_lock;
+    static QWaitCondition             s_wait;
+    static QHash<TextSubtitles*,uint> s_loading;
 };
-QMutex                    SubtitleLoadHelper::s_lock;
-QWaitCondition            SubtitleLoadHelper::s_wait;
-QMap<TextSubtitles*,uint> SubtitleLoadHelper::s_loading;
+QMutex                     SubtitleLoadHelper::s_lock;
+QWaitCondition             SubtitleLoadHelper::s_wait;
+QHash<TextSubtitles*,uint> SubtitleLoadHelper::s_loading;
 
 // Work around the fact that RemoteFile doesn't work when the target
 // file is actually local.
@@ -358,13 +358,19 @@ void TextSubtitleParser::LoadSubtitles(const QString &fileName,
     sub_data.rbuffer_text = ba.data();
     sub_data.rbuffer_len = ba.size();
 
-    subtitle_t *loaded_subs = sub_read_file(&sub_data);
-    if (!loaded_subs)
+    try
     {
-        // Don't delete[] sub_data.rbuffer_text; because the
-        // QByteArray destructor will clean up.
-        LOG(VB_VBI, LOG_ERR, QString("Failed to read subtitles from '%1'")
-            .arg(fileName));
+        if (!sub_read_file(&sub_data))
+        {
+            // Don't delete[] sub_data.rbuffer_text; because the
+            // QByteArray destructor will clean up.
+            LOG(VB_VBI, LOG_ERR, QString("Failed to read subtitles from '%1'")
+                .arg(fileName));
+            return;
+        }
+    } catch (std::exception& e) {
+        LOG(VB_VBI, LOG_ERR,
+            QString("Exception reading subtitles file (%1)").arg(e.what()));
         return;
     }
 
@@ -379,10 +385,9 @@ void TextSubtitleParser::LoadSubtitles(const QString &fileName,
     if (textCodec)
         dec.reset(textCodec->makeDecoder());
 
-    for (int sub_i = 0; sub_i < sub_data.num; ++sub_i)
+    for (const auto& sub : sub_data.subtitles)
     {
-        const subtitle_t *sub = &loaded_subs[sub_i];
-        text_subtitle_t newsub(sub->start, sub->end);
+        text_subtitle_t newsub(sub.start, sub.end);
 
         if (!target.IsFrameBasedTiming())
         {
@@ -390,24 +395,21 @@ void TextSubtitleParser::LoadSubtitles(const QString &fileName,
             newsub.m_end *= 10;
         }
 
-        for (int line = 0; line < sub->lines; ++line)
+        for (const auto & line : sub.text)
         {
-            const char *subLine = sub->text[line];
+            const char *subLine = line.c_str();
             QString str;
             if (textCodec)
                 str = dec->toUnicode(subLine, strlen(subLine));
             else
                 str = QString(subLine);
             newsub.m_textLines.push_back(str);
-
-            free(sub->text[line]);
         }
         target.AddSubtitle(newsub);
     }
 
     // textCodec object is managed by Qt, do not delete...
 
-    free(loaded_subs);
     // Don't delete[] sub_data.rbuffer_text; because the QByteArray
     // destructor will clean up.
 

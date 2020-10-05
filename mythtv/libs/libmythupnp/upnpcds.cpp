@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-using namespace std;
 
 #include "upnp.h"
 #include "upnpcds.h"
@@ -277,7 +276,7 @@ bool UPnpCDS::ProcessRequest( HTTPRequest *pRequest )
     return false;
 }
 
-static UPnpCDSClientException clientExceptions[] = {
+static const std::array<const UPnpCDSClientException,5> clientExceptions {{
     // Windows Media Player version 12
     { CDS_ClientWMP, 
       "User-Agent",
@@ -298,63 +297,58 @@ static UPnpCDSClientException clientExceptions[] = {
     { CDS_ClientSonyDB,
       "X-AV-Client-Info",
       R"(cn="Sony Corporation"; mn="Blu-ray Disc Player")" },
-};
-static uint clientExceptionCount = sizeof(clientExceptions) /
-                                   sizeof(clientExceptions[0]);
+}};
 
 void UPnpCDS::DetermineClient( HTTPRequest *pRequest,
                                UPnpCDSRequest *pCDSRequest )
 {
     pCDSRequest->m_eClient = CDS_ClientDefault;
     pCDSRequest->m_nClientVersion = 0;
-    bool found = false;
 
     // Do we know this client string?
-    for ( uint i = 0; !found && i < clientExceptionCount; i++ )
+    for ( const auto & except : clientExceptions )
     {
-        UPnpCDSClientException *except = &clientExceptions[i];
+        QString sHeaderValue = pRequest->GetRequestHeader(except.sHeaderKey, "");
+        int idx = sHeaderValue.indexOf(except.sHeaderValue);
+        if (idx == -1)
+            continue;
 
-        QString sHeaderValue = pRequest->GetRequestHeader(except->sHeaderKey, "");
-        int idx = sHeaderValue.indexOf(except->sHeaderValue);
+        pCDSRequest->m_eClient = except.nClientType;
+
+        idx += except.sHeaderValue.length();
+ 
+        // If we have a / at the end of the string then we
+        // increment the string to skip over it
+        if ( sHeaderValue[idx] == '/')
+        {
+            idx++;
+        }
+
+        // Now find the version number
+        QString version = sHeaderValue.mid(idx).trimmed();
+        idx = version.indexOf( '.' );
         if (idx != -1)
         {
-            pCDSRequest->m_eClient = except->nClientType;
-
-            idx += except->sHeaderValue.length();
- 
-            // If we have a / at the end of the string then we 
-            // increment the string to skip over it
-            if ( sHeaderValue[idx] == '/')
-            {
-                idx++;
-            }
-
-            // Now find the version number
-            QString version = sHeaderValue.mid(idx).trimmed();
-            idx = version.indexOf( '.' );
-            if (idx != -1)
-            {
-                idx = version.indexOf( '.', idx + 1 );
-            }
-            if (idx != -1)
-            {
-                version = version.left( idx );
-            }
-            idx = version.indexOf( ' ' );
-            if (idx != -1)
-            {
-                version = version.left( idx );
-            }
-
-            pCDSRequest->m_nClientVersion = version.toDouble();
-
-            LOG(VB_UPNP, LOG_INFO,
-                QString("DetermineClient %1:%2 Identified as %3 version %4")
-                    .arg(except->sHeaderKey) .arg(sHeaderValue)
-                    .arg(pCDSRequest->m_eClient)
-                    .arg(pCDSRequest->m_nClientVersion));
-            found = true;
+            idx = version.indexOf( '.', idx + 1 );
         }
+        if (idx != -1)
+        {
+            version = version.left( idx );
+        }
+        idx = version.indexOf( ' ' );
+        if (idx != -1)
+        {
+            version = version.left( idx );
+        }
+
+        pCDSRequest->m_nClientVersion = version.toDouble();
+
+        LOG(VB_UPNP, LOG_INFO,
+            QString("DetermineClient %1:%2 Identified as %3 version %4")
+                .arg(except.sHeaderKey) .arg(sHeaderValue)
+                .arg(pCDSRequest->m_eClient)
+                .arg(pCDSRequest->m_nClientVersion));
+        break;
     }
 }
 
@@ -569,15 +563,14 @@ void UPnpCDS::HandleSearch( HTTPRequest *pRequest )
     // -=>TODO: This DOES NOT handle ('s or other complex expressions
     // ----------------------------------------------------------------------
 
-    QRegExp  rMatch( "\\b(or|and)\\b" );
-    rMatch.setCaseSensitivity(Qt::CaseInsensitive);
+    QRegularExpression re {"\\b(or|and)\\b", QRegularExpression::CaseInsensitiveOption};
 
 #if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     request.m_sSearchList  = request.m_sSearchCriteria.split(
-        rMatch, QString::SkipEmptyParts);
+        re, QString::SkipEmptyParts);
 #else
     request.m_sSearchList  = request.m_sSearchCriteria.split(
-        rMatch, Qt::SkipEmptyParts);
+        re, Qt::SkipEmptyParts);
 #endif
     request.m_sSearchClass = "object";  // Default to all objects.
 

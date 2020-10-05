@@ -1,5 +1,4 @@
 #include <algorithm>
-using namespace std;
 
 #include <QCoreApplication>
 #include <QStringList>
@@ -21,7 +20,7 @@ using namespace std;
 #include "remoteutil.h"
 #include "mythevent.h"
 #include "mythdirs.h"
-#include "compat.h" // for random()
+#include "mythmiscutil.h"
 
 #define LOC      QString("PlaybackBoxHelper: ")
 #define LOC_WARN QString("PlaybackBoxHelper Warning: ")
@@ -247,8 +246,8 @@ bool PBHEventHandler::event(QEvent *e)
             const QString& token = me->ExtraData(0);
             bool check_avail = (bool) me->ExtraData(1).toInt();
             QStringList list = me->ExtraDataList();
-            QStringList::const_iterator it = list.begin()+2;
-            ProgramInfo evinfo(it, list.end());
+            QStringList::const_iterator it = list.cbegin()+2;
+            ProgramInfo evinfo(it, list.cend());
             if (!evinfo.HasPathname())
                 return true;
 
@@ -447,9 +446,9 @@ QString PlaybackBoxHelper::LocateArtwork(
     QMutexLocker locker(&m_lock);
 
     InfoMap::const_iterator it =
-        m_artworkCache.find(cacheKey);
+        m_artworkCache.constFind(cacheKey);
 
-    if (it != m_artworkCache.end())
+    if (it != m_artworkCache.constEnd())
         return *it;
 
     QStringList list(inetref);
@@ -473,7 +472,7 @@ QString PlaybackBoxHelper::GetPreviewImage(
         return QString();
 
     QString token = QString("%1:%2")
-        .arg(pginfo.MakeUniqueKey()).arg(random());
+        .arg(pginfo.MakeUniqueKey()).arg(MythRandom());
 
     QStringList extra(token);
     extra.push_back(check_availability?"1":"0");

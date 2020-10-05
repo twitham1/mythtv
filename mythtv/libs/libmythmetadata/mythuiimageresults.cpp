@@ -47,10 +47,8 @@ bool ImageSearchResultsDialog::Create()
         return false;
     }
 
-    for (ArtworkList::const_iterator i = m_list.begin();
-            i != m_list.end(); ++i)
+    for (const auto & info : qAsConst(m_list))
     {
-            ArtworkInfo info = (*i);
             auto *button = new MythUIButtonListItem(m_resultsList, QString());
             button->SetText(info.label, "label");
             button->SetText(info.thumbnail, "thumbnail");
@@ -85,7 +83,7 @@ bool ImageSearchResultsDialog::Create()
                 }
             }
 
-            button->SetData(QVariant::fromValue<ArtworkInfo>(*i));
+            button->SetData(QVariant::fromValue<ArtworkInfo>(info));
         }
 
     connect(m_resultsList, SIGNAL(itemClicked(MythUIButtonListItem *)),
@@ -103,8 +101,7 @@ void ImageSearchResultsDialog::cleanCacheDir()
     QDir cacheDir(cache);
     QStringList thumbs = cacheDir.entryList(QDir::Files);
 
-    for (QStringList::const_iterator i = thumbs.end() - 1;
-            i != thumbs.begin() - 1; --i)
+    for (auto i = thumbs.crbegin(); i != thumbs.crend(); ++i)
     {
         QString filename = QString("%1/%2").arg(cache).arg(*i);
         QFileInfo fi(filename);

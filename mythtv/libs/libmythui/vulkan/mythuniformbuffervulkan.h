@@ -4,11 +4,10 @@
 // MythTV
 #include "vulkan/mythrendervulkan.h"
 
-class MythUniformBufferVulkan : protected MythVulkanObject
+class MUI_PUBLIC MythUniformBufferVulkan : protected MythVulkanObject
 {
   public:
-    static MythUniformBufferVulkan* Create(MythRenderVulkan* Render, VkDevice Device,
-                                           QVulkanDeviceFunctions* Functions, VkDeviceSize Size);
+    static MythUniformBufferVulkan* Create(MythVulkanObject* Vulkan, VkDeviceSize Size);
    ~MythUniformBufferVulkan();
 
     VkDeviceSize           Size          (void) const;
@@ -16,14 +15,13 @@ class MythUniformBufferVulkan : protected MythVulkanObject
     void                   Update        (void *Source);
 
   protected:
-    MythUniformBufferVulkan(MythRenderVulkan* Render, VkDevice Device,
-                            QVulkanDeviceFunctions* Functions, VkDeviceSize Size);
+    MythUniformBufferVulkan(MythVulkanObject* Vulkan, VkDeviceSize Size);
 
   private:
     VkDeviceSize   m_bufferSize    { 0       };
-    VkBuffer       m_buffer        { nullptr };
-    VkDeviceMemory m_bufferMemory  { nullptr };
+    VkBuffer       m_buffer        { MYTH_NULL_DISPATCH };
+    VkDeviceMemory m_bufferMemory  { MYTH_NULL_DISPATCH };
     void*          m_mappedMemory  { nullptr };
 };
 
-#endif // MYTHUNIFORMBUFFERVULKAN_H
+#endif

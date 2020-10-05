@@ -7,7 +7,6 @@
 
 // C++ headers
 #include <fstream>
-using namespace std;
 
 // Qt headers
 #include <QTextStream>
@@ -87,7 +86,7 @@ void FillData::SetRefresh(int day, bool set)
 }
 
 // XMLTV stuff
-bool FillData::GrabDataFromFile(int id, QString &filename)
+bool FillData::GrabDataFromFile(int id, const QString &filename)
 {
     ChannelInfoList chanlist;
     QMap<QString, QList<ProgInfo> > proglist;
@@ -178,8 +177,19 @@ bool FillData::GrabData(const Source& source, int offset)
     LOG(VB_XMLTV, LOG_INFO,
             "----------------- Start of XMLTV output -----------------");
 
-    uint systemcall_status = myth_system(command, kMSRunShell);
+    MythSystemLegacy run_grabber(command, kMSRunShell | kMSStdErr);
+
+    run_grabber.Run();
+    uint systemcall_status = run_grabber.Wait();
     bool succeeded = (systemcall_status == GENERIC_EXIT_OK);
+
+    QByteArray result = run_grabber.ReadAllErr();
+    QTextStream ostream(result);
+    while (!ostream.atEnd())
+        {
+            QString line = ostream.readLine().simplified();
+            LOG(VB_XMLTV, LOG_INFO, line);
+        }
 
     LOG(VB_XMLTV, LOG_INFO,
             "------------------ End of XMLTV output ------------------");
@@ -194,12 +204,14 @@ bool FillData::GrabData(const Source& source, int offset)
         {
             m_interrupted = true;
             status = QObject::tr("FAILED: XMLTV grabber ran but was interrupted.");
+            LOG(VB_GENERAL, LOG_ERR,
+                QString("XMLTV grabber ran but was interrupted."));
         }
         else
         {
             status = QObject::tr("FAILED: XMLTV grabber returned error code %1.")
                             .arg(systemcall_status);
-            LOG(VB_GENERAL, LOG_ERR, LOC +
+            LOG(VB_GENERAL, LOG_ERR,
                 QString("XMLTV grabber returned error code %1")
                     .arg(systemcall_status));
         }
@@ -426,7 +438,7 @@ bool FillData::Run(SourceList &sourcelist)
             grabdays = (m_maxDays > 0)          ? m_maxDays : grabdays;
             grabdays = (m_onlyUpdateChannels)   ? 1         : grabdays;
 
-            vector<bool> refresh_request;
+            std::vector<bool> refresh_request;
             refresh_request.resize(grabdays, m_refreshAll);
             if (!m_refreshAll)
             {
@@ -454,7 +466,6 @@ bool FillData::Run(SourceList &sourcelist)
                     qCurrentDate = newDate;
                 }
 
-                QString prevDate(qCurrentDate.addDays(i-1).toString());
                 QString currDate(qCurrentDate.addDays(i).toString());
 
                 LOG(VB_GENERAL, LOG_INFO, ""); // add a space between days

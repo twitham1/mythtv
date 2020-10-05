@@ -4,7 +4,6 @@
 #include <fcntl.h>
 #include <iostream>
 #include <memory>
-using namespace std;
 
 #include <QFile>
 #include <QFileInfo>
@@ -861,7 +860,7 @@ static void handleGalleryMedia(MythMediaDevice *dev)
 
     for (const auto *screen : qAsConst(screens))
     {
-        if (dynamic_cast<const GalleryThumbView*>(screen))
+        if (qobject_cast<const GalleryThumbView*>(screen))
         {
             // Running gallery will receive this event later
             LOG(VB_MEDIA, LOG_INFO, "Main: Ignoring new gallery media - already running");
@@ -1380,7 +1379,7 @@ static int internal_play_media(const QString &mrl, const QString &plot,
 static void gotoMainMenu(void)
 {
     // Reset the selected button to the first item.
-    auto *lmenu = dynamic_cast<MythThemedMenuState *>
+    auto *lmenu = qobject_cast<MythThemedMenuState *>
         (GetMythMainWindow()->GetMainStack()->GetTopScreen());
     if (lmenu)
         lmenu->m_buttonList->SetItemCurrent(0);
@@ -1404,7 +1403,6 @@ static bool resetTheme(QString themedir, const QString &badtheme)
 
     MythTranslation::reload();
     gCoreContext->ReInitLocale();
-    GetMythUI()->LoadQtConfig();
     GetMythMainWindow()->Init();
     GetMythMainWindow()->ReinitDone();
 
@@ -1478,7 +1476,6 @@ static int reloadTheme(void)
     MythTranslation::reload();
 
     GetMythMainWindow()->SetEffectsEnabled(false);
-    GetMythUI()->LoadQtConfig();
     if (g_menu)
         g_menu->Close();
     GetMythMainWindow()->Init();
@@ -1508,20 +1505,20 @@ static void reloadTheme_void(void)
 
 static void setDebugShowBorders(void)
 {
-    MythPainter *p = GetMythPainter();
-    p->SetDebugMode(!p->ShowBorders(), p->ShowTypeNames());
-
-    if (GetMythMainWindow()->GetMainStack()->GetTopScreen())
-        GetMythMainWindow()->GetMainStack()->GetTopScreen()->SetRedraw();
+    MythMainWindow* window = GetMythMainWindow();
+    MythPainter* painter = window->GetPainter();
+    painter->SetDebugMode(!painter->ShowBorders(), painter->ShowTypeNames());
+    if (window->GetMainStack()->GetTopScreen())
+        window->GetMainStack()->GetTopScreen()->SetRedraw();
 }
 
 static void setDebugShowNames(void)
 {
-    MythPainter *p = GetMythPainter();
-    p->SetDebugMode(p->ShowBorders(), !p->ShowTypeNames());
-
-    if (GetMythMainWindow()->GetMainStack()->GetTopScreen())
-        GetMythMainWindow()->GetMainStack()->GetTopScreen()->SetRedraw();
+    MythMainWindow* window = GetMythMainWindow();
+    MythPainter* painter = window->GetPainter();
+    painter->SetDebugMode(painter->ShowBorders(), !painter->ShowTypeNames());
+    if (window->GetMainStack()->GetTopScreen())
+        window->GetMainStack()->GetTopScreen()->SetRedraw();
 }
 
 static void InitJumpPoints(void)
@@ -1644,10 +1641,12 @@ static void InitKeys(void)
 
 static void ReloadKeys(void)
 {
-    GetMythMainWindow()->ClearKeyContext("Video");
+    MythMainWindow* mainwindow = GetMythMainWindow();
+    if (mainwindow)
+        mainwindow->ClearKeyContext("Video");
     InitKeys();
-
-    TV::ReloadKeys();
+    if (mainwindow)
+        mainwindow->ReloadKeys();
 }
 
 static void SetFuncPtrs(void)
@@ -1736,7 +1735,7 @@ static bool WasAutomaticStart(void)
         if( gCoreContext->IsMasterHost() )
         {
             QString s = gCoreContext->GetSetting("MythShutdownWakeupTime", "");
-            if (s.length())
+            if (!s.isEmpty())
                 startupTime = MythDate::fromString(s);
 
             // if we don't have a valid startup time assume we were started manually
@@ -1748,7 +1747,7 @@ static bool WasAutomaticStart(void)
                 // to record, to obtain guide data or or for a
                 // daily wakeup/shutdown period
                 if (abs(startupTime.secsTo(MythDate::current())) <
-                    max(startupSecs, 15 * 60))
+                    std::max(startupSecs, 15 * 60))
                 {
                     LOG(VB_GENERAL, LOG_INFO,
                         "Close to auto-start time, AUTO-Startup assumed");
@@ -1756,7 +1755,7 @@ static bool WasAutomaticStart(void)
                     QString str = gCoreContext->GetSetting("MythFillSuggestedRunTime");
                     QDateTime guideRunTime = MythDate::fromString(str);
                     if (guideRunTime.secsTo(MythDate::current()) <
-                        max(startupSecs, 15 * 60))
+                        std::max(startupSecs, 15 * 60))
                     {
                         LOG(VB_GENERAL, LOG_INFO,
                             "Close to MythFillDB suggested run time, AUTO-Startup to fetch guide data?");
@@ -1899,10 +1898,10 @@ int main(int argc, char **argv)
         bBypassAutoDiscovery = true;
 
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
-        cerr << "Unable to ignore SIGPIPE\n";
+        std::cerr << "Unable to ignore SIGPIPE\n";
 
     if (!cmdline.toString("geometry").isEmpty())
-        MythUIHelper::ParseGeometryOverride(cmdline.toString("geometry"));
+        MythMainWindow::ParseGeometryOverride(cmdline.toString("geometry"));
 
     fe_sd_notify("STATUS=Connecting to database.");
     gContext = new MythContext(MYTH_BINARY_VERSION, true);
@@ -2005,8 +2004,6 @@ int main(int argc, char **argv)
         return GENERIC_EXIT_NO_THEME;
     }
 
-    GetMythUI()->LoadQtConfig();
-
     themename = gCoreContext->GetSetting("Theme", DEFAULT_UI_THEME);
     themedir = GetMythUI()->FindThemeDir(themename);
     if (themedir.isEmpty())
@@ -2108,7 +2105,7 @@ int main(int argc, char **argv)
     fe_sd_notify("STATUS=Loading theme updates");
     std::unique_ptr<ThemeUpdateChecker> themeUpdateChecker;
     if (gCoreContext->GetBoolSetting("ThemeUpdateNofications", true))
-        themeUpdateChecker = make_unique<ThemeUpdateChecker>();
+        themeUpdateChecker = std::make_unique<ThemeUpdateChecker>();
 
     MythSystemEventHandler sysEventHandler {};
 

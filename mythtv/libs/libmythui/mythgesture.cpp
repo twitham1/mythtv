@@ -26,133 +26,170 @@
  * the appropriate fixes.
  */
 
+// Qt
+#include <QMetaEnum>
+
+// MythTV
 #include "mythgesture.h"
 
+// Std
 #include <array>
 #include <cmath>
 #include <algorithm>
 #include <complex>
 
-#include <QMutex>
-#include <QMap>
+QEvent::Type MythGestureEvent::kEventType = static_cast<QEvent::Type>(QEvent::registerEventType());
 
-QEvent::Type MythGestureEvent::kEventType =
-    (QEvent::Type) QEvent::registerEventType();
+/*! \class MythGestureEvent
+ * \brief A custom event that represents a mouse gesture.
+ */
 
-// Force this class to have a vtable so that dynamic_cast works.
-// NOLINTNEXTLINE(modernize-use-equals-default)
-MythGestureEvent::~MythGestureEvent()
+/*! \brief Create a MythGesture
+ * \param gesture What type of gesture was performed.
+ * \param button The button (if any) that was pressed during the gesture.
+ */
+MythGestureEvent::MythGestureEvent(Gesture gesture, Qt::MouseButton Button)
+  : QEvent(kEventType),
+    m_gesture(gesture),
+    m_button(Button)
 {
 }
 
-/**
- * @class MythGesturePrivate
- * @brief Private information used only by a stroke class.
- */
-class MythGesturePrivate {
-
-public:
-    QMutex m_m;
-    QMap <QString, MythGestureEvent::Gesture> m_sequences;
+const std::map<QString, MythGestureEvent::Gesture>MythGesture::kSequences =
+{
+    { "1",     MythGestureEvent::LongClick },
+    { "5",     MythGestureEvent::Click },
+    { "456",   MythGestureEvent::Right },
+    { "654",   MythGestureEvent::Left  },
+    { "258",   MythGestureEvent::Down  },
+    { "852",   MythGestureEvent::Up    },
+    { "951",   MythGestureEvent::UpLeft    },
+    { "753",   MythGestureEvent::UpRight   },
+    { "159",   MythGestureEvent::DownRight },
+    { "357",   MythGestureEvent::DownLeft  },
+    { "96321", MythGestureEvent::UpThenLeft    },
+    { "74123", MythGestureEvent::UpThenRight   },
+    { "36987", MythGestureEvent::DownThenLeft  },
+    { "14789", MythGestureEvent::DownThenRight },
+    { "32147", MythGestureEvent::LeftThenDown  },
+    { "98741", MythGestureEvent::LeftThenUp    },
+    { "12369", MythGestureEvent::RightThenDown },
+    { "78963", MythGestureEvent::RightThenUp   },
+    { "45654", MythGestureEvent::RightThenLeft },
+    { "65456", MythGestureEvent::LeftThenRight },
+    { "85258", MythGestureEvent::UpThenDown    },
+    { "25852", MythGestureEvent::DownThenUp    }
 };
 
-
-
-/* comments in header */
-MythGesture::MythGesture(size_t max_points, size_t min_points,
-                         size_t max_sequence, size_t scale_ratio,
-                         float bin_percent) :
-    m_maxPoints(max_points), m_minPoints(min_points), m_maxSequence(max_sequence),
-    m_scaleRatio(scale_ratio), m_binPercent(bin_percent)
+/*! \brief Get the symbolic name of the gesture.
+ * \return A string containing the symbolic name of the gesture.
+ */
+QString MythGestureEvent::GetName() const
 {
-    /* default to an invalid event */
-    m_lastGesture = MythGestureEvent::MaxGesture;
-
-    /* create new private information */
-    p = new MythGesturePrivate();
-
-    /* Click */
-    p->m_sequences.insert("5", MythGestureEvent::Click);
-
-    /* Lines */
-    p->m_sequences.insert("456", MythGestureEvent::Right);
-    p->m_sequences.insert("654", MythGestureEvent::Left);
-    p->m_sequences.insert("258", MythGestureEvent::Down);
-    p->m_sequences.insert("852", MythGestureEvent::Up);
-
-    /* Diagonals */
-    p->m_sequences.insert("951", MythGestureEvent::UpLeft);
-    p->m_sequences.insert("753", MythGestureEvent::UpRight);
-    p->m_sequences.insert("159", MythGestureEvent::DownRight);
-    p->m_sequences.insert("357", MythGestureEvent::DownLeft);
-
-    /* Double Lines*/
-    p->m_sequences.insert("96321",MythGestureEvent::UpThenLeft);
-    p->m_sequences.insert("74123",MythGestureEvent::UpThenRight);
-    p->m_sequences.insert("36987",MythGestureEvent::DownThenLeft);
-    p->m_sequences.insert("14789",MythGestureEvent::DownThenRight);
-    p->m_sequences.insert("32147",MythGestureEvent::LeftThenDown);
-    p->m_sequences.insert("98741",MythGestureEvent::LeftThenUp);
-    p->m_sequences.insert("12369",MythGestureEvent::RightThenDown);
-    p->m_sequences.insert("78963",MythGestureEvent::RightThenUp);
-    p->m_sequences.insert("45654",MythGestureEvent::RightThenLeft);
-    p->m_sequences.insert("65456",MythGestureEvent::LeftThenRight);
-    p->m_sequences.insert("85258",MythGestureEvent::UpThenDown);
-    p->m_sequences.insert("25852",MythGestureEvent::DownThenUp);
+    return QMetaEnum::fromType<Gesture>().valueToKey(m_gesture);
 }
 
-MythGesture::~MythGesture()
+QString MythGestureEvent::GetButtonName() const
 {
-    delete p;
+    return QMetaEnum::fromType<Qt::MouseButtons>().valueToKey(static_cast<int>(m_button));
 }
 
-/* comments in header */
-void MythGesture::adjustExtremes(int x, int y)
+/*! \class MythGesture
+ * \brief Contains the points in a stroke, and translates them into
+ * gestures.
+ *
+ * Because the indended use of the stop method is to be called by
+ * either the expiration of a timer or when an event is called (or
+ * both at the same time) it must have a mutex.
+ *
+ * \ingroup MythUI_Input
+ */
+
+/*! \brief Create a new stroke, specifying tuning values
+ * \param max_points The maximum number of points to record.
+ * \param min_points The minimum number of points to record.
+ * \param max_sequence The maximum producible sequence size.
+ * \param scale_ratio The stroke scale ratio
+ * \param bin_percent The bin count percentage required
+ * to add to the sequence.
+ */
+MythGesture::MythGesture(size_t MaxPoints, size_t MinPoints,
+                         size_t MaxSequence, int ScaleRatio,
+                         float BinPercent)
+  : m_maxPoints(MaxPoints),
+    m_minPoints(MinPoints),
+    m_maxSequence(MaxSequence),
+    m_scaleRatio(ScaleRatio),
+    m_binPercent(BinPercent)
 {
-    m_minX = std::min(m_minX, x);
-    m_maxX = std::max(m_maxX, x);
-    m_minY = std::min(m_minY, y);
-    m_maxY = std::max(m_maxY, y);
 }
 
-bool MythGesture::recording(void) const
+/*! \brief Adjust horizontal and vertical extremes.
+ * \param x The new horizontal extreme.
+ * \param y The new vertical extreme
+ */
+void MythGesture::AdjustExtremes(int X, int Y)
 {
-    p->m_m.lock();
+    m_minX = std::min(m_minX, X);
+    m_maxX = std::max(m_maxX, X);
+    m_minY = std::min(m_minY, Y);
+    m_maxY = std::max(m_maxY, Y);
+}
+
+/*! \brief Determine if the stroke is being recorded.
+ * \return True if recording is in progress, otherwise, false.
+ */
+bool MythGesture::Recording(void)
+{
+    m_lock.lock();
     bool temp = m_recording;
-    p->m_m.unlock();
+    m_lock.unlock();
     return temp;
 }
 
-/* comments in header */
-void MythGesture::start(void)
+/// \brief Start recording
+void MythGesture::Start(void)
 {
-    p->m_m.lock();
+    m_lock.lock();
     m_recording = true;
-    p->m_m.unlock();
+    m_lock.unlock();
 }
 
-/* comments in header */
-void MythGesture::stop(void)
+
+/*! \brief Stop recording.
+ *
+ * This method stores the gesture, as it is, and resets all information.
+ */
+void MythGesture::Stop(bool Timeout)
 {
-    p->m_m.lock();
+    m_lock.lock();
 
     if (m_recording)
     {
         m_recording = false;
 
-        /* translate before resetting maximums */
-        m_lastGesture = p->m_sequences[translate()];
+        // translate before resetting maximums
+        const QString gesture = Translate(Timeout);
+        auto found = kSequences.find(gesture);
+        if (found != kSequences.cend())
+            m_lastGesture = found->second;
+        else
+            m_lastGesture = MythGestureEvent::Unknown;
 
         m_minX = m_minY = 10000;
         m_maxX = m_maxY = -1;
     }
 
-    p->m_m.unlock();
+    m_lock.unlock();
 }
 
-MythGestureEvent *MythGesture::gesture(void) const
+
+/*! \brief Complete the gesture event of the last completed stroke.
+ * \return A new gesture event, or nullptr on error.
+ */
+MythGestureEvent *MythGesture::GetGesture(void) const
 {
-    return new MythGestureEvent(m_lastGesture);
+    return new MythGestureEvent(m_lastGesture, m_lastButton);
 }
 
 /* comments in header */
@@ -171,10 +208,15 @@ static int determineBin (const QPoint & p, int x1, int x2, int y1, int y2)
     return bin_num;
 }
 
-/* comments in header */
-QString MythGesture::translate(void)
+
+/*! \brief Translate the stroke into a sequence.
+ * \return The sequence string made by the mouse.
+ *
+ * \note The points will be removed during this method.
+ */
+QString MythGesture::Translate(bool Timeout)
 {
-    size_t total_points = m_points.count();
+    auto total_points = static_cast<size_t>(m_points.count());
 
     if (total_points > m_maxPoints)
     {
@@ -187,6 +229,8 @@ QString MythGesture::translate(void)
     if (total_points < m_minPoints)
     {
         m_points.clear();
+        if (Timeout)
+            return "1";
         return "5";
     }
 
@@ -250,7 +294,7 @@ QString MythGesture::translate(void)
             if ((bin_count > (total_points * m_binPercent)) || first_bin)
             {
                 first_bin = false;
-                sequence += '0' + prev_bin;
+                sequence += '0' + static_cast<char>(prev_bin);
                 sequence_count ++;
             }
 
@@ -261,7 +305,7 @@ QString MythGesture::translate(void)
     }
 
     /* add the last run of points to the sequence */
-    sequence += '0' + current_bin;
+    sequence += '0' + static_cast<char>(current_bin);
     sequence_count++;
 
     /* bail out on error cases */
@@ -271,22 +315,36 @@ QString MythGesture::translate(void)
     return sequence;
 }
 
-/* comments in header */
-bool MythGesture::record(const QPoint & pt)
+
+/*! \brief Determine if the stroke has the minimum required points.
+ * \return true if the gesture can be translated, otherwise, false.
+ */
+bool MythGesture::HasMinimumPoints() const
+{
+    return static_cast<size_t>(m_points.size()) >= m_minPoints;
+}
+
+/*! \brief Record a point.
+ * \param Point The point to record.
+ * \return True if the point was recorded, otherwise, false.
+ */
+bool MythGesture::Record(const QPoint& Point, Qt::MouseButton Button)
 {
     /* only record if we haven't exceeded the maximum points */
-    if (((uint)m_points.size() >= m_maxPoints) || !recording())
+    if ((static_cast<size_t>(m_points.size()) >= m_maxPoints) || !Recording())
         return false;
+
+    m_lastButton = Button;
 
     if (m_points.empty())
     {
-        m_points.push_back(pt);
+        m_points.push_back(Point);
         return true;
     }
 
     /* interpolate between last and current point */
-    int delx = pt.x() - m_points.back().x();
-    int dely = pt.y() - m_points.back().y();
+    int delx = Point.x() - m_points.back().x();
+    int dely = Point.y() - m_points.back().y();
 
     /* step by the greatest delta direction */
     if (abs(delx) > abs(dely))
@@ -296,7 +354,7 @@ bool MythGesture::record(const QPoint & pt)
         /* go from the last point to the current, whatever direction
          * it may be */
         for (int ix = m_points.back().x();
-             (delx > 0) ? (ix < pt.x()) : (ix > pt.x());
+             (delx > 0) ? (ix < Point.x()) : (ix > Point.x());
              ix += (delx > 0) ? 1 : -1)
         {
             /* step the other axis by the correct increment */
@@ -306,7 +364,7 @@ bool MythGesture::record(const QPoint & pt)
 
             /* add the interpolated point */
             m_points.push_back(QPoint(ix, iy));
-            adjustExtremes(ix, iy);
+            AdjustExtremes(ix, iy);
         }
     }
     else /* same thing, but for dely larger than delx case... */
@@ -316,7 +374,7 @@ bool MythGesture::record(const QPoint & pt)
         /* go from the last point to the current, whatever direction
            it may be */
         for (int iy = m_points.back().y();
-             (dely > 0) ? (iy < pt.y()) : (iy > pt.y());
+             (dely > 0) ? (iy < Point.y()) : (iy > Point.y());
              iy += (dely > 0) ? 1 : -1)
         {
             /* step the other axis by the correct increment */
@@ -325,45 +383,12 @@ bool MythGesture::record(const QPoint & pt)
             int ix = static_cast<int>(fx);
 
             /* add the interpolated point */
-            m_points.push_back(QPoint((int)ix, iy));
-            adjustExtremes((int)ix, iy);
+            m_points.push_back(QPoint(ix, iy));
+            AdjustExtremes(ix, iy);
         }
     }
 
-    m_points.push_back(pt);
+    m_points.push_back(Point);
 
     return true;
-}
-
-
-static const std::array<const std::string,23> gesturename {
-    "Unknown",
-    "Up",
-    "Down",
-    "Left",
-    "Right",
-    "UpLeft",
-    "UpRight",
-    "DownLeft",
-    "DownRight",
-    "UpThenLeft",
-    "UpThenRight",
-    "DownThenLeft",
-    "DownThenRight",
-    "LeftThenUp",
-    "LeftThenDown",
-    "RightThenUp",
-    "RightThenDown",
-    "RightThenLeft",
-    "LeftThenRight",
-    "UpThenDown",
-    "DownThenUp",
-    "Click",
-    "MaxGesture"
-};
-
-/* comments in header */
-MythGestureEvent::operator QString() const
-{
-    return QString::fromStdString(gesturename[m_gesture]);
 }

@@ -59,14 +59,14 @@ class MHDynamicLineArt : public MHLineArt
     void GetLineWidth(MHRoot *pResult) override // MHRoot
         { pResult->SetVariableValue(m_nLineWidth); }
     void GetLineStyle(MHRoot *pResult) override // MHRoot
-        { pResult->SetVariableValue(m_LineStyle); }
+        { pResult->SetVariableValue(m_lineStyle); }
     void GetLineColour(MHRoot *pResult) override; // MHRoot
     void GetFillColour(MHRoot *pResult) override; // MHRoot
     void DrawArcSector(bool fIsSector, int x, int y, int width, int height, int start, int arc, MHEngine *engine) override; // MHRoot
     void DrawLine(int x1, int y1, int x2, int y2, MHEngine *engine) override; // MHRoot
     void DrawOval(int x1, int y1, int width, int height, MHEngine *engine) override; // MHRoot
     void DrawRectangle(int x1, int y1, int x2, int y2, MHEngine *engine) override; // MHRoot
-    void DrawPoly(bool fIsPolygon, int nPoints, const int *xArray, const int *yArray, MHEngine *engine) override; // MHRoot
+    void DrawPoly(bool fIsPolygon, const MHPointVec& xArray, const MHPointVec& yArray, MHEngine *engine) override; // MHRoot
 
   protected:
     MHDLADisplay *m_picture {nullptr}; // The sequence of drawing actions.
@@ -152,7 +152,7 @@ class MHDrawPoly: public MHElemAction {
   protected:
     void PrintArgs(FILE *fd, int nTabs) const override; // MHElemAction
     bool m_fIsPolygon;
-    MHOwnPtrSequence<MHPointArg> m_Points; // List of points
+    MHOwnPtrSequence<MHPointArg> m_points; // List of points
 };
 
 #endif

@@ -8,12 +8,10 @@
 #include <algorithm>
 #include <utility>
 #include <vector>
-using namespace std;
 
-// QT headers
+// QT
 #include <QWaitCondition>
 #include <QApplication>
-#include <QTimer>
 #include <QHash>
 #include <QFile>
 #include <QDir>
@@ -40,7 +38,6 @@ using namespace std;
 
 // libmythui headers
 #include "myththemebase.h"
-#include "screensaver.h"
 #include "mythudplistener.h"
 #include "mythrender_base.h"
 #include "mythuistatetracker.h"
@@ -53,6 +50,7 @@ using namespace std;
 #include "mythgesture.h"
 #include "mythuihelper.h"
 #include "mythdialogbox.h"
+#include "mythscreensaver.h"
 #include "devices/mythinputdevicehandler.h"
 
 #ifdef _WIN32
@@ -121,7 +119,7 @@ void DestroyMythMainWindow(void)
 
 MythPainter *GetMythPainter(void)
 {
-    return MythMainWindow::getMainWindow()->GetCurrentPainter();
+    return MythMainWindow::getMainWindow()->GetPainter();
 }
 
 MythNotificationCenter *GetNotificationCenter(void)
@@ -135,7 +133,12 @@ MythNotificationCenter *GetNotificationCenter(void)
 MythMainWindow::MythMainWindow(const bool useDB)
   : QWidget(nullptr)
 {
-    m_display = MythDisplay::AcquireRelease();
+    m_display = MythDisplay::Create();
+
+    // Switch to desired GUI resolution
+    if (m_display->UsingVideoModes())
+        m_display->SwitchToGUI(true);
+
     m_deviceHandler = new MythInputDeviceHandler(this);
     connect(this, &MythMainWindow::signalWindowReady, m_deviceHandler, &MythInputDeviceHandler::MainWindowReady);
 
@@ -191,22 +194,28 @@ MythMainWindow::MythMainWindow(const bool useDB)
     // We need to listen for playback start/end events
     gCoreContext->addListener(this);
 
-    d->m_idleTime = gCoreContext->GetNumSetting("FrontendIdleTimeout",
-                                              STANDBY_TIMEOUT);
+    // Idle timer setup
+    m_idleTime = gCoreContext->GetNumSetting("FrontendIdleTimeout", STANDBY_TIMEOUT);
+    if (m_idleTime < 0)
+        m_idleTime = 0;
+    m_idleTimer.setInterval(1000 * 60 * m_idleTime);
+    connect(&m_idleTimer, &QTimer::timeout, this, &MythMainWindow::IdleTimeout);
+    if (m_idleTime > 0)
+        m_idleTimer.start();
 
-    if (d->m_idleTime < 0)
-        d->m_idleTime = 0;
-
-    d->m_idleTimer = new QTimer(this);
-    d->m_idleTimer->setSingleShot(false);
-    d->m_idleTimer->setInterval(1000 * 60 * d->m_idleTime);
-    connect(d->m_idleTimer, SIGNAL(timeout()), SLOT(IdleTimeout()));
-    if (d->m_idleTime > 0)
-        d->m_idleTimer->start();
+    m_screensaver = new MythScreenSaverControl(m_display);
+    if (m_screensaver)
+    {
+        connect(this, &MythMainWindow::signalRestoreScreensaver, m_screensaver, &MythScreenSaverControl::Restore);
+        connect(this, &MythMainWindow::signalDisableScreensaver, m_screensaver, &MythScreenSaverControl::Disable);
+        connect(this, &MythMainWindow::signalResetScreensaver,   m_screensaver, &MythScreenSaverControl::Reset);
+    }
 }
 
 MythMainWindow::~MythMainWindow()
 {
+    delete m_screensaver;
+
     if (gCoreContext != nullptr)
         gCoreContext->removeListener(this);
 
@@ -223,7 +232,7 @@ MythMainWindow::~MythMainWindow()
         delete stack;
     }
 
-    delete d->m_themeBase;
+    delete m_themeBase;
 
     while (!d->m_keyContexts.isEmpty())
     {
@@ -236,12 +245,21 @@ MythMainWindow::~MythMainWindow()
     delete d->m_nc;
 
     MythPainterWindow::DestroyPainters(m_painterWin, m_painter);
-    MythDisplay::AcquireRelease(false);
+
+    // N.B. we always call this to ensure the desktop mode is restored
+    // in case the setting was changed
+    m_display->SwitchToDesktop();
+    delete m_display;
 
     delete d;
 }
 
-MythPainter *MythMainWindow::GetCurrentPainter(void)
+MythDisplay* MythMainWindow::GetDisplay()
+{
+    return m_display;
+}
+
+MythPainter *MythMainWindow::GetPainter(void)
 {
     return m_painter;
 }
@@ -376,13 +394,13 @@ void MythMainWindow::drawScreen(QPaintEvent* Event)
 
     if (!m_painter->SupportsClipping())
     {
-        m_repaintRegion = m_repaintRegion.united(d->m_uiScreenRect);
+        m_repaintRegion = m_repaintRegion.united(m_uiScreenRect);
     }
     else
     {
         // Ensure that the region is not larger than the screen which
         // can happen with bad themes
-        m_repaintRegion = m_repaintRegion.intersected(d->m_uiScreenRect);
+        m_repaintRegion = m_repaintRegion.intersected(m_uiScreenRect);
 
         // Check for any widgets that have been updated since we built
         // the dirty region list in ::animate()
@@ -436,14 +454,14 @@ void MythMainWindow::Draw(MythPainter *Painter /* = nullptr */)
     Painter->Begin(m_painterWin);
 
     if (!Painter->SupportsClipping())
-        m_repaintRegion = QRegion(d->m_uiScreenRect);
+        m_repaintRegion = QRegion(m_uiScreenRect);
 
     for (const QRect& rect : m_repaintRegion)
     {
         if (rect.width() == 0 || rect.height() == 0)
             continue;
 
-        if (rect != d->m_uiScreenRect)
+        if (rect != m_uiScreenRect)
             Painter->SetClipRect(rect);
 
         // The call to GetDrawOrder can apparently alter m_stackList.
@@ -495,8 +513,8 @@ void MythMainWindow::GrabWindow(QImage &image)
         winid = 0;
     }
 
-    QScreen *screen = MythDisplay::AcquireRelease()->GetCurrentScreen();
-    MythDisplay::AcquireRelease(false);
+    MythDisplay* display = GetMythMainWindow()->GetDisplay();
+    QScreen* screen = display->GetCurrentScreen();
     if (screen)
     {
         QPixmap p = screen->grabWindow(winid);
@@ -569,6 +587,42 @@ bool MythMainWindow::ScreenShot(int w, int h, QString filename)
     return SaveScreenShot(img, std::move(filename));
 }
 
+void MythMainWindow::RestoreScreensaver()
+{
+    if (HasMythMainWindow())
+        emit GetMythMainWindow()->signalRestoreScreensaver();
+}
+
+void MythMainWindow::DisableScreensaver()
+{
+    if (HasMythMainWindow())
+        emit GetMythMainWindow()->signalDisableScreensaver();
+}
+
+void MythMainWindow::ResetScreensaver()
+{
+    if (HasMythMainWindow())
+        emit GetMythMainWindow()->signalResetScreensaver();
+}
+
+bool MythMainWindow::IsScreensaverAsleep()
+{
+    if (HasMythMainWindow())
+    {
+        MythMainWindow* window = GetMythMainWindow();
+        if (window->m_screensaver)
+            return window->m_screensaver->Asleep();
+    }
+    return false;
+}
+
+bool MythMainWindow::IsTopScreenInitialized()
+{
+    if (HasMythMainWindow())
+        return GetMythMainWindow()->GetMainStack()->GetTopScreen()->IsInitialized();
+    return false;
+}
+
 bool MythMainWindow::event(QEvent *e)
 {
     if (!updatesEnabled() && (e->type() == QEvent::UpdateRequest))
@@ -593,26 +647,28 @@ bool MythMainWindow::event(QEvent *e)
     return QWidget::event(e);
 }
 
+void MythMainWindow::LoadQtConfig()
+{
+    gCoreContext->ResetLanguage();
+    GetMythUI()->ClearThemeCacheDir();
+    QApplication::setStyle("Windows");
+}
+
 void MythMainWindow::Init(bool mayReInit)
 {
+    LoadQtConfig();
     m_display->SetWidget(nullptr);
     d->m_useDB = ! gCoreContext->GetDB()->SuppressDBMessages();
 
     if (!(mayReInit || d->m_firstinit))
         return;
 
-    d->m_doesFillScreen =
-        (GetMythDB()->GetNumSetting("GuiOffsetX") == 0 &&
-         GetMythDB()->GetNumSetting("GuiWidth")   == 0 &&
-         GetMythDB()->GetNumSetting("GuiOffsetY") == 0 &&
-         GetMythDB()->GetNumSetting("GuiHeight")  == 0);
-
     // Set window border based on fullscreen attribute
     Qt::WindowFlags flags = Qt::Window;
 
-    bool inwindow = GetMythDB()->GetBoolSetting("RunFrontendInWindow", false) &&
-                    !WindowIsAlwaysFullscreen();
-    bool fullscreen = d->m_doesFillScreen && !MythUIHelper::IsGeometryOverridden();
+    InitScreenBounds();
+    bool inwindow   = m_wantWindow && !m_qtFullScreen;
+    bool fullscreen = m_wantFullScreen && !GeometryIsOverridden();
 
     // On Compiz/Unit, when the window is fullscreen and frameless changing
     // screen position ends up stuck. Adding a border temporarily prevents this
@@ -650,27 +706,22 @@ void MythMainWindow::Init(bool mayReInit)
         setWindowState(Qt::WindowNoState);
     }
 
-    if (gCoreContext->GetBoolSetting("AlwaysOnTop", false) &&
-        !WindowIsAlwaysFullscreen())
-    {
+    if (m_alwaysOnTop && !WindowIsAlwaysFullscreen())
         flags |= Qt::WindowStaysOnTopHint;
-    }
 
     setWindowFlags(flags);
 
     // SetWidget may move the widget into a new screen.
     m_display->SetWidget(this);
     // Ensure MythUIHelper has latest screen bounds if we have moved
-    GetMythUI()->UpdateScreenSettings();
-    // And use them
-    GetMythUI()->GetScreenSettings(d->m_screenRect, d->m_wmult, d->m_hmult);
+    UpdateScreenSettings(m_display);
 
     QTimer::singleShot(1000, this, SLOT(DelayedAction()));
 
-    d->m_uiScreenRect = QRect(QPoint(0, 0), d->m_screenRect.size());
+    m_uiScreenRect = QRect(QPoint(0, 0), m_screenRect.size());
     LOG(VB_GENERAL, LOG_INFO, QString("UI Screen Resolution: %1 x %2")
-        .arg(d->m_screenRect.width()).arg(d->m_screenRect.height()));
-    MoveResize(d->m_screenRect);
+        .arg(m_screenRect.width()).arg(m_screenRect.height()));
+    MoveResize(m_screenRect);
     Show();
     // The window is sometimes not created until Show has been called - so try
     // MythDisplay::setWidget again to ensure we listen for QScreen changes
@@ -681,7 +732,7 @@ void MythMainWindow::Init(bool mayReInit)
     // Set cursor call must come after Show() to work on some systems.
     ShowMouseCursor(false);
 
-    move(d->m_screenRect.topLeft());
+    move(m_screenRect.topLeft());
 
     if (m_painterWin)
     {
@@ -712,14 +763,12 @@ void MythMainWindow::Init(bool mayReInit)
         setAutoFillBackground(false);
     }
 
-    MoveResize(d->m_screenRect);
+    MoveResize(m_screenRect);
     ShowPainterWindow();
 
     // Redraw the window now to avoid race conditions in EGLFS (Qt5.4) if a
     // 2nd window (e.g. TVPlayback) is created before this is redrawn.
-#ifdef ANDROID
-    LOG(VB_GENERAL, LOG_INFO, QString("Platform name is %1")
-        .arg(QGuiApplication::platformName()));
+#ifdef Q_OS_ANDROID
 #   define EARLY_SHOW_PLATFORM_NAME_CHECK "android"
 #else
 #   define EARLY_SHOW_PLATFORM_NAME_CHECK "egl"
@@ -731,10 +780,10 @@ void MythMainWindow::Init(bool mayReInit)
         m_painterWin->setMouseTracking(true); // Required for mouse cursor auto-hide
 
     GetMythUI()->UpdateImageCache();
-    if (d->m_themeBase)
-        d->m_themeBase->Reload();
+    if (m_themeBase)
+        m_themeBase->Reload();
     else
-        d->m_themeBase = new MythThemeBase();
+        m_themeBase = new MythThemeBase(this);
 
     if (!d->m_nc)
         d->m_nc = new MythNotificationCenter();
@@ -750,7 +799,7 @@ void MythMainWindow::Init(bool mayReInit)
 
 void MythMainWindow::DelayedAction(void)
 {
-    MoveResize(d->m_screenRect);
+    MoveResize(m_screenRect);
     Show();
 
 #ifdef Q_OS_ANDROID
@@ -930,17 +979,15 @@ void MythMainWindow::ReloadKeys()
 void MythMainWindow::ReinitDone(void)
 {
     MythPainterWindow::DestroyPainters(m_oldPainterWin, m_oldPainter);
-
     ShowPainterWindow();
-    MoveResize(d->m_screenRect);
-
+    MoveResize(m_screenRect);
     d->m_drawTimer->start(1000 / drawRefresh);
 }
 
 void MythMainWindow::Show(void)
 {
-    bool inwindow = GetMythDB()->GetBoolSetting("RunFrontendInWindow", false);
-    bool fullscreen = d->m_doesFillScreen && !MythUIHelper::IsGeometryOverridden();
+    bool inwindow = m_wantWindow && !m_qtFullScreen;
+    bool fullscreen = m_wantFullScreen && !GeometryIsOverridden();
     if (fullscreen && !inwindow && !d->m_firstinit)
         showFullScreen();
     else
@@ -958,17 +1005,6 @@ void MythMainWindow::MoveResize(QRect &Geometry)
         m_painterWin->setFixedSize(Geometry.size());
         m_painterWin->setGeometry(0, 0, Geometry.width(), Geometry.height());
     }
-}
-
-/// \brief Return true if the current platform only supports fullscreen windows
-bool MythMainWindow::WindowIsAlwaysFullscreen(void)
-{
-#ifdef Q_OS_ANDROID
-    return true;
-#else
-    // this may need to cover other platform plugins
-    return QGuiApplication::platformName().toLower().contains("eglfs");
-#endif
 }
 
 uint MythMainWindow::PushDrawDisabled(void)
@@ -1207,7 +1243,7 @@ void MythMainWindow::BindKey(const QString &context, const QString &action,
     if (!d->m_keyContexts.contains(context))
         d->m_keyContexts.insert(context, new KeyContext());
 
-    for (unsigned int i = 0; i < (uint)keyseq.count(); i++)
+    for (unsigned int i = 0; i < static_cast<uint>(keyseq.count()); i++)
     {
         int keynum = keyseq[i];
         keynum &= ~Qt::UNICODE_ACCEL;
@@ -1367,7 +1403,7 @@ void MythMainWindow::BindJump(const QString &destination, const QString &key)
 
     QKeySequence keyseq(key);
 
-    for (unsigned int i = 0; i < (uint)keyseq.count(); i++)
+    for (unsigned int i = 0; i < static_cast<uint>(keyseq.count()); i++)
     {
         int keynum = keyseq[i];
         keynum &= ~Qt::UNICODE_ACCEL;
@@ -1501,7 +1537,7 @@ bool MythMainWindow::HandleMedia(const QString &handler, const QString &mrl,
         lhandler = "Internal";
 
     // Let's see if we have a plugin that matches the handler name...
-    if (d->m_mediaPluginMap.count(lhandler))
+    if (d->m_mediaPluginMap.count(lhandler)) // clazy:exclude=isempty-vs-count
     {
         d->m_mediaPluginMap[lhandler].second(mrl, plot, title, subtitle,
                                              director, season, episode,
@@ -1526,15 +1562,13 @@ void MythMainWindow::AllowInput(bool allow)
 void MythMainWindow::mouseTimeout(void)
 {
     /* complete the stroke if its our first timeout */
-    if (d->m_gesture.recording())
-    {
-        d->m_gesture.stop();
-    }
+    if (d->m_gesture.Recording())
+        d->m_gesture.Stop(true);
 
     /* get the last gesture */
-    MythGestureEvent *e = d->m_gesture.gesture();
+    MythGestureEvent *e = d->m_gesture.GetGesture();
 
-    if (e->gesture() < MythGestureEvent::Click)
+    if (e->GetGesture() < MythGestureEvent::Click)
         QCoreApplication::postEvent(this, e);
 }
 
@@ -1712,13 +1746,13 @@ bool MythMainWindow::eventFilter(QObject * /*watched*/, QEvent *e)
         {
             ResetIdleTimer();
             ShowMouseCursor(true);
-            if (!d->m_gesture.recording())
+            if (!d->m_gesture.Recording())
             {
-                d->m_gesture.start();
+                d->m_gesture.Start();
                 auto *mouseEvent = dynamic_cast<QMouseEvent*>(e);
                 if (!mouseEvent)
                     return false;
-                d->m_gesture.record(mouseEvent->pos());
+                d->m_gesture.Record(mouseEvent->pos(), mouseEvent->button());
 
                 /* start a single shot timer */
                 d->m_gestureTimer->start(GESTURE_TIMEOUT);
@@ -1734,54 +1768,30 @@ bool MythMainWindow::eventFilter(QObject * /*watched*/, QEvent *e)
             if (d->m_gestureTimer->isActive())
                 d->m_gestureTimer->stop();
 
-            if (d->m_gesture.recording())
+            if (d->m_gesture.Recording())
             {
-                d->m_gesture.stop();
-                MythGestureEvent *ge = d->m_gesture.gesture();
+                d->m_gesture.Stop();
+                MythGestureEvent *ge = d->m_gesture.GetGesture();
 
+                QPoint point { -1, -1 };
                 auto *mouseEvent = dynamic_cast<QMouseEvent*>(e);
+                if (mouseEvent)
+                {
+                    point = mouseEvent->pos();
+                    ge->SetPosition(point);
+                }
 
                 /* handle clicks separately */
-                if (ge->gesture() == MythGestureEvent::Click)
+                if (ge->GetGesture() == MythGestureEvent::Click)
                 {
                     if (!mouseEvent)
                         return false;
 
-                    QPoint p = mouseEvent->pos();
-
-                    ge->SetPosition(p);
-
-                    MythGestureEvent::Button button = MythGestureEvent::NoButton;
-                    switch (mouseEvent->button())
-                    {
-                        case Qt::LeftButton :
-                            button = MythGestureEvent::LeftButton;
-                            break;
-                        case Qt::RightButton :
-                            button = MythGestureEvent::RightButton;
-                            break;
-                        case Qt::MidButton :
-                            button = MythGestureEvent::MiddleButton;
-                            break;
-                        case Qt::XButton1 :
-                            button = MythGestureEvent::Aux1Button;
-                            break;
-                        case Qt::XButton2 :
-                            button = MythGestureEvent::Aux2Button;
-                            break;
-                        default :
-                            button = MythGestureEvent::NoButton;
-                    }
-
-                    ge->SetButton(button);
-
-                    for (auto *it = d->m_stackList.end()-1;
-                         it != d->m_stackList.begin()-1;
-                         --it)
+                    for (auto *it = d->m_stackList.end()-1; it != d->m_stackList.begin()-1; --it)
                     {
                         MythScreenType *screen = (*it)->GetTopScreen();
 
-                        if (!screen || !screen->ContainsPoint(p))
+                        if (!screen || !screen->ContainsPoint(point))
                             continue;
 
                         if (screen->gestureEvent(ge))
@@ -1809,18 +1819,12 @@ bool MythMainWindow::eventFilter(QObject * /*watched*/, QEvent *e)
                         QCoreApplication::postEvent(this, ge);
                         return true;
                     }
-
-                    QPoint p = mouseEvent->pos();
-
-                    ge->SetPosition(p);
                     
-                    for (auto *it = d->m_stackList.end()-1;
-                         it != d->m_stackList.begin()-1;
-                         --it)
+                    for (auto *it = d->m_stackList.end()-1; it != d->m_stackList.begin()-1; --it)
                     {
                         MythScreenType *screen = (*it)->GetTopScreen();
 
-                        if (!screen || !screen->ContainsPoint(p))
+                        if (!screen || !screen->ContainsPoint(point))
                             continue;
 
                         if (screen->gestureEvent(ge))
@@ -1841,13 +1845,9 @@ bool MythMainWindow::eventFilter(QObject * /*watched*/, QEvent *e)
                     }
 
                     if (handled)
-                    {
                         delete ge;
-                    }
                     else
-                    {
                         QCoreApplication::postEvent(this, ge);
-                    }
                 }
 
                 return true;
@@ -1858,7 +1858,7 @@ bool MythMainWindow::eventFilter(QObject * /*watched*/, QEvent *e)
         {
             ResetIdleTimer();
             ShowMouseCursor(true);
-            if (d->m_gesture.recording())
+            if (d->m_gesture.Recording())
             {
                 /* reset the timer */
                 d->m_gestureTimer->stop();
@@ -1867,7 +1867,7 @@ bool MythMainWindow::eventFilter(QObject * /*watched*/, QEvent *e)
                 auto *mouseEvent = dynamic_cast<QMouseEvent*>(e);
                 if (!mouseEvent)
                     return false;
-                d->m_gesture.record(mouseEvent->pos());
+                d->m_gesture.Record(mouseEvent->pos(), mouseEvent->button());
                 return true;
             }
             break;
@@ -1925,7 +1925,8 @@ void MythMainWindow::customEvent(QEvent *ce)
             if (screen)
                 screen->gestureEvent(ge);
         }
-        LOG(VB_GUI, LOG_DEBUG, QString("Gesture: %1") .arg(QString(*ge)));
+        LOG(VB_GUI, LOG_DEBUG, QString("Gesture: %1 (Button: %2)")
+            .arg(ge->GetName()).arg(ge->GetButtonName()));
     }
     else if (ce->type() == MythEvent::kExitToMainMenuEventType &&
              d->m_exitingtomain)
@@ -1983,36 +1984,6 @@ void MythMainWindow::customEvent(QEvent *ce)
         {
             LOG(VB_GENERAL, LOG_DEBUG, QString("Media Event: %1 - %2")
                     .arg(device->getDevicePath()).arg(device->getStatus()));
-        }
-    }
-    else if (ce->type() == ScreenSaverEvent::kEventType)
-    {
-        auto *sse = dynamic_cast<ScreenSaverEvent *>(ce);
-        if (sse == nullptr)
-            return;
-        switch (sse->getSSEventType())
-        {
-            case ScreenSaverEvent::ssetDisable:
-            {
-                GetMythUI()->DoDisableScreensaver();
-                break;
-            }
-            case ScreenSaverEvent::ssetRestore:
-            {
-                GetMythUI()->DoRestoreScreensaver();
-                break;
-            }
-            case ScreenSaverEvent::ssetReset:
-            {
-                GetMythUI()->DoResetScreensaver();
-                break;
-            }
-            default:
-            {
-                LOG(VB_GENERAL, LOG_ERR,
-                        QString("Unknown ScreenSaverEvent type: %1")
-                        .arg(sse->getSSEventType()));
-            }
         }
     }
     else if (ce->type() == MythEvent::kPushDisableDrawingEventType)
@@ -2088,36 +2059,27 @@ void MythMainWindow::customEvent(QEvent *ce)
         {
             QVariantMap state;
             state.insert("state", "idle");
-            state.insert("menutheme",
-                 GetMythDB()->GetSetting("menutheme", "defaultmenu"));
+            state.insert("menutheme", GetMythDB()->GetSetting("menutheme", "defaultmenu"));
             state.insert("currentlocation", GetMythUI()->GetCurrentLocation());
             MythUIStateTracker::SetState(state);
         }
         else if (message == "CLEAR_SETTINGS_CACHE")
         {
             // update the idle time
-            d->m_idleTime = gCoreContext->GetNumSetting("FrontendIdleTimeout",
-                                                      STANDBY_TIMEOUT);
-
-            if (d->m_idleTime < 0)
-                d->m_idleTime = 0;
-
-            bool isActive = d->m_idleTimer->isActive();
-
-            if (isActive)
-                d->m_idleTimer->stop();
-
-            if (d->m_idleTime > 0)
+            m_idleTime = gCoreContext->GetNumSetting("FrontendIdleTimeout", STANDBY_TIMEOUT);
+            if (m_idleTime < 0)
+                m_idleTime = 0;
+            m_idleTimer.stop();
+            if (m_idleTime > 0)
             {
-                d->m_idleTimer->setInterval(1000 * 60 * d->m_idleTime);
-
-                if (isActive)
-                    d->m_idleTimer->start();
-
-                LOG(VB_GENERAL, LOG_INFO, QString("Updating the frontend idle time to: %1 mins").arg(d->m_idleTime));
+                m_idleTimer.setInterval(1000 * 60 * m_idleTime);
+                m_idleTimer.start();
+                LOG(VB_GENERAL, LOG_INFO, QString("Updating the frontend idle time to: %1 mins").arg(m_idleTime));
             }
             else
+            {
                 LOG(VB_GENERAL, LOG_INFO, "Frontend idle timeout is disabled");
+            }
         }
         else if (message == "NOTIFICATION")
         {
@@ -2175,90 +2137,6 @@ QObject *MythMainWindow::getTarget(QKeyEvent &key)
     return key_target;
 }
 
-int MythMainWindow::NormalizeFontSize(int pointSize)
-{
-    float floatSize = pointSize;
-    float desired = 100.0;
-
-#ifdef _WIN32
-    // logicalDpiY not supported in Windows.
-    int logicalDpiY = 100;
-    HDC hdc = GetDC(nullptr);
-    if (hdc)
-    {
-        logicalDpiY = GetDeviceCaps(hdc, LOGPIXELSY);
-        ReleaseDC(nullptr, hdc);
-    }
-#else
-    int logicalDpiY = this->logicalDpiY();
-#endif
-
-    // adjust for screen resolution relative to 100 dpi
-    floatSize = floatSize * desired / logicalDpiY;
-    // adjust for myth GUI size relative to 800x600
-    floatSize = floatSize * d->m_hmult;
-    // round to the nearest point size
-    pointSize = lroundf(floatSize);
-
-    return pointSize;
-}
-
-MythRect MythMainWindow::NormRect(const MythRect &rect)
-{
-    MythRect ret;
-    ret.setWidth((int)(rect.width() * d->m_wmult));
-    ret.setHeight((int)(rect.height() * d->m_hmult));
-    ret.moveTopLeft(QPoint((int)(rect.x() * d->m_wmult),
-                           (int)(rect.y() * d->m_hmult)));
-    ret = ret.normalized();
-
-    return ret;
-}
-
-QPoint MythMainWindow::NormPoint(const QPoint &point)
-{
-    QPoint ret;
-    ret.setX((int)(point.x() * d->m_wmult));
-    ret.setY((int)(point.y() * d->m_hmult));
-
-    return ret;
-}
-
-QSize MythMainWindow::NormSize(const QSize &size)
-{
-    QSize ret;
-    ret.setWidth((int)(size.width() * d->m_wmult));
-    ret.setHeight((int)(size.height() * d->m_hmult));
-
-    return ret;
-}
-
-int MythMainWindow::NormX(const int x)
-{
-    return qRound(x * d->m_wmult);
-}
-
-int MythMainWindow::NormY(const int y)
-{
-    return qRound(y * d->m_hmult);
-}
-
-void MythMainWindow::SetScalingFactors(float wmult, float hmult)
-{
-    d->m_wmult = wmult;
-    d->m_hmult = hmult;
-}
-
-QRect MythMainWindow::GetUIScreenRect(void)
-{
-    return d->m_uiScreenRect;
-}
-
-void MythMainWindow::SetUIScreenRect(QRect &rect)
-{
-    d->m_uiScreenRect = rect;
-}
-
 int MythMainWindow::GetDrawInterval() const
 {
     return d->m_drawInterval;
@@ -2281,62 +2159,76 @@ void MythMainWindow::ShowMouseCursor(bool show)
         d->m_hideMouseTimer->start();
 }
 
-void MythMainWindow::HideMouseTimeout(void)
+void MythMainWindow::HideMouseTimeout()
 {
     ShowMouseCursor(false);
 }
 
-void MythMainWindow::ResetIdleTimer(void)
+/*! \brief Disable the idle timeout timer
+ * \note This should only be called from the main thread.
+*/
+void MythMainWindow::DisableIdleTimer(bool DisableIdle)
+{
+    if ((d->m_disableIdle = DisableIdle))
+        m_idleTimer.stop();
+    else
+        m_idleTimer.start();
+}
+
+/*! \brief Reset the idle timeout timer
+ * \note This should only be called from the main thread.
+*/
+void MythMainWindow::ResetIdleTimer()
 {
     if (d->m_disableIdle)
         return;
 
-    if (d->m_idleTime == 0 ||
-        !d->m_idleTimer->isActive() ||
-        (d->m_standby && d->m_enteringStandby))
+    if (m_idleTime == 0 || !m_idleTimer.isActive() || (d->m_standby && d->m_enteringStandby))
         return;
 
     if (d->m_standby)
         ExitStandby(false);
 
-    QMetaObject::invokeMethod(d->m_idleTimer, "start");
+    m_idleTimer.start();
 }
 
-void MythMainWindow::PauseIdleTimer(bool pause)
+/*! \brief Pause the idle timeout timer
+ * \note This should only be called from the main thread.
+*/
+void MythMainWindow::PauseIdleTimer(bool Pause)
 {
     if (d->m_disableIdle)
         return;
 
     // don't do anything if the idle timer is disabled
-    if (d->m_idleTime == 0)
+    if (m_idleTime == 0)
         return;
 
-    if (pause)
+    if (Pause)
     {
         LOG(VB_GENERAL, LOG_NOTICE, "Suspending idle timer");
-        QMetaObject::invokeMethod(d->m_idleTimer, "stop");
+        m_idleTimer.stop();
     }
     else
     {
         LOG(VB_GENERAL, LOG_NOTICE, "Resuming idle timer");
-        QMetaObject::invokeMethod(d->m_idleTimer, "start");
+        m_idleTimer.start();
     }
 
     // ResetIdleTimer();
 }
 
-void MythMainWindow::IdleTimeout(void)
+void MythMainWindow::IdleTimeout()
 {
     if (d->m_disableIdle)
         return;
 
     d->m_enteringStandby = false;
 
-    if (d->m_idleTime > 0 && !d->m_standby)
+    if (m_idleTime > 0 && !d->m_standby)
     {
-        LOG(VB_GENERAL, LOG_NOTICE, QString("Entering standby mode after "
-                                        "%1 minutes of inactivity")
-                                        .arg(d->m_idleTime));
+        LOG(VB_GENERAL, LOG_NOTICE,
+            QString("Entering standby mode after %1 minutes of inactivity").arg(m_idleTime));
         EnterStandby(false);
         if (gCoreContext->GetNumSetting("idleTimeoutSecs", 0) > 0)
         {
@@ -2412,14 +2304,6 @@ void MythMainWindow::ExitStandby(bool manual)
          GetMythDB()->GetSetting("menutheme", "defaultmenu"));
     state.insert("currentlocation", GetMythUI()->GetCurrentLocation());
     MythUIStateTracker::SetState(state);
-}
-
-void MythMainWindow::DisableIdleTimer(bool disableIdle)
-{
-    if ((d->m_disableIdle = disableIdle))
-        QMetaObject::invokeMethod(d->m_idleTimer, "stop");
-    else
-        QMetaObject::invokeMethod(d->m_idleTimer, "start");
 }
 
 void MythMainWindow::onApplicationStateChange(Qt::ApplicationState state)

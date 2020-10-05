@@ -3,7 +3,6 @@
 
 #include <iostream>
 #include <vector>
-using namespace std;
 
 // myth
 #include <mythsocket.h>
@@ -12,6 +11,8 @@ using namespace std;
 
 // zm
 #include "zmdefines.h"
+#define MAX_IMAGE_SIZE  (2048*1536*3)
+using FrameData = std::array<uint8_t,MAX_IMAGE_SIZE>;
 
 class MPUBLIC ZMClient : public QObject
 {
@@ -43,13 +44,13 @@ class MPUBLIC ZMClient : public QObject
     void getServerStatus(QString &status, QString &cpuStat, QString &diskStat);
     void updateMonitorStatus(void);
     void getEventList(const QString &monitorName, bool oldestFirst,
-                      const QString &date, bool includeContinuous, vector<Event*> *eventList);
+                      const QString &date, bool includeContinuous, std::vector<Event*> *eventList);
     void getEventFrame(Event *event, int frameNo, MythImage **image);
     void getAnalyseFrame(Event *event, int frameNo, QImage &image);
-    int  getLiveFrame(int monitorID, QString &status, unsigned char* buffer, int bufferSize);
-    void getFrameList(int eventID, vector<Frame*> *frameList);
+    int  getLiveFrame(int monitorID, QString &status, FrameData& buffer);
+    void getFrameList(int eventID, std::vector<Frame*> *frameList);
     void deleteEvent(int eventID);
-    void deleteEventList(vector<Event*> *eventList);
+    void deleteEventList(std::vector<Event*> *eventList);
 
     int  getMonitorCount(void);
     Monitor* getMonitorAt(int pos);

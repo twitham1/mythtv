@@ -52,6 +52,17 @@ void RunProgramFinder(TV *player, bool embedVideo, bool allowEPG)
         delete programFind;
 }
 
+ProgFinder::ProgFinder(MythScreenStack *parentStack, bool allowEPG ,
+                       TV *player, bool embedVideo)
+  : ScheduleCommon(parentStack, "ProgFinder"),
+    m_player(player),
+    m_embedVideo(embedVideo),
+    m_allowEPG(allowEPG)
+{
+    if (m_player)
+        m_player->IncrRef();
+}
+
 bool ProgFinder::Create()
 {
     if (!LoadWindowFromXML("schedule-ui.xml", "programfind", this))
@@ -80,7 +91,7 @@ bool ProgFinder::Create()
     LoadInBackground();
 
     if (m_player)
-        m_player->StartEmbedding(QRect());
+        emit m_player->RequestStartEmbedding(QRect());
 
     return true;
 }
@@ -118,10 +129,11 @@ ProgFinder::~ProgFinder()
 
     // if we have a player and we are returning to it we need
     // to tell it to stop embedding and return to fullscreen
-    if (m_player && m_allowEPG)
+    if (m_player)
     {
-        QString message = QString("PROGFINDER_EXITING");
-        QCoreApplication::postEvent(m_player, new MythEvent(message));
+        if (m_allowEPG)
+            emit m_player->RequestStopEmbedding();
+        m_player->DecrRef();
     }
 }
 
@@ -342,9 +354,6 @@ void ProgFinder::updateInfo(void)
 
     if (GetFocusWidget() == m_alphabetList)
     {
-        QString title;
-        QString description;
-
         if (m_showList->GetCount() == 0)
         {
             if (m_help1Text)
@@ -412,9 +421,12 @@ void ProgFinder::ShowGuide() const
         if (GetFocusWidget() == m_timesList)
         {
             ProgramInfo *pginfo = m_showData[m_timesList->GetCurrentPos()];
-            startchannel = pginfo->GetChanNum();
-            startchanid = pginfo->GetChanID();
-            starttime = pginfo->GetScheduledStartTime();
+            if (pginfo != nullptr)
+            {
+                startchannel = pginfo->GetChanNum();
+                startchanid = pginfo->GetChanID();
+                starttime = pginfo->GetScheduledStartTime();
+            }
         }
         GuideGrid::RunProgramGuide(startchanid, startchannel, starttime,
                                    m_player, m_embedVideo, false, -2);
@@ -703,7 +715,7 @@ void ProgFinder::restoreSelectedData(QString &data)
 // Japanese specific program finder
 
 // japanese HIRAGANA list and more
-const QChar JaProgFinder::kSearchChars[] =
+const std::vector<QChar> JaProgFinder::kSearchChars
 {
     // "あ", "か", "さ", "た",
     QChar(0x3042), QChar(0x304b), QChar(0x3055), QChar(0x305f),
@@ -711,23 +723,13 @@ const QChar JaProgFinder::kSearchChars[] =
     QChar(0x306a), QChar(0x306f), QChar(0x307e), QChar(0x3084),
     // "ら", "わ", "英", "数",
     QChar(0x3089), QChar(0x308f), QChar(0x82f1), QChar(0x6570),
-    0,
 };
-
-JaProgFinder::JaProgFinder(MythScreenStack *parentStack, bool gg,
-                           TV *player, bool embedVideo)
-            : ProgFinder(parentStack, gg, player, embedVideo)
-{
-    for (m_numberOfSearchChars = 0; !kSearchChars[m_numberOfSearchChars].isNull();
-         ++m_numberOfSearchChars)
-         ;
-}
 
 void JaProgFinder::initAlphabetList()
 {
-    for (int charNum = 0; charNum < m_numberOfSearchChars; ++charNum)
+    for (auto search_char : kSearchChars)
     {
-        new MythUIButtonListItem(m_alphabetList, QString(kSearchChars[charNum]));
+        new MythUIButtonListItem(m_alphabetList, QString(search_char));
     }
 }
 
@@ -818,7 +820,7 @@ void JaProgFinder::restoreSelectedData(QString& data)
 // Hebrew specific program finder
 
 // Hebrew alphabet list and more
-const QChar HeProgFinder::kSearchChars[] =
+const std::vector<QChar> HeProgFinder::kSearchChars
 {
     // "א", "ב", "ג", "ד",
     QChar(0x5d0), QChar(0x5d1), QChar(0x5d2), QChar(0x5d3),
@@ -832,23 +834,13 @@ const QChar HeProgFinder::kSearchChars[] =
     QChar(0x5e4), QChar(0x5e6), QChar(0x5e7), QChar(0x5e8),
     // "ש", "ת", "E", "#",
     QChar(0x5e9), QChar(0x5ea), QChar('E'), QChar('#'),
-    QChar(0),
 };
-
-HeProgFinder::HeProgFinder(MythScreenStack *parentStack, bool gg,
-                           TV *player, bool embedVideo)
-            : ProgFinder(parentStack, gg, player, embedVideo)
-{
-    for (m_numberOfSearchChars = 0; !kSearchChars[m_numberOfSearchChars].isNull();
-         ++m_numberOfSearchChars)
-        ;
-}
 
 void HeProgFinder::initAlphabetList()
 {
-    for (int charNum = 0; charNum < m_numberOfSearchChars; ++charNum)
+    for (auto search_char : kSearchChars)
     {
-        new MythUIButtonListItem(m_alphabetList, QString(kSearchChars[charNum]));
+        new MythUIButtonListItem(m_alphabetList, QString(search_char));
     }
 }
 
@@ -916,7 +908,7 @@ void HeProgFinder::restoreSelectedData(QString& data)
 
 // Cyrrilic specific program finder
 // Cyrrilic alphabet list and more
-const QChar RuProgFinder::kSearchChars[] =
+const std::vector<QChar> RuProgFinder::kSearchChars
 {
     // "А", "Б", "В", "Г",
     QChar(0x410), QChar(0x411), QChar(0x412), QChar(0x413),
@@ -944,23 +936,14 @@ const QChar RuProgFinder::kSearchChars[] =
     QChar('M'),   QChar('N'),   QChar('O'),   QChar('P'),
     QChar('Q'),   QChar('R'),   QChar('S'),   QChar('T'),
     QChar('U'),   QChar('V'),   QChar('W'),   QChar('X'),
-    QChar('Y'),   QChar('Z'), 0
+    QChar('Y'),   QChar('Z')
 };
-
-RuProgFinder::RuProgFinder(MythScreenStack *parentStack, bool gg,
-                           TV *player, bool embedVideo)
-            : ProgFinder(parentStack, gg, player, embedVideo)
-{
-    for (m_numberOfSearchChars = 0; !kSearchChars[m_numberOfSearchChars].isNull();
-         ++m_numberOfSearchChars)
-        ;
-}
 
 void RuProgFinder::initAlphabetList()
 {
-    for (int charNum = 0; charNum < m_numberOfSearchChars; ++charNum)
+    for (auto search_char : kSearchChars)
     {
-        new MythUIButtonListItem(m_alphabetList, kSearchChars[charNum]);
+        new MythUIButtonListItem(m_alphabetList, search_char);
     }
 }
 

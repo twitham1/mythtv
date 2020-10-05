@@ -188,19 +188,16 @@ void CleanupTask::CleanupRecordedTables(void)
 {
     MSqlQuery query(MSqlQuery::InitCon());
     MSqlQuery deleteQuery(MSqlQuery::InitCon());
-    int tableIndex = 0;
     // tables[tableIndex][0] is the table name
     // tables[tableIndex][1] is the name of the column on which the join is
     // performed
-    QString tables[][2] = {
+    std::array<std::array<QString,2>,5> tables {{
         { "recordedprogram", "progstart" },
         { "recordedrating", "progstart" },
         { "recordedcredits", "progstart" },
         { "recordedmarkup", "starttime" },
         { "recordedseek", "starttime" },
-        { "", "" } }; // This blank entry must exist, do not remove.
-    QString table = tables[tableIndex][0];
-    QString column = tables[tableIndex][1];
+    }};
 
     // Because recordedseek can have millions of rows, we don't want to JOIN it
     // with recorded.  Instead, pull out DISTINCT chanid and starttime into a
@@ -219,7 +216,7 @@ void CleanupTask::CleanupRecordedTables(void)
         return;
     }
 
-    while (!table.isEmpty())
+    for (const auto & [table,column] : tables)
     {
         query.prepare(QString("TRUNCATE TABLE temprecordedcleanup;"));
         if (!query.exec() || !query.isActive())
@@ -270,10 +267,6 @@ void CleanupTask::CleanupRecordedTables(void)
                 return;
             }
         }
-
-        tableIndex++;
-        table = tables[tableIndex][0];
-        column = tables[tableIndex][1];
     }
 
     if (!query.exec("DROP TABLE temprecordedcleanup;"))
@@ -314,7 +307,6 @@ void CleanupTask::CleanupChannelTables(void)
 void CleanupTask::CleanupProgramListings(void)
 {
     MSqlQuery query(MSqlQuery::InitCon());
-    QString querystr;
     // Keep as many days of listings data as we keep matching, non-recorded
     // oldrecorded entries to allow for easier post-mortem analysis
     int offset = gCoreContext->GetNumSetting( "CleanOldRecorded", 10);
@@ -407,7 +399,7 @@ bool ThemeUpdateTask::DoCheckRun(const QDateTime& now)
 bool ThemeUpdateTask::DoRun(void)
 {
     bool    result = false;
-    QString MythVersion = MYTH_SOURCE_PATH;
+    QString MythVersion = GetMythSourcePath();
 
     // Treat devel branches as master
     if (!MythVersion.isEmpty() && !MythVersion.startsWith("fixes/"))
@@ -430,7 +422,7 @@ bool ThemeUpdateTask::DoRun(void)
 
         // If a version of the theme for this tag exists, use it...
         QRegExp subexp("v[0-9]+\\.([0-9]+)-*");
-        int pos = subexp.indexIn(MYTH_SOURCE_VERSION);
+        int pos = subexp.indexIn(GetMythSourceVersion());
         if (pos > -1)
         {
             QString subversion;

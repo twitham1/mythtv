@@ -931,7 +931,7 @@ void MythBDBuffer::PressButton(int32_t Key, int64_t Pts)
     LOG(VB_PLAYBACK, LOG_INFO, LOC + QString("Key %1 (pts %2)").arg(Key).arg(Pts));
     // HACK for still frame menu navigation
     Pts = 1;
-    if (!m_bdnav || Pts <= 0 || Key < 0)
+    if (!m_bdnav || /*Pts <= 0 ||*/ Key < 0)
         return;
     bd_user_input(m_bdnav, Pts, static_cast<uint32_t>(Key));
 }
@@ -1358,7 +1358,7 @@ MythBDOverlay* MythBDBuffer::GetOverlay(void)
 
 void MythBDBuffer::SubmitOverlay(const bd_overlay_s* const Overlay)
 {
-    if (!Overlay || (Overlay && (Overlay->plane > m_overlayPlanes.size())))
+    if (!Overlay || (Overlay->plane > m_overlayPlanes.size()))
         return;
 
     LOG(VB_PLAYBACK, LOG_DEBUG, QString("--------------------"));
@@ -1438,7 +1438,7 @@ void MythBDBuffer::SubmitOverlay(const bd_overlay_s* const Overlay)
 
 void MythBDBuffer::SubmitARGBOverlay(const bd_argb_overlay_s * const Overlay)
 {
-    if (!Overlay || (Overlay && (Overlay->plane > m_overlayPlanes.size())))
+    if (!Overlay || (Overlay->plane > m_overlayPlanes.size()))
         return;
 
     LOG(VB_PLAYBACK, LOG_DEBUG, QString("--------------------"));

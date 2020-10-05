@@ -6,7 +6,6 @@
 #include <functional>
 #include <deque>                        // for _Deque_iterator, operator-, etc
 #include <iterator>                     // for reverse_iterator
-using namespace std;
 
 // Qt
 #include <QCoreApplication>
@@ -537,7 +536,7 @@ bool ProgLister::PowerStringToSQL(
         return false;
     };
 
-    static const QString kBindingList[6] =
+    static const std::array<QString,6> kBindingList
     {
         ":POWERTITLE",
         ":POWERSUB",
@@ -547,7 +546,7 @@ bool ProgLister::PowerStringToSQL(
         ":POWERCALLSIGN",
     };
 
-    static const QString kOutputList[6] =
+    static const std::array<QString,6> kOutputList
     {
         "program.title LIKE :POWERTITLE ",
         "program.subtitle LIKE :POWERSUB ",
@@ -992,7 +991,7 @@ void ProgLister::FillViewList(const QString &view)
         m_curView = m_viewList.size() - 1;
 }
 
-class plCompare : binary_function<const ProgramInfo*, const ProgramInfo*, bool>
+class plCompare : std::binary_function<const ProgramInfo*, const ProgramInfo*, bool>
 {
   public:
     virtual bool operator()(const ProgramInfo*, const ProgramInfo*) = 0;
@@ -1602,7 +1601,7 @@ void ProgLister::customEvent(QEvent *event)
         auto *dce = (DialogCompletionEvent*)(event);
 
         QString resultid   = dce->GetId();
-        QString resulttext = dce->GetResultText();
+//      QString resulttext = dce->GetResultText();
         int     buttonnum  = dce->GetResult();
 
         if (resultid == "sortmenu")

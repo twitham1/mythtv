@@ -33,36 +33,35 @@
  *
  */
 
+// C++
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
-#include <map>
-#include <utility>
-#include <vector>
 
-using namespace std;
-
+// C
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <linux/dvb/ca.h>
 
-#include <dvbci.h>
+// Qt
+#include <QString>
+#include <QList>
+#include <QMap>
 
+// MythTV
+#include "dvbci.h"
 #include "recorderbase.h"
-
 #include "cardutil.h"
-
 #include "dvbcam.h"
 #include "mthread.h"
 #include "dvbchannel.h"
 #include "dvbrecorder.h"
 #include "mythlogging.h"
 
-#define LOC QString("DVB#%1 CA: ").arg(m_device)
+#define LOC QString("DVBCam(%1): ").arg(m_device)
 
-DVBCam::DVBCam(QString aDevice)
-    : m_device(std::move(aDevice))
+DVBCam::DVBCam(QString device)
+    : m_device(std::move(device))
 {
     QString dvbdev = CardUtil::GetDeviceName(DVB_DEV_CA, m_device);
     QByteArray dev = dvbdev.toLatin1();
@@ -74,7 +73,7 @@ DVBCam::DVBCam(QString aDevice)
         if (ioctl(cafd, CA_GET_CAP, &caps) >= 0)
             m_numslots = caps.slot_num;
         else
-            LOG(VB_GENERAL, LOG_ERR, "ioctl CA_GET_CAP failed: " + ENO);
+            LOG(VB_GENERAL, LOG_ERR, LOC + "ioctl CA_GET_CAP failed: " + ENO);
 
         close(cafd);
     }
@@ -202,10 +201,66 @@ void DVBCam::HandleUserIO(void)
     }
 }
 
+// Remove duplicate service IDs because the CAM needs to be setup only
+// once for each service even if the service is recorded twice.
+// This can happen with overlapping recordings on the same channel.
+void DVBCam::RemoveDuplicateServices(void)
+{
+    QList<uint> unique_sids;
+    pmt_list_t::iterator it;
+
+    // Remove duplicates in m_pmtList
+    for (it = m_pmtList.begin(); it != m_pmtList.end(); )
+    {
+        const ChannelBase *chan = it.key();
+        uint inputId = chan->GetInputID();
+        const ProgramMapTable *pmt = (*it);
+        uint serviceId = pmt->ProgramNumber();
+        if (unique_sids.contains(serviceId))
+        {
+            it = m_pmtList.erase(it);
+            LOG(VB_DVBCAM, LOG_DEBUG, LOC + QString("Service [%1]%2 duplicate, removed from pmtList")
+                .arg(inputId).arg(serviceId));
+        }
+        else
+        {
+            unique_sids.append(serviceId);
+            ++it;
+            LOG(VB_DVBCAM, LOG_DEBUG, LOC + QString("Service [%1]%2 stays in pmtList")
+                .arg(inputId).arg(serviceId));
+        }
+    }
+
+    // Remove duplicates in m_pmtAddList
+    for (it = m_pmtAddList.begin(); it != m_pmtAddList.end(); )
+    {
+        const ChannelBase *chan = it.key();
+        uint inputId = chan->GetInputID();
+        const ProgramMapTable *pmt = (*it);
+        uint serviceId = pmt->ProgramNumber();
+        if (unique_sids.contains(serviceId))
+        {
+            it = m_pmtAddList.erase(it);
+            LOG(VB_DVBCAM, LOG_DEBUG, LOC + QString("Service [%1]%2 duplicate, removed from pmtAddList")
+                .arg(inputId).arg(serviceId));
+        }
+        else
+        {
+            unique_sids.append(serviceId);
+            ++it;
+            LOG(VB_DVBCAM, LOG_DEBUG, LOC + QString("Service [%1]%2 stays in pmtAddList")
+                .arg(inputId).arg(serviceId));
+        }
+    }
+}
+
+
 void DVBCam::HandlePMT(void)
 {
     LOG(VB_DVBCAM, LOG_INFO, LOC + "CiHandler needs CA_PMT");
     QMutexLocker locker(&m_pmtLock);
+
+    RemoveDuplicateServices();
 
     if (m_pmtSent && m_pmtAdded && !m_pmtUpdated)
     {
@@ -238,14 +293,13 @@ void DVBCam::HandlePMT(void)
     uint length = m_pmtList.size();
     uint count  = 0;
 
-    pmt_list_t::const_iterator pmtit;
-    for (pmtit = m_pmtList.begin(); pmtit != m_pmtList.end(); ++pmtit)
+    for (auto *pmt : qAsConst(m_pmtList))
     {
         uint cplm = (count     == 0)      ? CPLM_FIRST : CPLM_MORE;
         cplm      = (count + 1 == length) ? CPLM_LAST  : cplm;
         cplm      = (length    == 1)      ? CPLM_ONLY  : cplm;
 
-        SendPMT(**pmtit, cplm);
+        SendPMT(*pmt, cplm);
 
         count++;
     }
@@ -324,7 +378,7 @@ void DVBCam::SetTimeOffset(double offset_in_seconds)
         m_ciHandler->SetTimeOffset(offset_in_seconds);
 }
 
-static const char *cplm_info[] =
+static std::array<const std::string,6> cplm_info
 {
     "CPLM_MORE",
     "CPLM_FIRST",
@@ -334,7 +388,7 @@ static const char *cplm_info[] =
     "CPLM_UPDATE"
 };
 
-cCiCaPmt CreateCAPMT(const ProgramMapTable& /*pmt*/, const unsigned short* /*casids*/, uint /*cplm*/);
+cCiCaPmt CreateCAPMT(const ProgramMapTable& /*pmt*/, const dvbca_vector &/*casids*/, uint /*cplm*/);
 
 /*
  * Send a CA_PMT object to the CAM (see EN50221, section 8.4.3.4)
@@ -345,17 +399,9 @@ void DVBCam::SendPMT(const ProgramMapTable &pmt, uint cplm)
 
     for (uint s = 0; s < (uint)m_ciHandler->NumSlots(); s++)
     {
-        const unsigned short *casids = m_ciHandler->GetCaSystemIds(s);
+        dvbca_vector casids = m_ciHandler->GetCaSystemIds(s);
 
-        if (!casids)
-        {
-            LOG(success ? VB_DVBCAM : VB_GENERAL, LOG_ERR,
-                LOC + "GetCaSystemIds returned NULL! " +
-                QString("(Slot #%1)").arg(s));
-            continue;
-        }
-
-        if (!casids[0])
+        if (casids.empty())
         {
             LOG(success ? VB_DVBCAM : VB_GENERAL, LOG_ERR,
                 LOC + "CAM supports no CA systems! " +
@@ -371,7 +417,7 @@ void DVBCam::SendPMT(const ProgramMapTable &pmt, uint cplm)
 
         LOG(VB_DVBCAM, LOG_INFO, LOC +
             QString("Sending CA_PMT with %1 to CI slot #%2")
-                .arg(cplm_info[cplm]).arg(s));
+                .arg(QString::fromStdString(cplm_info[cplm])).arg(s));
 
         if (!m_ciHandler->SetCaPmt(capmt, s))
         {
@@ -386,16 +432,16 @@ void DVBCam::SendPMT(const ProgramMapTable &pmt, uint cplm)
 }
 
 static void process_desc(cCiCaPmt &capmt,
-                  const unsigned short *casids,
+                  const dvbca_vector &casids,
                   const desc_list_t &desc)
 {
     desc_list_t::const_iterator it;
     for (it = desc.begin(); it != desc.end(); ++it)
     {
         ConditionalAccessDescriptor cad(*it);
-        for (uint q = 0; casids[q]; q++)
+        for (auto id : casids)
         {
-            if (!cad.IsValid() || cad.SystemID() != casids[q])
+            if (!cad.IsValid() || cad.SystemID() != id)
                 continue;
 
             LOG(VB_DVBCAM, LOG_INFO, QString("DVBCam: Adding CA descriptor: "
@@ -410,7 +456,7 @@ static void process_desc(cCiCaPmt &capmt,
 }
 
 cCiCaPmt CreateCAPMT(const ProgramMapTable &pmt,
-                     const unsigned short *casids,
+                     const dvbca_vector &casids,
                      uint cplm)
 {
     cCiCaPmt capmt(pmt.ProgramNumber(), cplm);

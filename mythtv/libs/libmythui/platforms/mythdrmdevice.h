@@ -6,7 +6,6 @@
 
 // MythTV
 #include "mythlogging.h"
-#include "referencecounter.h"
 #include "mythdisplay.h"
 
 // libdrm
@@ -15,31 +14,47 @@ extern "C" {
 #include <xf86drmMode.h>
 }
 
-class MythDRMDevice : public ReferenceCounter
+// Std
+#include <memory>
+
+using MythDRMPtr = std::shared_ptr<class MythDRMDevice>;
+
+class MythDRMDevice
 {
   public:
-    explicit MythDRMDevice(QScreen *qScreen, const QString& Device = QString());
-   ~MythDRMDevice() override;
+    static MythDRMPtr Create(QScreen *qScreen, const QString& Device = QString());
+   ~MythDRMDevice();
 
-    bool     IsValid        (void) const;
-    QString  GetSerialNumber(void) const;
-    QScreen* GetScreen      (void) const;
-    QSize    GetResolution  (void) const;
-    QSize    GetPhysicalSize(void) const;
-    double   GetRefreshRate (void) const;
-    bool     Authenticated  (void) const;
-    MythEDID GetEDID        (void);
+    class DRMEnum
+    {
+      public:
+        DRMEnum(uint64_t Value) : m_value(Value) {}
+        uint64_t m_value { 0 };
+        std::map<uint64_t,QString> m_enums;
+    };
+
+    bool     IsValid        () const;
+    QString  GetSerialNumber() const;
+    QScreen* GetScreen      () const;
+    QSize    GetResolution  () const;
+    QSize    GetPhysicalSize() const;
+    double   GetRefreshRate () const;
+    bool     Authenticated  () const;
+    MythEDID GetEDID        ();
+    DRMEnum  GetEnumProperty(const QString& Property);
+    bool     SetEnumProperty(const QString& Property, uint64_t Value);
+
+  protected:
+    explicit MythDRMDevice(QScreen *qScreen, const QString& Device = QString());
 
   private:
     Q_DISABLE_COPY(MythDRMDevice)
-    bool     Open           (void);
-    void     Close          (void);
-    void     Authenticate   (void);
-    bool     Initialise     (void);
-
-    QString  FindBestDevice (void);
+    bool     Open           ();
+    void     Close          ();
+    void     Authenticate   ();
+    bool     Initialise     ();
+    QString  FindBestDevice ();
     static bool ConfirmDevice(const QString& Device);
-
     drmModePropertyBlobPtr GetBlobProperty(drmModeConnectorPtr Connector, const QString& Property) const;
 
   private:
@@ -60,4 +75,4 @@ class MythDRMDevice : public ReferenceCounter
     MythEDID           m_edid          { };
 };
 
-#endif // MYTHDRMDEVICE_H
+#endif

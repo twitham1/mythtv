@@ -14,36 +14,35 @@
 #include "mythegl.h"
 #include "mythmainwindow.h"
 
+#ifdef USING_DBUS
+#include "platforms/mythdisplaymutter.h"
+#endif
 #ifdef Q_OS_ANDROID
-#include "mythdisplayandroid.h"
+#include "platforms/mythdisplayandroid.h"
 #endif
 #if defined(Q_OS_MAC)
-#include "mythdisplayosx.h"
+#include "platforms/mythdisplayosx.h"
 #endif
 #ifdef USING_X11
-#include "mythdisplayx11.h"
+#include "platforms/mythdisplayx11.h"
 #endif
 #ifdef USING_DRM
-#include "mythdisplaydrm.h"
+#include "platforms/mythdisplaydrm.h"
 #endif
 #if defined(Q_OS_WIN)
-#include "mythdisplaywindows.h"
+#include "platforms/mythdisplaywindows.h"
 #endif
 #ifdef USING_MMAL
-#include "mythdisplayrpi.h"
+#include "platforms/mythdisplayrpi.h"
 #endif
 
 #define LOC QString("Display: ")
 
 /*! \class MythDisplay
  *
- * MythDisplay is a reference counted, singleton class.
- *
- * Retrieve a reference to the MythDisplay object by calling AcquireRelease().
- *
- * A valid pointer is always returned.
- *
- * Release the reference by calling AcquireRelease(false).
+ * MythDisplay is a wrapper around platform dependant display functionality.
+ * It can only be created by MythMainWindow and the single instance is owned by
+ * the MythMainWindow object.
  *
  * \note There is no locking in MythDisplay. It should never be used from anywhere
  * other than the main/UI thread.
@@ -66,78 +65,67 @@
  * There are various complications here. Currently switching windows is triggered
  * from the settings screens - which initiate a teardown of painter/render/UI etc.
  * We cannot do that from random parts of the UI or during video playback.
+ *
+ * \sa MythMainWindow
 */
-MythDisplay* MythDisplay::AcquireRelease(bool Acquire)
+
+/*! \brief Create a MythDisplay object appropriate for the current platform.
+ * \note This function always returns a valid MythDisplay object.
+*/
+MythDisplay* MythDisplay::Create()
 {
-    static QMutex s_lock(QMutex::Recursive);
-    static MythDisplay* s_display = nullptr;
-
-    QMutexLocker locker(&s_lock);
-
-    if (Acquire)
-    {
-        if (s_display)
-        {
-            s_display->IncrRef();
-        }
-        else
-        {
+    MythDisplay* result = nullptr;
 #ifdef USING_X11
-            if (MythDisplayX11::IsAvailable())
-                s_display = new MythDisplayX11();
+    if (MythDisplayX11::IsAvailable())
+        result = new MythDisplayX11();
+#endif
+#ifdef USING_DBUS
+    /* disabled until testing can be completed (add docs on subclass choice when done)
+    if (!result)
+        result = MythDisplayMutter::Create();
+    */
 #endif
 #ifdef USING_MMAL
-            if (!s_display)
-                s_display = new MythDisplayRPI();
+    if (!result)
+        result = new MythDisplayRPI();
 #endif
 #ifdef USING_DRM
-            // this will only work by validating the screen's serial number
-            if (!s_display)
-                s_display = new MythDisplayDRM();
+    // this will only work by validating the screen's serial number
+    if (!result)
+        result = new MythDisplayDRM();
 #endif
 #if defined(Q_OS_MAC)
-            if (!s_display)
-                s_display = new MythDisplayOSX();
+    if (!result)
+        result = new MythDisplayOSX();
 #endif
 #ifdef Q_OS_ANDROID
-            if (!s_display)
-                s_display = new MythDisplayAndroid();
+    if (!result)
+        result = new MythDisplayAndroid();
 #endif
 #if defined(Q_OS_WIN)
-            if (!s_display)
-                s_display = new MythDisplayWindows();
+    if (!result)
+        result = new MythDisplayWindows();
 #endif
-            if (!s_display)
-                s_display = new MythDisplay();
-        }
-    }
-    else
-    {
-        if (s_display)
-            if (s_display->DecrRef() == 0)
-                s_display = nullptr;
-    }
-    return s_display;
+    if (!result)
+        result = new MythDisplay();
+    return result;
 }
 
-QStringList MythDisplay::GetDescription(void)
+QStringList MythDisplay::GetDescription()
 {
     QStringList result;
     bool spanall = false;
     int screencount = MythDisplay::GetScreenCount();
-    MythDisplay* display = MythDisplay::AcquireRelease();
-
     if (MythDisplay::SpanAllScreens() && screencount > 1)
     {
         spanall = true;
         result.append(tr("Spanning %1 screens").arg(screencount));
         result.append(tr("Total bounds") + QString("\t: %1x%2")
-                      .arg(display->GetScreenBounds().width())
-                      .arg(display->GetScreenBounds().height()));
+            .arg(GetScreenBounds().width()).arg(GetScreenBounds().height()));
         result.append("");
     }
 
-    QScreen *current = display->GetCurrentScreen();
+    QScreen *current = GetCurrentScreen();
     QList<QScreen*> screens = QGuiApplication::screens();
     bool first = true;
     for (auto *screen : qAsConst(screens))
@@ -155,18 +143,17 @@ QStringList MythDisplay::GetDescription(void)
         if (screen == current)
         {
             QString source;
-            double aspect = display->GetAspectRatio(source);
+            double aspect = GetAspectRatio(source);
             result.append(tr("Aspect ratio") + QString("\t: %1 (%2)")
                     .arg(aspect, 0, 'f', 3).arg(source));
             if (!spanall)
             {
                 result.append(tr("Current mode") + QString("\t: %1x%2@%3Hz")
-                              .arg(display->GetResolution().width()).arg(display->GetResolution().height())
-                              .arg(display->GetRefreshRate(), 0, 'f', 2));
+                              .arg(GetResolution().width()).arg(GetResolution().height())
+                              .arg(GetRefreshRate(), 0, 'f', 2));
             }
         }
     }
-    MythDisplay::AcquireRelease(false);
     return result;
 }
 
@@ -249,12 +236,12 @@ void MythDisplay::SetWidget(QWidget *MainWindow)
     }
 }
 
-int MythDisplay::GetScreenCount(void)
+int MythDisplay::GetScreenCount()
 {
     return QGuiApplication::screens().size();
 }
 
-double MythDisplay::GetPixelAspectRatio(void)
+double MythDisplay::GetPixelAspectRatio()
 {
     if (m_physicalSize.isEmpty() || m_resolution.isEmpty())
         return 1.0;
@@ -263,12 +250,12 @@ double MythDisplay::GetPixelAspectRatio(void)
            (m_physicalSize.height() / static_cast<double>(m_resolution.height()));
 }
 
-QSize MythDisplay::GetGUIResolution(void)
+QSize MythDisplay::GetGUIResolution()
 {
     return m_guiMode.Resolution();
 }
 
-QRect MythDisplay::GetScreenBounds(void)
+QRect MythDisplay::GetScreenBounds()
 {
     return m_screenBounds;
 }
@@ -285,12 +272,12 @@ QRect MythDisplay::GetScreenBounds(void)
  * screen size/geometry accessed, and the proper physical/virtual
  * size/geometry retrieved.
 */
-QScreen* MythDisplay::GetCurrentScreen(void)
+QScreen* MythDisplay::GetCurrentScreen()
 {
     return m_screen;
 }
 
-QScreen *MythDisplay::GetDesiredScreen(void)
+QScreen *MythDisplay::GetDesiredScreen()
 {
     QScreen* newscreen = nullptr;
 
@@ -299,17 +286,18 @@ QScreen *MythDisplay::GetDesiredScreen(void)
     // N.B. So many potential issues here e.g. should the geometry override be
     // ignored after first use? (as it will continue to override the screen
     // regardless of changes to screen preference).
-    if (MythUIHelper::IsGeometryOverridden())
+    if (MythMainWindow::GeometryIsOverridden())
     {
         // this matches the check in MythMainWindow
         bool windowed = GetMythDB()->GetBoolSetting("RunFrontendInWindow", false) &&
                         !MythMainWindow::WindowIsAlwaysFullscreen();
-        QRect override = MythUIHelper::GetGeometryOverride();
+        QRect override = MythMainWindow::GetGeometryOverride();
         // When windowed, we use topleft as a best guess as to which screen we belong in.
         // When fullscreen, Qt appears to use the reverse - though this may be
         // the window manager rather than Qt. So could be wrong.
         QPoint point = windowed ? override.topLeft() : override.bottomRight();
-        for (QScreen *screen : QGuiApplication::screens())
+        QList screens = QGuiApplication::screens();
+        for (QScreen *screen : qAsConst(screens))
         {
             if (screen->geometry().contains(point))
             {
@@ -332,7 +320,8 @@ QScreen *MythDisplay::GetDesiredScreen(void)
     // Lookup by name
     if (!newscreen)
     {
-        for (QScreen *screen : QGuiApplication::screens())
+        QList screens = QGuiApplication::screens();
+        for (QScreen *screen : qAsConst(screens))
         {
             if (!name.isEmpty() && name == screen->name())
             {
@@ -428,7 +417,7 @@ void MythDisplay::GeometryChanged(const QRect &Geo)
  * It is usually accurate apart from the refresh rate - which is often
  * rounded down.
 */
-void MythDisplay::UpdateCurrentMode(void)
+void MythDisplay::UpdateCurrentMode()
 {
     // Certain platform implementations do not have a window to access at startup
     // and hence use this implementation. Flag the status as incomplete to ensure
@@ -450,7 +439,7 @@ void MythDisplay::UpdateCurrentMode(void)
 }
 
 /// \brief Return true if the MythTV windows should span all screens.
-bool MythDisplay::SpanAllScreens(void)
+bool MythDisplay::SpanAllScreens()
 {
     return gCoreContext->GetSetting("XineramaScreen", nullptr) == "-1";
 }
@@ -490,7 +479,7 @@ void MythDisplay::DebugScreen(QScreen *qScreen, const QString &Message)
     }
 }
 
-void MythDisplay::Initialise(void)
+void MythDisplay::Initialise()
 {
     m_videoModes.clear();
     m_overrideVideoModes.clear();
@@ -563,7 +552,7 @@ void MythDisplay::Initialise(void)
  * Otherwise QScreen::size() or QScreen::availableSize() will provide
  * the size of an individual screen.
 */
-void MythDisplay::InitScreenBounds(void)
+void MythDisplay::InitScreenBounds()
 {
     QList<QScreen*> screens = QGuiApplication::screens();
     for (auto *screen : screens)
@@ -728,7 +717,7 @@ bool MythDisplay::SwitchToGUI(bool Wait)
     return true;
 }
 
-double MythDisplay::GetRefreshRate(void) const
+double MythDisplay::GetRefreshRate() const
 {
     return m_refreshRate;
 }
@@ -746,7 +735,7 @@ std::vector<double> MythDisplay::GetRefreshRates(QSize Size)
 {
     auto targetrate = static_cast<double>(NAN);
     const MythDisplayMode mode(Size, QSize(0, 0), -1.0, 0.0);
-    const vector<MythDisplayMode>& modes = GetVideoModes();
+    const std::vector<MythDisplayMode>& modes = GetVideoModes();
     int match = MythDisplayMode::FindBestMatch(modes, mode, targetrate);
     if (match < 0)
         return std::vector<double>();
@@ -758,7 +747,7 @@ bool MythDisplay::SwitchToVideoMode(QSize /*Size*/, double /*Framerate*/)
     return false;
 }
 
-const vector<MythDisplayMode> &MythDisplay::GetVideoModes(void)
+const std::vector<MythDisplayMode> &MythDisplay::GetVideoModes()
 {
     return m_videoModes;
 }
@@ -844,7 +833,7 @@ double MythDisplay::GetAspectRatio(QString &Source, bool IgnoreModeOverride)
     return 16.0 / 9.0;
 }
 
-MythEDID& MythDisplay::GetEDID(void)
+MythEDID& MythDisplay::GetEDID()
 {
     return m_edid;
 }
@@ -858,7 +847,7 @@ MythEDID& MythDisplay::GetEDID(void)
  *
  * \note Untested with a grid layout - anyone have a card with 4 outputs?
 */
-double MythDisplay::EstimateVirtualAspectRatio(void)
+double MythDisplay::EstimateVirtualAspectRatio()
 {
     auto sortscreens = [](const QScreen* First, const QScreen* Second)
     {
@@ -956,17 +945,17 @@ double MythDisplay::EstimateVirtualAspectRatio(void)
     return aspectratio;
 }
 
-QSize MythDisplay::GetResolution(void)
+QSize MythDisplay::GetResolution()
 {
     return m_resolution;
 }
 
-QSize MythDisplay::GetPhysicalSize(void)
+QSize MythDisplay::GetPhysicalSize()
 {
     return m_physicalSize;
 }
 
-void MythDisplay::WaitForScreenChange(void)
+void MythDisplay::WaitForScreenChange()
 {
     // Some implementations may have their own mechanism for ensuring the mode
     // is updated before continuing
@@ -985,7 +974,7 @@ void MythDisplay::WaitForScreenChange(void)
     loop.exec();
 }
 
-void MythDisplay::WaitForNewScreen(void)
+void MythDisplay::WaitForNewScreen()
 {
     // N.B. This isn't working as intended as it always times out rather than
     // exiting deliberately. It does however somehow filter out unwanted screenChanged
@@ -1005,7 +994,7 @@ void MythDisplay::WaitForNewScreen(void)
     loop.exec();
 }
 
-void MythDisplay::PauseForModeSwitch(void)
+void MythDisplay::PauseForModeSwitch()
 {
     int pauselengthinms = gCoreContext->GetNumSetting("VideoModeChangePauseMS", 0);
     if (pauselengthinms)
@@ -1022,7 +1011,7 @@ void MythDisplay::PauseForModeSwitch(void)
     }
 }
 
-void MythDisplay::DebugModes(void) const
+void MythDisplay::DebugModes() const
 {
     // This is intentionally formatted to match the output of xrandr for comparison
     if (VERBOSE_LEVEL_CHECK(VB_PLAYBACK, LOG_INFO))
@@ -1047,10 +1036,11 @@ void MythDisplay::DebugModes(void) const
  * \note This function must be called before Qt/QPA is initialised i.e. before
  * any call to QApplication.
 */
-void MythDisplay::ConfigureQtGUI(int SwapInterval, QString _Display)
+void MythDisplay::ConfigureQtGUI(int SwapInterval, const QString& _Display)
 {
     // Set the default surface format. Explicitly required on some platforms.
     QSurfaceFormat format;
+    format.setAlphaBufferSize(0);
     format.setDepthBufferSize(0);
     format.setStencilBufferSize(0);
     format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
@@ -1063,7 +1053,21 @@ void MythDisplay::ConfigureQtGUI(int SwapInterval, QString _Display)
     // of the MythPushButton widgets, and they don't use the themed background.
     QApplication::setDesktopSettingsAware(false);
 #endif
-#if defined (Q_OS_LINUX) && defined (USING_EGL)
+
+    // If Wayland decorations are enabled, the default framebuffer format is forced
+    // to use alpha. This framebuffer is rendered with alpha blending by the wayland
+    // compositor - so any translucent areas of our UI will allow the underlying
+    // window to bleed through.
+    // N.B. this is probably not the most performant solution as compositors MAY
+    // still render hidden windows. A better solution is probably to call
+    // wl_surface_set_opaque_region on the wayland surface. This is confirmed to work
+    // and should allow the compositor to optimise rendering for opaque areas. It does
+    // however require linking to libwayland-client AND including private Qt headers
+    // to retrieve the surface and compositor structures (the latter being a significant issue).
+    // see also setAlphaBufferSize above
+    setenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1", 0);
+
+#if defined (Q_OS_LINUX) && defined (USING_EGL) && defined (USING_X11)
     // We want to use EGL for VAAPI/MMAL/DRMPRIME rendering to ensure we
     // can use zero copy video buffers for the best performance (N.B. not tested
     // on AMD desktops). To force Qt to use EGL we must set 'QT_XCB_GL_INTEGRATION'
@@ -1077,9 +1081,9 @@ void MythDisplay::ConfigureQtGUI(int SwapInterval, QString _Display)
     // NOTE We have no Qt platform information, window/surface or logging when this is called.
     QString soft = qgetenv("LIBGL_ALWAYS_SOFTWARE");
     bool ignore = soft == "1" || soft.compare("true", Qt::CaseInsensitive) == 0;
-    bool allow = qgetenv("MYTHTV_NO_EGL").isEmpty() && !ignore;
-    bool force = !qgetenv("MYTHTV_FORCE_EGL").isEmpty();
-    if (force || allow)
+    bool allow = qEnvironmentVariableIsEmpty("MYTHTV_NO_EGL") && !ignore;
+    bool force = !qEnvironmentVariableIsEmpty("MYTHTV_FORCE_EGL");
+    if ((force || allow) && MythDisplayX11::IsAvailable())
     {
         // N.B. By default, ignore EGL if vendor string is not returned
         QString vendor = MythEGL::GetEGLVendor();

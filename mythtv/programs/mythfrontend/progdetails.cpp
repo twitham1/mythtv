@@ -82,7 +82,7 @@ QString ProgDetails::getRatings(bool recorded, uint chanid, const QDateTime& sta
 
     QString ratings;
     QMap<QString,QString>::const_iterator it;
-    for (it = main_ratings.begin(); it != main_ratings.end(); ++it)
+    for (it = main_ratings.cbegin(); it != main_ratings.cend(); ++it)
     {
         ratings += it.key() + ": " + *it + ", ";
     }
@@ -159,8 +159,7 @@ void ProgDetails::PowerPriorities(const QString & ptable)
         return;
 
     using string_pair = QPair<QString, QString>;
-    QList<string_pair > tests;
-    QList<string_pair >::iterator Itest;
+    QVector<string_pair> tests;
     QString  recmatch;
     QString  pwrpri;
     QString  desc;
@@ -183,7 +182,7 @@ void ProgDetails::PowerPriorities(const QString & ptable)
     tests.append(qMakePair(QString("capturecard.recpriority"),
                            QString("capturecard.recpriority")));
 
-    if (recordid && prefinputpri)
+    if (prefinputpri)
     {
         pwrpri = QString("(capturecard.cardid = record.prefinput) * %1")
               .arg(prefinputpri);
@@ -259,8 +258,6 @@ void ProgDetails::PowerPriorities(const QString & ptable)
             sclause.remove(';');
             pwrpri = QString("(%1) * %2").arg(sclause)
                                             .arg(query.value(0).toInt());
-            if (!recordid && pwrpri.indexOf("RECTABLE") != -1)
-                continue;
             pwrpri.replace("RECTABLE", "record");
 
             desc = pwrpri;
@@ -270,16 +267,14 @@ void ProgDetails::PowerPriorities(const QString & ptable)
         }
     }
 
-    if (recordid)
-    {
-        recmatch = QString("INNER JOIN record "
-                           "      ON ( record.recordid = %1 ) ")
-                   .arg(recordid);
-    }
+    recmatch = QString("INNER JOIN record "
+                       "      ON ( record.recordid = %1 ) ")
+        .arg(recordid);
 
-    for (Itest = tests.begin(); Itest != tests.end(); ++Itest)
+    for (const auto & [label, csqlStart] : qAsConst(tests))
     {
-        query.prepare("SELECT " + (*Itest).second.replace("program.", "p.")
+        QString sqlStart = csqlStart;
+        query.prepare("SELECT " + sqlStart.replace("program.", "p.")
                       + QString
                       (" FROM %1 as p "
                        "INNER JOIN channel "
@@ -295,7 +290,7 @@ void ProgDetails::PowerPriorities(const QString & ptable)
         query.bindValue(":CHANID",    m_progInfo.GetChanID());
         query.bindValue(":STARTTIME", m_progInfo.GetScheduledStartTime());
 
-        adjustmsg = QString("%1 : ").arg((*Itest).first);
+        adjustmsg = QString("%1 : ").arg(label);
         if (query.exec() && query.next())
         {
             int adj = query.value(0).toInt();

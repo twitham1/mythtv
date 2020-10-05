@@ -3,7 +3,7 @@
 // Some of the XDS was inspired by code in TVTime. -- dtk 03/30/2006
 
 #include <algorithm>
-using namespace std;
+#include <vector>
 
 // Qt headers
 #include <QStringList>
@@ -18,7 +18,7 @@ using namespace std;
 
 #define DEBUG_XDS 0
 
-static void init_xds_program_type(QString xds_program_type[96]);
+static void init_xds_program_type(CC608ProgramType& xds_program_type);
 
 CC608Decoder::CC608Decoder(CC608Input *ccr)
     : m_reader(ccr),
@@ -52,7 +52,7 @@ void CC608Decoder::FormatCC(int tc, int code1, int code2)
     FormatCCField(tc, 1, code2);
 }
 
-void CC608Decoder::GetServices(uint seconds, bool seen[4]) const
+void CC608Decoder::GetServices(uint seconds, CC608Seen& seen) const
 {
     time_t now = time(nullptr);
     time_t then = now - seconds;
@@ -668,7 +668,7 @@ void CC608Decoder::BufferCC(int mode, int len, int clr)
     {
         // calculate UTF-8 encoding length
         tmpbuf = m_ccBuf[mode].toUtf8();
-        len = min(tmpbuf.length(), 255);
+        len = std::min(tmpbuf.length(), 255);
     }
 
     unsigned char *bp = m_rbuf;
@@ -880,7 +880,7 @@ void CC608Decoder::DecodeVPS(const unsigned char *buf)
     if ((int8_t) c < 0)
     {
         m_vpsLabel[m_vpsL] = 0;
-        memcpy(m_vpsPrLabel, m_vpsLabel, sizeof(m_vpsPrLabel));
+        m_vpsPrLabel = m_vpsLabel;
         m_vpsL = 0;
     }
     c &= 0x7F;
@@ -889,7 +889,7 @@ void CC608Decoder::DecodeVPS(const unsigned char *buf)
 
     LOG(VB_VBI, LOG_INFO, QString("VPS: 3-10: %1 %2 %3 %4 %5 %6 %7 %8 (\"%9\")")
             .arg(buf[0]).arg(buf[1]).arg(buf[2]).arg(buf[3]).arg(buf[4])
-            .arg(buf[5]).arg(buf[6]).arg(buf[7]).arg(m_vpsPrLabel));
+            .arg(buf[5]).arg(buf[6]).arg(buf[7]).arg(m_vpsPrLabel.data()));
 
     int pcs = buf[2] >> 6;
     int cni = + ((buf[10] & 3) << 10)
@@ -951,7 +951,7 @@ void CC608Decoder::DecodeWSS(const unsigned char *buf)
     }
 }
 
-QString CC608Decoder::XDSDecodeString(const vector<unsigned char> &buf,
+QString CC608Decoder::XDSDecodeString(const std::vector<unsigned char> &buf,
                                       uint start, uint end) const
 {
 #if DEBUG_XDS
@@ -988,11 +988,8 @@ static bool is_better(const QString &newStr, const QString &oldStr)
             return true;
 
         // check if the string contains any bogus characters
-        for (auto ch : qAsConst(newStr))
-            if (ch.toLatin1() < 0x20)
-                return false;
-
-        return true;
+        return std::all_of(newStr.cbegin(), newStr.cend(),
+                           [](auto ch){ return ch.toLatin1() >= 0x20; } );
     }
     return false;
 }
@@ -1054,7 +1051,7 @@ QString CC608Decoder::GetProgramName(bool future) const
 QString CC608Decoder::GetProgramType(bool future) const
 {
     QMutexLocker locker(&m_xdsLock);
-    const vector<uint> &program_type = m_xdsProgramType[(future) ? 1 : 0];
+    const std::vector<uint> &program_type = m_xdsProgramType[(future) ? 1 : 0];
     QString tmp = "";
 
     for (size_t i = 0; i < program_type.size(); i++)
@@ -1074,16 +1071,16 @@ QString CC608Decoder::GetXDS(const QString &key) const
     if (key == "ratings")
         return QString::number(GetRatingSystems(false));
     if (key.startsWith("has_rating_"))
-        return ((1<<key.right(1).toUInt()) & GetRatingSystems(false))?"1":"0";
+        return ((1<<key.rightRef(1).toUInt()) & GetRatingSystems(false))?"1":"0";
     if (key.startsWith("rating_"))
-        return GetRatingString(key.right(1).toUInt(), false);
+        return GetRatingString(key.rightRef(1).toUInt(), false);
 
     if (key == "future_ratings")
         return QString::number(GetRatingSystems(true));
     if (key.startsWith("has_future_rating_"))
-        return ((1<<key.right(1).toUInt()) & GetRatingSystems(true))?"1":"0";
+        return ((1<<key.rightRef(1).toUInt()) & GetRatingSystems(true))?"1":"0";
     if (key.startsWith("future_rating_"))
-        return GetRatingString(key.right(1).toUInt(), true);
+        return GetRatingString(key.rightRef(1).toUInt(), true);
 
     if (key == "programname")
         return GetProgramName(false);
@@ -1188,7 +1185,7 @@ bool CC608Decoder::XDSDecode(int field, int b1, int b2)
     return true;
 }
 
-void CC608Decoder::XDSPacketParse(const vector<unsigned char> &xds_buf)
+void CC608Decoder::XDSPacketParse(const std::vector<unsigned char> &xds_buf)
 {
     QMutexLocker locker(&m_xdsLock);
 
@@ -1221,7 +1218,7 @@ void CC608Decoder::XDSPacketParse(const vector<unsigned char> &xds_buf)
     }
 }
 
-bool CC608Decoder::XDSPacketCRC(const vector<unsigned char> &xds_buf)
+bool CC608Decoder::XDSPacketCRC(const std::vector<unsigned char> &xds_buf)
 {
     /* Check the checksum for validity of the packet. */
     int sum = 0;
@@ -1243,7 +1240,7 @@ bool CC608Decoder::XDSPacketCRC(const vector<unsigned char> &xds_buf)
 }
 
 bool CC608Decoder::XDSPacketParseProgram(
-    const vector<unsigned char> &xds_buf, bool future)
+    const std::vector<unsigned char> &xds_buf, bool future)
 {
     bool handled = true;
     int b2 = xds_buf[1];
@@ -1298,7 +1295,7 @@ bool CC608Decoder::XDSPacketParseProgram(
     }
     else if ((b2 == 0x04) && (xds_buf.size() >= 6))
     {
-        vector<uint> program_type;
+        std::vector<uint> program_type;
         for (size_t i = 2; i < xds_buf.size() - 2; i++)
         {
             int cur = xds_buf[i] - 0x20;
@@ -1403,7 +1400,7 @@ bool CC608Decoder::XDSPacketParseProgram(
     return handled;
 }
 
-bool CC608Decoder::XDSPacketParseChannel(const vector<unsigned char> &xds_buf)
+bool CC608Decoder::XDSPacketParseChannel(const std::vector<unsigned char> &xds_buf)
 {
     bool handled = true;
 
@@ -1442,7 +1439,7 @@ bool CC608Decoder::XDSPacketParseChannel(const vector<unsigned char> &xds_buf)
     return handled;
 }
 
-static void init_xds_program_type(QString xds_program_type[96])
+static void init_xds_program_type(CC608ProgramType& xds_program_type)
 {
     xds_program_type[0]  = QCoreApplication::translate("(Categories)",
                                                        "Education");

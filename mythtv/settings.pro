@@ -13,6 +13,7 @@ win32-msvc* {
   CONFIG *= using_backend using_frontend
   CONFIG *= using_opengl
   CONFIG *= using_hdhomerun
+  CONFIG *= using_satip
 
   CONFIG_LIBMPEG2EXTERNAL = yes
   CONFIG_QTDBUS = no
@@ -26,6 +27,10 @@ win32-msvc* {
 
 CONFIG += $$CCONFIG
 CONFIG += c++17
+
+# Make sure all the Qt header files are marked as system headers
+QMAKE_DEFAULT_INCDIRS += $$[QT_INSTALL_HEADERS]
+INCLUDEPATH += $$[QT_INSTALL_HEADERS]
 
 defineReplace(avLibName) {
         NAME = $$1
@@ -262,10 +267,10 @@ macx:QMAKE_CFLAGS_STATIC_LIB += -fno-common
 # clang 3.0 on Linux does not like duplicate arguments.
 macx {
     QMAKE_CFLAGS   += $$CPPFLAGS   $$CFLAGS
-    QMAKE_CXXFLAGS += $$CXXPPFLAGS $$ECXXFLAGS
+    QMAKE_CXXFLAGS += $$CXXPPFLAGS $$CXXFLAGS $$ECXXFLAGS
 } else {
     QMAKE_CFLAGS   *= $$CPPFLAGS   $$CFLAGS
-    QMAKE_CXXFLAGS *= $$CXXPPFLAGS $$ECXXFLAGS
+    QMAKE_CXXFLAGS *= $$CXXPPFLAGS $$CXXFLAGS $$ECXXFLAGS
 }
 
 profile:!win32:!macx:CONFIG += debug

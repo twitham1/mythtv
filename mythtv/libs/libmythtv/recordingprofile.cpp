@@ -140,7 +140,7 @@ class SampleRate : public MythUIComboBoxSetting, public CodecParamStorage
         }
 
         int which = getValueIndex(val);
-        setValue(max(which,0));
+        setValue(std::max(which,0));
 
         if (m_allowedRate.size() <= 1)
             setEnabled(false);
@@ -164,7 +164,7 @@ class SampleRate : public MythUIComboBoxSetting, public CodecParamStorage
         }
     }
 
-    vector<uint>    m_rates;
+    std::vector<uint> m_rates;
     QMap<uint,bool> m_allowedRate;
 };
 
@@ -350,7 +350,7 @@ class MPEG2AudioBitrateSettings : public GroupSetting
         addTargetedChild(layers[1], new MPEG2audBitrateL2(parent));
         addTargetedChild(layers[2], new MPEG2audBitrateL3(parent));
 
-        uint desired_layer = max(min(3U, default_layer), 1U) - 1;
+        uint desired_layer = std::max(std::min(3U, default_layer), 1U) - 1;
         int which = audType->getValueIndex(layers[desired_layer]);
         if (which >= 0)
             audType->setValue(which);
@@ -1221,10 +1221,10 @@ class TranscodeLossless : public MythUICheckBoxSetting, public CodecParamStorage
     };
 };
 
-class RecordingType : public MythUIComboBoxSetting, public CodecParamStorage
+class RecordingTypeStream : public MythUIComboBoxSetting, public CodecParamStorage
 {
   public:
-    explicit RecordingType(const RecordingProfile &parent) :
+    explicit RecordingTypeStream(const RecordingProfile &parent) :
         MythUIComboBoxSetting(this), CodecParamStorage(this, parent, "recordingtype")
     {
         setLabel(QObject::tr("Recording Type"));
@@ -1355,7 +1355,7 @@ class ImageSize : public GroupSetting
             else
                 defaultsize = QSize(480, 576);
         }
-        else if (tvFormat.toLower().startsWith("ntsc"))
+        else if (tvFormat.startsWith("ntsc", Qt::CaseInsensitive))
         {
             maxsize     = QSize(720, 480);
             defaultsize = (ivtv) ? QSize(720, 480) : QSize(480, 480);
@@ -1633,7 +1633,7 @@ void RecordingProfile::CompleteLoad(int profileId, const QString &type,
     }
     else if (type.toUpper() == "DVB")
     {
-        addChild(new RecordingType(*this));
+        addChild(new RecordingTypeStream(*this));
     }
 
     if (CardUtil::IsTunerSharingCapable(type))
@@ -1765,7 +1765,6 @@ void RecordingProfile::fillSelections(GroupSetting *setting, int group,
 
     if (group == RecordingProfile::TranscoderGroup && foldautodetect)
     {
-        QString id = QString::number(RecordingProfile::kTranscoderAutodetect);
         auto *profile = new GroupSetting();
         profile->setLabel(QObject::tr("Autodetect"));
         setting->addChild(profile);

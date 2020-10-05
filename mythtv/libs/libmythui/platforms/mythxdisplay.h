@@ -4,14 +4,14 @@
 // Qt
 #include <QString>
 #include <QMutex>
-
-#ifdef USING_X11
 #include <QSize>
 #include <QRect>
-#include <X11/Xlib.h>
 
 // MythTV
 #include "mythuiexp.h"
+
+// X11
+#include <X11/Xlib.h>
 
 // Std
 #include <vector>
@@ -24,6 +24,7 @@ class MUI_PUBLIC MythXDisplay
 
     static MythXDisplay* OpenMythXDisplay(bool Warn = true);
     static void          SetQtX11Display (const QString &Display);
+    static bool          DisplayIsRemote (void);
 
     MythXDisplay() = default;
     ~MythXDisplay();
@@ -35,9 +36,7 @@ class MUI_PUBLIC MythXDisplay
     int      GetDepth(void) const      { return m_depth;       }
     Window   GetRoot(void) const       { return m_root;        }
     bool     Open(void);
-    QSize    GetDisplaySize(void);
     QSize    GetDisplayDimensions(void);
-    double   GetRefreshRate(void);
     void     Sync(bool Flush = false);
     void     StartLog(void);
     bool     StopLog(void);
@@ -56,8 +55,6 @@ class MUI_PUBLIC MythXDisplay
     QMutex        m_lock       { QMutex::Recursive };
     QString       m_displayName{ };
 };
-
-#endif // USING_X11
 
 // These X11 defines conflict with the QT key event enum values
 #undef KeyPress

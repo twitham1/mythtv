@@ -123,22 +123,22 @@ static QString determineURLType(const QString& url)
     return result;
 }
 
-static const std::array<const QString,ProgramInfo::kNumCatTypes> s_cattype
+static const std::array<const QString,ProgramInfo::kNumCatTypes> kCatName
 { "", "movie", "series", "sports", "tvshow" };
 
 QString myth_category_type_to_string(ProgramInfo::CategoryType category_type)
 {
     if ((category_type > ProgramInfo::kCategoryNone) &&
-        (category_type < s_cattype.size()))
-        return s_cattype[category_type];
+        (category_type < kCatName.size()))
+        return kCatName[category_type];
 
     return "";
 }
 
 ProgramInfo::CategoryType string_to_myth_category_type(const QString &category_type)
 {
-    for (size_t i = 1; i < s_cattype.size(); i++)
-        if (category_type == s_cattype[i])
+    for (size_t i = 1; i < kCatName.size(); i++)
+        if (category_type == kCatName[i])
             return (ProgramInfo::CategoryType) i;
     return ProgramInfo::kCategoryNone;
 }
@@ -2251,12 +2251,10 @@ bool ProgramInfo::IsSameChannel(const ProgramInfo& other) const
 void ProgramInfo::CheckProgramIDAuthorities(void)
 {
     QMap<QString, int> authMap;
-    QString tables[] = { "program", "recorded", "oldrecorded", "" };
+    std::array<QString,3> tables { "program", "recorded", "oldrecorded" };
     MSqlQuery query(MSqlQuery::InitCon());
 
-    int tableIndex = 0;
-    QString table = tables[tableIndex];
-    while (!table.isEmpty())
+    for (const QString& table : tables)
     {
         query.prepare(QString(
             "SELECT DISTINCT LEFT(programid, LOCATE('/', programid)) "
@@ -2268,8 +2266,6 @@ void ProgramInfo::CheckProgramIDAuthorities(void)
             while (query.next())
                 authMap[query.value(0).toString()] = 1;
         }
-        ++tableIndex;
-        table = tables[tableIndex];
     }
 
     int numAuths = authMap.count();
@@ -3456,7 +3452,6 @@ void ProgramInfo::SaveMarkupMap(
     for (it = marks.begin(); it != marks.end(); ++it)
     {
         uint64_t frame = it.key();
-        QString querystr;
 
         if ((min_frame >= 0) && (frame < (uint64_t)min_frame))
             continue;
@@ -4928,7 +4923,6 @@ void ProgramInfo::MarkAsInUse(bool inuse, const QString& usedFor)
         }
         else if (m_inUseForWhat.isEmpty())
         {
-            QString oldInUseForWhat = m_inUseForWhat;
             m_inUseForWhat = QString("%1 [%2]")
                 .arg(QObject::tr("Unknown")).arg(getpid());
             LOG(VB_GENERAL, LOG_WARNING, LOC +
@@ -5246,7 +5240,7 @@ void ProgramInfo::SubstituteMatches(QString &str)
                 m_originalAirDate.toString(Qt::ISODate));
     static const std::array<const QString,4> s_timeStr
         { "STARTTIME", "ENDTIME", "PROGSTART", "PROGEND", };
-    static const std::array<const QDateTime *,4> time_dtr
+    const std::array<const QDateTime *,4> time_dtr
         { &m_recStartTs, &m_recEndTs, &m_startTs, &m_endTs, };
     for (size_t i = 0; i < s_timeStr.size(); i++)
     {
@@ -5824,7 +5818,6 @@ bool LoadFromRecorded(
 {
     destination.clear();
 
-    QString     fs_db_name = "";
     QDateTime   rectime    = MythDate::current().addSecs(
         -gCoreContext->GetNumSetting("RecordOverTime"));
 

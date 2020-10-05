@@ -351,7 +351,7 @@ void DVBStreamHandler::RunSR(void)
     LOG(VB_RECORD, LOG_DEBUG, LOC + "RunSR(): " + "end");
 }
 
-using pid_list_t = vector<uint>;
+using pid_list_t = std::vector<uint>;
 
 static pid_list_t::iterator find(
     const PIDInfoMap &map,
@@ -392,7 +392,7 @@ void DVBStreamHandler::CycleFiltersByPriority(void)
     }
 
     for (auto & it : priority_queue)
-        sort(it.begin(), it.end());
+        std::sort(it.begin(), it.end());
 
     for (PIDPriority i = kPIDPriorityHigh; i > kPIDPriorityNone;
          i = (PIDPriority)((int)i-1))
@@ -551,8 +551,8 @@ bool DVBStreamHandler::SupportsTSMonitoring(void)
     {
         QMutexLocker locker(&s_rec_supportsTsMonitoringLock);
         QMap<QString,bool>::const_iterator it;
-        it = s_recSupportsTsMonitoring.find(m_device);
-        if (it != s_recSupportsTsMonitoring.end())
+        it = s_recSupportsTsMonitoring.constFind(m_device);
+        if (it != s_recSupportsTsMonitoring.constEnd())
             return *it;
     }
 

@@ -164,10 +164,10 @@ class HEVCParser : public H2645Parser
 
     using ShortTermRefPicSet = struct {
         /* calculated values */
-        int32_t DeltaPocS0[16];
-        int32_t DeltaPocS1[16];
-        uint8_t UsedByCurrPicS0[16];
-        uint8_t UsedByCurrPicS1[16];
+        std::array<int32_t,16> DeltaPocS0;
+        std::array<int32_t,16> DeltaPocS1;
+        std::array<uint8_t,16> UsedByCurrPicS0;
+        std::array<uint8_t,16> UsedByCurrPicS1;
         uint8_t NumDeltaPocs;
         uint8_t NumNegativePics;
         uint8_t NumPositivePics;
@@ -191,13 +191,13 @@ class HEVCParser : public H2645Parser
        scaling_lists_32x32: 32x32 scaling list
      */
     using ScalingList = struct {
-        int16_t scaling_list_dc_coef_minus8_16x16[6];
-        int16_t scaling_list_dc_coef_minus8_32x32[2];
+        std::vector<int16_t> scaling_list_dc_coef_minus8_16x16 {6,0};
+        std::vector<int16_t> scaling_list_dc_coef_minus8_32x32 {2,0};
 
-        uint8_t scaling_lists_4x4 [6][16];
-        uint8_t scaling_lists_8x8 [6][64];
-        uint8_t scaling_lists_16x16 [6][64];
-        uint8_t scaling_lists_32x32 [2][64];
+        std::array<std::array<uint8_t,16>,6> scaling_lists_4x4   {};
+        std::array<std::array<uint8_t,64>,6> scaling_lists_8x8   {};
+        std::array<std::array<uint8_t,64>,6> scaling_lists_16x16 {};
+        std::array<std::array<uint8_t,64>,2> scaling_lists_32x32 {};
     };
 
     using QuantMatrixSize = enum
@@ -282,10 +282,10 @@ class HEVCParser : public H2645Parser
     bool     m_noRaslOutputFlag           {false};
     bool     m_seenEOS                    {true};
 
-    std::map<uint, SPS>  m_SPS;
-    std::map<uint, PPS>  m_PPS;
-    std::map<uint, VPS>  m_VPS;
-    std::map<uint, uint> m_POC;
+    std::map<uint, SPS>  m_sps;
+    std::map<uint, PPS>  m_pps;
+    std::map<uint, VPS>  m_vps;
+    std::map<uint, uint> m_poc;
 };
 
 #endif /* HEVCPARSER_H */

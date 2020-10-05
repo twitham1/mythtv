@@ -158,7 +158,9 @@ int MythDVDDecoder::ReadPacket(AVFormatContext *Ctx, AVPacket* Pkt, bool& StoreP
                     m_ringBuffer->DVD()->UnblockReading();
                 }
 
+                m_avCodecLock.lock();
                 result = av_read_frame(Ctx, Pkt);
+                m_avCodecLock.unlock();
 
                 // Make sure we yield.  Otherwise other threads may not
                 // get chance to take the lock.  Shouldn't be necessary
@@ -431,8 +433,8 @@ void MythDVDDecoder::PostProcessTracks(void)
 
     if (!m_tracks[kTrackTypeSubtitle].empty())
     {
-        map<int,uint> lang_sub_cnt;
-        map<int,int>  stream2idx;
+        std::map<int,uint> lang_sub_cnt;
+        std::map<int,int>  stream2idx;
 
         // First, create a map containing stream id -> track index
         // of the subtitle streams that have been found so far.

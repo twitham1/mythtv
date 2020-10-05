@@ -37,13 +37,13 @@
 
 static QString coderate_inner(uint coderate);
 
+using enc_override = std::vector<uint8_t>;
 MTV_PUBLIC QString dvb_decode_text(const unsigned char *src, uint length,
-                               const unsigned char *encoding_override,
-                               uint encoding_override_length);
+                               const enc_override &encoding_override);
 
 inline QString dvb_decode_text(const unsigned char *src, uint length)
 {
-    return dvb_decode_text(src, length, nullptr, 0);
+    return dvb_decode_text(src, length, {} );
 }
 
 QString dvb_decode_short_name(const unsigned char *src, uint raw_length);
@@ -1050,7 +1050,7 @@ class ImageIconDescriptor : public MPEGDescriptor
         const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::extension)
         {
-            if (DescriptorTagExtension() != DescriptorID::image_icon)
+            if (IsValid() && (DescriptorTagExtension() != DescriptorID::image_icon))
             {
                 m_data = nullptr;
             }
@@ -1213,8 +1213,8 @@ class T2DeliverySystemDescriptor : public MPEGDescriptor
     QString toString(void) const override; // MPEGDescriptor
 
   private:
-    mutable vector<const unsigned char*> m_cellPtrs; // used to parse
-    mutable vector<const unsigned char*> m_subCellPtrs; // used to parse
+    mutable std::vector<const unsigned char*> m_cellPtrs; // used to parse
+    mutable std::vector<const unsigned char*> m_subCellPtrs; // used to parse
 };
 
 // DVB Bluebook A038 (Feb 2019) p 100       0x7f 0x05
@@ -1225,7 +1225,7 @@ class SHDeliverySystemDescriptor : public MPEGDescriptor
         const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::extension)
     {
-        if (DescriptorTagExtension() != DescriptorID::sh_delivery_system)
+        if (IsValid() && (DescriptorTagExtension() != DescriptorID::sh_delivery_system))
         {
             m_data = nullptr;
         }
@@ -1250,7 +1250,7 @@ class SupplementaryAudioDescriptor : public MPEGDescriptor
         const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::extension)
     {
-        if (DescriptorTagExtension() != DescriptorID::supplementary_audio)
+        if (IsValid() && (DescriptorTagExtension() != DescriptorID::supplementary_audio))
         {
             m_data = nullptr;
         }
@@ -1289,7 +1289,7 @@ class NetworkChangeNotifyDescriptor : public MPEGDescriptor
         const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::extension)
     {
-        if (DescriptorTagExtension() != DescriptorID::network_change_notify)
+        if (IsValid() && (DescriptorTagExtension() != DescriptorID::network_change_notify))
         {
             m_data = nullptr;
         }
@@ -1310,7 +1310,7 @@ class MessageDescriptor : public MPEGDescriptor
         const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::extension)
     {
-        if (DescriptorTagExtension() != DescriptorID::supplementary_audio)
+        if (IsValid() && (DescriptorTagExtension() != DescriptorID::supplementary_audio))
         {
             m_data = nullptr;
         }
@@ -1344,7 +1344,7 @@ class TargetRegionDescriptor : public MPEGDescriptor
         const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::extension)
     {
-        if (DescriptorTagExtension() != DescriptorID::target_region)
+        if (IsValid() && (DescriptorTagExtension() != DescriptorID::target_region))
         {
             m_data = nullptr;
         }
@@ -1377,7 +1377,7 @@ class TargetRegionNameDescriptor : public MPEGDescriptor
         const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::extension)
     {
-        if (DescriptorTagExtension() != DescriptorID::target_region_name)
+        if (IsValid() && (DescriptorTagExtension() != DescriptorID::target_region_name))
         {
             m_data = nullptr;
         }
@@ -1417,7 +1417,7 @@ class ServiceRelocatedDescriptor : public MPEGDescriptor
         const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::extension)
     {
-        if (DescriptorTagExtension() != DescriptorID::service_relocated)
+        if (IsValid() && (DescriptorTagExtension() != DescriptorID::service_relocated))
         {
             m_data = nullptr;
         }
@@ -1445,7 +1445,7 @@ class C2DeliverySystemDescriptor : public MPEGDescriptor
         const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::extension)
     {
-        if (DescriptorTagExtension() != DescriptorID::c2_delivery_system)
+        if (IsValid() && (DescriptorTagExtension() != DescriptorID::c2_delivery_system))
         {
             m_data = nullptr;
         }
@@ -1489,7 +1489,7 @@ class S2XSatelliteDeliverySystemDescriptor : public MPEGDescriptor
         const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::extension)
     {
-        if (DescriptorTagExtension() != DescriptorID::s2x_satellite_delivery_system)
+        if (IsValid() && (DescriptorTagExtension() != DescriptorID::s2x_satellite_delivery_system))
         {
             m_data = nullptr;
         }
@@ -1550,7 +1550,7 @@ class MTV_PUBLIC ExtendedEventDescriptor : public MPEGDescriptor
     //   item_length            8   1.0+p2
     //   for (j=0;j<N;j++) { item_char 8 }
     // }
-    QMap<QString,QString> Items(void) const;
+    QMultiMap<QString,QString> Items(void) const;
     // text_length 8
     uint TextLength(void)       const { return m_data[7 + LengthOfItems()]; }
     // for (i=0; i<N; i++) { text_char 8 }
@@ -1558,11 +1558,10 @@ class MTV_PUBLIC ExtendedEventDescriptor : public MPEGDescriptor
         { return dvb_decode_text(&m_data[8 + LengthOfItems()], TextLength()); }
 
     // HACK beg -- Pro7Sat is missing encoding
-    QString Text(const unsigned char *encoding_override,
-                 uint encoding_length) const
+    QString Text(const enc_override &encoding_override) const
     {
         return dvb_decode_text(&m_data[8 + LengthOfItems()], TextLength(),
-                               encoding_override, encoding_length);
+                               encoding_override);
     }
     // HACK end -- Pro7Sat is missing encoding
 };
@@ -1802,6 +1801,8 @@ class ParentalRatingDescriptor : public MPEGDescriptor
   public:
     explicit ParentalRatingDescriptor(const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::parental_rating) { }
+    explicit ParentalRatingDescriptor(const std::vector<uint8_t> &data) :
+        MPEGDescriptor(data, DescriptorID::parental_rating) { }
     //       Name             bits  loc  expected value
     // descriptor_tag           8   0.0       0x55
     // descriptor_length        8   1.0
@@ -1870,6 +1871,8 @@ class PrivateDataSpecifierDescriptor : public MPEGDescriptor
   public:
     explicit PrivateDataSpecifierDescriptor(const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, DescriptorID::private_data_specifier) { }
+    explicit PrivateDataSpecifierDescriptor(const std::vector<uint8_t> &data) :
+        MPEGDescriptor(data, DescriptorID::private_data_specifier) { }
     //       Name             bits  loc  expected value
     // descriptor_tag           8   0.0       0x5f
     // descriptor_length        8   1.0
@@ -2097,11 +2100,11 @@ class ServiceListDescriptor : public MPEGDescriptor
 
     QString toString(void) const override // MPEGDescriptor
     {
-        QString str = QString("ServiceListDescriptor: %1 Services\n")
+        QString str = QString("ServiceListDescriptor: %1 Services")
             .arg(ServiceCount());
         for (uint i=0; i<ServiceCount(); i++)
         {
-            if (i!=0) str.append("\n");
+            str.append("\n");
             str.append(QString("      Service (%1) Type%2 (0x%3)")
                 .arg(ServiceID(i))
                 .arg(ServiceDescriptorMapping(ServiceType(i)).toString())
@@ -2159,18 +2162,16 @@ class ShortEventDescriptor : public MPEGDescriptor
         { return dvb_decode_text(&m_data[7 + m_data[5]], TextLength()); }
 
     // HACK beg -- Pro7Sat is missing encoding
-    QString EventName(const unsigned char *encoding_override,
-                      uint encoding_length) const
+    QString EventName(const enc_override& encoding_override) const
     {
         return dvb_decode_text(&m_data[6], m_data[5],
-                               encoding_override, encoding_length);
+                               encoding_override);
     }
 
-    QString Text(const unsigned char *encoding_override,
-                 uint encoding_length) const
+    QString Text(const enc_override& encoding_override) const
     {
         return dvb_decode_text(&m_data[7 + m_data[5]], TextLength(),
-                               encoding_override, encoding_length);
+                               encoding_override);
     }
     // HACK end -- Pro7Sat is missing encoding
 
@@ -2796,7 +2797,7 @@ class SkyLCNDescriptor : public MPEGDescriptor
 class OpenTVChannelListDescriptor : public MPEGDescriptor
 {
   public:
-    OpenTVChannelListDescriptor(const unsigned char *data, int len = 300) :
+    explicit OpenTVChannelListDescriptor(const unsigned char *data, int len = 300) :
         MPEGDescriptor(data, len, PrivateDescriptorID::opentv_channel_list) { }
     //       Name             bits  loc  expected value
     // descriptor_tag           8   0.0       0xB1
@@ -2834,7 +2835,7 @@ class DVBContentIdentifierDescriptor : public MPEGDescriptor
     {
         size_t count  = 0;
 
-        memset ((void *) m_crid, 0, sizeof(m_crid));
+        m_crid.fill(nullptr);
 
         if (IsValid())
         {
@@ -2879,7 +2880,7 @@ class DVBContentIdentifierDescriptor : public MPEGDescriptor
 
   private:
     size_t m_cridCount;
-    const uint8_t *m_crid[8] {};
+    std::array<const uint8_t*,8> m_crid {};
 };
 
 // ETSI TS 102 323 (TV Anytime)
@@ -2912,6 +2913,8 @@ class PrivateUPCCablecomEpisodeTitleDescriptor : public MPEGDescriptor
     public:
      explicit PrivateUPCCablecomEpisodeTitleDescriptor(const unsigned char *data, int len = 300) :
          MPEGDescriptor(data, len, PrivateDescriptorID::upc_event_episode_title) { }
+    explicit PrivateUPCCablecomEpisodeTitleDescriptor(const std::vector<uint8_t> &data) :
+        MPEGDescriptor(data, PrivateDescriptorID::upc_event_episode_title) { }
     //       Name             bits  loc  expected value
     // descriptor_tag           8   0.0       0xa7
     // descriptor_length        8   1.0

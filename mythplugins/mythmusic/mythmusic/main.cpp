@@ -57,7 +57,7 @@
  */
 static QString chooseCD(void)
 {
-    if (gCDdevice.length())
+    if (!gCDdevice.isEmpty())
         return gCDdevice;
 
 #ifdef Q_OS_MAC
@@ -353,7 +353,7 @@ static int runMenu(const QString& which_menu)
 
     while (parentObject)
     {
-        auto *menu = dynamic_cast<MythThemedMenu *>(parentObject);
+        auto *menu = qobject_cast<MythThemedMenu *>(parentObject);
 
         if (menu && menu->objectName() == "mainmenu")
         {
@@ -469,9 +469,8 @@ static QStringList BuildFileList(const QString &dir, const QStringList &filters)
     if (list.isEmpty())
         return ret;
 
-    for(QFileInfoList::const_iterator it = list.begin(); it != list.end(); ++it)
+    for (const auto & fi : qAsConst(list))
     {
-        const QFileInfo &fi = *it;
         if (fi.isDir())
         {
             ret += BuildFileList(fi.absoluteFilePath(), filters);
@@ -578,10 +577,9 @@ static void handleMedia(MythMediaDevice *cd)
 
     // Read track metadata and add to all_music
     int track = 0;
-    for (QStringList::const_iterator it = trackList.begin();
-            it != trackList.end(); ++it)
+    for (const auto & file : qAsConst(trackList))
     {
-        QScopedPointer<MusicMetadata> meta(MetaIO::readMetadata(*it));
+        QScopedPointer<MusicMetadata> meta(MetaIO::readMetadata(file));
         if (meta)
         {
             meta->setTrack(++track);
@@ -757,7 +755,7 @@ static void handleCDMedia(MythMediaDevice *cd)
                 songList.append((mdata)->ID());
         }
 
-        if (songList.count())
+        if (!songList.isEmpty())
         {
             gMusicData->m_all_playlists->getActive()->fillSonglistFromList(
                     songList, true, PL_REPLACE, 0);

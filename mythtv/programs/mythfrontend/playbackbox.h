@@ -8,7 +8,6 @@
 #include <deque>
 #include <utility>
 #include <vector>
-using namespace std;
 
 #include <QStringList>
 #include <QDateTime>
@@ -179,7 +178,7 @@ class PlaybackBox : public ScheduleCommon
 
     void askDelete();
     void Undelete(void);
-    void Delete(DeleteFlags flags = kNoFlags);
+    void Delete(PlaybackBox::DeleteFlags flags = kNoFlags);
     void DeleteForgetHistory(void)      { Delete(kForgetHistory); }
     void DeleteForce(void)              { Delete(kForce);         }
     void DeleteIgnore(void)             { Delete(kIgnore);        }
@@ -195,7 +194,7 @@ class PlaybackBox : public ScheduleCommon
     void toggleAutoExpire();
     void togglePreserveEpisode();
 
-    void toggleView(ViewMask itemMask, bool setOn);
+    void toggleView(PlaybackBox::ViewMask itemMask, bool setOn);
     void toggleTitleView(bool setOn)     { toggleView(VIEW_TITLES, setOn); }
     void toggleCategoryView(bool setOn)  { toggleView(VIEW_CATEGORIES, setOn); }
     void toggleRecGroupView(bool setOn)  { toggleView(VIEW_RECGROUPS, setOn); }
@@ -252,7 +251,7 @@ class PlaybackBox : public ScheduleCommon
     void doPlaylistAllowRerecord();
     void togglePlayListTitle(void);
     void togglePlayListItem(void);
-    void playSelectedPlaylist(bool random);
+    void playSelectedPlaylist(bool Random);
     void doPlayList(void);
     void showViewChanger(void);
     void saveViewChanges(void);
@@ -351,8 +350,8 @@ class PlaybackBox : public ScheduleCommon
 
     QString      m_artHostOverride;
     constexpr static int kNumArtImages = 3;
-    MythUIImage *m_artImage[kNumArtImages]    {};
-    QTimer      *m_artTimer[kNumArtImages]    {};
+    std::array<MythUIImage*,kNumArtImages> m_artImage {};
+    std::array<QTimer*,kNumArtImages>      m_artTimer {};
 
     InfoMap m_currentMap;
 

@@ -463,10 +463,10 @@ bool VideoDisplayProfile::CheckVideoRendererGroup(const QString &Renderer)
         QString("Preferred video renderer: %1 (current: %2)")
                 .arg(Renderer).arg(m_lastVideoRenderer));
 
-    for (const auto& group : qAsConst(s_safe_renderer_group))
-        if (group.contains(m_lastVideoRenderer) && group.contains(Renderer))
-            return true;
-    return false;
+    return std::any_of(s_safe_renderer_group.cbegin(), s_safe_renderer_group.cend(),
+                       [this,Renderer](const auto& group)
+                           { return group.contains(m_lastVideoRenderer) &&
+                                    group.contains(Renderer); } );
 }
 
 bool VideoDisplayProfile::IsDecoderCompatible(const QString &Decoder) const
@@ -502,7 +502,7 @@ void VideoDisplayProfile::SetPreference(const QString &Key, const QString &Value
 }
 
 vector<ProfileItem>::const_iterator VideoDisplayProfile::FindMatch
-    (const QSize &Size, float Framerate, const QString &CodecName, const QStringList DisallowedDecoders)
+    (const QSize &Size, float Framerate, const QString &CodecName, const QStringList& DisallowedDecoders)
 {
     for (auto it = m_allowedPreferences.cbegin(); it != m_allowedPreferences.cend(); ++it)
         if ((*it).IsMatch(Size, Framerate, CodecName, DisallowedDecoders))
@@ -661,7 +661,7 @@ bool VideoDisplayProfile::SaveDB(uint GroupId, vector<ProfileItem> &Items)
         if (list.begin() == list.end())
             continue;
 
-        QMap<QString,QString>::const_iterator lit = list.begin();
+        QMap<QString,QString>::const_iterator lit = list.cbegin();
 
         if (!item.GetProfileID())
         {
@@ -677,7 +677,7 @@ bool VideoDisplayProfile::SaveDB(uint GroupId, vector<ProfileItem> &Items)
                 item.SetProfileID(query.value(0).toUInt() + 1);
             }
 
-            for (; lit != list.end(); ++lit)
+            for (; lit != list.cend(); ++lit)
             {
                 if ((*lit).isEmpty())
                     continue;
@@ -696,7 +696,7 @@ bool VideoDisplayProfile::SaveDB(uint GroupId, vector<ProfileItem> &Items)
             continue;
         }
 
-        for (; lit != list.end(); ++lit)
+        for (; lit != list.cend(); ++lit)
         {
             query.prepare(
                 "SELECT count(*) "
@@ -807,8 +807,8 @@ QString VideoDisplayProfile::GetDecoderName(const QString &Decoder)
     }
 
     QString ret = Decoder;
-    QMap<QString,QString>::const_iterator it = s_dec_name.find(Decoder);
-    if (it != s_dec_name.end())
+    QMap<QString,QString>::const_iterator it = s_dec_name.constFind(Decoder);
+    if (it != s_dec_name.constEnd())
         ret = *it;
     return ret;
 }
@@ -904,11 +904,12 @@ QString VideoDisplayProfile::GetVideoRendererName(const QString &Renderer)
         s_rend_name["opengl"]         = QObject::tr("OpenGL");
         s_rend_name["opengl-yv12"]    = QObject::tr("OpenGL YV12");
         s_rend_name["opengl-hw"]      = QObject::tr("OpenGL Hardware");
+        s_rend_name["vulkan"]         = QObject::tr("Vulkan");
     }
 
     QString ret = Renderer;
-    QMap<QString,QString>::const_iterator it = s_rend_name.find(Renderer);
-    if (it != s_rend_name.end())
+    QMap<QString,QString>::const_iterator it = s_rend_name.constFind(Renderer);
+    if (it != s_rend_name.constEnd())
         ret = *it;
     return ret;
 }
@@ -1037,9 +1038,9 @@ void VideoDisplayProfile::CreateProfile(uint GroupId, uint Priority,
     queryValue += "pref_deint1";
     queryData  += Deint2;
 
-    QStringList::const_iterator itV = queryValue.begin();
-    QStringList::const_iterator itD = queryData.begin();
-    for (; itV != queryValue.end() && itD != queryData.end(); ++itV,++itD)
+    QStringList::const_iterator itV = queryValue.cbegin();
+    QStringList::const_iterator itD = queryData.cbegin();
+    for (; itV != queryValue.cend() && itD != queryData.cend(); ++itV,++itD)
     {
         if (itD->isEmpty())
             continue;
@@ -1265,9 +1266,9 @@ QStringList VideoDisplayProfile::GetVideoRenderers(const QString &Decoder)
     QMutexLocker locker(&s_safe_lock);
     InitStatics();
 
-    QMap<QString,QStringList>::const_iterator it = s_safe_renderer.find(Decoder);
+    QMap<QString,QStringList>::const_iterator it = s_safe_renderer.constFind(Decoder);
     QStringList tmp;
-    if (it != s_safe_renderer.end())
+    if (it != s_safe_renderer.constEnd())
         tmp = *it;
     return tmp;
 }
@@ -1354,8 +1355,8 @@ QString VideoDisplayProfile::GetBestVideoRenderer(const QStringList &Renderers)
 
     for (const auto& renderer : qAsConst(Renderers))
     {
-        QMap<QString,uint>::const_iterator p = s_safe_renderer_priority.find(renderer);
-        if ((p != s_safe_renderer_priority.end()) && (*p >= top_priority))
+        QMap<QString,uint>::const_iterator p = s_safe_renderer_priority.constFind(renderer);
+        if ((p != s_safe_renderer_priority.constEnd()) && (*p >= top_priority))
         {
             top_priority = *p;
             top_renderer = renderer;
@@ -1407,7 +1408,7 @@ void VideoDisplayProfile::InitStatics(bool Reinit /*= false*/)
     options.decoders       = &s_safe_decoders;
     options.equiv_decoders = &s_safe_equiv_dec;
 
-    // N.B. assumes NuppelDecoder and DummyDecoder always present
+    // N.B. assumes DummyDecoder always present
     AvFormatDecoder::GetDecoders(options);
     MythVideoOutput::GetRenderOptions(options);
 

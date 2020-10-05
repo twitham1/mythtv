@@ -431,12 +431,10 @@ void HttpStatus::FillStatusXML( QDomDocument *pDoc )
     // drive space   ---------------------
 
     QStringList strlist;
-    QString dirs;
     QString hostname;
     QString directory;
     QString isLocalstr;
     QString fsID;
-    QString ids;
 
     if (m_pMainServer)
         m_pMainServer->BackendQueryDiskSpace(strlist, true, m_bIsMaster);
@@ -446,8 +444,8 @@ void HttpStatus::FillStatusXML( QDomDocument *pDoc )
     // Make a temporary list to hold the per-filesystem elements so that the
     // total is always the first element.
     QList<QDomElement> fsXML;
-    QStringList::const_iterator sit = strlist.begin();
-    while (sit != strlist.end())
+    QStringList::const_iterator sit = strlist.cbegin();
+    while (sit != strlist.cend())
     {
         // cppcheck-suppress unreadVariable
         hostname   = *(sit++);

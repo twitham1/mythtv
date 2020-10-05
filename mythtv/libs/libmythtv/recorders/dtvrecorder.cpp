@@ -59,6 +59,8 @@ DTVRecorder::DTVRecorder(TVRec *rec) :
         gCoreContext->GetNumSetting("MinimumRecordingQuality", 95);
 
     m_containerFormat = formatMPEG2_TS;
+
+    m_continuityCounter.fill(0xff);
 }
 
 DTVRecorder::~DTVRecorder(void)
@@ -351,7 +353,7 @@ static int64_t extract_timestamp(
 }
 
 static QDateTime ts_to_qdatetime(
-    uint64_t pts, uint64_t pts_first, QDateTime &pts_first_dt)
+    uint64_t pts, uint64_t pts_first, const QDateTime &pts_first_dt)
 {
     if (pts < pts_first)
         pts += 0x1FFFFFFFFLL;
@@ -603,10 +605,10 @@ void DTVRecorder::HandleTimestamps(int stream_id, int64_t pts, int64_t dts)
         return;
     }
 
-    if ((dts < 0) && !m_use_pts)
+    if ((dts < 0) && !m_usePts)
     {
         m_tsLast[stream_id] = -1;
-        m_use_pts = true;
+        m_usePts = true;
         LOG(VB_RECORD, LOG_DEBUG,
             "Switching from dts tracking to pts tracking." +
             QString("TS count is %1").arg(m_tsCount[stream_id]));
@@ -614,7 +616,7 @@ void DTVRecorder::HandleTimestamps(int stream_id, int64_t pts, int64_t dts)
 
     int64_t ts = dts;
     int64_t gap_threshold = 90000; // 1 second
-    if (m_use_pts)
+    if (m_usePts)
     {
         ts = dts;
         gap_threshold = 2*90000; // two seconds, compensate for GOP ordering
@@ -1378,7 +1380,7 @@ void DTVRecorder::HandleSingleProgramPMT(ProgramMapTable *pmt, bool insert)
                     }
                     break;
                 case StreamID::H265Video:
-                  LOG(VB_GENERAL, LOG_WARNING, LOC + "HEVC detected");
+                  LOG(VB_GENERAL, LOG_INFO, LOC + "HEVC detected");
                     m_primaryVideoCodec = AV_CODEC_ID_H265;
                     if (dynamic_cast<HEVCParser *>(m_h2645Parser) == nullptr)
                     {
@@ -1499,17 +1501,15 @@ bool DTVRecorder::ProcessTSPacket(const TSPacket &tspacket)
          * unprocessed we cannot wait for a keyframe to trigger the
          * writes. */
 
-        static MythTimer s_timer;
-
         if (m_framesSeenCount++ == 0)
-            s_timer.start();
+            m_recordMptsTimer.start();
 
-        if (s_timer.elapsed() > 500) // 0.5 seconds
+        if (m_recordMptsTimer.elapsed() > 500) // 0.5 seconds
         {
             UpdateFramesWritten();
             m_lastKeyframeSeen = m_framesSeenCount;
             HandleKeyframe(m_payloadBuffer.size());
-            s_timer.addMSecs(-500);
+            m_recordMptsTimer.addMSecs(-500);
         }
     }
     else if (m_streamId[pid] == 0)

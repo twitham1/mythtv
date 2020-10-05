@@ -8,7 +8,6 @@
 // STL headers
 #include <list>
 #include <vector>
-using namespace std;
 
 // Qt headers
 #include <QWaitCondition>
@@ -195,12 +194,12 @@ class MHIContext : public MHContext, public QRunnable
     MHEG            *m_engine; // Pointer to the MHEG engine
 
     mutable QMutex   m_runLock;
-    QWaitCondition   m_engine_wait; // protected by m_runLock
+    QWaitCondition   m_engineWait; // protected by m_runLock
     bool             m_stop           {false}; // protected by m_runLock
     QMutex           m_displayLock;
     bool             m_updated        {false};
 
-    list<MHIImageData*> m_display; // List of items to display
+    std::list<MHIImageData*> m_display; // List of items to display
 
     FT_Face          m_face           {nullptr};
     bool             m_faceLoaded     {false};
@@ -217,7 +216,7 @@ class MHIContext : public MHContext, public QRunnable
     QList<int>       m_tuneInfo;
 
     uint             m_lastNbiVersion {NBI_VERSION_UNSET};
-    vector<unsigned char> m_nbiData;
+    std::vector<unsigned char> m_nbiData;
 
     QRect            m_videoRect, m_videoDisplayRect;
     QRect            m_displayRect;
@@ -225,7 +224,7 @@ class MHIContext : public MHContext, public QRunnable
     // Channel index database cache
     using Val_t = QPair< int, int >; // transportid, chanid
     using Key_t = QPair< int, int >; // networkid, serviceid
-    using ChannelCache_t = QMap< Key_t, Val_t >;
+    using ChannelCache_t = QMultiMap< Key_t, Val_t >;
     ChannelCache_t  m_channelCache;
     QMutex          m_channelMutex;
     static inline int Tid(ChannelCache_t::const_iterator it) { return it->first; }
@@ -344,7 +343,7 @@ class MHIDLA : public MHDLADisplay
     void DrawOval(int x, int y, int width, int height) override; // MHDLADisplay
     void DrawArcSector(int x, int y, int width, int height,
                        int start, int arc, bool isSector) override; // MHDLADisplay
-    void DrawPoly(bool isFilled, int nPoints, const int *xArray, const int *yArray) override; // MHDLADisplay
+    void DrawPoly(bool isFilled, const MHPointVec& xArray, const MHPointVec& yArray) override; // MHDLADisplay
 
   protected:
     void DrawRect(int x, int y, int width, int height, MHRgba colour);

@@ -21,6 +21,14 @@
 #include "upnptaskevent.h"
 #include "mythlogging.h"
 
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
+  #define QT_ENDL endl
+  #define QT_FLUSH flush
+#else
+  #define QT_ENDL Qt::endl
+  #define QT_FLUSH Qt::flush
+#endif
+
 /////////////////////////////////////////////////////////////////////////////
 //
 /////////////////////////////////////////////////////////////////////////////
@@ -30,8 +38,8 @@ uint StateVariables::BuildNotifyBody(
 {
     uint nCount = 0;
 
-    ts << "<?xml version=\"1.0\"?>" << endl
-       << "<e:propertyset xmlns:e=\"urn:schemas-upnp-org:event-1-0\">" << endl;
+    ts << "<?xml version=\"1.0\"?>" << QT_ENDL
+       << "<e:propertyset xmlns:e=\"urn:schemas-upnp-org:event-1-0\">" << QT_ENDL;
 
     for (auto *prop : qAsConst(m_map))
     {
@@ -39,16 +47,16 @@ uint StateVariables::BuildNotifyBody(
         {
             nCount++;
 
-            ts << "<e:property>" << endl;
+            ts << "<e:property>" << QT_ENDL;
             ts <<   "<" << prop->m_sName << ">";
             ts <<     prop->ToString();
             ts <<   "</" << prop->m_sName << ">";
-            ts << "</e:property>" << endl;
+            ts << "</e:property>" << QT_ENDL;
         }
     }
 
-    ts << "</e:propertyset>" << endl;
-    ts << flush;
+    ts << "</e:propertyset>" << QT_ENDL;
+    ts << QT_FLUSH;
 
     return nCount;
 }
@@ -74,9 +82,9 @@ Eventing::Eventing(const QString &sExtensionName,
 
 Eventing::~Eventing()
 {
-    for (const auto *subscriber : qAsConst(m_Subscribers))
+    for (const auto *subscriber : qAsConst(m_subscribers))
         delete subscriber;
-    m_Subscribers.clear();
+    m_subscribers.clear();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -238,13 +246,13 @@ void Eventing::HandleSubscribe( HTTPRequest *pRequest )
 
         pInfo = new SubscriberInfo( sCallBack, nDuration );
 
-        Subscribers::iterator it = m_Subscribers.find(pInfo->m_sUUID);
-        if (it != m_Subscribers.end())
+        Subscribers::iterator it = m_subscribers.find(pInfo->m_sUUID);
+        if (it != m_subscribers.end())
         {
             delete *it;
-            m_Subscribers.erase(it);
+            m_subscribers.erase(it);
         }
-        m_Subscribers[pInfo->m_sUUID] = pInfo;
+        m_subscribers[pInfo->m_sUUID] = pInfo;
 
         // Use PostProcess Hook to Send Initial FULL Notification...
         //      *** Must send this response first then notify.
@@ -262,7 +270,7 @@ void Eventing::HandleSubscribe( HTTPRequest *pRequest )
         if ( sSID.length() != 0 )   
         {
             sSID  = sSID.mid( 5 );
-            pInfo = m_Subscribers[sSID];
+            pInfo = m_subscribers[sSID];
         }
 
     }
@@ -302,11 +310,11 @@ void Eventing::HandleUnsubscribe( HTTPRequest *pRequest )
 
     sSID = sSID.mid( 5 );
 
-    Subscribers::iterator it = m_Subscribers.find(sSID);
-    if (it != m_Subscribers.end())
+    Subscribers::iterator it = m_subscribers.find(sSID);
+    if (it != m_subscribers.end())
     {
         delete *it;
-        m_Subscribers.erase(it);
+        m_subscribers.erase(it);
         pRequest->m_nResponseStatus = 200;
     }
 }
@@ -322,8 +330,8 @@ void Eventing::Notify()
 
     m_mutex.lock();
 
-    Subscribers::iterator it = m_Subscribers.begin();
-    while (it != m_Subscribers.end())
+    Subscribers::iterator it = m_subscribers.begin();
+    while (it != m_subscribers.end())
     { 
         if (!(*it))
         {   // This should never happen, but if someone inserted bad data...
@@ -341,7 +349,7 @@ void Eventing::Notify()
         {
             // Time to expire this subscription. Remove subscriber from list.
             delete *it;
-            it = m_Subscribers.erase(it);
+            it = m_subscribers.erase(it);
         }
     }
 
@@ -395,7 +403,7 @@ void Eventing::NotifySubscriber( SubscriberInfo *pInfo )
         tsMsg << "SEQ: " << QString::number( pInfo->m_nKey ) << "\r\n";
         tsMsg << "\r\n";
         tsMsg << aBody;
-        tsMsg << flush;
+        tsMsg << QT_FLUSH;
 
         // ------------------------------------------------------------------
         // Add new EventTask to the TaskQueue to do the actual sending.

@@ -43,8 +43,6 @@
 #define LOC_WARN QString("MythScreenWizard, Warning: ")
 #define LOC_ERR  QString("MythScreenWizard, Error: ")
 
-using namespace std;
-
 namespace
 {
     void cleanup()
@@ -170,8 +168,6 @@ int main(int argc, char **argv)
     gCoreContext->OverrideSettingForSession("GuiHeight",  "0");
 
     cmdline.ApplySettingsOverride();
-
-    GetMythUI()->LoadQtConfig();
 
     QString themename = gCoreContext->GetSetting("Theme", DEFAULT_UI_THEME);
     QString themedir = GetMythUI()->FindThemeDir(themename);

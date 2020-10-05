@@ -93,9 +93,9 @@ DTC::VideoMetadataInfoList* Video::GetVideoList( const QString &Folder,
 
     auto *pVideoMetadataInfos = new DTC::VideoMetadataInfoList();
 
-    nStartIndex   = (nStartIndex > 0) ? min( nStartIndex, (int)videos.size() ) : 0;
-    nCount        = (nCount > 0) ? min( nCount, (int)videos.size() ) : videos.size();
-    int nEndIndex = min((nStartIndex + nCount), (int)videos.size() );
+    nStartIndex   = (nStartIndex > 0) ? std::min( nStartIndex, (int)videos.size() ) : 0;
+    nCount        = (nCount > 0) ? std::min( nCount, (int)videos.size() ) : videos.size();
+    int nEndIndex = std::min((nStartIndex + nCount), (int)videos.size() );
 
     for( int n = nStartIndex; n < nEndIndex; n++ )
     {
@@ -840,6 +840,100 @@ DTC::VideoStreamInfoList* Video::GetStreamInfo
 
     }
     return pVideoStreamInfos;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Get bookmark of a video as a frame number.
+/////////////////////////////////////////////////////////////////////////////
+
+long Video::GetSavedBookmark( int  Id )
+{
+    MSqlQuery query(MSqlQuery::InitCon());
+
+    query.prepare("SELECT filename "
+                  "FROM videometadata "
+                  "WHERE intid = :ID ");
+    query.bindValue(":ID", Id);
+
+    if (!query.exec())
+    {
+        MythDB::DBError("Video::GetSavedBookmark", query);
+        return 0;
+    }
+
+    QString fileName;
+
+    if (query.next())
+        fileName = query.value(0).toString();
+    else
+    {
+        LOG(VB_GENERAL, LOG_ERR, QString("Video/GetSavedBookmark Video id %1 Not found.").arg(Id));
+        return -1;
+    }
+
+    ProgramInfo pi(fileName,
+                         nullptr, // _plot,
+                         nullptr, // _title,
+                         nullptr, // const QString &_sortTitle,
+                         nullptr, // const QString &_subtitle,
+                         nullptr, // const QString &_sortSubtitle,
+                         nullptr, // const QString &_director,
+                         0, // int _season,
+                         0, // int _episode,
+                         nullptr, // const QString &_inetref,
+                         0, // uint _length_in_minutes,
+                         0, // uint _year,
+                         nullptr); //const QString &_programid);
+
+    long ret = pi.QueryBookmark();
+    return ret;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Set bookmark of a video as a frame number.
+/////////////////////////////////////////////////////////////////////////////
+
+bool Video::SetSavedBookmark( int  Id, long Offset )
+{
+    MSqlQuery query(MSqlQuery::InitCon());
+
+    query.prepare("SELECT filename "
+                  "FROM videometadata "
+                  "WHERE intid = :ID ");
+    query.bindValue(":ID", Id);
+
+    if (!query.exec())
+    {
+        MythDB::DBError("Video::SetSavedBookmark", query);
+        return false;
+    }
+
+    QString fileName;
+
+    if (query.next())
+        fileName = query.value(0).toString();
+    else
+    {
+        LOG(VB_GENERAL, LOG_ERR, QString("Video/SetSavedBookmark Video id %1 Not found.").arg(Id));
+        return false;
+    }
+
+    ProgramInfo pi(fileName,
+                         nullptr, // _plot,
+                         nullptr, // _title,
+                         nullptr, // const QString &_sortTitle,
+                         nullptr, // const QString &_subtitle,
+                         nullptr, // const QString &_sortSubtitle,
+                         nullptr, // const QString &_director,
+                         0, // int _season,
+                         0, // int _episode,
+                         nullptr, // const QString &_inetref,
+                         0, // uint _length_in_minutes,
+                         0, // uint _year,
+                         nullptr); //const QString &_programid);
+
+    pi.SaveBookmark(Offset);
+    return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////

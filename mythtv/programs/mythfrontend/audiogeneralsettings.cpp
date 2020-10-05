@@ -32,7 +32,9 @@ AudioDeviceComboBox::AudioDeviceComboBox(AudioConfigSettings *parent) :
     HostComboBoxSetting("AudioOutputDevice", true), m_parent(parent)
 {
     setLabel(tr("Audio output device"));
-#ifdef USING_ALSA
+#ifdef Q_OS_ANDROID
+    QString dflt = "OpenSLES:";
+#elif USING_ALSA
     QString dflt = "ALSA:default";
 #elif USING_PULSEOUTPUT
     QString dflt = "PulseAudio:default";
@@ -40,8 +42,6 @@ AudioDeviceComboBox::AudioDeviceComboBox(AudioConfigSettings *parent) :
     QString dflt = "CoreAudio:";
 #elif _WIN32
     QString dflt = "Windows:";
-#elif ANDROID
-    QString dflt = "OpenSLES:";
 #else
     QString dflt = "NULL";
 #endif
@@ -100,7 +100,7 @@ void AudioConfigScreen::Init(void)
 {
     StandardSettingDialog::Init();
 
-    auto *settings = dynamic_cast<AudioConfigSettings*>(GetGroupSettings());
+    auto *settings = qobject_cast<AudioConfigSettings*>(GetGroupSettings());
     if (settings == nullptr)
         return;
     settings->CheckConfiguration();
@@ -564,7 +564,8 @@ static void fillSelectionsFromDir(HostComboBoxSetting *comboBox,
                                   const QDir& dir, bool absPath = true)
 
 {
-    for (const auto & fi : dir.entryInfoList())
+    QFileInfoList entries = dir.entryInfoList();
+    for (const auto & fi : qAsConst(entries))
     {
         if (absPath)
             comboBox->addSelection( fi.absoluteFilePath() );
@@ -650,7 +651,7 @@ void AudioTestThread::run()
 {
     RunProlog();
     m_interrupted = false;
-    int smptelayout[7][8] = {
+    std::array<std::array<int,8>,7> smptelayout {{
         { 0, 1, 1 },                    //stereo
         { },                            //not used
         { },                            //not used
@@ -658,7 +659,7 @@ void AudioTestThread::run()
         { 0, 2, 1, 5, 4, 3 },           //5.1
         { 0, 2, 1, 6, 4, 5, 3 },        //6.1
         { 0, 2, 1, 7, 5, 4, 6, 3 },     //7.1
-    };
+    }};
 
     if (m_audioOutput)
     {
@@ -1079,7 +1080,7 @@ HostComboBoxSetting *AudioConfigSettings::MixerDevice()
     gc->addSelection("DirectX:", "DirectX:");
     gc->addSelection("Windows:", "Windows:");
 #endif
-#ifdef ANDROID
+#ifdef Q_OS_ANDROID
     gc->addSelection("OpenSLES:", "OpenSLES:");
 #endif
 #if !defined(_WIN32)
@@ -1094,7 +1095,7 @@ HostComboBoxSetting *AudioConfigSettings::MixerDevice()
     return gc;
 }
 
-const char* AudioConfigSettings::kMixerControlControls[] =
+const std::array<const char *,2> AudioConfigSettings::kMixerControlControls
     {QT_TR_NOOP("PCM"),
      QT_TR_NOOP("Master")};
 
@@ -1104,7 +1105,7 @@ HostComboBoxSetting *AudioConfigSettings::MixerControl()
 
     gc->setLabel(tr("Mixer controls"));
 
-    for (auto & control : kMixerControlControls)
+    for (const auto & control : kMixerControlControls)
         gc->addSelection(tr(control), control);
 
     gc->setHelpText(tr("Changing the volume adjusts the selected mixer."));

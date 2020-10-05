@@ -33,8 +33,6 @@
 #include <decoderhandler.h>
 #include <mythavutil.h>
 
-using namespace std;
-
 // Mythmusic Headers
 #include "avfdecoder.h"
 #include "metaio.h"
@@ -509,7 +507,8 @@ void avfDecoder::run()
                 if (buffered < 1000)
                     break;
                 // wait
-                usleep((buffered - 1000) * 1000);
+                const struct timespec ns {0, (buffered - 1000) * 1000000};
+                nanosleep(&ns, nullptr);
             }
         }
     }
@@ -586,13 +585,9 @@ bool avfDecoderFactory::supports(const QString &source) const
 #else
     QStringList list = extension().split("|", Qt::SkipEmptyParts);
 #endif
-    for (QStringList::const_iterator it = list.begin(); it != list.end(); ++it)
-    {
-        if (*it == source.right((*it).length()).toLower())
-            return true;
-    }
-
-    return false;
+    return std::any_of(list.cbegin(), list.cend(),
+                       [source](const auto& str)
+                           { return str == source.right(str.length()).toLower(); } );
 }
 
 const QString &avfDecoderFactory::extension() const

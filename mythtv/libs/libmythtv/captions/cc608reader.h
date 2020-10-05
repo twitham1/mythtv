@@ -48,7 +48,7 @@ class CC608Buffer
     }
 
     QMutex             m_lock;
-    vector<CC608Text*> m_buffers;
+    std::vector<CC608Text*> m_buffers;
 };
 
 class CC608StateTracker
@@ -95,7 +95,7 @@ class MTV_PUBLIC CC608Reader : public CC608Input
 
   private:
     int Update(unsigned char *inpos);
-    void Update608Text(vector<CC608Text*> *ccbuf,
+    void Update608Text(std::vector<CC608Text*> *ccbuf,
                          int replace = 0, int scroll = 0,
                          bool scroll_prsv = false,
                          int scroll_yoff = 0, int scroll_ymax = 15,
@@ -109,11 +109,11 @@ class MTV_PUBLIC CC608Reader : public CC608Input
     int               m_writePosition {0};
     QMutex            m_inputBufLock;
     int               m_maxTextSize   {0};
-    TextContainer     m_inputBuffers[MAXTBUFFER+1] {};
+    std::array<TextContainer,MAXTBUFFER+1> m_inputBuffers {};
     int               m_ccMode        {CC_CC1};
     int               m_ccPageNum     {0x888};
     // Output buffers
-    CC608StateTracker m_state[MAXOUTBUFFERS];
+    std::array<CC608StateTracker,MAXOUTBUFFERS> m_state;
 };
 
 #endif // CC608READER_H

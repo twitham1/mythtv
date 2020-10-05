@@ -30,16 +30,16 @@
  *
  */
 
+// C++ includes
 #include <vector>
-using namespace std;
 
+// MythTV includes
 #include "transporteditor.h"
 #include "videosource.h"
 #include "sourceutil.h"
 #include "mythcorecontext.h"
 #include "mythdb.h"
-
-#define LOC QString("DTVMux: ")
+#include "satiputils.h"
 
 class MultiplexID : public AutoIncrementSetting
 {
@@ -70,7 +70,7 @@ static QString pp_modulation(const QString& mod)
 
 static CardUtil::INPUT_TYPES get_cardtype(uint sourceid)
 {
-    vector<uint> cardids;
+    std::vector<uint> cardids;
 
     // Work out what card we have.. (doesn't always work well)
     MSqlQuery query(MSqlQuery::InitCon());
@@ -100,7 +100,7 @@ static CardUtil::INPUT_TYPES get_cardtype(uint sourceid)
         return CardUtil::ERROR_PROBE;
     }
 
-    vector<CardUtil::INPUT_TYPES> cardtypes;
+    std::vector<CardUtil::INPUT_TYPES> cardtypes;
 
     for (uint cardid : cardids)
     {
@@ -116,6 +116,12 @@ static CardUtil::INPUT_TYPES get_cardtype(uint sourceid)
                 nType = CardUtil::DVBC;
             else if (CardUtil::HDHRdoesDVB(CardUtil::GetVideoDevice(cardid)))
                 nType = CardUtil::DVBT2;
+        }
+
+        if (nType == CardUtil::SATIP)
+        {
+            QString deviceid = CardUtil::GetVideoDevice(cardid);
+            nType = SatIP::toDVBInputType(deviceid);
         }
 
         if ((CardUtil::ERROR_OPEN    == nType) ||
@@ -187,7 +193,7 @@ static CardUtil::INPUT_TYPES get_cardtype(uint sourceid)
 
 void TransportListEditor::SetSourceID(uint sourceid)
 {
-    for (auto *setting : m_list)
+    for (auto *setting : qAsConst(m_list))
         removeChild(setting);
     m_list.clear();
 

@@ -1,0 +1,103 @@
+// MythTV
+#include "mythlogging.h"
+#include "vulkan/mythvideotexturevulkan.h"
+
+#define LOC QString("VulkanVidTex: ")
+
+vector<MythVideoTextureVulkan*> MythVideoTextureVulkan::CreateTextures(MythVulkanObject* Vulkan,
+                                                                       VkCommandBuffer CommandBuffer,
+                                                                       VideoFrameType Type,
+                                                                       VideoFrameType Format,
+                                                                       QSize Size)
+{
+    if (!(Vulkan && Vulkan->IsValidVulkan() && !Size.isEmpty()))
+        return vector<MythVideoTextureVulkan*>{};
+
+    if (format_is_hw(Type))
+        return vector<MythVideoTextureVulkan*>{};
+
+    return CreateSoftwareTextures(Vulkan, CommandBuffer, Type, Format, Size);
+}
+
+MythVideoTextureVulkan::MythVideoTextureVulkan(VideoFrameType Type, VideoFrameType Format)
+{
+    m_frameType = Type;
+    m_frameFormat = Format;
+    m_valid = false;
+    m_plane = 0;
+    m_planeCount = planes(Format);
+}
+
+void MythVideoTextureVulkan::DeleteTextures(MythVulkanObject *Vulkan,
+                                            VkCommandBuffer CommandBuffer,
+                                            vector<MythVideoTextureVulkan*>& Textures)
+{
+    if (!(Vulkan && Vulkan->IsValidVulkan()))
+        return;
+
+    VkCommandBuffer cmdbuffer = nullptr;
+    if (!CommandBuffer)
+    {
+        cmdbuffer = Vulkan->Render()->CreateSingleUseCommandBuffer();
+        CommandBuffer = cmdbuffer;
+    }
+
+    for (auto * texture : Textures)
+        MythVideoTextureVulkan::DeleteTexture(Vulkan, CommandBuffer, texture);
+
+    if (cmdbuffer)
+        Vulkan->Render()->FinishSingleUseCommandBuffer(cmdbuffer);
+
+    Textures.clear();
+}
+
+void MythVideoTextureVulkan::DeleteTexture(MythVulkanObject* Vulkan,
+                                           VkCommandBuffer CommandBuffer,
+                                           MythVideoTextureVulkan* Texture)
+{
+    if (!(Vulkan && Vulkan->IsValidVulkan() && CommandBuffer && Texture))
+        return;
+
+    delete Texture;
+}
+
+vector<MythVideoTextureVulkan*> MythVideoTextureVulkan::CreateSoftwareTextures(MythVulkanObject* Vulkan,
+                                                                               VkCommandBuffer CommandBuffer,
+                                                                               VideoFrameType Type,
+                                                                               VideoFrameType Format,
+                                                                               QSize Size)
+{
+    (void)Vulkan;
+    (void)CommandBuffer;
+    (void)Type;
+
+    vector<MythVideoTextureVulkan*> result;
+
+    uint count = planes(Format);
+    if (count < 1)
+    {
+        LOG(VB_GENERAL, LOG_ERR, LOC + "Invalid software frame format");
+        return result;
+    }
+
+    for (uint plane = 0; plane < count; ++plane)
+    {
+        QSize size = Size;
+        MythVideoTextureVulkan* texture = nullptr;
+        switch (Format)
+        {
+            case FMT_YV12:
+                if (plane > 0)
+                    size = QSize(size.width() >> 1, size.height() >> 1);
+                //texture = CreateTexture(Context, size, Target,
+                //              QOpenGLTexture::UInt8, r8pixelfmtnorm, r8internalfmt);
+                break;
+            default: break;
+        }
+
+        if (texture)
+            result.push_back(texture);
+    }
+
+    return result;
+}

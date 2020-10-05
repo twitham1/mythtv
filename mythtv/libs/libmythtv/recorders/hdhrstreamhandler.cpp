@@ -244,21 +244,21 @@ bool HDHRStreamHandler::UpdateFilters(void)
     }
 
 #ifdef DEBUG_PID_FILTERS
-    LOG(VB_RECORD, LOG_INFO, LOC + "UpdateFilters()");
+    LOG(VB_RECORD, LOG_DEBUG, LOC + "UpdateFilters()");
 #endif // DEBUG_PID_FILTERS
     QMutexLocker locker(&m_pidLock);
 
     QString filter = "";
 
-    vector<uint> range_min;
-    vector<uint> range_max;
+    std::vector<uint> range_min;
+    std::vector<uint> range_max;
 
     for (auto it = m_pidInfo.cbegin(); it != m_pidInfo.cend(); ++it)
     {
         range_min.push_back(it.key());
         PIDInfoMap::const_iterator eit = it;
         for (++eit;
-             (eit != m_pidInfo.end()) && (it.key() + 1 == eit.key());
+             (eit != m_pidInfo.cend()) && (it.key() + 1 == eit.key());
              ++it, ++eit);
         range_max.push_back(it.key());
     }
@@ -287,7 +287,7 @@ bool HDHRStreamHandler::UpdateFilters(void)
     if (filter != new_filter)
         msg += QString("\n\t\t\t\t'%2'").arg(new_filter);
 
-    LOG(VB_RECORD, LOG_INFO, LOC + msg);
+    LOG(VB_RECORD, LOG_DEBUG, LOC + msg);
 #endif // DEBUG_PID_FILTERS
 
     return filter == new_filter;
@@ -299,7 +299,7 @@ bool HDHRStreamHandler::Open(void)
     {
         const char *model = hdhomerun_device_get_model_str(m_hdhomerunDevice);
         m_tunerTypes.clear();
-        if (QString(model).toLower().contains("cablecard"))
+        if (QString(model).contains("cablecard", Qt::CaseInsensitive))
         {
             QString status_channel = "none";
             hdhomerun_tuner_status_t t_status {};
@@ -329,15 +329,15 @@ bool HDHRStreamHandler::Open(void)
                 m_tunerTypes.emplace_back(DTVTunerType::kTunerTypeOCUR);
             }
         }
-        else if (QString(model).toLower().endsWith("dvbt"))
+        else if (QString(model).endsWith("dvbt", Qt::CaseInsensitive))
         {
             m_tunerTypes.emplace_back(DTVTunerType::kTunerTypeDVBT);
         }
-        else if (QString(model).toLower().endsWith("dvbc"))
+        else if (QString(model).endsWith("dvbc", Qt::CaseInsensitive))
         {
             m_tunerTypes.emplace_back(DTVTunerType::kTunerTypeDVBC);
         }
-        else if (QString(model).toLower().endsWith("dvbtc"))
+        else if (QString(model).endsWith("dvbtc", Qt::CaseInsensitive))
         {
             m_tunerTypes.emplace_back(DTVTunerType::kTunerTypeDVBT);
             m_tunerTypes.emplace_back(DTVTunerType::kTunerTypeDVBC);

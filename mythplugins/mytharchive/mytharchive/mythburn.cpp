@@ -41,8 +41,6 @@
 #include "videoselector.h"
 #include "logviewer.h"
 
-using namespace std;
-
 MythBurn::MythBurn(MythScreenStack   *parent,
                    MythScreenType    *destinationScreen,
                    MythScreenType    *themeScreen,
@@ -603,7 +601,7 @@ void MythBurn::createConfigFile(const QString &filename)
             QDomElement thumbs = doc.createElement("thumbimages");
             file.appendChild(thumbs);
 
-            for (auto *thumbImage : a->thumbList)
+            for (auto *thumbImage : qAsConst(a->thumbList))
             {
                 QDomElement thumb = doc.createElement("thumb");
                 thumbs.appendChild(thumb);
@@ -1028,7 +1026,7 @@ bool ProfileDialog::Create()
         return false;
     }
 
-    for (auto *x : m_profileList)
+    for (auto *x : qAsConst(m_profileList))
     {
         auto *item = new
                 MythUIButtonListItem(m_profileBtnList, x->name);
@@ -1138,7 +1136,6 @@ void BurnMenu::doBurn(int mode)
         return;
 
     QString logDir = tempDir + "logs";
-    QString configDir = tempDir + "config";
     QString commandline;
 
     // remove existing progress.log if present

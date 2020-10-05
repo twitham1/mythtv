@@ -166,7 +166,7 @@ void ThemeChooser::Load(void)
     }
 
     // MYTH_SOURCE_VERSION - examples v29-pre-574-g92517f5, v29-Pre, v29.1-21-ge26a33c
-    QString MythVersion(MYTH_SOURCE_VERSION);
+    QString MythVersion(GetMythSourceVersion());
     QRegExp trunkver("v[0-9]+-pre.*",Qt::CaseInsensitive);
     QRegExp validver("v[0-9]+.*",Qt::CaseInsensitive);
 
@@ -196,7 +196,7 @@ void ThemeChooser::Load(void)
         // MYTH_SOURCE_VERSION - examples v29-pre-574-g92517f5, v29-Pre, v29.1-21-ge26a33c
         QRegExp subexp("v[0-9]+\\.([0-9]+)-*");
         // This captures the subversion, i.e. the number after a dot
-        int pos = subexp.indexIn(MYTH_SOURCE_VERSION);
+        int pos = subexp.indexIn(GetMythSourceVersion());
         if (pos > -1)
         {
             QString subversion;
@@ -450,7 +450,6 @@ void ThemeChooser::Init(void)
             item->SetData(QVariant::fromValue(themeinfo));
 
             QString thumbnail = themeinfo->GetPreviewPath();
-            QFileInfo fInfo(thumbnail);
             // Downloadable themeinfos have thumbnail copies of their preview images
             if (!themeinfo->GetDownloadURL().isEmpty())
                 thumbnail = thumbnail.append(".thumb.jpg");
@@ -976,19 +975,17 @@ bool ThemeChooser::removeThemeDir(const QString &dirname)
 
     dir.setFilter(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
     QFileInfoList list = dir.entryInfoList();
-    QFileInfoList::const_iterator it = list.begin();
 
-    while (it != list.end())
+    for (const auto & fi : qAsConst(list))
     {
-        const QFileInfo *fi = &(*it++);
-        if (fi->isFile() && !fi->isSymLink())
+        if (fi.isFile() && !fi.isSymLink())
         {
-            if (!QFile::remove(fi->absoluteFilePath()))
+            if (!QFile::remove(fi.absoluteFilePath()))
                 return false;
         }
-        else if (fi->isDir() && !fi->isSymLink())
+        else if (fi.isDir() && !fi.isSymLink())
         {
-            if (!removeThemeDir(fi->absoluteFilePath()))
+            if (!removeThemeDir(fi.absoluteFilePath()))
                 return false;
         }
     }
@@ -1001,7 +998,7 @@ bool ThemeChooser::removeThemeDir(const QString &dirname)
 ThemeUpdateChecker::ThemeUpdateChecker(void) :
     m_updateTimer(new QTimer(this))
 {
-    QString version = MYTH_SOURCE_PATH;
+    QString version = GetMythSourcePath();
 
     if (!version.isEmpty() && !version.startsWith("fixes/"))
     {
@@ -1015,10 +1012,9 @@ ThemeUpdateChecker::ThemeUpdateChecker(void) :
 
         // If a version of the theme for this tag exists, use it...
         QRegExp subexp("v[0-9]+.[0-9]+.([0-9]+)-*");
-        int pos = subexp.indexIn(MYTH_SOURCE_VERSION);
+        int pos = subexp.indexIn(GetMythSourceVersion());
         if (pos > -1)
         {
-            QString subversion;
             for (int idx = subexp.cap(1).toInt(); idx > 0; --idx)
                 m_mythVersions << version + "." + QString::number(idx);
         }

@@ -42,8 +42,6 @@
 #include "musicutils.h"
 #include "lyricsdata.h"
 
-using namespace std;
-
 static QString thePrefix = "the ";
 
 bool operator==(MusicMetadata& a, MusicMetadata& b)
@@ -72,9 +70,7 @@ MusicMetadata::MusicMetadata(int lid, QString lbroadcaster, QString lchannel, QS
             m_country(std::move(lcountry)),
             m_language(std::move(llanguage))
 {
-    for (int x = 0; x < STREAMURLCOUNT; x++)
-        m_urls[x] = lurls[x];
-
+    m_urls = lurls;
     setRepo(RT_Radio);
     ensureSortFields();
 }
@@ -142,8 +138,7 @@ MusicMetadata& MusicMetadata::operator=(const MusicMetadata &rhs)
     m_channel = rhs.m_channel;
     m_description = rhs.m_description;
 
-    for (int x = 0; x < 5; x++)
-        m_urls[x] = rhs.m_urls[x];
+    m_urls = rhs.m_urls;
     m_logoUrl = rhs.m_logoUrl;
     m_metaFormat = rhs.m_metaFormat;
     m_country = rhs.m_country;
@@ -462,7 +457,6 @@ int MusicMetadata::getDirectoryId()
     if (m_directoryId < 0)
     {
         QString sqldir = m_filename.section('/', 0, -2);
-        QString sqlfilename = m_filename.section('/', -1);
 
         checkEmptyFields();
 
@@ -736,7 +730,6 @@ void MusicMetadata::dumpToDatabase()
                    "WHERE song_id= :ID ;";
     }
 
-    QString sqldir = m_filename.section('/', 0, -2);
     QString sqlfilename = m_filename.section('/', -1);
 
     MSqlQuery query(MSqlQuery::InitCon());
@@ -1217,8 +1210,7 @@ void MusicMetadata::setEmbeddedAlbumArt(AlbumArtList &albumart)
 
     for (auto *art : qAsConst(albumart))
     {
-        AlbumArtImage *image = art;
-        image->m_filename = QString("%1-%2").arg(m_id).arg(image->m_filename);
+        art->m_filename = QString("%1-%2").arg(m_id).arg(art->m_filename);
         m_albumArt->addImage(art);
     }
 
@@ -1515,12 +1507,6 @@ void AllMusic::resync()
                      "LEFT JOIN music_genres ON music_songs.genre_id=music_genres.genre_id "
                      "ORDER BY music_songs.song_id;";
 
-    QString filename;
-    QString artist;
-    QString album;
-    QString title;
-    QString compartist;
-
     MSqlQuery query(MSqlQuery::InitCon());
     if (!query.exec(aquery))
         MythDB::DBError("AllMusic::resync", query);
@@ -1603,10 +1589,10 @@ void AllMusic::resync()
                 int playCount = query.value(13).toInt();
                 qint64 lastPlay = query.value(14).toDateTime().toSecsSinceEpoch();
 
-                m_playCountMin = min(playCount, m_playCountMin);
-                m_playCountMax = max(playCount, m_playCountMax);
-                m_lastPlayMin  = min(lastPlay,  m_lastPlayMin);
-                m_lastPlayMax  = max(lastPlay,  m_lastPlayMax);
+                m_playCountMin = std::min(playCount, m_playCountMin);
+                m_playCountMax = std::max(playCount, m_playCountMax);
+                m_lastPlayMin  = std::min(lastPlay,  m_lastPlayMin);
+                m_lastPlayMax  = std::max(lastPlay,  m_lastPlayMax);
             }
             m_numLoaded++;
         }
@@ -2236,15 +2222,15 @@ ImageType AlbumArtImages::getImageTypeFromName(const QString &name)
     return type;
 }
 
-void AlbumArtImages::addImage(const AlbumArtImage &newImage)
+void AlbumArtImages::addImage(const AlbumArtImage * const newImage)
 {
     // do we already have an image of this type?
     AlbumArtImage *image = nullptr;
 
     for (auto *item : qAsConst(m_imageList))
     {
-        if (item->m_imageType == newImage.m_imageType
-            && item->m_embedded == newImage.m_embedded)
+        if (item->m_imageType == newImage->m_imageType
+            && item->m_embedded == newImage->m_embedded)
         {
             image = item;
             break;
@@ -2260,11 +2246,11 @@ void AlbumArtImages::addImage(const AlbumArtImage &newImage)
     else
     {
         // we already have an image of this type so just update it with the new info
-        image->m_filename = newImage.m_filename;
-        image->m_imageType = newImage.m_imageType;
-        image->m_embedded = newImage.m_embedded;
-        image->m_description = newImage.m_description;
-        image->m_hostname = newImage.m_hostname;
+        image->m_filename    = newImage->m_filename;
+        image->m_imageType   = newImage->m_imageType;
+        image->m_embedded    = newImage->m_embedded;
+        image->m_description = newImage->m_description;
+        image->m_hostname    = newImage->m_hostname;
     }
 }
 

@@ -8,6 +8,7 @@
 using std::getenv;
 #include <cstddef>
 #include <cstdio>
+#include <cinttypes>
 #include <utility>
 
 // Qt
@@ -327,7 +328,9 @@ static qlonglong inline ContentRange(const QNetworkReply *reply,
 
     // See RFC 2616 14.16: 'bytes begin-end/size'
     qulonglong len = 0;
-    if (3 != std::sscanf(range.constData(), " bytes %20lld - %20lld / %20lld", &first, &last, &len))
+    const char *fmt = " bytes %20" SCNd64 " - %20" SCNd64 " / %20" SCNd64;
+    // cppcheck-suppress wrongPrintfScanfArgNum
+    if (3 != std::sscanf(range.constData(), fmt, &first, &last, &len))
     {
         LOG(VB_GENERAL, LOG_ERR, LOC + QString("Invalid Content-Range:'%1'")
             .arg(range.constData()) );

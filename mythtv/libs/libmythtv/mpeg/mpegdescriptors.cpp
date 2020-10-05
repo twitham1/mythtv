@@ -114,7 +114,7 @@ static uint maxPriority(const QMap<uint,uint> &langPrefs)
 {
     uint max_pri = 0;
     for (uint pref : langPrefs)
-        max_pri = max(max_pri, pref);
+        max_pri = std::max(max_pri, pref);
     return max_pri;
 }
 
@@ -134,9 +134,9 @@ const unsigned char *MPEGDescriptor::FindBestMatch(
             if (!sed.IsValid())
                 continue;
             QMap<uint,uint>::const_iterator it =
-                langPrefs.find(sed.CanonicalLanguageKey());
+                langPrefs.constFind(sed.CanonicalLanguageKey());
 
-            if ((it != langPrefs.end()) && (*it < match_pri))
+            if ((it != langPrefs.constEnd()) && (*it < match_pri))
             {
                 match_idx = i;
                 match_pri = *it;
@@ -179,9 +179,9 @@ desc_list_t MPEGDescriptor::FindBestMatches(
             if (!eed.IsValid())
                 continue;
             QMap<uint,uint>::const_iterator it =
-                langPrefs.find(eed.CanonicalLanguageKey());
+                langPrefs.constFind(eed.CanonicalLanguageKey());
 
-            if ((it != langPrefs.end()) && (*it < match_pri))
+            if ((it != langPrefs.constEnd()) && (*it < match_pri))
             {
                 match_key = eed.LanguageKey();
                 match_pri = *it;
@@ -299,7 +299,7 @@ const std::array<const std::string,256> descriptor_tag_strings
     /* 0x82 */ "SCTE Frame Rate",       /* 0x83 */ "SCTE Extended Video",
     /* 0x84 */ "SCTE Component Name",   /* 0x85 */ "ATSC Program Identifier",
     /* 0x86 */ "Caption Service",       /* 0x87 */ "Content Advisory",
-    /* 0x88 */ "ATSC CA Descriptor",    /* 0x89 */ "ATSC Descriptor Tag",
+    /* 0x88 */ "ATSC CA",               /* 0x89 */ "ATSC Descriptor Tag",
     /* 0x8A */ "SCTE CUE Identifier",   /* 0x8B */ "",
     /* 0x8C */ "TimeStamp",             /* 0x8D */ "",
     /* 0x8E */ "",                      /* 0x8F */ "",
@@ -602,6 +602,11 @@ QString MPEGDescriptor::toStringPD(uint priv_dsid) const
     {
         str = descrDump("Video on Demand");
     }
+    else if (priv_dsid == PrivateDataSpecifierID::CASEMA &&
+             PrivateDescriptorID::ziggo_package_descriptor == DescriptorTag())
+    {
+        str = descrDump("Ziggo Package");
+    }
     else if ((priv_dsid == PrivateDataSpecifierID::EACEM  ||
               priv_dsid == PrivateDataSpecifierID::NORDIG ||
               priv_dsid == PrivateDataSpecifierID::ITC     ) &&
@@ -615,6 +620,16 @@ QString MPEGDescriptor::toStringPD(uint priv_dsid) const
              PrivateDescriptorID::dvb_logical_channel_descriptor == DescriptorTag())
     {
         SET_STRING(DVBLogicalChannelDescriptor);
+    }
+    else if (priv_dsid == PrivateDataSpecifierID::CIPLUS &&
+             PrivateDescriptorID::ci_protection_descriptor == DescriptorTag())
+    {
+        str = descrDump("CI Protection");
+    }
+    // All not otherwise specified private descriptors
+    else if (priv_dsid > 0 && DescriptorTag() > 0x80)
+    {
+        str = descrDump("User Defined");
     }
     //
     // POSSIBLY UNSAFE ! -- begin
@@ -780,8 +795,8 @@ QString RegistrationDescriptor::GetDescription(const QString &fmt)
     QString ret;
     {
         QMutexLocker locker(&description_map_lock);
-        QMap<QString,QString>::const_iterator it = description_map.find(fmt);
-        if (it != description_map.end())
+        QMap<QString,QString>::const_iterator it = description_map.constFind(fmt);
+        if (it != description_map.constEnd())
             ret = *it;
     }
 

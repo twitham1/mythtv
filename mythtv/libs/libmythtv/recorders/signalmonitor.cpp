@@ -37,6 +37,11 @@ extern "C" {
 #   include "hdhrchannel.h"
 #endif
 
+#ifdef USING_SATIP
+#   include "satipsignalmonitor.h"
+#   include "satipchannel.h"
+#endif
+
 #ifdef USING_IPTV
 #   include "iptvsignalmonitor.h"
 #   include "iptvchannel.h"
@@ -134,6 +139,15 @@ SignalMonitor *SignalMonitor::Init(const QString& cardtype, int db_cardnum,
     }
 #endif
 
+#ifdef USING_SATIP
+    else if (cardtype.toUpper() == "SATIP")
+    {
+        auto *satipchan = dynamic_cast<SatIPChannel*>(channel);
+        if (satipchan)
+            signalMonitor = new SatIPSignalMonitor(db_cardnum, satipchan);
+    }
+#endif
+
 #ifdef USING_CETON
     else if (cardtype.toUpper() == "CETON")
     {
@@ -225,7 +239,7 @@ SignalMonitor::SignalMonitor(int _inputid, ChannelBase *_channel,
     : MThread("SignalMonitor"),
       m_channel(_channel),
       m_inputid(_inputid), m_flags(wait_for_mask),
-      m_release_stream(_release_stream),
+      m_releaseStream(_release_stream),
       m_signalLock    (QCoreApplication::translate("(Common)", "Signal Lock"),
                      "slock", 1, true, 0,   1, 0),
       m_signalStrength(QCoreApplication::translate("(Common)", "Signal Power"),
@@ -341,7 +355,7 @@ void SignalMonitor::run(void)
 
         UpdateValues();
 
-        if (m_notify_frontend && m_inputid>=0)
+        if (m_notifyFrontend && m_inputid>=0)
         {
             QStringList slist = GetStatusList();
             MythEvent me(QString("SIGNAL %1").arg(m_inputid), slist);
@@ -349,14 +363,14 @@ void SignalMonitor::run(void)
         }
 
         locker.relock();
-        m_startStopWait.wait(locker.mutex(), m_update_rate);
+        m_startStopWait.wait(locker.mutex(), m_updateRate);
     }
 
     // We need to send a last informational message because a
     // signal update may have come in while we were sleeping
     // if we are using the multithreaded dtvsignalmonitor.
     locker.unlock();
-    if (m_notify_frontend && m_inputid>=0)
+    if (m_notifyFrontend && m_inputid>=0)
     {
         QStringList slist = GetStatusList();
         MythEvent me(QString("SIGNAL %1").arg(m_inputid), slist);
@@ -385,7 +399,7 @@ void SignalMonitor::RemoveListener(SignalMonitorListener *listener)
 {
     QMutexLocker locker(&m_listenerLock);
 
-    vector<SignalMonitorListener*> new_listeners;
+    std::vector<SignalMonitorListener*> new_listeners;
     for (auto & entry : m_listeners)
     {
         if (entry != listener)

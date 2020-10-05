@@ -10,18 +10,12 @@
 #include "frequencies.h"
 
 #ifdef USING_V4L2
-#include "videodev2.h" // needed for v4l2_std_id type
-#else
-using v4l2_std_id = uint64_t;
+#include <linux/videodev2.h>
 #endif
-
-using namespace std;
 
 #define FAKE_VIDEO 0
 
 class TVRec;
-
-using VidModV4L2 = QMap<int,v4l2_std_id>;
 
 /** \class V4LChannel
  *  \brief Implements tuning for TV cards using the V4L driver API,

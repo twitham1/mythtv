@@ -452,7 +452,6 @@ void ScreenSetup::doListSelect(MythUIButtonListItem *selected)
     if (!selected)
         return;
 
-    QString txt = selected->GetText();
     if (GetFocusWidget() == m_activeList)
     {
         auto *si = selected->GetData().value<ScreenListInfo *>();
@@ -928,7 +927,7 @@ void LocationDialog::doSearch()
     }
        
 
-    QMap<ScriptInfo *, QStringList> result_cache;
+    QHash<ScriptInfo *, QStringList> result_cache;
     int numresults = 0;
     clearResults();
 
@@ -953,8 +952,7 @@ void LocationDialog::doSearch()
         }
     }
 
-    QMap<ScriptInfo *, QStringList>::iterator it;
-    for (it = result_cache.begin(); it != result_cache.end(); ++it)
+    for (auto it = result_cache.begin(); it != result_cache.end(); ++it)
     {
         ScriptInfo *si = it.key();
         QStringList results = it.value();

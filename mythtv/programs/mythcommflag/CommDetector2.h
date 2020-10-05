@@ -3,7 +3,6 @@
 
 // C++ headers
 #include <vector>
-using namespace std;
 
 // Qt headers
 #include <QDateTime>
@@ -15,7 +14,7 @@ using namespace std;
 #include "CommDetectorBase.h"
 #include "FrameAnalyzer.h"
 
-class MythPlayer;
+class MythCommFlagPlayer;
 class TemplateFinder;
 class TemplateMatcher;
 class BlankFrameDetector;
@@ -31,22 +30,22 @@ QString strftimeval(const struct timeval *tv);
 
 };  /* namespace */
 
-using FrameAnalyzerItem = vector<FrameAnalyzer*>;
-using FrameAnalyzerList = vector<FrameAnalyzerItem>;
+using FrameAnalyzerItem = std::vector<FrameAnalyzer*>;
+using FrameAnalyzerList = std::vector<FrameAnalyzerItem>;
 
 class CommDetector2 : public CommDetectorBase
 {
   public:
     CommDetector2(
         SkipType commDetectMethod,
-        bool showProgress, bool fullSpeed, MythPlayer* player,
+        bool showProgress, bool fullSpeed, MythCommFlagPlayer* player,
         int chanid, QDateTime startts, QDateTime endts,
         QDateTime recstartts, QDateTime recendts, bool useDB);
     bool go(void) override; // CommDetectorBase
     void GetCommercialBreakList(frm_dir_map_t &marks) override; // CommDetectorBase
     void recordingFinished(long long totalFileSize) override; // CommDetectorBase
     void requestCommBreakMapUpdate(void) override; // CommDetectorBase
-    void PrintFullMap(ostream &out, const frm_dir_map_t *comm_breaks,
+    void PrintFullMap(std::ostream &out, const frm_dir_map_t *comm_breaks,
                       bool verbose) const override; // CommDetectorBase
 
   private:
@@ -60,7 +59,7 @@ class CommDetector2 : public CommDetectorBase
     SkipType                     m_commDetectMethod;
     bool                         m_showProgress            {false};
     bool                         m_fullSpeed               {false};
-    MythPlayer                  *m_player                  {nullptr};
+    MythCommFlagPlayer          *m_player                  {nullptr};
     QDateTime                    m_startts;
     QDateTime                    m_endts;
     QDateTime                    m_recstartts;

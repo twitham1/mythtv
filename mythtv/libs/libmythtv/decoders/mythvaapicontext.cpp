@@ -187,18 +187,13 @@ MythCodecID MythVAAPIContext::GetSupportedCodec(AVCodecContext **Context,
             MythCodecContext::FFmpegToMythProfile((*Context)->codec_id, (*Context)->profile);
     auto haveprofile = [=](MythCodecContext::CodecProfile Profile, QSize Size)
     {
-        for (auto vaprofile : qAsConst(profiles))
-        {
-            if (vaprofile.first == Profile &&
-                vaprofile.second.first.width() <= Size.width() &&
-                vaprofile.second.first.height() <= Size.height() &&
-                vaprofile.second.second.width() >= Size.width() &&
-                vaprofile.second.second.height() >= Size.height())
-            {
-                return true;
-            }
-        }
-        return false;
+        return std::any_of(profiles.cbegin(), profiles.cend(),
+                           [&Profile,Size](auto vaprofile)
+                               { return vaprofile.first == Profile &&
+                                        vaprofile.second.first.width() <= Size.width() &&
+                                        vaprofile.second.first.height() <= Size.height() &&
+                                        vaprofile.second.second.width() >= Size.width() &&
+                                        vaprofile.second.second.height() >= Size.height(); } );
     };
 
     ok = haveprofile(mythprofile, QSize((*Context)->width, (*Context)->height));
@@ -288,14 +283,14 @@ int MythVAAPIContext::InitialiseContext(AVCodecContext *Context)
 
     // Create hardware device context
     AVBufferRef* hwdeviceref = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_VAAPI);
-    if (!hwdeviceref || (hwdeviceref && !hwdeviceref->data))
+    if (!hwdeviceref || !hwdeviceref->data)
     {
         LOG(VB_GENERAL, LOG_ERR, LOC + "Failed to create VAAPI hardware device context");
         return -1;
     }
 
     auto* hwdevicecontext  = reinterpret_cast<AVHWDeviceContext*>(hwdeviceref->data);
-    if (!hwdevicecontext || (hwdevicecontext && !hwdevicecontext->hwctx))
+    if (!hwdevicecontext || !hwdevicecontext->hwctx)
         return -1;
     auto *vaapidevicectx = reinterpret_cast<AVVAAPIDeviceContext*>(hwdevicecontext->hwctx);
     if (!vaapidevicectx)
@@ -357,11 +352,11 @@ int MythVAAPIContext::InitialiseContext(AVCodecContext *Context)
                 .arg(toString(vaapiid)).arg(MythOpenGLInterop::TypeToString(type)).arg(vendor));
         }
 
-        VASurfaceAttrib prefs[3] = {
+        std::array<VASurfaceAttrib,3> prefs {{
             { VASurfaceAttribPixelFormat, VA_SURFACE_ATTRIB_SETTABLE, { VAGenericValueTypeInteger, { format } } },
             { VASurfaceAttribUsageHint,   VA_SURFACE_ATTRIB_SETTABLE, { VAGenericValueTypeInteger, { VA_SURFACE_ATTRIB_USAGE_HINT_DISPLAY } } },
-            { VASurfaceAttribMemoryType,  VA_SURFACE_ATTRIB_SETTABLE, { VAGenericValueTypeInteger, { VA_SURFACE_ATTRIB_MEM_TYPE_VA} } } };
-        vaapi_frames_ctx->attributes = prefs;
+            { VASurfaceAttribMemoryType,  VA_SURFACE_ATTRIB_SETTABLE, { VAGenericValueTypeInteger, { VA_SURFACE_ATTRIB_MEM_TYPE_VA} } } }};
+        vaapi_frames_ctx->attributes = prefs.data();
         vaapi_frames_ctx->nb_attributes = 3;
     }
 
@@ -863,8 +858,7 @@ void MythVAAPIContext::DestroyDeinterlacer(void)
     m_filterSink = nullptr;
     m_filterSource = nullptr;
     m_filterPTSUsed = 0;
-    m_filterPriorPTS[0] = 0;
-    m_filterPriorPTS[1] = 0;
+    m_filterPriorPTS.fill(0);
     m_filterWidth = 0;
     m_filterHeight = 0;
     if (m_framesCtx)

@@ -1,47 +1,46 @@
 // MythTV
-#include "mythdrmdevice.h"
-#include "mythdisplaydrm.h"
+#include "platforms/mythdrmdevice.h"
+#include "platforms/mythdisplaydrm.h"
 
 #define LOC QString("DispDRM: ")
 
 MythDisplayDRM::MythDisplayDRM()
 {
-    m_device = new MythDRMDevice(m_screen);
+    m_device = MythDRMDevice::Create(m_screen);
     if (!m_device->IsValid())
-    {
-        delete m_device;
         m_device = nullptr;
-    }
     Initialise();
 }
 
 MythDisplayDRM::~MythDisplayDRM()
 {
-    delete m_device;
+    m_device = nullptr;
 }
 
+MythDRMPtr MythDisplayDRM::GetDevice()
+{
+    return m_device;
+}
+
+// FIXME - I doubt this slot is being called correctly
 void MythDisplayDRM::ScreenChanged(QScreen *qScreen)
 {
     MythDisplay::ScreenChanged(qScreen);
 
     if (m_device && m_device->GetScreen() != m_screen)
-    {
-        delete m_device;
         m_device = nullptr;
-    }
 
     if (!m_device)
     {
-        m_device = new MythDRMDevice(m_screen);
+        m_device = MythDRMDevice::Create(m_screen);
         if (!m_device->IsValid())
-        {
-            delete m_device;
             m_device = nullptr;
-        }
     }
+
+    emit screenChanged();
 }
 
-void MythDisplayDRM::UpdateCurrentMode(void)
+void MythDisplayDRM::UpdateCurrentMode()
 {
     if (m_device)
     {

@@ -1,9 +1,7 @@
 #include <unistd.h>
 
 #include <cstdlib>
-
 #include <iostream>
-using namespace std;
 
 #include <QString>
 
@@ -75,9 +73,8 @@ FlacEncoder::FlacEncoder(const QString &outfile, int qualitylevel,
                 .arg(ret));
     }
 
-    for (auto & i : m_inputIn)
-        for (int & j : i)
-            j = 0;
+    for (auto & chan : m_inputIn)
+        chan.fill(0);
 
     for (int i = 0; i < NUM_CHANNELS; i++)
         m_input[i] = &(m_inputIn[i][0]);
@@ -114,7 +111,7 @@ int FlacEncoder::addSamples(int16_t *bytes, unsigned int length)
         if(m_sampleIndex == MAX_SAMPLES || (length == 0 && m_sampleIndex > 0) ) 
         {
             if (!encoder_process(m_encoder,
-                                 (const FLAC__int32 * const *) m_input,
+                                 (const FLAC__int32 * const *) m_input.data(),
                                  m_sampleIndex))
             {
                 LOG(VB_GENERAL, LOG_ERR,

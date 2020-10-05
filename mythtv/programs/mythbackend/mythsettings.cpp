@@ -350,7 +350,7 @@ MythSetting::DataType parse_data_type(const QString &str)
     return MythSetting::kInvalidDataType;
 }
 
-QMap<QString,QString> GetSettingsMap(MythSettingList &settings,
+QMap<QString,QString> GetSettingsMap(const MythSettingList &settings,
                                      const QString &hostname)
 {
     QMap<QString,QString> result;
@@ -580,8 +580,8 @@ bool parse_dom(MythSettingList &settings, const QDomElement &element,
                 m["range_max"] = e.attribute("range_max");
             }
 
-            QMap<QString,QString>::const_iterator it = m.begin();
-            for (; it != m.end(); ++it)
+            QMap<QString,QString>::const_iterator it = m.cbegin();
+            for (; it != m.cend(); ++it)
             {
                 if ((*it).isEmpty())
                 {

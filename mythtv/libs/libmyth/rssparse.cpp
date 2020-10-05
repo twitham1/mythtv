@@ -15,8 +15,6 @@
 #include "programinfo.h" // for format_season_and_episode()
 #include "mythsorthelper.h"
 
-using namespace std;
-
 ResultItem::ResultItem(const QString& title, const QString& sortTitle,
               const QString& subtitle, const QString& sortSubtitle,
               const QString& desc, const QString& URL,
@@ -891,8 +889,8 @@ ResultItem* Parse::ParseItem(const QDomElement& item) const
     if (html.size())
     {
         QString htmlstring = html.at(0).toElement().text();
-        if (htmlstring.toLower().contains("true") || htmlstring == "1" ||
-            htmlstring.toLower().contains("yes"))
+        if (htmlstring.contains("true", Qt::CaseInsensitive) || htmlstring == "1" ||
+            htmlstring.contains("yes", Qt::CaseInsensitive))
             customhtml = true;
     }
 
@@ -1032,7 +1030,7 @@ QDateTime Parse::RFC822TimeToQDateTime(const QString& t) const
     QStringList tmp = time.split(' ');
     if (tmp.isEmpty())
         return QDateTime();
-    if (tmp. at(0).contains(QRegExp("\\D")))
+    if (tmp.at(0).contains(QRegularExpression(R"(\D)")))
         tmp.removeFirst();
     if (tmp.size() != 5)
         return QDateTime();
@@ -1161,8 +1159,7 @@ QString Parse::UnescapeHTML(const QString& escaped)
     result.replace("&#x201D;", QChar(0x201d));
     result.replace("<p>", "\n");
 
-    QRegExp stripHTML(QLatin1String("<.*>"));
-    stripHTML.setMinimal(true);
+    QRegularExpression stripHTML {"<.*?>"};
     result.remove(stripHTML);
 
     return result;

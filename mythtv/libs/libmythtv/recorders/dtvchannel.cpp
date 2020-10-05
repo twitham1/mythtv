@@ -33,7 +33,7 @@ void DTVChannel::SetDTVInfo(uint atsc_major, uint atsc_minor,
                             uint dvb_orig_netid,
                             uint mpeg_tsid, int mpeg_pnum)
 {
-    QMutexLocker locker(&m_dtvinfo_lock);
+    QMutexLocker locker(&m_dtvinfoLock);
     m_currentProgramNum        = mpeg_pnum;
     m_currentATSCMajorChannel  = atsc_major;
     m_currentATSCMinorChannel  = atsc_minor;
@@ -43,13 +43,13 @@ void DTVChannel::SetDTVInfo(uint atsc_major, uint atsc_minor,
 
 QString DTVChannel::GetSIStandard(void) const
 {
-    QMutexLocker locker(&m_dtvinfo_lock);
+    QMutexLocker locker(&m_dtvinfoLock);
     return m_sistandard;
 }
 
 void DTVChannel::SetSIStandard(const QString &si_std)
 {
-    QMutexLocker locker(&m_dtvinfo_lock);
+    QMutexLocker locker(&m_dtvinfoLock);
     m_sistandard = si_std.toLower();
 }
 
@@ -63,7 +63,7 @@ QString DTVChannel::GetSuggestedTuningMode(bool is_live_tv) const
 
     bool useQuickTuning = ((quickTuning != 0U) && is_live_tv) || (quickTuning > 1);
 
-    QMutexLocker locker(&m_dtvinfo_lock);
+    QMutexLocker locker(&m_dtvinfoLock);
     if (!useQuickTuning && ((m_sistandard == "atsc") || (m_sistandard == "dvb")))
         return m_sistandard;
     return "mpeg";
@@ -71,13 +71,13 @@ QString DTVChannel::GetSuggestedTuningMode(bool is_live_tv) const
 
 QString DTVChannel::GetTuningMode(void) const
 {
-    QMutexLocker locker(&m_dtvinfo_lock);
+    QMutexLocker locker(&m_dtvinfoLock);
     return m_tuningMode;
 }
 
-vector<DTVTunerType> DTVChannel::GetTunerTypes(void) const
+std::vector<DTVTunerType> DTVChannel::GetTunerTypes(void) const
 {
-    vector<DTVTunerType> tts;
+    std::vector<DTVTunerType> tts;
     if (m_tunerType != DTVTunerType::kTunerTypeUnknown)
         tts.push_back(m_tunerType);
     return tts;
@@ -85,7 +85,7 @@ vector<DTVTunerType> DTVChannel::GetTunerTypes(void) const
 
 void DTVChannel::SetTuningMode(const QString &tuning_mode)
 {
-    QMutexLocker locker(&m_dtvinfo_lock);
+    QMutexLocker locker(&m_dtvinfoLock);
     m_tuningMode = tuning_mode.toLower();
 }
 
@@ -340,13 +340,13 @@ bool DTVChannel::SetChannelByString(const QString &channum)
         }
 
         // Now we construct the PAT & PMT
-        vector<uint> pnum; pnum.push_back(1);
-        vector<uint> pid;  pid.push_back(9999);
+        std::vector<uint> pnum; pnum.push_back(1);
+        std::vector<uint> pid;  pid.push_back(9999);
         m_genPAT = ProgramAssociationTable::Create(0,version,pnum,pid);
 
         int pcrpid = -1;
-        vector<uint> pids;
-        vector<uint> types;
+        std::vector<uint> pids;
+        std::vector<uint> types;
         for (auto & pit : pid_cache)
         {
             if (!pit.GetStreamID())

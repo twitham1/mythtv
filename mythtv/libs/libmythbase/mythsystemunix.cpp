@@ -18,7 +18,6 @@
 #include <sys/select.h>
 #include <sys/wait.h>
 #include <unistd.h>
-using namespace std; // for most of the above
 
 // QT headers
 #include <QCoreApplication>
@@ -148,7 +147,7 @@ void MythSystemLegacyIOHandler::run(void)
 void MythSystemLegacyIOHandler::HandleRead(int fd, QBuffer *buff)
 {
     errno = 0;
-    int len = read(fd, &m_readbuf, 65536);
+    int len = read(fd, m_readbuf.data(), m_readbuf.size());
     if( len <= 0 )
     {
         if( errno != EAGAIN )
@@ -159,16 +158,20 @@ void MythSystemLegacyIOHandler::HandleRead(int fd, QBuffer *buff)
     }
     else
     {
-        buff->buffer().append(m_readbuf, len);
+        buff->buffer().append(m_readbuf.data(), len);
 
         // Get the corresponding MythSystemLegacy instance, and the stdout/stderr
         // type
         fdLock.lock();
         FDType_t *fdType = fdMap.value(fd);
         fdLock.unlock();
+        if (fdType == nullptr)
+            return;
 
         // Emit the data ready signal (1 = stdout, 2 = stderr)
         MythSystemLegacyUnix *ms = fdType->m_ms;
+        if (ms == nullptr)
+            return;
         emit ms->readDataReady(fdType->m_type);
     }
 }
@@ -770,20 +773,18 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
     QString LOC_ERR = QString("myth_system('%1'): Error: ").arg(GetLogCmd());
 
     // For use in the child
-    char locerr[MAX_BUFLEN];
-    strncpy(locerr, LOC_ERR.toUtf8().constData(), MAX_BUFLEN);
-    locerr[MAX_BUFLEN-1] = '\0';
+    std::string locerr = qPrintable(LOC_ERR);
 
     LOG(VB_SYSTEM, LOG_DEBUG, QString("Launching: %1").arg(GetLogCmd()));
 
-    int p_stdin[]  = {-1,-1};
-    int p_stdout[] = {-1,-1};
-    int p_stderr[] = {-1,-1};
+    std::array<int,2> p_stdin  {-1,-1};
+    std::array<int,2> p_stdout {-1,-1};
+    std::array<int,2> p_stderr {-1,-1};
 
     /* set up pipes */
     if( GetSetting("UseStdin") )
     {
-        if( pipe(p_stdin) == -1 )
+        if( pipe(p_stdin.data()) == -1 )
         {
             LOG(VB_SYSTEM, LOG_ERR, LOC_ERR + "stdin pipe() failed");
             SetStatus( GENERIC_EXIT_NOT_OK );
@@ -811,7 +812,7 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
     }
     if( GetSetting("UseStdout") )
     {
-        if( pipe(p_stdout) == -1 )
+        if( pipe(p_stdout.data()) == -1 )
         {
             LOG(VB_SYSTEM, LOG_ERR, LOC_ERR + "stdout pipe() failed");
             SetStatus( GENERIC_EXIT_NOT_OK );
@@ -839,7 +840,7 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
     }
     if( GetSetting("UseStderr") )
     {
-        if( pipe(p_stderr) == -1 )
+        if( pipe(p_stderr.data()) == -1 )
         {
             LOG(VB_SYSTEM, LOG_ERR, LOC_ERR + "stderr pipe() failed");
             SetStatus( GENERIC_EXIT_NOT_OK );
@@ -972,9 +973,9 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
             /* try to attach stdin to input pipe - failure is fatal */
             if( dup2(p_stdin[0], 0) < 0 )
             {
-                cerr << locerr
-                     << "Cannot redirect input pipe to standard input: "
-                     << strerror(errno) << endl;
+                std::cerr << locerr
+                          << "Cannot redirect input pipe to standard input: "
+                          << strerror(errno) << std::endl;
                 _exit(GENERIC_EXIT_PIPE_FAILURE);
             }
         }
@@ -986,27 +987,27 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
             {
                 if( dup2(fd, 0) < 0)
                 {
-                    cerr << locerr
-                         << "Cannot redirect /dev/null to standard input,"
-                            "\n\t\t\tfailed to duplicate file descriptor: "
-                         << strerror(errno) << endl;
+                    std::cerr << locerr
+                              << "Cannot redirect /dev/null to standard input,"
+                                 "\n\t\t\tfailed to duplicate file descriptor: "
+                              << strerror(errno) << std::endl;
                 }
                 if (fd != 0)    // if fd was zero, do not close
                 {
                     if (close(fd) < 0)
                     {
-                        cerr << locerr
-                             << "Unable to close stdin redirect /dev/null: "
-                             << strerror(errno) << endl;
+                        std::cerr << locerr
+                                  << "Unable to close stdin redirect /dev/null: "
+                                  << strerror(errno) << std::endl;
                     }
                 }
             }
             else
             {
-                cerr << locerr
-                     << "Cannot redirect /dev/null to standard input, "
-                        "failed to open: "
-                     << strerror(errno) << endl;
+                std::cerr << locerr
+                          << "Cannot redirect /dev/null to standard input, "
+                             "failed to open: "
+                          << strerror(errno) << std::endl;
             }
         }
 
@@ -1016,9 +1017,9 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
             /* try to attach stdout to output pipe - failure is fatal */
             if( dup2(p_stdout[1], 1) < 0)
             {
-                cerr << locerr
-                     << "Cannot redirect output pipe to standard output: "
-                     << strerror(errno) << endl;
+                std::cerr << locerr
+                          << "Cannot redirect output pipe to standard output: "
+                          << strerror(errno) << std::endl;
                 _exit(GENERIC_EXIT_PIPE_FAILURE);
             }
         }
@@ -1030,27 +1031,27 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
             {
                 if( dup2(fd, 1) < 0)
                 {
-                    cerr << locerr
-                         << "Cannot redirect standard output to /dev/null,"
-                            "\n\t\t\tfailed to duplicate file descriptor: "
-                         << strerror(errno) << endl;
+                    std::cerr << locerr
+                              << "Cannot redirect standard output to /dev/null,"
+                                 "\n\t\t\tfailed to duplicate file descriptor: "
+                              << strerror(errno) << std::endl;
                 }
                 if (fd != 1)    // if fd was one, do not close
                 {
                    if (close(fd) < 0)
                    {
-                       cerr << locerr
-                            << "Unable to close stdout redirect /dev/null: "
-                            << strerror(errno) << endl;
+                       std::cerr << locerr
+                                 << "Unable to close stdout redirect /dev/null: "
+                                 << strerror(errno) << std::endl;
                    }
                 }
             }
             else
             {
-                cerr << locerr
-                     << "Cannot redirect standard output to /dev/null, "
-                        "failed to open: "
-                     << strerror(errno) << endl;
+                std::cerr << locerr
+                          << "Cannot redirect standard output to /dev/null, "
+                             "failed to open: "
+                          << strerror(errno) << std::endl;
             }
         }
 
@@ -1060,9 +1061,9 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
             /* try to attach stderr to error pipe - failure is fatal */
             if( dup2(p_stderr[1], 2) < 0)
             {
-                cerr << locerr
-                     << "Cannot redirect error pipe to standard error: "
-                     << strerror(errno) << endl;
+                std::cerr << locerr
+                          << "Cannot redirect error pipe to standard error: "
+                          << strerror(errno) << std::endl;
                 _exit(GENERIC_EXIT_PIPE_FAILURE);
             }
         }
@@ -1074,27 +1075,27 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
             {
                 if( dup2(fd, 2) < 0)
                 {
-                    cerr << locerr
-                         << "Cannot redirect standard error to /dev/null,"
-                            "\n\t\t\tfailed to duplicate file descriptor: "
-                         << strerror(errno) << endl;
+                    std::cerr << locerr
+                              << "Cannot redirect standard error to /dev/null,"
+                                 "\n\t\t\tfailed to duplicate file descriptor: "
+                              << strerror(errno) << std::endl;
                 }
                 if (fd != 2)    // if fd was two, do not close
                 {
                    if (close(fd) < 0)
                    {
-                       cerr << locerr
-                            << "Unable to close stderr redirect /dev/null: "
-                            << strerror(errno) << endl;
+                       std::cerr << locerr
+                                 << "Unable to close stderr redirect /dev/null: "
+                                 << strerror(errno) << std::endl;
                    }
                 }
             }
             else
             {
-                cerr << locerr
-                     << "Cannot redirect standard error to /dev/null, "
-                        "failed to open: "
-                     << strerror(errno) << endl;
+                std::cerr << locerr
+                          << "Cannot redirect standard error to /dev/null, "
+                             "failed to open: "
+                          << strerror(errno) << std::endl;
             }
         }
 
@@ -1105,9 +1106,9 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
         /* set directory */
         if( directory && chdir(directory) < 0 )
         {
-            cerr << locerr
-                 << "chdir() failed: "
-                 << strerror(errno) << endl;
+            std::cerr << locerr
+                      << "chdir() failed: "
+                      << strerror(errno) << std::endl;
         }
 
         /* Set nice and ioprio values if non-default */
@@ -1120,9 +1121,9 @@ void MythSystemLegacyUnix::Fork(time_t timeout)
         if( execv(command, cmdargs) < 0 )
         {
             // Can't use LOG due to locking fun.
-            cerr << locerr
-                 << "execv() failed: "
-                 << strerror(errno) << endl;
+            std::cerr << locerr
+                      << "execv() failed: "
+                      << strerror(errno) << std::endl;
         }
 
         /* Failed to exec */

@@ -585,14 +585,13 @@ bool HEVCParser::profileTierLevel(GetBitContext *gb,
                                   int  maxNumSubLayersMinus1)
 {
     int i = 0;
-    int j = 0;
 
     if (profilePresentFlag)
     {
         get_bits(gb, 2); // general_profile_space u(2);
         get_bits1(gb);   // general_tier_flag u(1)
         get_bits(gb, 5); // general_profile_idc u(5);
-        for (j = 0; j < 32; ++j)
+        for (int j = 0; j < 32; ++j)
             get_bits1(gb); // general_profile_compatibility_flag[j] u(1);
 
         /*
@@ -772,7 +771,7 @@ bool HEVCParser::profileTierLevel(GetBitContext *gb,
             get_bits1(gb); //sub_layer_tier_flag[i] u(1)
             get_bits(gb, 5); // sub_layer_profile_idc[i] u(5);
 
-            for (j = 0; j < 32; ++j)
+            for (int j = 0; j < 32; ++j)
                 get_bits1(gb); //sub_layer_profile_compatibility_flag[i][j] u(1)
 
             get_bits1(gb); //sub_layer_progressive_source_flag[i] u(1)
@@ -885,30 +884,28 @@ bool HEVCParser::profileTierLevel(GetBitContext *gb,
 static bool getScalingListParams(uint8_t sizeId, uint8_t matrixId,
                                  HEVCParser::ScalingList & dest_scaling_list,
                                  uint8_t* &sl, uint8_t &size,
-                                 int16_t* &scaling_list_dc_coef_minus8)
+                                 std::vector<int16_t> &scaling_list_dc_coef_minus8)
 {
     switch (sizeId)
     {
         case HEVCParser::QUANT_MATIX_4X4:
-          sl = dest_scaling_list.scaling_lists_4x4[matrixId];
-          size = 16;
+          sl = dest_scaling_list.scaling_lists_4x4[matrixId].data();
+          size = dest_scaling_list.scaling_lists_4x4[matrixId].size();;
           break;
         case HEVCParser::QUANT_MATIX_8X8:
-          sl = dest_scaling_list.scaling_lists_8x8[matrixId];
-          size = 64;
+          sl = dest_scaling_list.scaling_lists_8x8[matrixId].data();
+          size = dest_scaling_list.scaling_lists_8x8[matrixId].size();
           break;
         case HEVCParser::QUANT_MATIX_16X16:
-          sl = dest_scaling_list.scaling_lists_16x16[matrixId];
-          size = 64;
-          if (scaling_list_dc_coef_minus8)
-              scaling_list_dc_coef_minus8 =
+          sl = dest_scaling_list.scaling_lists_16x16[matrixId].data();
+          size = dest_scaling_list.scaling_lists_16x16[matrixId].size();
+          scaling_list_dc_coef_minus8 =
                   dest_scaling_list.scaling_list_dc_coef_minus8_16x16;
           break;
         case HEVCParser::QUANT_MATIX_32X32:
-          sl = dest_scaling_list.scaling_lists_32x32[matrixId];
-          size = 64;
-          if (scaling_list_dc_coef_minus8)
-              scaling_list_dc_coef_minus8 =
+          sl = dest_scaling_list.scaling_lists_32x32[matrixId].data();
+          size = dest_scaling_list.scaling_lists_32x32[matrixId].size();
+          scaling_list_dc_coef_minus8 =
                   dest_scaling_list.scaling_list_dc_coef_minus8_32x32;
           break;
         default:
@@ -926,15 +923,13 @@ static bool scalingListData(GetBitContext * gb,
                             bool use_default)
 {
     uint8_t sizeId   = 0;
-    uint    matrixId = 0;
     uint8_t size     = 0;
-    uint8_t i        = 0;
 
     for (sizeId = 0; sizeId < 4; ++sizeId)
     {
-        for (matrixId = 0; matrixId < ((sizeId == 3) ? 2 : 6); ++matrixId)
+        for (uint matrixId = 0; matrixId < ((sizeId == 3) ? 2 : 6); ++matrixId)
         {
-            int16_t *scaling_list_dc_coef_minus8 = nullptr;
+            std::vector<int16_t> scaling_list_dc_coef_minus8 {};
             uint8_t *sl = nullptr;
 
             if (!getScalingListParams(sizeId, matrixId,
@@ -992,7 +987,7 @@ static bool scalingListData(GetBitContext * gb,
                                               scaling_list_pred_matrix_id_delta;
                         if (!getScalingListParams(dest_scaling_list, sizeId,
                                                   refMatrixId, &temp_sl,
-                                                  NULL, NULL))
+                                                  NULL, {}))
                         {
                             LOG(VB_RECORD, LOG_WARNING, LOC +
                                 QString("Failed to process scaling "
@@ -1032,7 +1027,7 @@ static bool scalingListData(GetBitContext * gb,
 #endif
                     }
 
-                    for (i = 0; i < size; ++i)
+                    for (uint8_t i = 0; i < size; ++i)
                     {
                         get_se_golomb(gb); // scaling_list_delta_coef  se(v)
 #if 0 // Unneeded
@@ -1063,18 +1058,14 @@ static bool scalingListData(GetBitContext * gb,
 */
 static bool shortTermRefPicSet(GetBitContext * gb, int stRPSIdx,
                                int num_short_term_ref_pic_sets,
-                               HEVCParser::ShortTermRefPicSet * stRPS,
+                               std::array<HEVCParser::ShortTermRefPicSet,65> & stRPS,
                                uint8_t max_dec_pic_buffering_minus1)
 {
-    int16_t  deltaRPS = 0;
-    bool use_delta_flag[16]        = { false };
-    bool used_by_curr_pic_flag[16] = { false };
-    uint32_t delta_poc_s0_minus1[16] = { 0 };
-    uint32_t delta_poc_s1_minus1[16] = { 0 };
+    std::array<bool,16>     use_delta_flag          { false };
+    std::array<bool,16>     used_by_curr_pic_flag   { false };
+    std::array<uint32_t,16> delta_poc_s0_minus1     { 0 };
+    std::array<uint32_t,16> delta_poc_s1_minus1     { 0 };
     uint i   = 0;
-    uint j   = 0;
-    int  k   = 0;
-    int dPoc = 0;
 
     /* 7.4.8 inter_ref_pic_set_prediction_flag equal to 1 specifies
        that the stRPSIdx-th candidate short-term RPS is predicted from
@@ -1088,6 +1079,8 @@ static bool shortTermRefPicSet(GetBitContext * gb, int stRPSIdx,
 
     if (inter_ref_pic_set_prediction_flag)
     {
+        int16_t  deltaRPS = 0;
+
         /*
           delta_idx_minus1 plus 1 specifies the difference between the
           value of stRPSIdx and the index, into the list of the
@@ -1115,7 +1108,7 @@ static bool shortTermRefPicSet(GetBitContext * gb, int stRPSIdx,
         int RefRPSIdx = stRPSIdx - (delta_idx_minus1 + 1);
         HEVCParser::ShortTermRefPicSet *RefRPS = &stRPS[RefRPSIdx];
 
-        for (j = 0; j <= RefRPS->NumDeltaPocs; ++j)
+        for (int j = 0; j <= RefRPS->NumDeltaPocs; ++j)
         {
             /*
               use_delta_flag[ j ] equal to 1 specifies that the
@@ -1134,92 +1127,92 @@ static bool shortTermRefPicSet(GetBitContext * gb, int stRPSIdx,
 
         /* 7.4.8 Short-term reference picture set semantics */
         i = 0;
-        for (k = (RefRPS->NumPositivePics - 1); k >= 0; --k)
+        for (int k = (RefRPS->NumPositivePics - 1); k >= 0; --k)
         {
-            dPoc = RefRPS->DeltaPocS1[k] + deltaRPS;
+            int dPoc = RefRPS->DeltaPocS1[k] + deltaRPS;
             if (dPoc < 0 && use_delta_flag[RefRPS->NumNegativePics + k])
             {
-                stRPS->DeltaPocS0[i] = dPoc;
-                stRPS->UsedByCurrPicS0[i++] =
+                stRPS[stRPSIdx].DeltaPocS0[i] = dPoc;
+                stRPS[stRPSIdx].UsedByCurrPicS0[i++] =
                     used_by_curr_pic_flag[RefRPS->NumNegativePics + k];
             }
         }
 
         if (deltaRPS < 0 && use_delta_flag[RefRPS->NumDeltaPocs])
         {
-            stRPS->DeltaPocS0[i] = deltaRPS;
-            stRPS->UsedByCurrPicS0[i++] =
+            stRPS[stRPSIdx].DeltaPocS0[i] = deltaRPS;
+            stRPS[stRPSIdx].UsedByCurrPicS0[i++] =
                 used_by_curr_pic_flag[RefRPS->NumDeltaPocs];
         }
 
-        for (j = 0; j < RefRPS->NumNegativePics; ++j)
+        for (int j = 0; j < RefRPS->NumNegativePics; ++j)
         {
-            dPoc = RefRPS->DeltaPocS0[j] + deltaRPS;
+            int dPoc = RefRPS->DeltaPocS0[j] + deltaRPS;
             if (dPoc < 0 && use_delta_flag[j])
             {
-                stRPS->DeltaPocS0[i] = dPoc;
-                stRPS->UsedByCurrPicS0[i++] = used_by_curr_pic_flag[j];
+                stRPS[stRPSIdx].DeltaPocS0[i] = dPoc;
+                stRPS[stRPSIdx].UsedByCurrPicS0[i++] = used_by_curr_pic_flag[j];
             }
         }
-        stRPS->NumNegativePics = i;
+        stRPS[stRPSIdx].NumNegativePics = i;
 
         i = 0;
-        for (k = (RefRPS->NumNegativePics - 1); k >= 0; --k)
+        for (int k = (RefRPS->NumNegativePics - 1); k >= 0; --k)
         {
-            dPoc = RefRPS->DeltaPocS0[k] + deltaRPS;
+            int dPoc = RefRPS->DeltaPocS0[k] + deltaRPS;
             if (dPoc > 0 && use_delta_flag[k])
             {
-                stRPS->DeltaPocS1[i] = dPoc;
-                stRPS->UsedByCurrPicS1[i++] = used_by_curr_pic_flag[k];
+                stRPS[stRPSIdx].DeltaPocS1[i] = dPoc;
+                stRPS[stRPSIdx].UsedByCurrPicS1[i++] = used_by_curr_pic_flag[k];
             }
         }
 
         if (deltaRPS > 0 && use_delta_flag[RefRPS->NumDeltaPocs])
         {
-            stRPS->DeltaPocS1[i] = deltaRPS;
-            stRPS->UsedByCurrPicS1[i++] =
+            stRPS[stRPSIdx].DeltaPocS1[i] = deltaRPS;
+            stRPS[stRPSIdx].UsedByCurrPicS1[i++] =
                 used_by_curr_pic_flag[RefRPS->NumDeltaPocs];
         }
 
-        for (j = 0; j < RefRPS->NumPositivePics; ++j)
+        for (int j = 0; j < RefRPS->NumPositivePics; ++j)
         {
-            dPoc = RefRPS->DeltaPocS1[j] + deltaRPS;
+            int dPoc = RefRPS->DeltaPocS1[j] + deltaRPS;
             if (dPoc > 0 && use_delta_flag[RefRPS->NumNegativePics + j])
             {
-                stRPS->DeltaPocS1[i] = dPoc;
-                stRPS->UsedByCurrPicS1[i++] =
+                stRPS[stRPSIdx].DeltaPocS1[i] = dPoc;
+                stRPS[stRPSIdx].UsedByCurrPicS1[i++] =
                     used_by_curr_pic_flag[RefRPS->NumNegativePics + j];
             }
         }
-        stRPS->NumPositivePics= i;
+        stRPS[stRPSIdx].NumPositivePics= i;
     }
     else
     {
-        stRPS->NumNegativePics = std::min((uint8_t)get_ue_golomb(gb), // ue(v)
+        stRPS[stRPSIdx].NumNegativePics = std::min((uint8_t)get_ue_golomb(gb), // ue(v)
                                           max_dec_pic_buffering_minus1);
-        stRPS->NumPositivePics = std::min((uint8_t)get_ue_golomb(gb), // ue(v)
+        stRPS[stRPSIdx].NumPositivePics = std::min((uint8_t)get_ue_golomb(gb), // ue(v)
                                           max_dec_pic_buffering_minus1);
 
-        for (i = 0; i < stRPS->NumNegativePics; ++i)
+        for (i = 0; i < stRPS[stRPSIdx].NumNegativePics; ++i)
         {
             delta_poc_s0_minus1[i] = get_ue_golomb(gb); // ue(v)
             get_bits1(gb); // used_by_curr_pic_s0_flag[i]; u(1)
 
             if (i == 0)
-                stRPS->DeltaPocS0[i] = -(delta_poc_s0_minus1[i] + 1);
+                stRPS[stRPSIdx].DeltaPocS0[i] = -(delta_poc_s0_minus1[i] + 1);
             else
-                stRPS->DeltaPocS0[i] = stRPS->DeltaPocS0[i - 1] -
+                stRPS[stRPSIdx].DeltaPocS0[i] = stRPS[stRPSIdx].DeltaPocS0[i - 1] -
                                        (delta_poc_s0_minus1[i] + 1);
         }
-        for (i = 0; i < stRPS->NumPositivePics; ++i)
+        for (i = 0; i < stRPS[stRPSIdx].NumPositivePics; ++i)
         {
             delta_poc_s1_minus1[i] = get_ue_golomb(gb); // ue(v)
             get_bits1(gb); // used_by_curr_pic_s1_flag[i]; u(1)
 
             if (i == 0)
-                stRPS->DeltaPocS1[i] = delta_poc_s1_minus1[i] + 1;
+                stRPS[stRPSIdx].DeltaPocS1[i] = delta_poc_s1_minus1[i] + 1;
             else
-                stRPS->DeltaPocS1[i] = stRPS->DeltaPocS1[i - 1] +
+                stRPS[stRPSIdx].DeltaPocS1[i] = stRPS[stRPSIdx].DeltaPocS1[i - 1] +
                                        (delta_poc_s1_minus1[i] + 1);
         }
     }
@@ -1229,8 +1222,8 @@ static bool shortTermRefPicSet(GetBitContext * gb, int stRPSIdx,
       NumDeltaPocs[ stRPSIdx ] = NumNegativePics[ stRPSIdx ] +
       NumPositivePics[ stRPSIdx ]
     */
-    stRPS->NumDeltaPocs = stRPS->NumNegativePics +
-                          stRPS->NumPositivePics;
+    stRPS[stRPSIdx].NumDeltaPocs = stRPS[stRPSIdx].NumNegativePics +
+                          stRPS[stRPSIdx].NumPositivePics;
     return true;
 }
 
@@ -1254,8 +1247,6 @@ bool HEVCParser::parseSliceSegmentLayer(GetBitContext *gb)
 */
 bool HEVCParser::parseSliceSegmentHeader(GetBitContext *gb)
 {
-    uint i = 0;
-    uint16_t slice_pic_order_cnt_lsb = 0;
     bool dependent_slice_segment_flag = false; // check!
 
     m_firstSliceSegmentInPicFlag = get_bits1(gb);
@@ -1266,15 +1257,15 @@ bool HEVCParser::parseSliceSegmentHeader(GetBitContext *gb)
     }
 
     int pps_id = get_ue_golomb(gb); // slice_pic_parameter_set_id; ue(v)
-    if (m_PPS.find(pps_id) == m_PPS.end())
+    if (m_pps.find(pps_id) == m_pps.end())
     {
         LOG(VB_RECORD, LOG_DEBUG, LOC +
             QString("PPS Id %1 not valid yet. Skipping parsing of slice.")
             .arg(pps_id));
         return false;
     }
-    PPS* pps = &m_PPS[pps_id];
-    SPS* sps = &m_SPS[pps->sps_id];
+    PPS* pps = &m_pps[pps_id];
+    SPS* sps = &m_sps[pps->sps_id];
 
     if (!m_firstSliceSegmentInPicFlag)
     {
@@ -1304,7 +1295,7 @@ bool HEVCParser::parseSliceSegmentHeader(GetBitContext *gb)
     // CuQpDeltaVal = 0;
     if (!dependent_slice_segment_flag)
     {
-        for (i = 0; i < pps->num_extra_slice_header_bits; ++i)
+        for (int i = 0; i < pps->num_extra_slice_header_bits; ++i)
         {
             get_bits1(gb); // slice_reserved_flag[i]; // u(1)
         }
@@ -1325,7 +1316,7 @@ bool HEVCParser::parseSliceSegmentHeader(GetBitContext *gb)
         }
         else
         {
-            slice_pic_order_cnt_lsb =
+            uint16_t slice_pic_order_cnt_lsb =
                 get_bits(gb, sps->log2_max_pic_order_cnt_lsb); // u(v)
 
             /*
@@ -1584,7 +1575,7 @@ bool HEVCParser::parseSliceSegmentHeader(GetBitContext *gb)
 bool HEVCParser::parseSPS(GetBitContext *gb)
 {
     uint i = 0;
-    static ShortTermRefPicSet short_term_ref_pic_set[65];
+    static std::array<ShortTermRefPicSet,65> short_term_ref_pic_set;
 
     static uint     sub_layer_size = 0;
     static uint8_t* max_dec_pic_buffering_minus1 = nullptr;
@@ -1600,7 +1591,7 @@ bool HEVCParser::parseSPS(GetBitContext *gb)
         max_sub_layers_minus1 = ext_or_max_sub_layers_minus1;
     else
     {
-        if (m_VPS.find(vps_id) == m_VPS.end())
+        if (m_vps.find(vps_id) == m_vps.end())
         {
             LOG(VB_RECORD, LOG_WARNING, LOC +
                 QString("Could not find VPS[%1]").arg(vps_id));
@@ -1615,7 +1606,7 @@ bool HEVCParser::parseSPS(GetBitContext *gb)
               sps_ext_or_max_sub_layers_minus1
             */
             max_sub_layers_minus1 = (ext_or_max_sub_layers_minus1 == 7) ?
-                                    m_VPS[vps_id].max_sub_layers :
+                                    m_vps[vps_id].max_sub_layers :
                                     ext_or_max_sub_layers_minus1;
         }
     }
@@ -1642,7 +1633,7 @@ bool HEVCParser::parseSPS(GetBitContext *gb)
     }
 
     uint sps_id = get_ue_golomb(gb); // sps_seq_parameter_set_id ue(v);
-    SPS* sps = &m_SPS[sps_id];
+    SPS* sps = &m_sps[sps_id];
 
     if (MultiLayerExtSpsFlag)
     {
@@ -1782,12 +1773,12 @@ bool HEVCParser::parseSPS(GetBitContext *gb)
     }
 
     uint num_short_term_ref_pic_sets = get_ue_golomb(gb); //  ue(v);
-    if (num_short_term_ref_pic_sets > 64)
+    if (num_short_term_ref_pic_sets > short_term_ref_pic_set.size() - 1 )
     {
         LOG(VB_RECORD, LOG_WARNING, LOC +
             QString("num_short_term_ref_pic_sets %1 > 64")
             .arg(num_short_term_ref_pic_sets));
-        num_short_term_ref_pic_sets = 64;
+        num_short_term_ref_pic_sets = short_term_ref_pic_set.size() - 1;
     }
     for(i = 0; i < num_short_term_ref_pic_sets; ++i)
     {
@@ -1811,9 +1802,9 @@ bool HEVCParser::parseSPS(GetBitContext *gb)
               number of bits used to represent lt_ref_pic_poc_lsb_sps[
               i ] is equal to log2_max_pic_order_cnt_lsb_minus4 + 4.
             */
-            m_POC[i] = get_bits(gb, sps->log2_max_pic_order_cnt_lsb); // u(v)
+            m_poc[i] = get_bits(gb, sps->log2_max_pic_order_cnt_lsb); // u(v)
             LOG(VB_RECORD, LOG_WARNING, LOC +
-                QString("POC[%1] %2").arg(i).arg(m_POC[i]));
+                QString("POC[%1] %2").arg(i).arg(m_poc[i]));
             get_bits1(gb); // used_by_curr_pic_lt_sps_flag[i] u(1)
         }
     }
@@ -1841,7 +1832,6 @@ bool HEVCParser::parseSPS(GetBitContext *gb)
 bool HEVCParser::parseVPS(GetBitContext *gb)
 {
     uint i = 0;
-    uint j = 0;
 
     uint8_t vps_id = get_bits(gb, 4);  // vps_video_parameter_set_id u(4)
     get_bits1(gb);    // vps_base_layer_internal_flag u(1)
@@ -1852,7 +1842,7 @@ bool HEVCParser::parseVPS(GetBitContext *gb)
 
     /* uint16_t check = */ get_bits(gb, 16); //  vps_reserved_0xffff_16bits u(16)
 
-    m_VPS[vps_id].max_sub_layers = max_sub_layers_minus1 + 1;
+    m_vps[vps_id].max_sub_layers = max_sub_layers_minus1 + 1;
     if (!profileTierLevel(gb, true, max_sub_layers_minus1))
     {
         LOG(VB_RECORD, LOG_WARNING, LOC +
@@ -1892,7 +1882,7 @@ bool HEVCParser::parseVPS(GetBitContext *gb)
     uint vps_num_layer_sets_minus1 = get_ue_golomb(gb); // ue(v)
     for (i = 1; i <= vps_num_layer_sets_minus1; ++i)
     {
-        for (j = 0; j <= vps_max_layer_id; ++j)
+        for (int j = 0; j <= vps_max_layer_id; ++j)
         {
             get_bits1(gb); // layer_id_included_flag[i][j] u(1)
         }
@@ -1969,7 +1959,7 @@ bool HEVCParser::parseVPS(GetBitContext *gb)
 bool HEVCParser::parsePPS(GetBitContext *gb)
 {
     uint pps_id = get_ue_golomb(gb); // pps_pic_parameter_set_id ue(v)
-    PPS* pps = &m_PPS[pps_id];
+    PPS* pps = &m_pps[pps_id];
 
     pps->sps_id = get_ue_golomb(gb); // pps_seq_parameter_set_id; ue(v)
     pps->dependent_slice_segments_enabled_flag = get_bits1(gb); // u(1)
@@ -2052,8 +2042,8 @@ bool HEVCParser::parsePPS(GetBitContext *gb)
 // Following the lead of AVCParser, ignore the left cropping.
 uint HEVCParser::pictureWidthCropped(void) const
 {
-    const uint subwc[] = {1, 2, 2, 1, 1};
-    const uint crop_unit_x = subwc[m_chromaFormatIdc];
+    static const std::array<const uint8_t,5> subwc {1, 2, 2, 1, 1};
+    const uint8_t crop_unit_x = subwc[m_chromaFormatIdc];
     // uint crop_rect_x = m_frameCropLeftOffset * crop_unit_x;
 
     return m_picWidth - ((/* m_frameCropLeftOffset + */
@@ -2063,8 +2053,8 @@ uint HEVCParser::pictureWidthCropped(void) const
 // Following the lead of AVCParser, ignore the top cropping.
 uint HEVCParser::pictureHeightCropped(void) const
 {
-    const uint subhc[] = {1, 2, 1, 1, 1};
-    const uint crop_unit_y = subhc[m_chromaFormatIdc];
+    static const std::array<const uint8_t,5> subhc {1, 2, 1, 1, 1};
+    const uint8_t crop_unit_y = subhc[m_chromaFormatIdc];
     // uint crop_rect_y = m_frameCropTopOffset * crop_unit_y;
 
     return m_picHeight - ((/* m_frameCropTopOffset + */

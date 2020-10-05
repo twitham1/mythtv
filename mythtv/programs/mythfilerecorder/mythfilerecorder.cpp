@@ -6,8 +6,6 @@
 #include <iostream>
 #include <sys/poll.h>
 
-using namespace std;
-
 #include <QCoreApplication>
 #include <QDir>
 #include <QThread>
@@ -94,8 +92,8 @@ void Streamer::SendBytes(void)
         int delta = m_startTime.secsTo(MythDate::current()) + 1;
         int rate  = (delta * m_dataRate) - m_dataRead;
 
-        read_sz = min(rate, read_sz);
-        read_sz = min(m_bufferMax - m_buffer.size(), read_sz);
+        read_sz = std::min(rate, read_sz);
+        read_sz = std::min(m_bufferMax - m_buffer.size(), read_sz);
 
         if (read_sz > 0)
         {
@@ -284,7 +282,7 @@ bool Commands::process_command(QString & cmd)
     }
     else if (cmd.startsWith("BlockSize"))
     {
-        m_streamer->BlockSize(cmd.mid(10).toInt());
+        m_streamer->BlockSize(cmd.midRef(10).toInt());
         send_status("OK");
     }
     else if (cmd.startsWith("StartStreaming"))
@@ -313,8 +311,7 @@ bool Commands::Run(const QString & filename, int data_rate, bool loopinput)
     QString cmd;
 
     int poll_cnt = 1;
-    struct pollfd polls[2];
-    memset(polls, 0, sizeof(polls));
+    std::array<struct pollfd,2> polls {};
 
     polls[0].fd      = 0;
     polls[0].events  = POLLIN | POLLPRI;
@@ -342,7 +339,7 @@ bool Commands::Run(const QString & filename, int data_rate, bool loopinput)
 
     while (m_run)
     {
-        int ret = poll(polls, poll_cnt, m_timeout);
+        int ret = poll(polls.data(), poll_cnt, m_timeout);
 
         if (polls[0].revents & POLLHUP)
         {
@@ -429,7 +426,7 @@ int main(int argc, char *argv[])
     if (!cmdline.toString("infile").isEmpty())
         filename = cmdline.toString("infile");
     else if (!cmdline.GetArgs().empty())
-        filename = cmdline.GetArgs()[0];
+        filename = cmdline.GetArgs().at(0);
 
     Commands recorder;
     recorder.Run(filename, data_rate, loopinput);

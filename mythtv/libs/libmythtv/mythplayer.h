@@ -1,19 +1,22 @@
 #ifndef MYTHPLAYER_H
 #define MYTHPLAYER_H
 
+// Std
 #include <cstdint>
 #include <utility>
 
+// Qt
 #include <QCoreApplication>
 #include <QList>
-#include <QMutex>                       // for QMutex
-#include <QTime>                        // for QTime
-#include <QString>                      // for QString
-#include <QRect>                        // for QRect
-#include <QSize>                        // for QSize
-#include <QStringList>                  // for QStringList
-#include <QWaitCondition>               // for QWaitCondition
+#include <QMutex>
+#include <QTime>
+#include <QString>
+#include <QRect>
+#include <QSize>
+#include <QStringList>
+#include <QWaitCondition>
 
+// MythTV
 #include "playercontext.h"
 #include "volumebase.h"
 #include "osd.h"
@@ -27,32 +30,23 @@
 #include "commbreakmap.h"
 #include "audioplayer.h"
 #include "audiooutputgraph.h"
-#include "mthread.h"                    // for MThread
-#include "mythavutil.h"                 // for VideoFrame
-#include "mythtypes.h"                  // for InfoMap
-#include "programtypes.h"               // for frm_dir_map_t, etc
-#include "tv.h"                         // for CommSkipMode
-#include "videoouttypes.h"              // for FrameScanType, PIPLocation, etc
+#include "mthread.h"
+#include "mythavutil.h"
+#include "mythtypes.h"
+#include "programtypes.h"
+#include "tv.h"
+#include "videoouttypes.h"
 #include "mythmiscutil.h"
-
 #include "mythtvexp.h"
 
-class MythVideoOutput;
-class RemoteEncoder;
-class MythSqlDatabase;
 class ProgramInfo;
-class DecoderBase;
-class LiveTVChain;
-class TV;
-struct SwsContext;
 class InteractiveTV;
-class NSAutoreleasePool;
 class DetectLetterbox;
-class MythPlayer;
 class Jitterometer;
 class QThread;
 class QWidget;
 class MythMediaBuffer;
+class MythDecoderThread;
 
 using StatusCallback = void (*)(int, void*);
 
@@ -65,6 +59,7 @@ enum TCTypes
     TC_CC
 };
 #define TCTYPESMAX 4
+using tctype_arr = std::array<int64_t,TCTYPESMAX>;
 
 // Caption Display modes
 enum
@@ -92,46 +87,14 @@ enum PlayerFlags
     kDecodeFewBlocks      = 0x000004,
     kDecodeNoLoopFilter   = 0x000008,
     kDecodeNoDecode       = 0x000010,
-    kDecodeDisallowCPU    = 0x000020, // NB CPU always available by default
-    kDecodeAllowGPU       = 0x000040, // VDPAU, VAAPI, DXVA2
-    kDecodeAllowEXT       = 0x000080, // VDA, CrystalHD
-    kVideoIsNull          = 0x000100,
+    kDecodeAllowGPU       = 0x000020,
+    kVideoIsNull          = 0x000040,
     kAudioMuted           = 0x010000,
     kNoITV                = 0x020000,
     kMusicChoice          = 0x040000,
 };
 
 #define FlagIsSet(arg) (m_playerFlags & (arg))
-
-class DecoderThread : public MThread
-{
-  public:
-    DecoderThread(MythPlayer *mp, bool start_paused)
-      : MThread("Decoder"), m_mp(mp), m_startPaused(start_paused) { }
-    ~DecoderThread() override { wait(); }
-
-  protected:
-    void run(void) override; // MThread
-
-  private:
-    MythPlayer *m_mp;
-    bool        m_startPaused;
-};
-
-class MythMultiLocker
-{
-  public:
-    MythMultiLocker(std::initializer_list<QMutex*> Locks);
-    MythMultiLocker() = delete;
-   ~MythMultiLocker();
-
-    void Unlock(void);
-    void Relock(void);
-
-  private:
-    Q_DISABLE_COPY(MythMultiLocker)
-    QVector<QMutex*> m_locks;
-};
 
 class DecoderCallback
 {
@@ -161,15 +124,15 @@ class DecoderCallback
 // still higher than the default warning threshhold of 24 bytes.
 //
 // NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
-class MTV_PUBLIC MythPlayer
+class MTV_PUBLIC MythPlayer : public QObject
 {
-    Q_DECLARE_TR_FUNCTIONS(MythPlayer)
+    Q_OBJECT
 
     // Do NOT add a decoder class to this list
     friend class PlayerContext;
     friend class CC708Reader;
     friend class CC608Reader;
-    friend class DecoderThread;
+    friend class MythDecoderThread;
     friend class DetectLetterbox;
     friend class TeletextScreen;
     friend class SubtitleScreen;
@@ -182,8 +145,7 @@ class MTV_PUBLIC MythPlayer
 
   public:
     explicit MythPlayer(PlayerFlags flags = kNoFlags);
-    MythPlayer(const MythPlayer& rhs);
-    virtual ~MythPlayer();
+   ~MythPlayer() override;
 
     // Initialisation
     virtual int OpenFile(int Retries = 4);
@@ -194,9 +156,6 @@ class MTV_PUBLIC MythPlayer
     void SetLength(int len)                   { m_totalLength = len; }
     void SetFramesPlayed(uint64_t played);
     void SetEof(EofState eof);
-    void SetPIPActive(bool is_active)         { m_pipActive = is_active; }
-    void SetPIPVisible(bool is_visible)       { m_pipVisible = is_visible; }
-
     void SetTranscoding(bool value);
     void SetWatchingRecording(bool mode);
     void SetWatched(bool forceWatched = false);
@@ -218,8 +177,7 @@ class MTV_PUBLIC MythPlayer
     float   GetVideoAspect(void) const        { return m_videoAspect; }
     float   GetFrameRate(void) const          { return m_videoFrameRate; }
     void    GetPlaybackData(InfoMap &infoMap);
-    bool    IsAudioNeeded(void)
-        { return ((FlagIsSet(kVideoIsNull)) == 0) && m_playerCtx->IsAudioNeeded(); }
+    bool    IsAudioNeeded(void) { return ((FlagIsSet(kVideoIsNull)) == 0); }
     uint    GetVolume(void) { return m_audio.GetVolume(); }
     int     GetFreeVideoFrames(void) const;
     AspectOverrideMode GetAspectOverride(void) const;
@@ -250,7 +208,6 @@ class MTV_PUBLIC MythPlayer
     QString   GetEncodingType(void) const;
     void      GetCodecDescription(InfoMap &infoMap);
     QString   GetXDS(const QString &key) const;
-    PIPLocation GetNextPIPLocation(void) const;
 
     // Bool Gets
     bool    IsPaused(void) const              { return m_allPaused;      }
@@ -263,8 +220,6 @@ class MTV_PUBLIC MythPlayer
     bool    IsReallyNearEnd(void) const;
     bool    IsNearEnd(void);
     bool    HasAudioOut(void) const           { return m_audio.HasAudioOut(); }
-    bool    IsPIPActive(void) const           { return m_pipActive; }
-    bool    IsPIPVisible(void) const          { return m_pipVisible; }
     bool    IsMuted(void)                     { return m_audio.IsMuted(); }
     bool    PlayerControlsVolume(void) const  { return m_audio.ControlsVolume(); }
     bool    UsingNullVideo(void) const { return FlagIsSet(kVideoIsNull); }
@@ -299,9 +254,8 @@ class MTV_PUBLIC MythPlayer
     void SetCutList(const frm_dir_map_t &newCutList);
 
     // Decoder stuff..
-    VideoFrameType* DirectRenderFormats(void);
+    const VideoFrameTypeVec* DirectRenderFormats(void);
     VideoFrame *GetNextVideoFrame(void);
-    VideoFrame *GetRawVideoFrame(long long frameNumber = -1);
     VideoFrame *GetCurrentFrame(int &w, int &h);
     void DeLimboFrame(VideoFrame *frame);
     virtual void ReleaseNextVideoFrame(VideoFrame *buffer, int64_t timecode,
@@ -419,9 +373,6 @@ class MTV_PUBLIC MythPlayer
 
     // Non-public sets
     virtual void SetBookmark(bool clear = false);
-    bool AddPIPPlayer(MythPlayer *pip, PIPLocation loc);
-    bool RemovePIPPlayer(MythPlayer *pip);
-
     FrameScanType NextScanOverride(void);
     void          SetScanOverride(FrameScanType Scan);
     void          SetScanType(FrameScanType Scan);
@@ -615,13 +566,10 @@ class MTV_PUBLIC MythPlayer
     void UnpauseBuffer(void);
 
     // Private decoder stuff
-    virtual void CreateDecoder(char *TestBuffer, int TestSize);
+    virtual void CreateDecoder(TestBufferVec & TestBuffer);
     void  SetDecoder(DecoderBase *dec);
     /// Returns the stream decoder currently in use.
     const DecoderBase *GetDecoder(void) const { return m_decoder; }
-    bool DecodeFrame(struct rtframeheader *frameheader,
-                     unsigned char *strm, unsigned char *outbuf);
-
     virtual bool DecoderGetFrameFFREW(void);
     virtual bool DecoderGetFrameREW(void);
     bool         DecoderGetFrame(DecodeType decodetype, bool unsafe = false);
@@ -670,7 +618,7 @@ class MTV_PUBLIC MythPlayer
     mutable QMutex   m_decoderChangeLock  {QMutex::Recursive};
     MythVideoOutput *m_videoOutput        {nullptr};
     PlayerContext   *m_playerCtx          {nullptr};
-    DecoderThread   *m_decoderThread      {nullptr};
+    MythDecoderThread* m_decoderThread    {nullptr};
     QThread         *m_playerThread       {nullptr};
 #ifdef Q_OS_ANDROID
     int            m_playerThreadId       {0};
@@ -818,12 +766,6 @@ class MTV_PUBLIC MythPlayer
     AudioPlayer      m_audio;
     AudioOutputGraph m_audiograph;
 
-    // Picture-in-Picture
-    PIPMap         m_pipPlayers;
-    PIPLocation    m_pipDefaultLoc;
-    volatile bool  m_pipActive            {false};
-    volatile bool  m_pipVisible           {true};
-
     // Commercial filtering
     CommBreakMap   m_commBreakMap;
     bool       m_forcePositionMapSync     {false};
@@ -863,8 +805,8 @@ class MTV_PUBLIC MythPlayer
     // Time Code stuff
     int        m_prevTc                   {0}; ///< 32 bit timecode if last VideoFrame shown
     int        m_prevRp                   {0}; ///< repeat_pict of last frame
-    int64_t    m_tcWrap[TCTYPESMAX]       {};
-    int64_t    m_tcLastVal[TCTYPESMAX]    {};
+    tctype_arr m_tcWrap                   {};
+    tctype_arr m_tcLastVal                {};
     int64_t    m_savedAudioTimecodeOffset {0};
 
     // LiveTV
@@ -878,10 +820,9 @@ class MTV_PUBLIC MythPlayer
     Jitterometer *m_outputJmeter          {nullptr};
 
   private:
+    Q_DISABLE_COPY(MythPlayer)
     void syncWithAudioStretch();
     bool m_disablePassthrough             {false};
 };
 
 #endif
-
-/* vim: set expandtab tabstop=4 shiftwidth=4: */

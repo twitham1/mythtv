@@ -7,7 +7,7 @@
 #include "mythlogging.h"
 #include "mpegtables.h"
 
-const unsigned char DEFAULT_PAT_HEADER[8] =
+const std::array<const uint8_t,8> DEFAULT_PAT_HEADER
 {
     0x00, // TableID::PAT
     0xb0, // Syntax indicator
@@ -20,7 +20,7 @@ const unsigned char DEFAULT_PAT_HEADER[8] =
     0x00, // Last Section
 };
 
-const unsigned char DEFAULT_PMT_HEADER[12] =
+const std::array<const uint8_t,12> DEFAULT_PMT_HEADER
 {
     0x02, // TableID::PMT
     0xb0, // Syntax indicator
@@ -331,23 +331,23 @@ ProgramAssociationTable* ProgramAssociationTable::CreateBlank(bool smallPacket)
 {
     (void) smallPacket; // currently always a small packet..
     TSPacket *tspacket = TSPacket::CreatePayloadOnlyPacket();
-    memcpy(tspacket->data() + sizeof(TSHeader) + 1/* start of field pointer */,
-           DEFAULT_PAT_HEADER, sizeof(DEFAULT_PAT_HEADER));
+    auto *dst = tspacket->data() + sizeof(TSHeader) + 1; /* start of field pointer */
+    std::copy(DEFAULT_PAT_HEADER.cbegin(), DEFAULT_PAT_HEADER.cend(), dst);
     PSIPTable psip = PSIPTable::View(*tspacket);
     psip.SetLength(TSPacket::kPayloadSize
                    - 1 /* for start of field pointer */
                    - 3 /* for data before data last byte of pes length */);
     auto *pat = new ProgramAssociationTable(psip);
-    pat->SetTotalLength(sizeof(DEFAULT_PAT_HEADER));
+    pat->SetTotalLength(DEFAULT_PAT_HEADER.size());
     delete tspacket;
     return pat;
 }
 
 ProgramAssociationTable* ProgramAssociationTable::Create(
     uint tsid, uint version,
-    const vector<uint>& pnum, const vector<uint>& pid)
+    const std::vector<uint>& pnum, const std::vector<uint>& pid)
 {
-    const uint count = min(pnum.size(), pid.size());
+    const uint count = std::min(pnum.size(), pid.size());
     ProgramAssociationTable* pat = CreateBlank();
     pat->SetVersionNumber(version);
     pat->SetTranportStreamID(tsid);
@@ -382,8 +382,8 @@ ProgramMapTable* ProgramMapTable::CreateBlank(bool smallPacket)
 {
     ProgramMapTable *pmt = nullptr;
     TSPacket *tspacket = TSPacket::CreatePayloadOnlyPacket();
-    memcpy(tspacket->data() + sizeof(TSHeader) + 1/* start of field pointer */,
-           DEFAULT_PMT_HEADER, sizeof(DEFAULT_PMT_HEADER));
+    auto *dst = tspacket->data() + sizeof(TSHeader) + 1; /* start of field pointer */
+    std::copy(DEFAULT_PMT_HEADER.cbegin(), DEFAULT_PMT_HEADER.cend(), dst);
 
     if (smallPacket)
     {
@@ -398,16 +398,16 @@ ProgramMapTable* ProgramMapTable::CreateBlank(bool smallPacket)
         pmt = new ProgramMapTable(psip);
     }
 
-    pmt->SetTotalLength(sizeof(DEFAULT_PMT_HEADER));
+    pmt->SetTotalLength(DEFAULT_PMT_HEADER.size());
     delete tspacket;
     return pmt;
 }
 
 ProgramMapTable* ProgramMapTable::Create(
     uint programNumber, uint basepid, uint pcrpid, uint version,
-    vector<uint> pids, vector<uint> types)
+    std::vector<uint> pids, std::vector<uint> types)
 {
-    const uint count = min(pids.size(), types.size());
+    const uint count = std::min(pids.size(), types.size());
     ProgramMapTable* pmt = CreateBlank(false);
     pmt->tsheader()->SetPID(basepid);
 
@@ -426,11 +426,11 @@ ProgramMapTable* ProgramMapTable::Create(
 ProgramMapTable* ProgramMapTable::Create(
     uint programNumber, uint basepid, uint pcrpid, uint version,
     const desc_list_t         &global_desc,
-    const vector<uint>        &pids,
-    const vector<uint>        &types,
-    const vector<desc_list_t> &prog_desc)
+    const std::vector<uint>        &pids,
+    const std::vector<uint>        &types,
+    const std::vector<desc_list_t> &prog_desc)
 {
-    const uint count = min(pids.size(), types.size());
+    const uint count = std::min(pids.size(), types.size());
     ProgramMapTable* pmt = CreateBlank(false);
     pmt->tsheader()->SetPID(basepid);
 
@@ -439,7 +439,7 @@ ProgramMapTable* ProgramMapTable::Create(
     pmt->SetPCRPID(pcrpid);
     pmt->SetVersionNumber(version);
 
-    vector<unsigned char> gdesc;
+    std::vector<unsigned char> gdesc;
     for (const auto *gd : global_desc)
     {
         uint len = gd[1] + 2;
@@ -449,7 +449,7 @@ ProgramMapTable* ProgramMapTable::Create(
 
     for (uint i = 0; i < count; i++)
     {
-        vector<unsigned char> pdesc;
+        std::vector<unsigned char> pdesc;
         for (const auto *pd : prog_desc[i])
         {
             uint len = pd[1] + 2;
@@ -639,7 +639,7 @@ bool ProgramMapTable::IsStillPicture(const QString& sistandard) const
  *  \return number of pids in list
  */
 uint ProgramMapTable::FindPIDs(uint           type,
-                               vector<uint>  &pids,
+                               std::vector<uint>  &pids,
                                const QString &sistandard) const
 {
     if ((StreamID::AnyMask & type) != StreamID::AnyMask)
@@ -675,8 +675,8 @@ uint ProgramMapTable::FindPIDs(uint           type,
  *  \return number of items in pids and types lists.
  */
 uint ProgramMapTable::FindPIDs(uint           type,
-                               vector<uint>  &pids,
-                               vector<uint>  &types,
+                               std::vector<uint>  &pids,
+                               std::vector<uint>  &types,
                                const QString &sistandard,
                                bool           normalize) const
 {
@@ -887,7 +887,7 @@ QString ProgramMapTable::toString(void) const
         .arg(tsheader()->PID(),0,16)
         .arg(PCRPID(),0,16);
 
-    vector<const unsigned char*> desc =
+    std::vector<const unsigned char*> desc =
         MPEGDescriptor::Parse(ProgramInfo(), ProgramInfoLength());
     for (auto & d : desc)
     {
@@ -927,7 +927,7 @@ QString ProgramMapTable::toStringXML(uint indent_level) const
         .arg(StreamCount())
         .arg(PSIPTable::XMLValues(indent_level + 1));
 
-    vector<const unsigned char*> gdesc =
+    std::vector<const unsigned char*> gdesc =
         MPEGDescriptor::Parse(ProgramInfo(), ProgramInfoLength());
     for (auto & gd : gdesc)
     {
@@ -944,7 +944,7 @@ QString ProgramMapTable::toStringXML(uint indent_level) const
             .arg(StreamType(i),2,16,QChar('0'))
             .arg(StreamTypeString(i))
             .arg(StreamInfoLength(i));
-        vector<const unsigned char*> ldesc =
+        std::vector<const unsigned char*> ldesc =
             MPEGDescriptor::Parse(StreamInfo(i), StreamInfoLength(i));
         str += (ldesc.empty()) ? " />\n" : ">\n";
         for (auto & ld : ldesc)
@@ -1175,15 +1175,13 @@ QString ProgramMapTable::StreamDescription(uint i, const QString& sistandard) co
 QString ConditionalAccessTable::toString(void) const
 {
     QString str =
-        QString("Condiditional Access Section %1")
+        QString("Conditional Access Section %1")
         .arg(PSIPTable::toString());
 
-    vector<const unsigned char*> gdesc =
+    std::vector<const unsigned char*> gdesc =
         MPEGDescriptor::Parse(Descriptors(), DescriptorsLength());
     for (auto & gd : gdesc)
         str += "  " + MPEGDescriptor(gd, 300).toString() + "\n";
-
-    str += "\n";
 
     return str;
 }
@@ -1197,7 +1195,7 @@ QString ConditionalAccessTable::toStringXML(uint indent_level) const
         .arg(indent_0)
         .arg(PSIPTable::XMLValues(indent_level + 1));
 
-    vector<const unsigned char*> gdesc =
+    std::vector<const unsigned char*> gdesc =
         MPEGDescriptor::Parse(Descriptors(), DescriptorsLength());
     str += (gdesc.empty()) ? " />\n" : ">\n";
     for (auto & gd : gdesc)

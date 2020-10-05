@@ -190,7 +190,7 @@ bool StreamHandler::AddPIDFilter(PIDInfo *info)
 {
 #ifdef DEBUG_PID_FILTERS
     LOG(VB_RECORD, LOG_DEBUG, LOC + QString("AddPIDFilter(0x%1)")
-            .arg(info->_pid, 0, 16));
+            .arg(info->m_pid, 0, 16));
 #endif // DEBUG_PID_FILTERS
 
     QMutexLocker writing_locker(&m_pidLock);
@@ -239,7 +239,7 @@ bool StreamHandler::RemoveAllPIDFilters(void)
     LOG(VB_RECORD, LOG_DEBUG, LOC + "RemoveAllPIDFilters()");
 #endif // DEBUG_PID_FILTERS
 
-    vector<int> del_pids;
+    std::vector<int> del_pids;
     for (auto it = m_pidInfo.begin(); it != m_pidInfo.end(); ++it)
         del_pids.push_back(it.key());
 
@@ -252,8 +252,8 @@ bool StreamHandler::RemoveAllPIDFilters(void)
 
 void StreamHandler::UpdateListeningForEIT(void)
 {
-    vector<uint> add_eit;
-    vector<uint> del_eit;
+    std::vector<uint> add_eit;
+    std::vector<uint> del_eit;
 
     QMutexLocker read_locker(&m_listenerLock);
 
@@ -294,7 +294,7 @@ bool StreamHandler::UpdateFiltersFromStreamData(void)
     }
 
     QMap<uint, PIDInfo*> add_pids;
-    vector<uint>         del_pids;
+    std::vector<uint>    del_pids;
 
     {
         QMutexLocker read_locker(&m_pidLock);
@@ -341,12 +341,12 @@ PIDPriority StreamHandler::GetPIDPriority(uint pid) const
     PIDPriority tmp = kPIDPriorityNone;
 
     for (auto it = m_streamDataList.cbegin(); it != m_streamDataList.cend(); ++it)
-        tmp = max(tmp, it.key()->GetPIDPriority(pid));
+        tmp = std::max(tmp, it.key()->GetPIDPriority(pid));
 
     return tmp;
 }
 
-void StreamHandler::WriteMPTS(unsigned char * buffer, uint len)
+void StreamHandler::WriteMPTS(const unsigned char * buffer, uint len)
 {
     if (m_mptsTfw == nullptr)
         return;

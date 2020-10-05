@@ -2,7 +2,6 @@
 #define NETWORKCONTROL_H_
 
 #include <deque>
-using namespace std;
 
 #include <QWaitCondition>
 #include <QStringList>
@@ -47,9 +46,9 @@ class NetworkCommand : public QObject
     Q_OBJECT
   public:
     NetworkCommand(NetworkControlClient *cli, const QString& c)
+        : m_command(c.trimmed()),
+          m_client(cli)
     {
-        m_command = c.trimmed();
-        m_client = cli;
         m_args = m_command.simplified().split(" ");
     }
 

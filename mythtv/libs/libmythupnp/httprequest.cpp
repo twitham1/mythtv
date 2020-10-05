@@ -14,6 +14,7 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QHostInfo>
 #include <QTextCodec>
 #include <QStringList>
 #include <QCryptographicHash>
@@ -57,8 +58,6 @@
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
 #endif
-
-using namespace std;
 
 static std::array<const MIMETypes,63> g_MIMETypes
 {{
@@ -154,6 +153,18 @@ static QString StaticPage =
 #endif
 
 const char *HTTPRequest::s_szServerHeaders = "Accept-Ranges: bytes\r\n";
+
+/////////////////////////////////////////////////////////////////////////////
+//
+/////////////////////////////////////////////////////////////////////////////
+
+QString HTTPRequest::GetLastHeader( const QString &sType ) const
+{
+    QStringList values = m_mapHeaders.values( sType );
+    if (!values.isEmpty())
+        return values.last();
+    return QString();
+}
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -270,8 +281,9 @@ QString HTTPRequest::BuildResponseHeader( long long nSize )
             SetResponseHeader("contentFeatures.dlna.org", "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01500000000000000000000000000000");
     }
 
-    if (!m_mapHeaders[ "origin" ].isEmpty())
-        AddCORSHeaders(m_mapHeaders[ "origin" ]);
+    auto values = m_mapHeaders.values("origin");
+    for (const auto & value : values)
+        AddCORSHeaders(value);
 
     if (getenv("HTTPREQUEST_DEBUG"))
     {
@@ -316,7 +328,6 @@ qint64 HTTPRequest::SendResponse( void )
             if (m_sFileName.isEmpty() || !m_response.buffer().isEmpty())
                 break;
             {
-                QByteArray fileBuffer;
                 QFile file(m_sFileName);
                 if (file.exists() && file.size() < (2 * 1024 * 1024) && // For security/stability, limit size of files read into buffer to 2MiB
                     file.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -390,7 +401,7 @@ qint64 HTTPRequest::SendResponse( void )
     // ----------------------------------------------------------------------
     // DEBUGGING
     if (getenv("HTTPREQUEST_DEBUG"))
-        cout << m_response.buffer().constData() << endl;
+        std::cout << m_response.buffer().constData() << std::endl;
     // ----------------------------------------------------------------------
 
     LOG(VB_HTTP, LOG_DEBUG, QString("Reponse Content Length: %1").arg(nContentLen));
@@ -401,7 +412,12 @@ qint64 HTTPRequest::SendResponse( void )
 
     QBuffer compBuffer;
 
-    if (( nContentLen > 0 ) && m_mapHeaders[ "accept-encoding" ].contains( "gzip" ))
+    auto values = m_mapHeaders.values("accept-encoding");
+    bool gzip_found = std::any_of(values.cbegin(), values.cend(),
+                                  [](const auto & value)
+                                      {return value.contains( "gzip" ); });
+
+    if (( nContentLen > 0 ) && gzip_found)
     {
         QByteArray compressed = gzipCompress( m_response.buffer() );
         compBuffer.setData( compressed );
@@ -666,21 +682,19 @@ qint64 HTTPRequest::SendData( QIODevice *pDevice, qint64 llStart, qint64 llBytes
     if ( !pDevice->seek( llStart ))
         return -1;
 
-    char   aBuffer[ SENDFILE_BUFFER_SIZE ];
+    std::array<char,SENDFILE_BUFFER_SIZE> aBuffer {};
 
     qint64 llBytesRemaining = llBytes;
     qint64 llBytesToRead    = 0;
     qint64 llBytesRead      = 0;
 
-    memset (aBuffer, 0, sizeof(aBuffer));
-
     while ((sent < llBytes) && !pDevice->atEnd())
     {
         llBytesToRead  = std::min( (qint64)SENDFILE_BUFFER_SIZE, llBytesRemaining );
 
-        if (( llBytesRead = pDevice->read( aBuffer, llBytesToRead )) != -1 )
+        if (( llBytesRead = pDevice->read( aBuffer.data(), llBytesToRead )) != -1 )
         {
-            if ( WriteBlock( aBuffer, llBytesRead ) == -1)
+            if ( WriteBlock( aBuffer.data(), llBytesRead ) == -1)
                 return -1;
 
             // -=>TODO: We don't handle the situation where we read more than was sent.
@@ -1032,7 +1046,7 @@ QString HTTPRequest::GetMimeType( const QString &sFileExtension )
     {
         ext = type.pszExtension;
 
-        if ( sFileExtension.toUpper() == ext.toUpper() )
+        if ( sFileExtension.compare(ext, Qt::CaseInsensitive) == 0 )
             return( type.pszType );
     }
 
@@ -1295,7 +1309,7 @@ bool HTTPRequest::ParseRequest()
 
                 if (!sName.isEmpty() && !sValue.isEmpty())
                 {
-                    m_mapHeaders.insertMulti(sName.toLower(), sValue.trimmed());
+                    m_mapHeaders.insert(sName.toLower(), sValue.trimmed());
                 }
 
                 sLine = ReadLine( 2000 );
@@ -1374,9 +1388,9 @@ bool HTTPRequest::ParseRequest()
 
         bSuccess = true;
 
-        SetContentType( m_mapHeaders[ "content-type" ] );
+        SetContentType( GetLastHeader( "content-type" ) );
         // Lets load payload if any.
-        long nPayloadSize = m_mapHeaders[ "content-length" ].toLong();
+        long nPayloadSize = GetLastHeader( "content-length" ).toLong();
 
         if (nPayloadSize > 0)
         {
@@ -1437,7 +1451,6 @@ void HTTPRequest::ProcessRequestLine( const QString &sLine )
 {
     m_sRawRequest = sLine;
 
-    QString     sToken;
 #if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList tokens = sLine.split(m_procReqLineExp, QString::SkipEmptyParts);
 #else
@@ -1614,9 +1627,8 @@ void HTTPRequest::ExtractMethodFromURL()
     // Strip out leading http://192.168.1.1:6544/ -> /
     // Should fix #8678
     // FIXME what about https?
-    QRegExp sRegex("^http://.*/");
-    sRegex.setMinimal(true);
-    m_sBaseUrl.replace(sRegex, "/");
+    QRegularExpression re {"^http[s]?://.*?/"};
+    m_sBaseUrl.replace(re, "/");
 
 #if QT_VERSION < QT_VERSION_CHECK(5,14,0)
     QStringList sList = m_sBaseUrl.split('/', QString::SkipEmptyParts);
@@ -1901,7 +1913,7 @@ QString HTTPRequest::CalculateDigestNonce(const QString& timeStamp) const
 bool HTTPRequest::BasicAuthentication()
 {
     LOG(VB_HTTP, LOG_NOTICE, "Attempting HTTP Basic Authentication");
-    QStringList oList = m_mapHeaders[ "authorization" ].split( ' ' );
+    QStringList oList = GetLastHeader( "authorization" ).split( ' ' );
 
     if (m_nMajor == 1 && m_nMinor == 0) // We only support Basic auth for http 1.0 clients
     {
@@ -1962,7 +1974,7 @@ bool HTTPRequest::DigestAuthentication()
     LOG(VB_HTTP, LOG_NOTICE, "Attempting HTTP Digest Authentication");
     QString realm = "MythTV"; // TODO Check which realm applies for the request path
 
-    QString authMethod = m_mapHeaders[ "authorization" ].section(' ', 0, 0).toLower();
+    QString authMethod = GetLastHeader( "authorization" ).section(' ', 0, 0).toLower();
 
     if (authMethod != "digest")
     {
@@ -1970,7 +1982,7 @@ bool HTTPRequest::DigestAuthentication()
         return false;
     }
 
-    QString parameterStr = m_mapHeaders[ "authorization" ].section(' ', 1);
+    QString parameterStr = GetLastHeader( "authorization" ).section(' ', 1);
 
     QMap<QString, QString> paramMap;
     QStringList paramList = parameterStr.split(',');
@@ -2124,7 +2136,7 @@ bool HTTPRequest::Authenticated()
     if (m_userSession.IsValid()) //m_userSession.CheckPermission())
         return true;
 
-    QStringList oList = m_mapHeaders[ "authorization" ].split( ' ' );
+    QStringList oList = GetLastHeader( "authorization" ).split( ' ' );
 
     if (oList.count() < 2)
         return false;
@@ -2202,7 +2214,7 @@ QString HTTPRequest::GetHostName()
 
     // RFC 3875 - The is the hostname or ip address in the client request, not
     //            the name or ip we might otherwise know for this server
-    QString hostname = m_mapHeaders["host"];
+    QString hostname = GetLastHeader("host");
     if (!hostname.isEmpty())
     {
         // Strip the port
@@ -2290,7 +2302,6 @@ void HTTPRequest::AddCORSHeaders( const QString &sOrigin )
     // ----------------------------------------------------------------------
 
     QStringList allowedOrigins;
-    char localhostname[1024]; // about HOST_NAME_MAX * 4
 
     int serverStatusPort = gCoreContext->GetMasterServerStatusPort();
     int backendSSLPort = gCoreContext->GetNumSetting( "BackendSSLPort",
@@ -2306,7 +2317,8 @@ void HTTPRequest::AddCORSHeaders( const QString &sOrigin )
     allowedOrigins << QString("http://%1").arg(masterAddrPort);
     allowedOrigins << QString("https://%2").arg(masterTLSAddrPort);
 
-    if (!gethostname(localhostname, 1024))
+    QString localhostname = QHostInfo::localHostName();
+    if (!localhostname.isEmpty())
     {
         allowedOrigins << QString("http://%1:%2")
             .arg(localhostname).arg(serverStatusPort);
@@ -2320,30 +2332,28 @@ void HTTPRequest::AddCORSHeaders( const QString &sOrigin )
             "http://chromecast.mythtvcast.com"
             )).split(",");
 
-    for (QStringList::const_iterator it = allowedOriginsList.begin();
-                                     it != allowedOriginsList.end(); it++)
+    for (const auto & origin : qAsConst(allowedOriginsList))
     {
-         if ((*it).isEmpty())
+         if (origin.isEmpty())
             continue;
 
-        if (*it == "*" || (!(*it).startsWith("http://") &&
-            !(*it).startsWith("https://")))
+        if (origin == "*" || (!origin.startsWith("http://") &&
+            !origin.startsWith("https://")))
         {
             LOG(VB_GENERAL, LOG_ERR, QString("Illegal AllowedOriginsList"
                 " entry '%1'. Must start with http[s]:// and not be *")
-                .arg(*it));
+                .arg(origin));
         }
         else
         {
-            allowedOrigins << *it;
+            allowedOrigins << origin;
         }
     }
 
     if (VERBOSE_LEVEL_CHECK(VB_HTTP, LOG_DEBUG))
     {
-        for (QStringList::const_iterator it = allowedOrigins.begin();
-                                         it != allowedOrigins.end(); it++)
-            LOG(VB_HTTP, LOG_DEBUG, QString("Will allow Origin: %1").arg(*it));
+        for (const auto & origin : qAsConst(allowedOrigins))
+            LOG(VB_HTTP, LOG_DEBUG, QString("Will allow Origin: %1").arg(origin));
     }
 
     if (allowedOrigins.contains(sOrigin))

@@ -16,7 +16,7 @@ void InteractiveScreen::Close(void)
 
 void InteractiveScreen::UpdateArea(void)
 {
-    if (m_ChildrenList.isEmpty())
+    if (m_childrenList.isEmpty())
     {
         m_safeArea = QRect();
     }
@@ -34,7 +34,7 @@ void InteractiveScreen::OptimiseDisplayedArea(void)
     UpdateArea();
 
     QRegion visible;
-    QListIterator<MythUIType *> i(m_ChildrenList);
+    QListIterator<MythUIType *> i(m_childrenList);
     while (i.hasNext())
     {
         MythUIType *img = i.next();
@@ -55,6 +55,6 @@ void InteractiveScreen::OptimiseDisplayedArea(void)
     while (i.hasNext())
     {
         MythUIType *img = i.next();
-        img->SetArea(img->GetArea().translated(left, top));
+        img->SetArea(MythRect(img->GetArea().translated(left, top)));
     }
 }

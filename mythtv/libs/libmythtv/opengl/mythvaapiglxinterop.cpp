@@ -86,19 +86,18 @@ uint MythVAAPIInteropGLX::GetFlagsForFrame(VideoFrame *Frame, FrameScanType Scan
     return flags;
 }
 
-void MythVAAPIInteropGLX::InitPictureAttributes(VideoColourSpace *ColourSpace)
+void MythVAAPIInteropGLX::InitPictureAttributes(MythVideoColourSpace *ColourSpace)
 {
     m_vaapiColourSpace = 0;
     if (!ColourSpace || !m_vaDisplay)
         return;
 
     OpenGLLocker locker(m_context);
-    m_vaapiHueBase = MythVideoOutput::CalcHueBase(m_vaVendor);
 
     delete [] m_vaapiPictureAttributes;
     m_vaapiPictureAttributeCount = 0;
     int supported_controls = kPictureAttributeSupported_None;
-    QList<VADisplayAttribute> supported;
+    QVector<VADisplayAttribute> supported;
     int num = vaMaxNumDisplayAttributes(m_vaDisplay);
     auto* attribs = new VADisplayAttribute[static_cast<unsigned int>(num)];
 
@@ -132,7 +131,7 @@ void MythVAAPIInteropGLX::InitPictureAttributes(VideoColourSpace *ColourSpace)
     // Set the supported attributes
     ColourSpace->SetSupportedAttributes(static_cast<PictureAttributeSupported>(supported_controls));
     // and listen for changes
-    connect(ColourSpace, &VideoColourSpace::PictureAttributeChanged, this, &MythVAAPIInteropGLX::SetPictureAttribute);
+    connect(ColourSpace, &MythVideoColourSpace::PictureAttributeChanged, this, &MythVAAPIInteropGLX::SetPictureAttribute);
 
     // create
     delete [] attribs;
@@ -172,7 +171,7 @@ int MythVAAPIInteropGLX::SetPictureAttribute(PictureAttribute Attribute, int Val
             break;
         case kPictureAttribute_Hue:
             attrib = VADisplayAttribHue;
-            adjustment = m_vaapiHueBase;
+            adjustment = 50;
             break;
         case kPictureAttribute_Colour:
             attrib = VADisplayAttribSaturation;
@@ -244,11 +243,11 @@ MythVAAPIInteropGLXCopy::~MythVAAPIInteropGLXCopy()
 }
 
 vector<MythVideoTexture*> MythVAAPIInteropGLXCopy::Acquire(MythRenderOpenGL *Context,
-                                                           VideoColourSpace *ColourSpace,
+                                                           MythVideoColourSpace *ColourSpace,
                                                            VideoFrame *Frame,
                                                            FrameScanType Scan)
 {
-    vector<MythVideoTexture*> result;
+    std::vector<MythVideoTexture*> result;
     if (!Frame)
         return result;
 
@@ -340,11 +339,11 @@ MythVAAPIInteropGLXPixmap::~MythVAAPIInteropGLXPixmap()
 }
 
 vector<MythVideoTexture*> MythVAAPIInteropGLXPixmap::Acquire(MythRenderOpenGL *Context,
-                                                             VideoColourSpace *ColourSpace,
+                                                             MythVideoColourSpace *ColourSpace,
                                                              VideoFrame *Frame,
                                                              FrameScanType Scan)
 {
-    vector<MythVideoTexture*> result;
+    std::vector<MythVideoTexture*> result;
     if (!Frame)
         return result;
 
@@ -423,9 +422,9 @@ vector<MythVideoTexture*> MythVAAPIInteropGLXPixmap::Acquire(MythRenderOpenGL *C
         // Create a texture
         // N.B. as for GLX Copy there is no obvious 10/12/16bit support here.
         // too many unknowns in this pipeline
-        vector<QSize> size;
+        std::vector<QSize> size;
         size.push_back(m_openglTextureSize);
-        vector<MythVideoTexture*> textures = MythVideoTexture::CreateTextures(m_context, FMT_VAAPI, FMT_RGBA32, size);
+        std::vector<MythVideoTexture*> textures = MythVideoTexture::CreateTextures(m_context, FMT_VAAPI, FMT_RGBA32, size);
         if (textures.empty())
             return result;
         result.push_back(textures[0]);

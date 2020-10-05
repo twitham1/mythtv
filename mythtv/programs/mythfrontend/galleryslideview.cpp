@@ -618,7 +618,7 @@ void GallerySlideView::SlideAvailable(int count)
 */
 void GallerySlideView::TransitionComplete()
 {
-    if (m_IsDeleting)
+    if (m_isDeleting)
         return;
 
     m_transitioning = false;
@@ -758,7 +758,7 @@ void GallerySlideView::ShowStatus()
 }
 
 
-void GallerySlideView::ClearStatus(Slide &slide)
+void GallerySlideView::ClearStatus(const Slide &slide)
 {
     if (m_uiStatus)
     {

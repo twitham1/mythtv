@@ -49,6 +49,7 @@
 #include "decoders/mythvaapicontext.h"
 #endif
 #include "mythpower.h"
+#include "mythpainterwindow.h"
 
 //Use for playBackGroup, to be remove at one point
 #include "playgroup.h"
@@ -143,20 +144,6 @@ static HostCheckBoxSetting *FFmpegDemuxer()
     return gc;
 }
 #endif
-
-static HostComboBoxSetting *PIPLocationComboBox()
-{
-    auto *gc = new HostComboBoxSetting("PIPLocation");
-
-    gc->setLabel(PlaybackSettings::tr("PIP video location"));
-
-    for (uint loc = 0; loc < kPIP_END; ++loc)
-        gc->addSelection(toString((PIPLocation) loc), QString::number(loc));
-
-    gc->setHelpText(PlaybackSettings::tr("Location of PIP Video window."));
-
-    return gc;
-}
 
 static HostComboBoxSetting *DisplayRecGroup()
 {
@@ -903,11 +890,11 @@ void PlaybackProfileItemConfig::Load(void)
     QString     dech = VideoDisplayProfile::GetDecoderHelp();
     QStringList decr = VideoDisplayProfile::GetDecoders();
     QStringList decn = VideoDisplayProfile::GetDecoderNames();
-    QStringList::const_iterator itr = decr.begin();
-    QStringList::const_iterator itn = decn.begin();
+    QStringList::const_iterator itr = decr.cbegin();
+    QStringList::const_iterator itn = decn.cbegin();
     m_decoder->clearSelections();
     m_decoder->setHelpText(dech);
-    for (; (itr != decr.end()) && (itn != decn.end()); ++itr, ++itn)
+    for (; (itr != decr.cend()) && (itn != decn.cend()); ++itr, ++itn)
     {
         m_decoder->addSelection(*itn, *itr, (*itr == pdecoder));
         found |= (*itr == pdecoder);
@@ -992,20 +979,19 @@ void PlaybackProfileItemConfig::decoderChanged(const QString &dec)
 {
     QString     vrenderer = m_vidRend->getValue();
     QStringList renderers = VideoDisplayProfile::GetVideoRenderers(dec);
-    QStringList::const_iterator it;
 
     QString prenderer;
-    for (it = renderers.begin(); it != renderers.end(); ++it)
-        prenderer = (*it == vrenderer) ? vrenderer : prenderer;
+    for (const auto & rend : qAsConst(renderers))
+        prenderer = (rend == vrenderer) ? vrenderer : prenderer;
     if (prenderer.isEmpty())
         prenderer = VideoDisplayProfile::GetPreferredVideoRenderer(dec);
 
     m_vidRend->clearSelections();
-    for (it = renderers.begin(); it != renderers.end(); ++it)
+    for (const auto & rend : qAsConst(renderers))
     {
-        if ((!(*it).contains("null")))
-            m_vidRend->addSelection(VideoDisplayProfile::GetVideoRendererName(*it),
-                                    *it, (*it == prenderer));
+        if ((!rend.contains("null")))
+            m_vidRend->addSelection(VideoDisplayProfile::GetVideoRendererName(rend),
+                                    rend, (rend == prenderer));
     }
     QString vrenderer2 = m_vidRend->getValue();
     vrenderChanged(vrenderer2);
@@ -1099,13 +1085,11 @@ bool PlaybackProfileItemConfig::keyPressEvent(QKeyEvent *e)
     if (GetMythMainWindow()->TranslateKeyPress("Global", e, actions))
         return true;
 
-    for (const QString & action : qAsConst(actions))
+    if (std::any_of(actions.cbegin(), actions.cend(),
+                    [](const QString & action) { return action == "DELETE"; } ))
     {
-        if (action == "DELETE")
-        {
-            ShowDeleteDialog();
-            return true;
-        }
+        ShowDeleteDialog();
+        return true;
     }
 
     return false;
@@ -1327,12 +1311,11 @@ static HostComboBoxSetting * CurrentPlaybackProfile()
         VideoDisplayProfile::SetDefaultProfileName(profile, host);
     }
 
-    QStringList::const_iterator it;
-    for (it = profiles.begin(); it != profiles.end(); ++it)
+    for (const auto & prof : qAsConst(profiles))
     {
-        grouptrigger->addSelection(ProgramInfo::i18n(*it), *it);
-        grouptrigger->addTargetedChild(*it,
-            new PlaybackProfileConfig(*it, grouptrigger));
+        grouptrigger->addSelection(ProgramInfo::i18n(prof), prof);
+        grouptrigger->addTargetedChild(prof,
+            new PlaybackProfileConfig(prof, grouptrigger));
     }
 
     return grouptrigger;
@@ -1383,7 +1366,7 @@ void PlaybackSettings::CreateNewPlaybackProfileSlot(const QString &name)
 
 static HostComboBoxSetting *PlayBoxOrdering()
 {
-    QString str[4] =
+    std::array<QString,4> str
     {
         PlaybackSettings::tr("Sort all sub-titles/multi-titles Ascending"),
         PlaybackSettings::tr("Sort all sub-titles/multi-titles Descending"),
@@ -1404,7 +1387,7 @@ static HostComboBoxSetting *PlayBoxOrdering()
 
     gc->setLabel(PlaybackSettings::tr("Episode sort orderings"));
 
-    for (int i = 0; i < 4; ++i)
+    for (size_t i = 0; i < str.size(); ++i)
         gc->addSelection(str[i], QString::number(i));
 
     gc->setValue(3);
@@ -1466,6 +1449,28 @@ static HostCheckBoxSetting *FFRewReverse()
                                          "switch to play mode if the speed "
                                          "can't be decreased further."));
     return gc;
+}
+
+static void AddPaintEngine(GroupSetting* Group)
+{
+    if (!Group)
+        return;
+
+    const QStringList options = MythPainterWindow::GetPainters();
+
+    // Don't show an option if there is no choice. Do not offer Qt painter (but
+    // MythPainterWindow will accept 'Qt' if overriden from the command line)
+    if (options.size() <= 1)
+        return;
+
+    QString pref = GetMythDB()->GetSetting("PaintEngine", MythPainterWindow::GetDefaultPainter());
+    auto* paint = new HostComboBoxSetting("PaintEngine");
+    paint->setLabel(AppearanceSettings::tr("Paint engine"));
+    for (const auto & option : options)
+        paint->addSelection(option, option, option == pref);
+
+    paint->setHelpText(AppearanceSettings::tr("This selects what MythTV uses to draw. "));
+    Group->addChild(paint);
 }
 
 static HostComboBoxSetting *MenuTheme()
@@ -2126,6 +2131,17 @@ static HostComboBoxSetting *LetterboxingColour()
     return gc;
 }
 
+static HostCheckBoxSetting* StereoDiscard()
+{
+    auto * cb = new HostCheckBoxSetting("DiscardStereo3D");
+    cb->setValue(true);
+    cb->setLabel("Discard 3D stereoscopic fields");
+    cb->setHelpText(PlaybackSettings::tr(
+        "If 'Side by Side' or 'Top and Bottom' 3D material is detected, "
+        "enabling this setting will discard one field (enabled by default)."));
+    return cb;
+}
+
 static HostComboBoxSetting *AspectOverride()
 {
     auto *gc = new HostComboBoxSetting("AspectOverride");
@@ -2288,9 +2304,8 @@ static HostComboBoxSetting *GuiVidModeResolution()
     gc->setHelpText(VideoModeSettings::tr("Resolution of screen when not "
                                           "watching a video."));
 
-    MythDisplay* display = MythDisplay::AcquireRelease();
-    vector<MythDisplayMode> scr = display->GetVideoModes();
-    MythDisplay::AcquireRelease(false);
+    MythDisplay* display = GetMythMainWindow()->GetDisplay();
+    std::vector<MythDisplayMode> scr = display->GetVideoModes();
     for (auto & vmode : scr)
     {
         int w = vmode.Width();
@@ -2338,9 +2353,8 @@ static HostComboBoxSetting *TVVidModeResolution(int idx=-1)
 
     gc->setHelpText(hstr);
 
-    MythDisplay* display = MythDisplay::AcquireRelease();
-    vector<MythDisplayMode> scr = display->GetVideoModes();
-    MythDisplay::AcquireRelease(false);
+    MythDisplay* display = GetMythMainWindow()->GetDisplay();
+    std::vector<MythDisplayMode> scr = display->GetVideoModes();
     for (auto & vmode : scr)
     {
         QString sel = QString("%1x%2").arg(vmode.Width()).arg(vmode.Height());
@@ -2359,7 +2373,7 @@ void HostRefreshRateComboBoxSetting::ChangeResolution(StandardSetting * setting)
     QString resolution = setting->getValue();
     int hz50 = -1;
     int hz60 = -1;
-    const vector<double> list = GetRefreshRates(resolution);
+    const std::vector<double> list = GetRefreshRates(resolution);
     addSelection(QObject::tr("Auto"), "0");
     for (size_t i = 0; i < list.size(); ++i)
     {
@@ -2385,7 +2399,7 @@ void HostRefreshRateComboBoxSetting::ChangeResolution(StandardSetting * setting)
     setEnabled(!list.empty());
 }
 
-vector<double> HostRefreshRateComboBoxSetting::GetRefreshRates(const QString &res)
+std::vector<double> HostRefreshRateComboBoxSetting::GetRefreshRates(const QString &res)
 {
     QStringList slist = res.split("x");
     int width = 0;
@@ -2398,13 +2412,12 @@ vector<double> HostRefreshRateComboBoxSetting::GetRefreshRates(const QString &re
         height = slist[1].toInt(&ok1);
     }
 
-    vector<double> result;
+    std::vector<double> result;
     if (ok0 && ok1)
     {
         QSize size(width, height);
-        MythDisplay *display = MythDisplay::AcquireRelease();
+        MythDisplay* display = GetMythMainWindow()->GetDisplay();
         result = display->GetRefreshRates(size);
-        MythDisplay::AcquireRelease(false);
     }
     return result;
 }
@@ -4271,12 +4284,11 @@ void PlaybackSettings::Load(void)
 #endif
 
     general->addChild(new PlayBackScaling());
-
+    general->addChild(StereoDiscard());
     general->addChild(AspectOverride());
     general->addChild(AdjustFill());
 
     general->addChild(LetterboxingColour());
-    general->addChild(PIPLocationComboBox());
     general->addChild(PlaybackExitPrompt());
     general->addChild(EndOfRecordingExitPrompt());
     general->addChild(MusicChoiceEnabled());
@@ -4563,7 +4575,8 @@ void AppearanceSettings::applyChange()
 void AppearanceSettings::PopulateScreens(int Screens)
 {
     m_screen->clearSelections();
-    for (QScreen *qscreen : QGuiApplication::screens())
+    QList screens = QGuiApplication::screens();
+    for (QScreen *qscreen : qAsConst(screens))
     {
         QString extra = MythDisplay::GetExtraScreenInfo(qscreen);
         m_screen->addSelection(qscreen->name() + extra, qscreen->name());
@@ -4578,10 +4591,11 @@ AppearanceSettings::AppearanceSettings()
     screen->setLabel(tr("Theme / Screen Settings"));
     addChild(screen);
 
+    AddPaintEngine(screen);
     screen->addChild(MenuTheme());
     screen->addChild(GUIRGBLevels());
 
-    m_display = MythDisplay::AcquireRelease();
+    m_display = GetMythMainWindow()->GetDisplay();
     m_screen = ScreenSelection();
     m_screenAspect = ScreenAspectRatio();
     screen->addChild(m_screen);
@@ -4604,14 +4618,13 @@ AppearanceSettings::AppearanceSettings()
     screen->addChild(AirPlayFullScreen());
 #endif
 
-    MythDisplay* display = MythDisplay::AcquireRelease();
+    MythDisplay* display = GetMythMainWindow()->GetDisplay();
     if (display->VideoModesAvailable())
     {
-        vector<MythDisplayMode> scr = display->GetVideoModes();
+        std::vector<MythDisplayMode> scr = display->GetVideoModes();
         if (!scr.empty())
             addChild(UseVideoModes());
     }
-    MythDisplay::AcquireRelease(false);
 
     auto *dates = new GroupSetting();
 
@@ -4627,11 +4640,6 @@ AppearanceSettings::AppearanceSettings()
     addChild(dates);
 
     addChild(LCDEnable());
-}
-
-AppearanceSettings::~AppearanceSettings()
-{
-    MythDisplay::AcquireRelease(false);
 }
 
 /*******************************************************************************

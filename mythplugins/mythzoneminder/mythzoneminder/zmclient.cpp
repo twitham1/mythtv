@@ -398,7 +398,7 @@ bool ZMClient::updateAlarmStates(void)
 
 void ZMClient::getEventList(const QString &monitorName, bool oldestFirst,
                             const QString &date, bool includeContinuous,
-                            vector<Event*> *eventList)
+                            std::vector<Event*> *eventList)
 {
     QMutexLocker locker(&m_commandLock);
 
@@ -497,7 +497,7 @@ void ZMClient::getEventDates(const QString &monitorName, bool oldestFirst,
     }
 }
 
-void ZMClient::getFrameList(int eventID, vector<Frame*> *frameList)
+void ZMClient::getFrameList(int eventID, std::vector<Frame*> *frameList)
 {
     QMutexLocker locker(&m_commandLock);
 
@@ -552,14 +552,14 @@ void ZMClient::deleteEvent(int eventID)
     sendReceiveStringList(strList);
 }
 
-void ZMClient::deleteEventList(vector<Event*> *eventList)
+void ZMClient::deleteEventList(std::vector<Event*> *eventList)
 {
     QMutexLocker locker(&m_commandLock);
 
     // delete events in 100 event chunks
     QStringList strList("DELETE_EVENT_LIST");
     int count = 0;
-    vector<Event*>::iterator it;
+    std::vector<Event*>::iterator it;
     for (it = eventList->begin(); it != eventList->end(); ++it)
     {
         strList << QString::number((*it)->eventID());
@@ -677,7 +677,7 @@ void ZMClient::getEventFrame(Event *event, int frameNo, MythImage **image)
     }
 
     // get a MythImage
-    *image = GetMythMainWindow()->GetCurrentPainter()->GetFormatImage();
+    *image = GetMythMainWindow()->GetPainter()->GetFormatImage();
 
     // extract the image data and create a MythImage from it
     if (!(*image)->loadFromData(data, imageSize, "JPEG"))
@@ -736,7 +736,7 @@ void ZMClient::getAnalyseFrame(Event *event, int frameNo, QImage &image)
     delete [] data;
 }
 
-int ZMClient::getLiveFrame(int monitorID, QString &status, unsigned char* buffer, int bufferSize)
+int ZMClient::getLiveFrame(int monitorID, QString &status, FrameData& buffer)
 {
     QMutexLocker locker(&m_commandLock);
 
@@ -771,9 +771,9 @@ int ZMClient::getLiveFrame(int monitorID, QString &status, unsigned char* buffer
     status = strList[2];
 
     // get frame length from data
-    int imageSize = strList[3].toInt();
+    size_t imageSize = strList[3].toInt();
 
-    if (bufferSize < imageSize)
+    if (buffer.size() < imageSize)
     {
         LOG(VB_GENERAL, LOG_ERR,
             "ZMClient::getLiveFrame(): Live frame buffer is too small!");
@@ -784,7 +784,7 @@ int ZMClient::getLiveFrame(int monitorID, QString &status, unsigned char* buffer
     if (imageSize == 0)
         return 0;
 
-    if (!readData(buffer, imageSize))
+    if (!readData(buffer.data(), imageSize))
     {
         LOG(VB_GENERAL, LOG_ERR,
             "ZMClient::getLiveFrame(): Failed to get image data");

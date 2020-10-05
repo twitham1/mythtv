@@ -18,8 +18,6 @@
 
 #define LOC      QString("NetContent: ")
 
-using namespace std;
-
 // ---------------------------------------------------
 
 GrabberScript::GrabberScript(const QString& title, const QString& image,
@@ -228,7 +226,7 @@ void GrabberDownloadThread::run()
     uint updateFreq = gCoreContext->GetNumSetting(
                "netsite.updateFreq", 24);
 
-    while (m_scripts.count())
+    while (!m_scripts.isEmpty())
     {
         GrabberScript *script = m_scripts.takeFirst();
         if (script && (needsUpdate(script, updateFreq) || m_refreshAll))

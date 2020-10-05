@@ -224,15 +224,15 @@ void MHIntegerVar::SetVariableValue(const MHUnion &value)
         int p = 0;
         bool fNegative = false;
 
-        if (value.m_StrVal.Size() > 0 && value.m_StrVal.GetAt(0) == '-')
+        if (value.m_strVal.Size() > 0 && value.m_strVal.GetAt(0) == '-')
         {
             p++;
             fNegative = true;
         }
 
-        for (; p < value.m_StrVal.Size(); p++)
+        for (; p < value.m_strVal.Size(); p++)
         {
-            unsigned char ch =  value.m_StrVal.GetAt(p);
+            unsigned char ch =  value.m_strVal.GetAt(p);
 
             if (ch < '0' || ch > '9')
             {
@@ -270,7 +270,7 @@ void MHOctetStrVar::Initialise(MHParseNode *p, MHEngine *engine)
 
     if (pInitial)
     {
-        pInitial->GetArgN(0)->GetStringValue(m_OriginalValue);
+        pInitial->GetArgN(0)->GetStringValue(m_originalValue);
     }
 }
 
@@ -281,7 +281,7 @@ void MHOctetStrVar::PrintMe(FILE *fd, int nTabs) const
     MHVariable::PrintMe(fd, nTabs + 1);
     PrintTabs(fd, nTabs + 1);
     fprintf(fd, ":OrigValue ");
-    m_OriginalValue.PrintMe(fd, nTabs + 1);
+    m_originalValue.PrintMe(fd, nTabs + 1);
     fprintf(fd, "\n");
     PrintTabs(fd, nTabs);
     fprintf(fd, "}\n");
@@ -294,7 +294,7 @@ void MHOctetStrVar::Preparation(MHEngine *engine)
         return;
     }
 
-    m_Value.Copy(m_OriginalValue);
+    m_value.Copy(m_originalValue);
     MHVariable::Preparation(engine);
 }
 
@@ -302,7 +302,7 @@ void MHOctetStrVar::Preparation(MHEngine *engine)
 void MHOctetStrVar::TestVariable(int nOp, const MHUnion &parm, MHEngine *engine)
 {
     parm.CheckType(MHUnion::U_String);
-    int nRes = m_Value.Compare(parm.m_StrVal);
+    int nRes = m_value.Compare(parm.m_strVal);
     bool fRes = false;
 
     switch (nOp)
@@ -321,8 +321,8 @@ void MHOctetStrVar::TestVariable(int nOp, const MHUnion &parm, MHEngine *engine)
             MHERROR("Invalid comparison for string"); // Shouldn't ever happen
     }
 
-    MHOctetString sample1(m_Value, 0, 10);
-    MHOctetString sample2(parm.m_StrVal, 0, 10);
+    MHOctetString sample1(m_value, 0, 10);
+    MHOctetString sample2(parm.m_strVal, 0, 10);
     MHLOG(MHLogDetail, QString("Comparison %1 %2 and %3 => %4").arg(TestToText(nOp))
           .arg(sample1.Printable()).arg(sample2.Printable()).arg(fRes ? "true" : "false"));
     engine->EventTriggered(this, EventTestEvent, fRes);
@@ -332,7 +332,7 @@ void MHOctetStrVar::TestVariable(int nOp, const MHUnion &parm, MHEngine *engine)
 void MHOctetStrVar::GetVariableValue(MHUnion &value, MHEngine * /*engine*/)
 {
     value.m_Type = MHUnion::U_String;
-    value.m_StrVal.Copy(m_Value);
+    value.m_strVal.Copy(m_value);
 }
 
 // Implement the SetVariable action.
@@ -340,19 +340,16 @@ void MHOctetStrVar::SetVariableValue(const MHUnion &value)
 {
     if (value.m_Type == MHUnion::U_Int)
     {
-        // Implicit conversion of int to string.
-        char buff[30]; // 30 chars is more than enough.
-        snprintf(buff, sizeof(buff), "%0d", value.m_nIntVal);
-        m_Value.Copy(buff);
+        m_value.Copy(std::to_string(value.m_nIntVal).data());
     }
     else
     {
         value.CheckType(MHUnion::U_String);
-        m_Value.Copy(value.m_StrVal);
+        m_value.Copy(value.m_strVal);
     }
 
     // Debug
-    MHOctetString sample(m_Value, 0, 60);
+    MHOctetString sample(m_value, 0, 60);
     MHLOG(MHLogDetail, QString("Update %1 := %2").arg(m_ObjectReference.Printable())
           .arg(sample.Printable()));
 }
@@ -371,7 +368,7 @@ void MHObjectRefVar::Initialise(MHParseNode *p, MHEngine *engine)
 
         if (pArg)
         {
-            m_OriginalValue.Initialise(pArg->GetArgN(0), engine);
+            m_originalValue.Initialise(pArg->GetArgN(0), engine);
         }
     }
 }
@@ -383,7 +380,7 @@ void MHObjectRefVar::PrintMe(FILE *fd, int nTabs) const
     MHVariable::PrintMe(fd, nTabs + 1);
     PrintTabs(fd, nTabs + 1);
     fprintf(fd, ":OrigValue ");
-    m_OriginalValue.PrintMe(fd, nTabs + 1);
+    m_originalValue.PrintMe(fd, nTabs + 1);
     fprintf(fd, "\n");
     PrintTabs(fd, nTabs);
     fprintf(fd, "}\n");
@@ -396,7 +393,7 @@ void MHObjectRefVar::Preparation(MHEngine *engine)
         return;
     }
 
-    m_Value.Copy(m_OriginalValue);
+    m_value.Copy(m_originalValue);
     MHVariable::Preparation(engine);
 }
 
@@ -409,10 +406,10 @@ void MHObjectRefVar::TestVariable(int nOp, const MHUnion &parm, MHEngine *engine
     switch (nOp)
     {
         case TC_Equal:
-            fRes = m_Value.Equal(parm.m_ObjRefVal, engine);
+            fRes = m_value.Equal(parm.m_objRefVal, engine);
             break;
         case TC_NotEqual:
-            fRes = ! m_Value.Equal(parm.m_ObjRefVal, engine);
+            fRes = ! m_value.Equal(parm.m_objRefVal, engine);
             break;
         default:
             MHERROR("Invalid comparison for object ref");
@@ -425,15 +422,15 @@ void MHObjectRefVar::TestVariable(int nOp, const MHUnion &parm, MHEngine *engine
 void MHObjectRefVar::GetVariableValue(MHUnion &value, MHEngine * /*engine*/)
 {
     value.m_Type = MHUnion::U_ObjRef;
-    value.m_ObjRefVal.Copy(m_Value);
+    value.m_objRefVal.Copy(m_value);
 }
 
 // Implement the SetVariable action.
 void MHObjectRefVar::SetVariableValue(const MHUnion &value)
 {
     value.CheckType(MHUnion::U_ObjRef);
-    m_Value.Copy(value.m_ObjRefVal);
-    MHLOG(MHLogDetail, QString("Update %1 := %2").arg(m_ObjectReference.Printable()).arg(m_Value.Printable()));
+    m_value.Copy(value.m_objRefVal);
+    MHLOG(MHLogDetail, QString("Update %1 := %2").arg(m_ObjectReference.Printable()).arg(m_value.Printable()));
 }
 
 
@@ -450,7 +447,7 @@ void MHContentRefVar::Initialise(MHParseNode *p, MHEngine *engine)
 
         if (pArg)
         {
-            m_OriginalValue.Initialise(pArg->GetArgN(0), engine);
+            m_originalValue.Initialise(pArg->GetArgN(0), engine);
         }
     }
 }
@@ -462,7 +459,7 @@ void MHContentRefVar::PrintMe(FILE *fd, int nTabs) const
     MHVariable::PrintMe(fd, nTabs + 1);
     PrintTabs(fd, nTabs + 1);
     fprintf(fd, ":OrigValue ");
-    m_OriginalValue.PrintMe(fd, nTabs + 1);
+    m_originalValue.PrintMe(fd, nTabs + 1);
     fprintf(fd, "\n");
     PrintTabs(fd, nTabs);
     fprintf(fd, "}\n");
@@ -475,7 +472,7 @@ void MHContentRefVar::Preparation(MHEngine *engine)
         return;
     }
 
-    m_Value.Copy(m_OriginalValue);
+    m_value.Copy(m_originalValue);
     MHVariable::Preparation(engine);
 }
 
@@ -488,10 +485,10 @@ void MHContentRefVar::TestVariable(int nOp, const MHUnion &parm, MHEngine *engin
     switch (nOp)
     {
         case TC_Equal:
-            fRes = m_Value.Equal(parm.m_ContentRefVal, engine);
+            fRes = m_value.Equal(parm.m_contentRefVal, engine);
             break;
         case TC_NotEqual:
-            fRes = !m_Value.Equal(parm.m_ContentRefVal, engine);
+            fRes = !m_value.Equal(parm.m_contentRefVal, engine);
             break;
         default:
             MHERROR("Invalid comparison for content ref");
@@ -504,30 +501,30 @@ void MHContentRefVar::TestVariable(int nOp, const MHUnion &parm, MHEngine *engin
 void MHContentRefVar::GetVariableValue(MHUnion &value, MHEngine * /*engine*/)
 {
     value.m_Type = MHUnion::U_ContentRef;
-    value.m_ContentRefVal.Copy(m_Value);
+    value.m_contentRefVal.Copy(m_value);
 }
 
 // Implement the SetVariable action.
 void MHContentRefVar::SetVariableValue(const MHUnion &value)
 {
     value.CheckType(MHUnion::U_ContentRef);
-    m_Value.Copy(value.m_ContentRefVal);
-    MHLOG(MHLogDetail, QString("Update %1 := %2").arg(m_ObjectReference.Printable()).arg(m_Value.Printable()));
+    m_value.Copy(value.m_contentRefVal);
+    MHLOG(MHLogDetail, QString("Update %1 := %2").arg(m_ObjectReference.Printable()).arg(m_value.Printable()));
 }
 
 // Actions
 void MHSetVariable::Initialise(MHParseNode *p, MHEngine *engine)
 {
     MHElemAction::Initialise(p, engine); // Target
-    m_NewValue.Initialise(p->GetArgN(1), engine); // Value to store
+    m_newValue.Initialise(p->GetArgN(1), engine); // Value to store
 }
 
 void MHSetVariable::Perform(MHEngine *engine)
 {
     MHObjectRef target;
-    m_Target.GetValue(target, engine); // Get the target
+    m_target.GetValue(target, engine); // Get the target
     MHUnion newValue;
-    newValue.GetValueFrom(m_NewValue, engine); // Get the actual value to set.
+    newValue.GetValueFrom(m_newValue, engine); // Get the actual value to set.
     engine->FindObject(target)->SetVariableValue(newValue); // Set the value.
 }
 
@@ -536,21 +533,21 @@ void MHTestVariable::Initialise(MHParseNode *p, MHEngine *engine)
 {
     MHElemAction::Initialise(p, engine); // Target
     m_nOperator = p->GetArgN(1)->GetIntValue(); // Test to perform
-    m_Comparison.Initialise(p->GetArgN(2), engine); // Value to compare against
+    m_comparison.Initialise(p->GetArgN(2), engine); // Value to compare against
 }
 
 void MHTestVariable::PrintArgs(FILE *fd, int /*nTabs*/) const
 {
     fprintf(fd, " %d ", m_nOperator);
-    m_Comparison.PrintMe(fd, 0);
+    m_comparison.PrintMe(fd, 0);
 }
 
 void MHTestVariable::Perform(MHEngine *engine)
 {
     MHObjectRef target;
-    m_Target.GetValue(target, engine); // Get the target
+    m_target.GetValue(target, engine); // Get the target
     MHUnion testValue;
-    testValue.GetValueFrom(m_Comparison, engine); // Get the actual value to compare.
+    testValue.GetValueFrom(m_comparison, engine); // Get the actual value to compare.
     engine->FindObject(target)->TestVariable(m_nOperator, testValue, engine); // Do the test.
 }
 
@@ -558,7 +555,7 @@ void MHIntegerAction::Initialise(MHParseNode *p, MHEngine *engine)
 {
     MHElemAction::Initialise(p, engine); // Target
     MHParseNode *pOp = p->GetArgN(1);
-    m_Operand.Initialise(pOp, engine); // Operand to add, subtract etc.
+    m_operand.Initialise(pOp, engine); // Operand to add, subtract etc.
 }
 
 void MHIntegerAction::Perform(MHEngine *engine)
@@ -566,12 +563,12 @@ void MHIntegerAction::Perform(MHEngine *engine)
     MHUnion targetVal;
     // Find the target and get its current value.  The target can be an indirect reference.
     MHObjectRef parm;
-    m_Target.GetValue(parm, engine);
+    m_target.GetValue(parm, engine);
     MHRoot *pTarget = engine->FindObject(parm);
     pTarget->GetVariableValue(targetVal, engine);
     targetVal.CheckType(MHUnion::U_Int);
     // Get the value of the operand.
-    int nOperand = m_Operand.GetValue(engine);
+    int nOperand = m_operand.GetValue(engine);
     // Set the value of targetVal to the new value and store it.
     targetVal.m_nIntVal = DoOp(targetVal.m_nIntVal, nOperand);
     pTarget->SetVariableValue(targetVal);
@@ -580,7 +577,7 @@ void MHIntegerAction::Perform(MHEngine *engine)
 void MHAppend::Initialise(MHParseNode *p, MHEngine *engine)
 {
     MHElemAction::Initialise(p, engine); // Target
-    m_Operand.Initialise(p->GetArgN(1), engine); // Operand to append
+    m_operand.Initialise(p->GetArgN(1), engine); // Operand to append
 }
 
 void MHAppend::Perform(MHEngine *engine)
@@ -588,13 +585,13 @@ void MHAppend::Perform(MHEngine *engine)
     MHUnion targetVal;
     // Find the target and get its current value.  The target can be an indirect reference.
     MHObjectRef parm;
-    m_Target.GetValue(parm, engine);
+    m_target.GetValue(parm, engine);
     MHRoot *pTarget = engine->FindObject(parm);
     pTarget->GetVariableValue(targetVal, engine);
     targetVal.CheckType(MHUnion::U_String);
     // Get the string to append.
     MHOctetString toAppend;
-    m_Operand.GetValue(toAppend, engine);
-    targetVal.m_StrVal.Append(toAppend); // Add it on the end
+    m_operand.GetValue(toAppend, engine);
+    targetVal.m_strVal.Append(toAppend); // Add it on the end
     pTarget->SetVariableValue(targetVal); // Set the target to the result.
 }

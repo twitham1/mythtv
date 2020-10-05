@@ -32,6 +32,9 @@
 #include "mythlogging.h"
 #include "unzip.h"
 
+#include "version.h"
+#include "mythversion.h"
+
 /** \fn getDiskSpace(const QString&,long long&,long long&)
  *  \brief Returns free space on disk containing file in KiB,
  *          or -1 if it does not succeed.
@@ -171,8 +174,7 @@ QByteArray gzipCompress(const QByteArray& data)
     if (data.length() == 0)
         return QByteArray();
 
-    static constexpr int kChunkSize = 1024;
-    char out[kChunkSize];
+    std::array <char,1024> out {};
 
     // allocate inflate state
     z_stream strm;
@@ -197,8 +199,8 @@ QByteArray gzipCompress(const QByteArray& data)
     // run deflate()
     do
     {
-        strm.avail_out = kChunkSize;
-        strm.next_out  = (Bytef*)(out);
+        strm.avail_out = out.size();
+        strm.next_out  = (Bytef*)(out.data());
 
         ret = deflate(&strm, Z_FINISH);
 
@@ -213,7 +215,7 @@ QByteArray gzipCompress(const QByteArray& data)
                 return QByteArray();
         }
 
-        result.append(out, kChunkSize - strm.avail_out);
+        result.append(out.data(), out.size() - strm.avail_out);
     }
     while (strm.avail_out == 0);
 
@@ -229,8 +231,7 @@ QByteArray gzipUncompress(const QByteArray &data)
     if (data.length() == 0)
         return QByteArray();
 
-    static constexpr int kChunkSize = 1024;
-    char out[kChunkSize];
+    std::array<char,1024> out {};
 
     // allocate inflate state
     z_stream strm;
@@ -250,8 +251,8 @@ QByteArray gzipUncompress(const QByteArray &data)
 
     do
     {
-        strm.avail_out = kChunkSize;
-        strm.next_out = (Bytef*)out;
+        strm.avail_out = out.size();
+        strm.next_out = (Bytef*)out.data();
         ret = inflate(&strm, Z_NO_FLUSH);
 
         Q_ASSERT(ret != Z_STREAM_ERROR);  // state not clobbered
@@ -265,7 +266,7 @@ QByteArray gzipUncompress(const QByteArray &data)
                 return QByteArray();
         }
 
-        result.append(out, kChunkSize - strm.avail_out);
+        result.append(out.data(), out.size() - strm.avail_out);
     }
     while (strm.avail_out == 0);
 
@@ -307,6 +308,16 @@ QString RemoteDownloadFileNow(const QString &url,
                               const QString &filename)
 {
     return downloadRemoteFile("DOWNLOAD_FILE_NOW", url, storageGroup, filename);
+}
+
+const char *GetMythSourceVersion()
+{
+    return MYTH_SOURCE_VERSION;
+}
+
+const char *GetMythSourcePath()
+{
+    return MYTH_SOURCE_PATH;
 }
 
 /* vim: set expandtab tabstop=4 shiftwidth=4: */

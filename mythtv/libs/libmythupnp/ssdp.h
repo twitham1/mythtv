@@ -60,9 +60,9 @@ class UPNP_PUBLIC SSDP : public MThread
         // Singleton instance used by all.
         static SSDP*        g_pSSDP;  
 
-        QRegExp             m_procReqLineExp        {"[ \r\n][ \r\n]*"};
+        QRegularExpression  m_procReqLineExp        {"\\s+"};
         constexpr static int kNumberOfSockets = 3;
-        MSocketDevice      *m_sockets[kNumberOfSockets] {nullptr,nullptr,nullptr};
+        std::array<MSocketDevice*,kNumberOfSockets> m_sockets {nullptr,nullptr,nullptr};
 
         int                 m_nPort                 {SSDP_PORT};
         int                 m_nSearchPort           {SSDP_SEARCHPORT};

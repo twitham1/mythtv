@@ -35,7 +35,7 @@ DTC::FrontendStatus* Frontend::GetStatus(void)
     MythUIStateTracker::GetFreshState(status->State());
 
     status->setName(gCoreContext->GetHostName());
-    status->setVersion(MYTH_SOURCE_VERSION);
+    status->setVersion(GetMythSourceVersion());
 
     status->Process();
     return status;
@@ -100,7 +100,7 @@ bool Frontend::SendAction(const QString &Action, const QString &Value,
 
     if (!Value.isEmpty() && kValueActions.contains(Action))
     {
-        MythUIHelper::ResetScreensaver();
+        MythMainWindow::ResetScreensaver();
         auto* me = new MythEvent(Action, QStringList(Value));
         qApp->postEvent(GetMythMainWindow(), me);
         return true;
@@ -121,7 +121,7 @@ bool Frontend::SendAction(const QString &Action, const QString &Value,
         return true;
     }
 
-    MythUIHelper::ResetScreensaver();
+    MythMainWindow::ResetScreensaver();
     auto* ke = new QKeyEvent(QEvent::KeyPress, 0, Qt::NoModifier, Action);
     qApp->postEvent(GetMythMainWindow(), (QEvent*)ke);
     return true;
@@ -167,8 +167,7 @@ bool Frontend::PlayRecording(int RecordedId, int ChanId,
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         timer.start();
-        while (!timer.hasExpired(10000) &&
-               (!MythUIHelper::IsTopScreenInitialized()))
+        while (!timer.hasExpired(10000) && (!MythMainWindow::IsTopScreenInitialized()))
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
@@ -440,7 +439,7 @@ bool Frontend::SendKey(const QString &sKey)
 
     if (ret)
     {
-        MythUIHelper::ResetScreensaver();
+        MythMainWindow::ResetScreensaver();
 
         event = new QKeyEvent(QEvent::KeyPress, keyCode, Qt::NoModifier,
                               keyText);

@@ -54,11 +54,8 @@ QVariant MethodInfo::Invoke( Service *pService, const QStringMap &reqParams ) co
     // switched to static array for performance.
     // ----------------------------------------------------------------------
 
-    void *param[ MAX_PARAMS ];
-    int   types[ MAX_PARAMS ];
-
-    memset( param, 0, MAX_PARAMS * sizeof(void *));
-    memset( types, 0, MAX_PARAMS * sizeof(int));
+    std::array<void*,MAX_PARAMS> param {};
+    std::array<int,MAX_PARAMS> types {};
 
     try
     {
@@ -117,9 +114,8 @@ QVariant MethodInfo::Invoke( Service *pService, const QStringMap &reqParams ) co
             LOG(VB_HTTP, LOG_DEBUG, "*** Threads are Different!!! ***");
 #endif
 
-        pService->qt_metacall( QMetaObject::InvokeMetaMethod, 
-                               m_nMethodIndex, 
-                               param );
+        if (pService->qt_metacall(QMetaObject::InvokeMetaMethod, m_nMethodIndex, param.data()) >= 0)
+            LOG(VB_GENERAL, LOG_WARNING, "qt_metacall error");
 
         // --------------------------------------------------------------
         // Delete param array, skip return parameter since not dynamically
@@ -249,7 +245,7 @@ ServiceHost::ServiceHost(const QMetaObject &metaObject,
                                                              RequestTypeHead);
             }
 
-            m_Methods.insert( oInfo.m_sName, oInfo );
+            m_methods.insert( oInfo.m_sName, oInfo );
         }
     }
 
@@ -359,7 +355,7 @@ bool ServiceHost::ProcessRequest( HTTPRequest *pRequest )
             QString sMethodName  = pRequest->m_sMethod;
             bool    bMethodFound = false;
 
-            if (m_Methods.contains(sMethodName))
+            if (m_methods.contains(sMethodName))
                 bMethodFound = true;
             else
             {
@@ -383,13 +379,13 @@ bool ServiceHost::ProcessRequest( HTTPRequest *pRequest )
                         break;
                 }
 
-                if (m_Methods.contains(sMethodName))
+                if (m_methods.contains(sMethodName))
                     bMethodFound = true;
             }
 
             if (bMethodFound)
             {
-                MethodInfo oInfo = m_Methods.value( sMethodName );
+                MethodInfo oInfo = m_methods.value( sMethodName );
 
                 if (( pRequest->m_eType & oInfo.m_eRequestType ) != 0)
                 {
@@ -476,8 +472,6 @@ bool ServiceHost::FormatResponse( HTTPRequest *pRequest, QObject *pResults )
 
 bool ServiceHost::FormatResponse( HTTPRequest *pRequest, const QFileInfo& oInfo )
 {
-    QString sName = oInfo.absoluteFilePath();
-
     if (oInfo.exists())
     {
         if (oInfo.isSymLink())

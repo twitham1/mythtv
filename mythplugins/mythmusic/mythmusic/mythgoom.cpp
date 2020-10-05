@@ -2,9 +2,7 @@
 
 #include <cmath>
 #include <cstdlib>
-
 #include <iostream>
-using namespace std;
 
 #include <QCoreApplication>
 #include <QPainter>
@@ -66,7 +64,7 @@ bool Goom::process(VisualNode *node)
     if (node->m_length < 512)
         numSamps = node->m_length;
 
-    signed short int data[2][512];
+    GoomDualData data;
 
     int i = 0;
     for (i = 0; i < numSamps; i++)
@@ -76,12 +74,6 @@ bool Goom::process(VisualNode *node)
             data[1][i] = node->m_right[i];
         else
             data[1][i] = data[0][i];
-    }
-
-    for (; i < 512; i++)
-    {
-        data[0][i] = 0;
-        data[1][i] = 0;
     }
 
     m_buffer = goom_update(data, 0);

@@ -14,7 +14,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
-using namespace std;
 
 // Qt
 #include <QCoreApplication>
@@ -446,20 +445,17 @@ bool Synaesthesia::process(VisualNode *node)
     if (!node)
         return false;
 
-    double x[NumSamples];
-    double y[NumSamples];
-    double a[NumSamples];
-    double b[NumSamples];
-    int clarity[NumSamples];
+    samp_dbl_array x {};
+    samp_dbl_array y {};
+    samp_dbl_array a {};
+    samp_dbl_array b {};
+    samp_int_array clarity {};
 
     int brightFactor = int(Brightness * m_brightnessTwiddler / (m_starSize + 0.01));
 
     int numSamps = NumSamples;
     if (node->m_length < NumSamples)
         numSamps = node->m_length;
-
-    memset(x, 0, sizeof(x));
-    memset(y, 0, sizeof(y));
 
     for (int i = 0; i < numSamps; i++)
     {
@@ -470,7 +466,7 @@ bool Synaesthesia::process(VisualNode *node)
             y[i] = x[i];
     }
 
-    fft(x, y);
+    fft(x.data(), y.data());
 
     double energy = 0.0;
 

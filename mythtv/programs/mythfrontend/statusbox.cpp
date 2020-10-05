@@ -1,8 +1,6 @@
 
 #include "statusbox.h"
 
-using namespace std;
-
 #include <QRegExp>
 #include <QHostAddress>
 #include <QNetworkInterface>
@@ -525,7 +523,6 @@ void StatusBox::doListingsStatus()
     QDateTime mfdLastRunEnd;
     QDateTime mfdNextRunStart;
     QString mfdLastRunStatus;
-    QString querytext;
     QDateTime qdtNow;
     QDateTime GuideDataThrough;
 
@@ -546,8 +543,8 @@ void StatusBox::doListingsStatus()
 
     mfdLastRunStatus = gCoreContext->GetSetting("mythfilldatabaseLastRunStatus");
 
-    AddLogLine(tr("Mythfrontend version: %1 (%2)").arg(MYTH_SOURCE_PATH)
-               .arg(MYTH_SOURCE_VERSION), helpmsg);
+    AddLogLine(tr("Mythfrontend version: %1 (%2)").arg(GetMythSourcePath())
+               .arg(GetMythSourceVersion()), helpmsg);
     AddLogLine(tr("Last mythfilldatabase guide update:"), helpmsg);
     tmp = tr("Started:   %1").arg(
         MythDate::toString(
@@ -870,8 +867,6 @@ void StatusBox::doTunerStatus()
         gCoreContext->SendReceiveStringList(strlist);
         int state = strlist[0].toInt();
 
-        QString status;
-        QString fontstate;
         if (state == kState_Error)
         {
             strlist.clear();
@@ -1287,7 +1282,8 @@ void StatusBox::doMachineStatus()
                                                       .arg(QSysInfo::currentCpuArchitecture()));
     AddLogLine("   " + tr("Qt version") + QString(": %1").arg(qVersion()));
 
-    for (const QNetworkInterface & iface : QNetworkInterface::allInterfaces())
+    QList allInterfaces = QNetworkInterface::allInterfaces();
+    for (const QNetworkInterface & iface : qAsConst(allInterfaces))
     {
         QNetworkInterface::InterfaceFlags f = iface.flags();
         if (!(f & QNetworkInterface::IsUp))
@@ -1305,7 +1301,8 @@ void StatusBox::doMachineStatus()
 #endif
         AddLogLine("   " + name + QString(" (%1): ").arg(iface.humanReadableName()));
         AddLogLine("        " + tr("MAC Address") + ": " + iface.hardwareAddress());
-        for (const QNetworkAddressEntry & addr : iface.addressEntries())
+        QList addresses = iface.addressEntries();
+        for (const QNetworkAddressEntry & addr : qAsConst(addresses))
         {
             if (addr.ip().protocol() == QAbstractSocket::IPv4Protocol ||
                 addr.ip().protocol() == QAbstractSocket::IPv6Protocol)
@@ -1406,12 +1403,12 @@ void StatusBox::doMachineStatus()
         }
 
         // weighted average loads
-        double floads[3];
+        system_load_array floads;
         if (RemoteGetLoad(floads))
         {
             auto UpdateRemoteLoad = [](StatusBoxItem* Item)
             {
-                double loads[3] = { 0.0 };
+                system_load_array loads = { 0.0, 0.0, 0.0 };
                 RemoteGetLoad(loads);
                 Item->SetText(QString("   %1: %2 %3 %4").arg(tr("Load")).arg(loads[0], 1, 'f', 2)
                         .arg(loads[1], 1, 'f', 2).arg(loads[2], 1, 'f', 2));
@@ -1550,12 +1547,13 @@ void StatusBox::doDisplayStatus()
     if (m_justHelpText)
         m_justHelpText->SetText(displayhelp);
 
-    QStringList desc = MythDisplay::GetDescription();
+    MythMainWindow* window = GetMythMainWindow();
+    QStringList desc = window->GetDisplay()->GetDescription();
     for (const auto & line : qAsConst(desc))
         AddLogLine(line);
     AddLogLine("");
 
-    MythRender* render = GetMythMainWindow()->GetRenderDevice();
+    MythRender* render = window->GetRenderDevice();
     if (render)
     {
         MythRenderOpenGL* gl = MythRenderOpenGL::GetOpenGLRender();

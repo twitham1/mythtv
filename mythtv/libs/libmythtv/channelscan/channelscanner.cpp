@@ -28,7 +28,6 @@
  */
 
 #include <algorithm>
-using namespace std;
 
 #include "analogsignalmonitor.h"
 #include "iptvchannelfetcher.h"
@@ -46,6 +45,7 @@ using namespace std;
 #include "iptvchannel.h"
 #include "ExternalChannel.h"
 #include "cardutil.h"
+#include "satipchannel.h"
 
 #define LOC QString("ChScan: ")
 
@@ -91,11 +91,11 @@ void ChannelScanner::Teardown(void)
 #endif
 
 #if !defined( USING_MINGW ) && !defined( _MSC_VER )
-    if (m_ExternRecScanner)
+    if (m_externRecScanner)
     {
-        m_ExternRecScanner->Stop();
-        delete m_ExternRecScanner;
-        m_ExternRecScanner = nullptr;
+        m_externRecScanner->Stop();
+        delete m_externRecScanner;
+        m_externRecScanner = nullptr;
     }
 #endif
 
@@ -241,7 +241,7 @@ void ChannelScanner::Scan(
     }
     else if (ScanTypeSetting::IPTVImportMPTS == scantype)
     {
-        if (m_iptv_channels.empty())
+        if (m_iptvChannels.empty())
         {
             LOG(VB_CHANSCAN, LOG_INFO, LOC + "IPTVImportMPTS: no channels");
         }
@@ -250,7 +250,7 @@ void ChannelScanner::Scan(
             LOG(VB_CHANSCAN, LOG_INFO, LOC +
                 QString("ScanIPTVChannels(%1) IPTV MPTS").arg(sourceid));
 
-            if ((ok = m_sigmonScanner->ScanIPTVChannels(sourceid, m_iptv_channels)))
+            if ((ok = m_sigmonScanner->ScanIPTVChannels(sourceid, m_iptvChannels)))
                 m_scanMonitor->ScanPercentComplete(0);
             else
             {
@@ -303,7 +303,7 @@ DTVConfParser::return_t ChannelScanner::ImportDVBUtils(
     type = ((CardUtil::ATSC == cardtype) ||
             (CardUtil::HDHOMERUN == cardtype)) ? DTVConfParser::ATSC : type;
 
-    DTVConfParser::return_t ret = DTVConfParser::OK;
+    DTVConfParser::return_t ret { DTVConfParser::OK };
     if (type == DTVConfParser::UNKNOWN)
         ret = DTVConfParser::ERROR_CARDTYPE;
     else
@@ -348,7 +348,7 @@ bool ChannelScanner::ImportM3U(uint cardid, const QString &inputname,
     m_iptvScanner->Scan();
 
     if (is_mpts)
-        m_iptv_channels = m_iptvScanner->GetChannels();
+        m_iptvChannels = m_iptvScanner->GetChannels();
 
     return true;
 }
@@ -385,14 +385,14 @@ bool ChannelScanner::ImportExternRecorder(uint cardid, const QString &inputname,
         m_scanMonitor = new ScanMonitor(this);
 
     // Create a External Recorder Channel Fetcher
-    m_ExternRecScanner = new ExternRecChannelScanner(cardid,
+    m_externRecScanner = new ExternRecChannelScanner(cardid,
                                                      inputname,
                                                      sourceid,
                                                      m_scanMonitor);
 
     MonitorProgress(false, false, false, false);
 
-    m_ExternRecScanner->Scan();
+    m_externRecScanner->Scan();
 
     return true;
 #else
@@ -428,6 +428,7 @@ void ChannelScanner::PreScanCommon(
 
     QString card_type = CardUtil::GetRawInputType(cardid);
 
+#ifdef USING_DVB
     if ("DVB" == card_type)
     {
         QString sub_type = CardUtil::ProbeDVBType(device).toUpper();
@@ -445,17 +446,17 @@ void ChannelScanner::PreScanCommon(
         }
 
         // ensure a minimal signal timeout of 1 second
-        signal_timeout = max(signal_timeout, 1000U);
+        signal_timeout = std::max(signal_timeout, 1000U);
 
         // Make sure that channel_timeout is at least 7 seconds to catch
         // at least one SDT section. kDVBTableTimeout in ChannelScanSM
         // ensures that we catch the NIT then.
-        channel_timeout = max(channel_timeout, static_cast<int>(need_nit) * 7 * 1000U);
-    }
+        channel_timeout = std::max(channel_timeout, static_cast<int>(need_nit) * 7 * 1000U);
 
-#ifdef USING_DVB
-    if ("DVB" == card_type)
         m_channel = new DVBChannel(device);
+    }
+#else
+    (void)do_ignore_signal_timeout;
 #endif
 
 #ifdef USING_V4L2
@@ -469,6 +470,13 @@ void ChannelScanner::PreScanCommon(
         m_channel = new HDHRChannel(nullptr, device);
     }
 #endif // USING_HDHOMERUN
+
+#ifdef USING_SATIP
+    if ("SATIP" == card_type)
+    {
+        m_channel = new SatIPChannel(nullptr, device);
+    }
+#endif
 
 #ifdef USING_ASI
     if ("ASI" == card_type)

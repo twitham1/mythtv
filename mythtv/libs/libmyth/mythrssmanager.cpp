@@ -13,8 +13,6 @@
 #include "rssparse.h"
 #include "mythsorthelper.h"
 
-using namespace std;
-
 #define LOC      QString("RSSSite: ")
 
 // ---------------------------------------------------
@@ -205,7 +203,7 @@ void RSSSite::process(void)
 
     m_articleList.clear();
 
-    if (!m_data.size())
+    if (m_data.isEmpty())
     {
         emit finished(this);
         return;

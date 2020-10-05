@@ -4,7 +4,6 @@
 
 // C/C++ headers
 #include <vector> // For std::vector
-using namespace std;
 
 // QT headers
 #include <QDateTime>
@@ -1150,10 +1149,10 @@ void ProgramRecPriority::FillList(void)
         countMatches();
         do {
             uint recordid = result.value(0).toUInt();
-            QString title = result.value(1).toString();
-            QString chanid = result.value(2).toString();
-            QString tempTime = result.value(3).toString();
-            QString tempDate = result.value(4).toString();
+//          QString title = result.value(1).toString();
+//          QString chanid = result.value(2).toString();
+//          QString tempTime = result.value(3).toString();
+//          QString tempDate = result.value(4).toString();
             RecordingType recType = (RecordingType)result.value(5).toInt();
             int inactive = result.value(6).toInt();
             QDateTime lastrec = MythDate::as_utc(result.value(7).toDateTime());

@@ -26,7 +26,6 @@
 #include <chrono> // for milliseconds
 #include <map>
 #include <thread> // for sleep_for
-using namespace std;
 
 // Qt headers
 #include <QDateTime>
@@ -43,7 +42,7 @@ using namespace std;
 #define kNoDataTimeout            50   /* msec */
 #define kResetTimeout             1000 /* msec */
 
-using handle_to_lfd_t = QMap<raw1394handle_t,LinuxFirewireDevice*>;
+using handle_to_lfd_t = QHash<raw1394handle_t,LinuxFirewireDevice*>;
 
 class LFDPriv
 {
@@ -243,7 +242,7 @@ bool LinuxFirewireDevice::OpenPort(void)
 
     if (GetInfoPtr()->IsPortOpen())
     {
-        m_open_port_cnt++;
+        m_openPortCnt++;
         return true;
     }
 
@@ -281,7 +280,7 @@ bool LinuxFirewireDevice::OpenPort(void)
 
     LOG(VB_RECORD, LOG_INFO, LOC + "Port handler thread started");
 
-    m_open_port_cnt++;
+    m_openPortCnt++;
 
     return true;
 }
@@ -296,12 +295,12 @@ bool LinuxFirewireDevice::ClosePort(void)
 
     LOG(VB_RECORD, LOG_INFO, LOC + "ClosePort()");
 
-    if (m_open_port_cnt < 1)
+    if (m_openPortCnt < 1)
         return false;
 
-    m_open_port_cnt--;
+    m_openPortCnt--;
 
-    if (m_open_port_cnt != 0)
+    if (m_openPortCnt != 0)
         return true;
 
     if (!GetInfoPtr())
@@ -364,8 +363,8 @@ void LinuxFirewireDevice::RemoveListener(TSDataListener *listener)
 }
 
 bool LinuxFirewireDevice::SendAVCCommand(
-    const vector<uint8_t>  &cmd,
-    vector<uint8_t>        &result,
+    const std::vector<uint8_t>  &cmd,
+    std::vector<uint8_t>        &result,
     int                     retry_cnt)
 {
     return GetInfoPtr()->SendAVCCommand(cmd, result, retry_cnt);
@@ -712,8 +711,8 @@ bool LinuxFirewireDevice::SetAVStreamBufferSize(uint size_in_bytes)
         return false;
 
     // Set buffered packets size
-    uint   buffer_size      = max(size_in_bytes, 50 * TSPacket::kSize);
-    size_t buffered_packets = min(buffer_size / 4, kMaxBufferedPackets);
+    uint   buffer_size      = std::max(size_in_bytes, 50 * TSPacket::kSize);
+    size_t buffered_packets = std::min(buffer_size / 4, kMaxBufferedPackets);
 
     iec61883_mpeg2_set_buffers(m_priv->m_avstream, buffered_packets);
 
@@ -797,9 +796,9 @@ void LinuxFirewireDevice::PrintDropped(uint dropped_packets)
     }
 }
 
-vector<AVCInfo> LinuxFirewireDevice::GetSTBList(void)
+std::vector<AVCInfo> LinuxFirewireDevice::GetSTBList(void)
 {
-    vector<AVCInfo> list;
+    std::vector<AVCInfo> list;
 
     {
         LinuxFirewireDevice dev(0,0,0,false);
@@ -809,7 +808,7 @@ vector<AVCInfo> LinuxFirewireDevice::GetSTBList(void)
     return list;
 }
 
-vector<AVCInfo> LinuxFirewireDevice::GetSTBListPrivate(void)
+std::vector<AVCInfo> LinuxFirewireDevice::GetSTBListPrivate(void)
 {
 #if 0
     LOG(VB_GENERAL, LOG_DEBUG, "GetSTBListPrivate -- begin");
@@ -819,7 +818,7 @@ vector<AVCInfo> LinuxFirewireDevice::GetSTBListPrivate(void)
     LOG(VB_GENERAL, LOG_DEBUG, "GetSTBListPrivate -- got lock");
 #endif
 
-    vector<AVCInfo> list;
+    std::vector<AVCInfo> list;
 
     for (const auto & device : qAsConst(m_priv->m_devices))
     {
@@ -855,15 +854,16 @@ bool LinuxFirewireDevice::UpdateDeviceList(void)
         return false;
     }
 
-    struct raw1394_portinfo port_info[16];
-    int numcards = raw1394_get_port_info(item.m_handle, port_info, 16);
+    std::array<raw1394_portinfo,16> port_info {};
+    int numcards = raw1394_get_port_info(item.m_handle, port_info.data(),
+                                         port_info.size());
     if (numcards < 1)
     {
         raw1394_destroy_handle(item.m_handle);
         return true;
     }
 
-    map<uint64_t,bool> guid_online;
+    std::map<uint64_t,bool> guid_online;
     for (int port = 0; port < numcards; port++)
     {
         if (raw1394_set_port(item.m_handle, port) < 0)
@@ -896,7 +896,8 @@ bool LinuxFirewireDevice::UpdateDeviceList(void)
             break;
         }
 
-        numcards = raw1394_get_port_info(item.m_handle, port_info, 16);
+        numcards = raw1394_get_port_info(item.m_handle, port_info.data(),
+                                         port_info.size());
     }
 
     if (item.m_handle)
@@ -998,7 +999,7 @@ static QString speed_to_string(uint speed)
     if (speed > 3)
         return QString("Invalid Speed (%1)").arg(speed);
 
-    static constexpr uint kSpeeds[] = { 100, 200, 400, 800 };
+    static constexpr std::array<const uint,4> kSpeeds { 100, 200, 400, 800 };
     return QString("%1Mbps").arg(kSpeeds[speed]);
 }
 

@@ -25,6 +25,13 @@
 #include <QFile>
 #include <QTextStream>
 #include <QHostAddress>
+#include <QHostInfo>
+
+#if QT_VERSION < QT_VERSION_CHECK(5,14,0)
+  #define QT_FLUSH flush
+#else
+  #define QT_FLUSH Qt::flush
+#endif
 
 int DeviceLocation::g_nAllocated   = 0;       // Debugging only
 
@@ -305,7 +312,7 @@ QString  UPnpDeviceDesc::GetValidXML( const QString &sBaseAddress, int nPort )
     QTextStream os( &sXML, QIODevice::WriteOnly );
 
     GetValidXML( sBaseAddress, nPort, os );
-    os << flush;
+    os << QT_FLUSH;
     return( sXML );
 }
 
@@ -331,7 +338,7 @@ void UPnpDeviceDesc::GetValidXML(
     OutputDevice( os, &m_rootDevice, sUserAgent );
 
     os << "</root>\n";
-    os << flush;
+    os << QT_FLUSH;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -490,7 +497,7 @@ void UPnpDeviceDesc::OutputDevice( QTextStream &os,
         os << "</deviceList>";
     }
     os << "</device>\n";
-    os << flush;
+    os << QT_FLUSH;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -663,14 +670,13 @@ QString UPnpDeviceDesc::GetHostName() const
     {
         // Get HostName
 
-        char localHostName[1024];
-
-        if (gethostname(localHostName, 1024))
+        QString localHostName = QHostInfo::localHostName();
+        if (localHostName.isEmpty())
             LOG(VB_GENERAL, LOG_ERR,
                 "UPnpDeviceDesc: Error, could not determine host name." + ENO);
 
         return UPnp::GetConfiguration()->GetValue("Settings/HostName",
-                                                  QString(localHostName));
+                                                  localHostName);
     }
 
     return m_sHostName;
@@ -686,7 +692,7 @@ QString UPnpDeviceDesc::GetHostName() const
 
 UPnpDevice::UPnpDevice() :
     m_sModelNumber(MYTH_BINARY_VERSION),
-    m_sSerialNumber(MYTH_SOURCE_VERSION),
+    m_sSerialNumber(GetMythSourceVersion()),
     m_protocolVersion(MYTH_PROTO_VERSION)
 {
 

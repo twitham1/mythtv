@@ -5,24 +5,6 @@
 #include <QString>
 #include <QObject>
 
-enum PIPState
-{
-    kPIPOff = 0,
-    kPIPonTV,
-    kPIPStandAlone,
-    kPBPLeft,
-    kPBPRight,
-};
-
-enum PIPLocation
-{
-    kPIPTopLeft = 0,
-    kPIPBottomLeft,
-    kPIPTopRight,
-    kPIPBottomRight,
-    kPIP_END
-};
-
 enum ZoomDirection
 {
     kZoomHome = 0,
@@ -117,11 +99,10 @@ enum PictureAttributeSupported
 
 enum StereoscopicMode
 {
-    kStereoscopicModeNone,
-    kStereoscopicModeSideBySide,
+    kStereoscopicModeAuto,
+    kStereoscopicModeIgnore3D,
     kStereoscopicModeSideBySideDiscard,
-    kStereoscopicModeTopAndBottom,
-    kStereoscopicModeTopAndBottomDiscard,
+    kStereoscopicModeTopAndBottomDiscard
 };
 
 enum PrimariesMode
@@ -156,10 +137,9 @@ inline QString StereoscopictoString(StereoscopicMode Mode)
 {
     switch (Mode)
     {
-        case kStereoscopicModeNone:                return QObject::tr("No 3D");
-        case kStereoscopicModeSideBySide:          return QObject::tr("3D Side by Side");
+        case kStereoscopicModeAuto:                return QObject::tr("Auto 3D");
+        case kStereoscopicModeIgnore3D:            return QObject::tr("Ignore 3D");
         case kStereoscopicModeSideBySideDiscard:   return QObject::tr("Discard 3D Side by Side");
-        case kStereoscopicModeTopAndBottom:        return QObject::tr("3D Top and Bottom");
         case kStereoscopicModeTopAndBottomDiscard: return QObject::tr("Discard 3D Top and Bottom");
     }
     return QObject::tr("Unknown");
@@ -181,7 +161,7 @@ inline bool is_progressive(FrameScanType Scan)
     return (kScan_Progressive == Scan);
 }
 
-inline QString ScanTypeToString(FrameScanType Scan, bool Forced = false)
+inline QString ScanTypeToUserString(FrameScanType Scan, bool Forced = false)
 {
     switch (Scan)
     {
@@ -194,30 +174,16 @@ inline QString ScanTypeToString(FrameScanType Scan, bool Forced = false)
     return QObject::tr("Unknown");
 }
 
-inline QString toString(PIPState State)
+inline QString ScanTypeToString(FrameScanType Scan)
 {
-    switch (State)
+    switch (Scan)
     {
-        case kPIPOff:        return QString("Pip Off");
-        case kPIPonTV:       return QString("Pip on TV");
-        case kPIPStandAlone: return QString("Pip Standalone");
-        case kPBPLeft:       return QString("PBP Left");
-        case kPBPRight:      return QString("PBP Right");
+        case kScan_Ignore:      return QString("Ignore Scan");
+        case kScan_Detect:      return QString("Detect Scan");
+        case kScan_Interlaced:  return QString("Interlaced Scan");
+        case kScan_Progressive: return QString("Progressive Scan");
+        default:                return QString("Unknown Scan");
     }
-    return QString("Unknown");
-}
-
-inline QString toString(PIPLocation Location)
-{
-    switch (Location)
-    {
-        case kPIPTopLeft:     return QObject::tr("Top Left");
-        case kPIPBottomLeft:  return QObject::tr("Bottom Left");
-        case kPIPTopRight:    return QObject::tr("Top Right");
-        case kPIPBottomRight: return QObject::tr("Bottom Right");
-        case kPIP_END:        break;
-    }
-    return "";
 }
 
 inline QString toString(AspectOverrideMode Aspectmode)
@@ -347,8 +313,8 @@ inline PictureAttributeSupported toMask(PictureAttribute PictureAttribute)
     return kPictureAttributeSupported_None;
 }
 
-inline PictureAttribute next(PictureAttributeSupported Supported,
-                             PictureAttribute          Attribute)
+inline PictureAttribute next_picattr(PictureAttributeSupported Supported,
+                                     PictureAttribute          Attribute)
 {
     int i = static_cast<int>(Attribute + 1) % static_cast<int>(kPictureAttribute_MAX);
     for (int j = 0; j < kPictureAttribute_MAX; (i = (i +1 ) % kPictureAttribute_MAX), j++)

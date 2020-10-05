@@ -60,7 +60,7 @@ class SignalMonitor;
 class DTVSignalMonitor;
 class DVBSignalMonitor;
 
-using pmt_vec_t = vector<const ProgramMapTable*>;
+using pmt_vec_t = std::vector<const ProgramMapTable*>;
 using pmt_map_t = QMap<uint, pmt_vec_t>;
 class ScannedChannelInfo;
 using ChannelListItem = QPair<transport_scan_items_it_t, ScannedChannelInfo*>;
@@ -137,7 +137,7 @@ class ChannelScanSM : public MPEGStreamListener,
 
     // MPEG
     void HandlePAT(const ProgramAssociationTable *pat) override; // MPEGStreamListener
-    void HandleCAT(const ConditionalAccessTable */*cat*/) override { } // MPEGStreamListener
+    void HandleCAT(const ConditionalAccessTable *cat) override; // MPEGStreamListener
     void HandlePMT(uint program_num, const ProgramMapTable *pmt) override; // MPEGStreamListener
     void HandleEncryptionStatus(uint pnum, bool encrypted) override; // MPEGStreamListener
 
@@ -258,6 +258,8 @@ class ChannelScanSM : public MPEGStreamListener,
 
     /// Scanner thread, runs ChannelScanSM::run()
     MThread             *m_scannerThread       {nullptr};
+
+    /// Protect UpdateChannelInfo
     QMutex               m_mutex;
 };
 

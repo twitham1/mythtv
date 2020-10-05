@@ -50,29 +50,29 @@ void MythNotificationScreenStack::PopScreen(MythScreenType *screen, bool allowFa
 
     screen->aboutToHide();
 
-    if (m_Children.isEmpty())
+    if (m_children.isEmpty())
         return;
 
     MythMainWindow *mainwindow = GetMythMainWindow();
 
     screen->setParent(nullptr);
-    if (allowFade && m_DoTransitions && !mainwindow->IsExitingToMain())
+    if (allowFade && m_doTransitions && !mainwindow->IsExitingToMain())
     {
         screen->SetFullscreen(false);
         if (deleteScreen)
         {
             screen->SetDeleting(true);
-            m_ToDelete.push_back(screen);
+            m_toDelete.push_back(screen);
         }
         screen->AdjustAlpha(1, -kFadeVal);
     }
     else
     {
-        for (int i = 0; i < m_Children.size(); ++i)
+        for (int i = 0; i < m_children.size(); ++i)
         {
-            if (m_Children.at(i) == screen)
+            if (m_children.at(i) == screen)
             {
-                m_Children.remove(i);
+                m_children.remove(i);
                 break;
             }
         }
@@ -87,12 +87,12 @@ void MythNotificationScreenStack::PopScreen(MythScreenType *screen, bool allowFa
     RecalculateDrawOrder();
 
     // If we're fading it, we still want to draw it.
-    if (screen && !m_DrawOrder.contains(screen))
-        m_DrawOrder.push_back(screen);
+    if (screen && !m_drawOrder.contains(screen))
+        m_drawOrder.push_back(screen);
 
-    if (!m_Children.isEmpty())
+    if (!m_children.isEmpty())
     {
-        for (auto *draw : qAsConst(m_DrawOrder))
+        for (auto *draw : qAsConst(m_drawOrder))
         {
             if (draw != screen && !draw->IsDeleting())
             {
@@ -123,17 +123,17 @@ void MythNotificationScreenStack::PopScreen(MythScreenType *screen, bool allowFa
 
 MythScreenType *MythNotificationScreenStack::GetTopScreen(void) const
 {
-    if (m_Children.isEmpty())
+    if (m_children.isEmpty())
         return nullptr;
     // The top screen is the only currently displayed first, if there's a
     // fullscreen notification displayed, it's the last one
-    MythScreenType *top = m_Children.front();
-    QVector<MythScreenType *>::const_iterator it = m_Children.end() - 1;
+    MythScreenType *top = m_children.front();
+    QVector<MythScreenType *>::const_iterator it = m_children.end() - 1;
 
     // loop from last to 2nd
-    for (; it != m_Children.begin(); --it)
+    for (; it != m_children.begin(); --it)
     {
-        auto *s = dynamic_cast<MythNotificationScreen *>(*it);
+        auto *s = qobject_cast<MythNotificationScreen *>(*it);
         if (!s)
         {
             // if for whatever reason it's not a notification on our screen
@@ -789,7 +789,7 @@ NCPrivate::~NCPrivate()
  */
 void NCPrivate::ScreenDeleted(void)
 {
-    auto *screen = dynamic_cast<MythNotificationScreen*>(sender());
+    auto *screen = qobject_cast<MythNotificationScreen*>(sender());
     if (screen == nullptr)
         return;
 
@@ -1236,7 +1236,7 @@ void NCPrivate::GetNotificationScreens(QList<MythScreenType*> &_screens)
     int position = 0;
     for (auto *item : qAsConst(screens))
     {
-        auto *screen = dynamic_cast<MythNotificationScreen*>(item);
+        auto *screen = qobject_cast<MythNotificationScreen*>(item);
         if (screen)
         {
             if ((screen->m_visibility & MythNotification::kPlayback) == 0)
@@ -1293,10 +1293,10 @@ bool NCPrivate::RemoveFirst(void)
     // The top screen is the only currently displayed first, if there's a
     // fullscreen notification displayed, it's the last one
     MythNotificationScreen *top = m_screens.front();
-    QList<MythNotificationScreen *>::const_iterator it = m_screens.end() - 1;
+    QList<MythNotificationScreen *>::const_iterator it = m_screens.cend() - 1;
 
     // loop from last to 2nd
-    for (; it != m_screens.begin(); --it)
+    for (; it != m_screens.cbegin(); --it)
     {
         MythNotificationScreen *s = *it;
 
@@ -1379,7 +1379,7 @@ void MythNotificationCenter::UnRegister(void *from, int id, bool closeimemdiatel
 
 QDateTime MythNotificationCenter::ScreenExpiryTime(const MythScreenType *screen)
 {
-    const auto *s = dynamic_cast<const MythNotificationScreen*>(screen);
+    const auto *s = qobject_cast<const MythNotificationScreen*>(screen);
     if (!s)
         return QDateTime();
     return s->m_expiry;
@@ -1387,7 +1387,7 @@ QDateTime MythNotificationCenter::ScreenExpiryTime(const MythScreenType *screen)
 
 bool MythNotificationCenter::ScreenCreated(const MythScreenType *screen)
 {
-    const auto *s = dynamic_cast<const MythNotificationScreen*>(screen);
+    const auto *s = qobject_cast<const MythNotificationScreen*>(screen);
     if (!s)
         return true;
     return s->m_created;
@@ -1400,7 +1400,7 @@ void MythNotificationCenter::GetNotificationScreens(QList<MythScreenType*> &_scr
 
 void MythNotificationCenter::UpdateScreen(MythScreenType *screen)
 {
-    auto *s = dynamic_cast<MythNotificationScreen*>(screen);
+    auto *s = qobject_cast<MythNotificationScreen*>(screen);
     if (!s)
         return;
 

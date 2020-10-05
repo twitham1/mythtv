@@ -5,10 +5,8 @@
 #ifndef DSMCC_OBJCAROUSEL_H
 #define DSMCC_OBJCAROUSEL_H
 
-#include <QLinkedList>
-
+#include <list>
 #include <vector>
-using namespace std;
 
 class DsmccDii;
 class Dsmcc;
@@ -55,7 +53,7 @@ class DSMCCCacheModuleData
     unsigned long  m_receivedData {0}; ///< Size received so far.
 
     /// Block table.  As blocks are received they are added to this table. 
-    vector<QByteArray*> m_blocks;
+    std::vector<QByteArray*> m_blocks;
     /// True if we have completed this module.
     bool                   m_completed {false};
     ModuleDescriptorData   m_descriptorData;
@@ -70,9 +68,9 @@ class ObjCarousel
     void AddModuleData(DsmccDb *ddb, const unsigned char *data);
 
     DSMCCCache                         m_fileCache;
-    QLinkedList<DSMCCCacheModuleData*> m_Cache;
+    std::list<DSMCCCacheModuleData*>   m_Cache;
     /// Component tags matched to this carousel.
-    vector<unsigned short>             m_Tags;
+    std::vector<unsigned short>        m_Tags;
     unsigned long                      m_id        {0};
 };
 

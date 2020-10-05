@@ -2,12 +2,11 @@
 #include "mythmiscutil.h"
 
 // C++ headers
+#include <array>
 #include <cerrno>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
-
-using namespace std;
 
 // POSIX
 #include <unistd.h>
@@ -75,16 +74,14 @@ bool getUptime(time_t &uptime)
 
 #elif defined(__FreeBSD__) || CONFIG_DARWIN
 
-    int            mib[2];
+    std::array<int,2> mib { CTL_KERN, KERN_BOOTTIME };
     struct timeval bootTime;
     size_t         len;
 
     // Uptime is calculated. Get this machine's boot time
     // and subtract it from the current machine time
     len    = sizeof(bootTime);
-    mib[0] = CTL_KERN;
-    mib[1] = KERN_BOOTTIME;
-    if (sysctl(mib, 2, &bootTime, &len, nullptr, 0) == -1)
+    if (sysctl(mib.data(), 2, &bootTime, &len, nullptr, 0) == -1)
     {
         LOG(VB_GENERAL, LOG_ERR, "sysctl() error");
         return false;
@@ -455,18 +452,18 @@ bool makeFileAccessible(const QString& filename)
 QString getResponse(const QString &query, const QString &def)
 {
     QByteArray tmp = query.toLocal8Bit();
-    cout << tmp.constData();
+    std::cout << tmp.constData();
 
     tmp = def.toLocal8Bit();
-    if (def.size())
-        cout << " [" << tmp.constData() << "]  ";
+    if (!def.isEmpty())
+        std::cout << " [" << tmp.constData() << "]  ";
     else
-        cout << "  ";
+        std::cout << "  ";
 
     if (!isatty(fileno(stdin)) || !isatty(fileno(stdout)))
     {
-        cout << endl << "[console is not interactive, using default '"
-             << tmp.constData() << "']" << endl;
+        std::cout << std::endl << "[console is not interactive, using default '"
+             << tmp.constData() << "']" << std::endl;
         return def;
     }
 
@@ -633,10 +630,9 @@ QString FileHash(const QString& filename)
 
 bool WakeOnLAN(const QString& MAC)
 {
-    char msg[1024] = "\xFF\xFF\xFF\xFF\xFF\xFF";
-    int  msglen = 6;
+    std::vector<char> msg(6, static_cast<char>(0xFF));
+    std::array<char,6> macaddr {};
     QStringList tokens = MAC.split(':');
-    int macaddr[6];
 
     if (tokens.size() != 6)
     {
@@ -658,16 +654,17 @@ bool WakeOnLAN(const QString& MAC)
         }
     }
 
+    msg.reserve(1024);
     for (int x = 0; x < 16; x++)
-        for (int y : macaddr)
-            msg[msglen++] = y;
+        msg.insert(msg.end(), macaddr.cbegin(), macaddr.cend());
 
     LOG(VB_NETWORK, LOG_INFO,
             QString("WakeOnLan(): Sending WOL packet to %1").arg(MAC));
 
     QUdpSocket udp_socket;
+    qlonglong msglen = msg.size();
     return udp_socket.writeDatagram(
-        msg, msglen, QHostAddress::Broadcast, 32767) == msglen;
+        msg.data(), msglen, QHostAddress::Broadcast, 32767) == msglen;
 }
 
 // Wake up either by command or by MAC address
@@ -856,7 +853,7 @@ void setHttpProxy(void)
     QString var(getenv("http_proxy"));
     if (var.isEmpty())
         var = getenv("HTTP_PROXY");  // Sadly, some OS envs are case sensitive
-    if (var.length())
+    if (!var.isEmpty())
     {
         if (!var.startsWith("http://"))   // i.e. just a host name
             var.prepend("http://");
@@ -961,7 +958,7 @@ void wrapList(QStringList &list, int width)
 {
     // if this is triggered, something has gone seriously wrong
     // the result won't really be usable, but at least it won't crash
-    width = max(width, 5);
+    width = std::max(width, 5);
 
     for (int i = 0; i < list.size(); i++)
     {
@@ -1009,8 +1006,8 @@ QString xml_indent(uint level)
     static QMap<uint,QString> s_cache;
 
     s_rwLock.lockForRead();
-    QMap<uint,QString>::const_iterator it = s_cache.find(level);
-    if (it != s_cache.end())
+    QMap<uint,QString>::const_iterator it = s_cache.constFind(level);
+    if (it != s_cache.constEnd())
     {
         QString tmp = *it;
         s_rwLock.unlock();
@@ -1229,12 +1226,12 @@ int naturalCompare(const QString &_a, const QString &_b, Qt::CaseSensitivity cas
     return currA->isNull() ? -1 : + 1;
 }
 
-QString MythFormatTimeMs(int msecs, QString fmt)
+QString MythFormatTimeMs(int msecs, const QString& fmt)
 {
     return QTime::fromMSecsSinceStartOfDay(msecs).toString(fmt);
 }
 
-QString MythFormatTime(int secs, QString fmt)
+QString MythFormatTime(int secs, const QString& fmt)
 {
     return QTime::fromMSecsSinceStartOfDay(secs*1000).toString(fmt);
 }

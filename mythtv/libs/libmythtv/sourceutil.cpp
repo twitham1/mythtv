@@ -101,25 +101,25 @@ QString SourceUtil::GetChannelSeparator(uint sourceid)
     if (query.exec() && query.isActive() && query.size() > 0)
     {
         QMap<QString,uint> counts;
-        const QRegExp sepExpr("(_|-|#|\\.)");
+        const QRegularExpression sepExpr(R"((_|-|#|\.))");
         while (query.next())
         {
             const QString channum = query.value(0).toString();
             const int where = channum.indexOf(sepExpr);
-            if (channum.right(2).startsWith("0"))
+            if (channum.rightRef(2).startsWith("0"))
                 counts["0"]++;
             else
                 counts[(where < 0) ? "" : QString(channum.at(where))]++;
         }
         QString sep = "_";
         uint max = counts["_"];
-        static const char *s_spacers[6] = { "", "-", "#", ".", "0", nullptr };
-        for (uint i=0; (s_spacers[i] != nullptr); ++i)
+        static const std::array<const QString,5> s_spacers { "", "-", "#", ".", "0" };
+        for (const auto & spacer : s_spacers)
         {
-            if (counts[s_spacers[i]] > max)
+            if (counts[spacer] > max)
             {
-                max = counts[s_spacers[i]];
-                sep = s_spacers[i];
+                max = counts[spacer];
+                sep = spacer;
             }
         }
         return sep;
@@ -145,7 +145,7 @@ uint SourceUtil::GetChannelCount(uint sourceid)
     return 0;
 }
 
-vector<uint> SourceUtil::GetMplexIDs(uint sourceid)
+std::vector<uint> SourceUtil::GetMplexIDs(uint sourceid)
 {
     MSqlQuery query(MSqlQuery::InitCon());
 
@@ -155,7 +155,7 @@ vector<uint> SourceUtil::GetMplexIDs(uint sourceid)
         "WHERE sourceid = :SOURCEID");
     query.bindValue(":SOURCEID", sourceid);
 
-    vector<uint> list;
+    std::vector<uint> list;
     if (!query.exec())
     {
         MythDB::DBError("SourceUtil::GetMplexIDs()", query);
@@ -353,7 +353,7 @@ bool SourceUtil::IsUnscanable(uint sourceid)
 bool SourceUtil::IsCableCardPresent(uint sourceid)
 {
     bool ccpresent = false;
-    vector<uint> inputs = CardUtil::GetInputIDs(sourceid);
+    std::vector<uint> inputs = CardUtil::GetInputIDs(sourceid);
     for (uint & input : inputs)
     {
         if (CardUtil::IsCableCardPresent(input, CardUtil::GetRawInputType(input))
@@ -532,11 +532,21 @@ bool SourceUtil::DeleteSource(uint sourceid)
 {
     MSqlQuery query(MSqlQuery::InitCon());
 
+    // Delete the transports associated with the source
+    query.prepare("DELETE FROM dtv_multiplex "
+                  "WHERE sourceid = :SOURCEID");
+    query.bindValue(":SOURCEID", sourceid);
+
+    if (!query.exec() || !query.isActive())
+    {
+        MythDB::DBError("Deleting transports", query);
+        return false;
+    }
+
     // Delete the channels associated with the source
     query.prepare("UPDATE channel "
-                  "SET deleted = NOW() "
-                  "WHERE deleted IS NULL AND "
-                  "      sourceid = :SOURCEID");
+                  "SET deleted = NOW(), mplexid = 0, sourceid = 0 "
+                  "WHERE deleted IS NULL AND sourceid = :SOURCEID");
     query.bindValue(":SOURCEID", sourceid);
 
     if (!query.exec() || !query.isActive())
@@ -587,8 +597,18 @@ bool SourceUtil::DeleteAllSources(void)
         return false;
     }
 
-    return (query.exec("TRUNCATE TABLE channel") &&
-            query.exec("TRUNCATE TABLE program") &&
+    // Delete all channels
+    query.prepare("UPDATE channel "
+                  "SET deleted = NOW(), mplexid = 0, sourceid = 0 "
+                  "WHERE deleted IS NULL");
+
+    if (!query.exec() || !query.isActive())
+    {
+        MythDB::DBError("Deleting all Channels", query);
+        return false;
+    }
+
+    return (query.exec("TRUNCATE TABLE program") &&
             query.exec("TRUNCATE TABLE videosource") &&
             query.exec("TRUNCATE TABLE credits") &&
             query.exec("TRUNCATE TABLE programrating") &&

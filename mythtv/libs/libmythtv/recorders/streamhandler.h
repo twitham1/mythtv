@@ -5,7 +5,6 @@
 
 #include <utility>
 #include <vector>
-using namespace std;
 
 // Qt headers
 #include <QWaitCondition>
@@ -100,7 +99,7 @@ class StreamHandler : protected MThread, public DeviceReaderCB
 
   protected:
     /// Write out a copy of the raw MPTS
-    void WriteMPTS(unsigned char * buffer, uint len);
+    void WriteMPTS(const unsigned char * buffer, uint len);
     /// At minimum this sets _running_desired, this may also send
     /// signals to anything that might be blocking the run() loop.
     /// \note: The _start_stop_lock must be held when this is called.
@@ -128,7 +127,7 @@ class StreamHandler : protected MThread, public DeviceReaderCB
     QWaitCondition      m_runningStateChanged;
 
     mutable QMutex      m_pidLock               {QMutex::Recursive};
-    vector<uint>        m_eitPids;
+    std::vector<uint>   m_eitPids;
     PIDInfoMap          m_pidInfo;
     uint                m_openPidFilters        {0};
     MythTimer           m_cycleTimer;
@@ -138,7 +137,7 @@ class StreamHandler : protected MThread, public DeviceReaderCB
     QString             m_mptsBaseFile;
     QMutex              m_mptsLock;
 
-    using StreamDataList = QMap<MPEGStreamData*,QString>;
+    using StreamDataList = QHash<MPEGStreamData*,QString>;
     mutable QMutex      m_listenerLock         {QMutex::Recursive};
     StreamDataList      m_streamDataList;
 };

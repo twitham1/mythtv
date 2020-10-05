@@ -14,6 +14,15 @@ MTV_PUBLIC QDateTime dvbdate2qt(const unsigned char *buf);
 MTV_PUBLIC time_t dvbdate2unix(const unsigned char *buf);
 uint32_t dvbdate2key(const unsigned char *buf);
 
+static inline QDateTime dvbdate2qt(const std::array<uint8_t,5> buf)
+{
+    return dvbdate2qt(buf.data());
+}
+static inline time_t dvbdate2unix(const std::array<uint8_t,5> buf)
+{
+    return dvbdate2unix(buf.data());
+}
+
 /** \class NetworkInformationTable
  *  \brief This table tells the decoder on which PIDs to find other tables.
  *  \todo This is just a stub.
@@ -91,7 +100,7 @@ class MTV_PUBLIC NetworkInformationTable : public PSIPTable
   private:
     mutable QString m_cachedNetworkName;
     mutable const unsigned char* m_tscPtr {nullptr};
-    mutable vector<const unsigned char*> m_ptrs; // used to parse
+    mutable std::vector<const unsigned char*> m_ptrs; // used to parse
 };
 
 /** \class ServiceDescriptionTable
@@ -167,7 +176,7 @@ class MTV_PUBLIC ServiceDescriptionTable : public PSIPTable
     QString toString(void) const override; // PSIPTable
 
   private:
-    mutable vector<const unsigned char*> m_ptrs; // used to parse
+    mutable std::vector<const unsigned char*> m_ptrs; // used to parse
 };
 
 /** \class BouquetAssociationTable
@@ -238,7 +247,7 @@ class MTV_PUBLIC BouquetAssociationTable : public PSIPTable
 
   private:
     mutable const unsigned char* m_tscPtr {nullptr};
-    mutable vector<const unsigned char*> m_ptrs;
+    mutable std::vector<const unsigned char*> m_ptrs;
 };
 
 class MTV_PUBLIC DiscontinuityInformationTable : public PSIPTable
@@ -365,7 +374,7 @@ class MTV_PUBLIC DVBEventInformationTable : public PSIPTable
     static bool IsEIT(uint table_id);
 
   private:
-    mutable vector<const unsigned char*> m_ptrs; // used to parse
+    mutable std::vector<const unsigned char*> m_ptrs; // used to parse
 };
 
 /** \class TimeDateTable

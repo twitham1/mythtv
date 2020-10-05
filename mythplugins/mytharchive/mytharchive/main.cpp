@@ -9,8 +9,6 @@
 #include <cstdlib>
 #include <iostream>
 
-using namespace std;
-
 // Qt
 #include <QApplication>
 #include <QDir>
@@ -112,7 +110,6 @@ static bool checkLockFile(const QString &lockFile)
 
 static void runCreateDVD(void)
 {
-    QString commandline;
     QString tempDir = getTempDirectory(true);
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
@@ -120,8 +117,6 @@ static void runCreateDVD(void)
         return;
 
     QString logDir = tempDir + "logs";
-    QString configDir = tempDir + "config";
-    QString workDir = tempDir + "work";
 
     checkTempDirectory();
 
@@ -141,7 +136,6 @@ static void runCreateDVD(void)
 
 static void runCreateArchive(void)
 {
-    QString commandline;
     QString tempDir = getTempDirectory(true);
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
 
@@ -149,8 +143,6 @@ static void runCreateArchive(void)
         return;
 
     QString logDir = tempDir + "logs";
-    QString configDir = tempDir + "config";
-    QString workDir = tempDir + "work";
 
     checkTempDirectory();
 
@@ -181,8 +173,6 @@ static void runImportVideo(void)
         return;
 
     QString logDir = tempDir + "logs";
-    QString configDir = tempDir + "config";
-    QString workDir = tempDir + "work";
 
     checkTempDirectory();
 
@@ -192,8 +182,6 @@ static void runImportVideo(void)
         showLogViewer();
         return;
     }
-
-    QString filter = "*.xml";
 
     // show the find archive screen
     MythScreenStack *mainStack = GetMythMainWindow()->GetMainStack();
@@ -293,7 +281,7 @@ static int runMenu(const QString& which_menu)
 
     while (parentObject)
     {
-        mainMenu = dynamic_cast<MythThemedMenu *>(parentObject);
+        mainMenu = qobject_cast<MythThemedMenu *>(parentObject);
 
         if (mainMenu && mainMenu->objectName() == "mainmenu")
             break;

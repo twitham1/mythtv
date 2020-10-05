@@ -100,14 +100,14 @@ bool MythUIVirtualKeyboard::Create()
     loadKeyDefinitions(gCoreContext->GetLanguageAndVariant());
     updateKeys(true);
 
-    QSize screensize = GetMythUI()->GetScreenSettings().size();
+    QSize screensize = GetMythMainWindow()->GetScreenRect().size();
     MythRect editArea = m_parentEdit->GetArea();
     MythRect area = GetArea();
     MythPoint newPos;
 
     //FIXME this assumes the edit is a direct child of the parent screen
     MythUIType *parentScreen = nullptr;
-    parentScreen = dynamic_cast<MythUIType *>(m_parentEdit->parent());
+    parentScreen = qobject_cast<MythUIType *>(m_parentEdit->parent());
     if (parentScreen)
     {
         editArea.moveTopLeft(QPoint(editArea.x() + parentScreen->GetArea().x(),
@@ -604,7 +604,7 @@ QString MythUIVirtualKeyboard::decodeChar(QString c)
         }
         else
         {
-            res += c.left(1);
+            res += c.leftRef(1);
             c = c.mid(1);
         }
     }

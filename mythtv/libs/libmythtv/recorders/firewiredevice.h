@@ -9,7 +9,6 @@
 
 // C++ headers
 #include <vector>
-using namespace std;
 
 // Qt headers
 #include <QString>
@@ -207,7 +206,7 @@ class FirewireDevice
 
     // Gets
     virtual bool IsPortOpen(void) const = 0;
-    bool IsSTBBufferCleared(void) const { return m_buffer_cleared; }
+    bool IsSTBBufferCleared(void) const { return m_bufferCleared; }
 
     // non-const Gets
     virtual PowerState GetPowerState(void);
@@ -215,16 +214,14 @@ class FirewireDevice
     // Statics
     static bool IsSTBSupported(const QString &model);
     static QString GetModelName(uint vendor_id, uint model_id);
-    static vector<AVCInfo> GetSTBList(void);
+    static std::vector<AVCInfo> GetSTBList(void);
 
   protected:
     FirewireDevice(uint64_t guid, uint subunitid, uint speed);
 
-    virtual bool SendAVCCommand(const vector<uint8_t> &cmd,
-                                vector<uint8_t> &result,
+    virtual bool SendAVCCommand(const std::vector<uint8_t> &cmd,
+                                std::vector<uint8_t> &result,
                                 int retry_cnt) = 0;
-    bool GetSubunitInfo(uint8_t table[32]);
-
     void SetLastChannel(uint channel);
     void ProcessPATPacket(const TSPacket &tspacket);
     virtual void BroadcastToListeners(
@@ -233,17 +230,17 @@ class FirewireDevice
     uint64_t                 m_guid;
     uint                     m_subunitid;
     uint                     m_speed;
-    uint                     m_last_channel   {0};
-    uint                     m_last_crc       {0};
-    bool                     m_buffer_cleared {true};
+    uint                     m_lastChannel    {0};
+    uint                     m_lastCrc        {0};
+    bool                     m_bufferCleared  {true};
 
-    uint                     m_open_port_cnt  {0};
-    vector<TSDataListener*>  m_listeners;
+    uint                     m_openPortCnt    {0};
+    std::vector<TSDataListener*>  m_listeners;
     mutable QMutex           m_lock;
 
     /// Vendor ID + Model ID to FirewireDevice STB model string
-    static QMap<uint64_t,QString> s_id_to_model;
-    static QMutex                 s_static_lock;
+    static QMap<uint64_t,QString> s_idToModel;
+    static QMutex                 s_staticLock;
 };
 
 #endif // FIREWIRE_DEVICE_H

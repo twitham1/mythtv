@@ -19,7 +19,7 @@
 #include <QBuffer>
 #include <QDateTime>
 #include <QFile>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QTcpSocket>
 #include <QTextStream>
 
@@ -110,8 +110,8 @@ class UPNP_PUBLIC HTTPRequest
 
         static const char  *s_szServerHeaders;
 
-        QRegExp             m_procReqLineExp    {"[ \r\n][ \r\n]*"};
-        QRegExp             m_parseRangeExp     {"(\\d|\\-)"};
+        QRegularExpression  m_procReqLineExp    {"\\s+"};
+        QRegularExpression  m_parseRangeExp     {"(\\d|\\-)"};
 
     public:
 
@@ -127,7 +127,7 @@ class UPNP_PUBLIC HTTPRequest
         QString             m_sMethod;
 
         QStringMap          m_mapParams;
-        QStringMap          m_mapHeaders;
+        QStringMultiMap     m_mapHeaders;
         QStringMap          m_mapCookies;
 
         QString             m_sPayload;
@@ -242,6 +242,7 @@ class UPNP_PUBLIC HTTPRequest
         static QString         GetResponseProtocol () ;
 
         QString         GetRequestType () const;
+        QString         GetLastHeader( const QString &sType ) const;
 
         static QString  GetMimeType     ( const QString &sFileExtension );
         static QStringList GetSupportedMimeTypes ();

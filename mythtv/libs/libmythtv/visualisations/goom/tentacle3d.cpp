@@ -2,8 +2,10 @@
 
 #include "v3d.h"
 #include "surf3d.h"
+#include "goom_core.h"
 #include "goom_tools.h"
 #include "goomconfig.h"
+#include "tentacle3d.h"
 
 #define D 256.0F
 
@@ -12,13 +14,8 @@
 #define definitionz 45
 
 static float cycle = 0.0F;
-static grid3d *grille[nbgrid];
+static std::array<grid3d *,nbgrid> grille;
 static float *vals;
-
-/* Prototypes to keep gcc from spewing warnings */
-void tentacle_free (void);
-void tentacle_new (void);
-void tentacle_update(int *buf, int *back, int W, int H, short data[2][512], float rapport, int drawit);
 
 void tentacle_free (void) {
 	free (vals);
@@ -32,14 +29,10 @@ void tentacle_new (void) {
 	vals = (float*)malloc ((definitionx+20)*sizeof(float));
 	
 	for (auto & tmp : grille) {
-		// Pseudo-random is good enough. Don't need a true random.
-		// NOLINTNEXTLINE(cert-msc30-c,cert-msc50-cpp)
-		int z = 45+rand()%30;
-		// NOLINTNEXTLINE(cert-msc30-c,cert-msc50-cpp)
-		int x = 85+rand()%5;
+		int z = 45+goom_rand()%30;
+		int x = 85+goom_rand()%5;
 		center.z = z;
-		// NOLINTNEXTLINE(cert-msc30-c,cert-msc50-cpp)
-		tmp = grid3d_new (x,definitionx,z,definitionz+rand()%10,center);
+		tmp = grid3d_new (x,definitionx,z,definitionz+goom_rand()%10,center);
 		center.y += 8;
 	}
 }
@@ -54,8 +47,6 @@ lighten (unsigned char value, float power)
 		val = (int) t; // (32.0F * log (t));
 		if (val > 255)
 			val = 255;
-		if (val < 0)
-			val = 0;
 		return val;
 	}
         return 0;
@@ -97,7 +88,6 @@ static void pretty_move (float lcycle, float *dist,float *dist2, float *rotangle
 	static float s_distT2 = 0.0F;
 	static float s_rot = 0.0F; // entre 0 et 2 * M_PI
 	static int s_happens = 0;
-        static int s_rotation = 0;
 	static int s_lock = 0;
 
 	if (s_happens)
@@ -122,6 +112,7 @@ static void pretty_move (float lcycle, float *dist,float *dist2, float *rotangle
 		tmp = M_PI_F*sinf(lcycle)/32+3*M_PI_F/2;
 	}
 	else {
+		static int s_rotation {0};
 		s_rotation = iRAND(500)?s_rotation:iRAND(2);
 		if (s_rotation)
 			lcycle *= 2.0F*M_PI_F;
@@ -146,14 +137,12 @@ static void pretty_move (float lcycle, float *dist,float *dist2, float *rotangle
 		*rotangle = s_rot = (tmp + 15.0F*s_rot) / 16.0F;
 }
 
-void tentacle_update(int *buf, int *back, int W, int H, short data[2][512], float rapport, int drawit) {
-	static int s_colors[] = {
+void tentacle_update(int *buf, int *back, int W, int H, GoomDualData& data, float rapport, int drawit) {
+        static std::array<int,3> s_colors {
 		(0x18<<(ROUGE*8))|(0x4c<<(VERT*8))|(0x2f<<(BLEU*8)),
 		(0x48<<(ROUGE*8))|(0x2c<<(VERT*8))|(0x6f<<(BLEU*8)),
 		(0x58<<(ROUGE*8))|(0x3c<<(VERT*8))|(0x0f<<(BLEU*8))};
 	
-	static int s_col = (0x28<<(ROUGE*8))|(0x2c<<(VERT*8))|(0x5f<<(BLEU*8));
-	static int s_dstCol = 0;
 	static float s_lig = 1.15F;
 	static float s_ligs = 0.1F;
 
@@ -170,6 +159,9 @@ void tentacle_update(int *buf, int *back, int W, int H, short data[2][512], floa
 		if ((s_lig>10.0F) || (s_lig<1.1F))
                     s_ligs = -s_ligs;
 		
+		static int s_col = (0x28<<(ROUGE*8))|(0x2c<<(VERT*8))|(0x5f<<(BLEU*8));
+		static int s_dstCol = 0;
+
 		if ((s_lig<6.3F)&&(iRAND(30)==0))
 			s_dstCol=iRAND(3);
 

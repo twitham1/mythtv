@@ -1,4 +1,3 @@
-/* -*- myth -*- */
 /**
  * \file mythgesture.h
  * \author Micah F. Galizia <mfgalizi@csd.uwo.ca>
@@ -23,26 +22,27 @@
 #ifndef MYTHGESTURE_H
 #define MYTHGESTURE_H
 
-#include <sys/types.h>
-
+// Qt
 #include <QPoint>
 #include <QList>
 #include <QString>
 #include <QEvent>
+#include <QMutex>
 
+// MythTV
 #include "mythuiexp.h"
 
-/**
- * \class MythGestureEvent
- * \brief A custom event that represents a mouse gesture.
- */
+// Std
+#include <sys/types.h>
+#include <map>
+
 class MUI_PUBLIC MythGestureEvent : public QEvent
 {
+    Q_GADGET
+
   public:
-    /**
-     * \brief The types of gestures supported by myth
-     */
-    enum Gesture {
+    enum Gesture
+    {
         Unknown,
 
         /* Horizontal and vertical lines */
@@ -72,167 +72,66 @@ class MUI_PUBLIC MythGestureEvent : public QEvent
         DownThenUp,
 
         /* A click */
-        Click,
-
-        /* This isn't real */
-        MaxGesture
+        // NB LongClick before Click as MythMainWindow filters out otherwise
+        LongClick,
+        Click
     };
+    Q_ENUM(Gesture)
 
-    enum Button {
-        NoButton,
-        LeftButton,
-        RightButton,
-        MiddleButton,
-        Aux1Button,
-        Aux2Button
-    };
+    explicit MythGestureEvent(Gesture gesture, Qt::MouseButton Button);
+    ~MythGestureEvent() override = default;
 
-    /**
-     * \brief Create a MythGesture
-     * \param gesture What type of gesture was performed.
-     * \param button The button (if any) that was pressed during the gesture.
-     */
-    explicit MythGestureEvent(Gesture gesture, Button button = LeftButton) :
-        QEvent(kEventType), m_gesture(Unknown)
-    {
-        m_button = button;
-        (gesture >= MaxGesture) ? m_gesture = MaxGesture : m_gesture = gesture;
-    }
-
-    ~MythGestureEvent() override;
-
-    /**
-     * \brief Get the gesture type.
-     * \return The gesture value corresponding to the Gesture
-     * enumeration.
-     */
-    inline Gesture gesture(void) const { return m_gesture; }
-
-    /**
-     * \brief Get the symbolic name of the gesture.
-     * \return A string containing the symbolic name of the gesture.
-     */
-    explicit operator QString() const;
-
-    void SetPosition(QPoint position) { m_position = position; }
-    QPoint GetPosition() const { return m_position; }
-
-    void SetButton(Button button) { m_button = button; }
-    Button GetButton(void) const { return m_button; }
+    QString         GetName     () const;
+    inline Gesture  GetGesture  () const { return m_gesture; }
+    void            SetPosition (QPoint Position) { m_position = Position; }
+    QPoint          GetPosition () const { return m_position; }
+    Qt::MouseButton GetButton   () const { return m_button; }
+    QString         GetButtonName() const;
 
     static Type kEventType;
 
   private:
-    Gesture m_gesture;
-    QPoint m_position;
-    Button m_button;
-
+    Gesture m_gesture { Unknown  };
+    QPoint  m_position;
+    Qt::MouseButton m_button { Qt::NoButton };
 };
 
-/* forward declaration of private information */
-class MythGesturePrivate;
-
-/**
- * \class MythGesture
- * \brief Contains the points in a stroke, and translates them into
- * gestures.
- *
- * Because the indended use of the stop method is to be called by
- * either the expiration of a timer or when an event is called (or
- * both at the same time) it must have a mutex.
- *
- * \ingroup MythUI_Input
- */
 class MythGesture
 {
   public:
-    /**
-     * \brief Create a new stroke, specifying tuning values
-     * \param max_points The maximum number of points to record.
-     * \param min_points The minimum number of points to record.
-     * \param max_sequence The maximum producible sequence size.
-     * \param scale_ratio The stroke scale ratio
-     * \param bin_percent The bin count percentage required
-     * to add to the sequence.
-     */
-    explicit MythGesture(size_t max_points = 10000, size_t min_points = 50,
-                         size_t max_sequence = 20, size_t scale_ratio = 4,
-                         float bin_percent = 0.07);
-   ~MythGesture();
+    explicit MythGesture(size_t MaxPoints = 10000, size_t MinPoints = 50,
+                         size_t MaxSequence = 20,  int ScaleRatio = 4,
+                         float BinPercent = 0.07F);
 
-    /**
-     * \brief Start recording.
-     */
-    void start(void);
-
-    /**
-     * \brief Stop recording.
-     *
-     * This method stores the gesture, as it is, and resets all
-     * information.
-     */
-    void stop(void);
-
-    /**
-     * \brief Determine if the stroke is being recorded.
-     * \return True if recording is in progress, otherwise, false.
-     */
-    bool recording(void) const;
-
-    /**
-     * \brief Complete the gesture event of the last completed stroke.
-     * \return A new gesture event, or nullptr on error.
-     */
-    MythGestureEvent *gesture(void) const;
-
-    /**
-     * \brief Record a point.
-     * \param p The point to record.
-     * \return True if the point was recorded, otherwise, false.
-     */
-    bool record(const QPoint &p);
-
-    /**
-     * \brief Determine if the stroke has the minimum required points.
-     * \return true if the gesture can be translated, otherwise, false.
-     */
-    bool hasMinimumPoints(void) const
-        { return (uint)m_points.size() >= m_minPoints; }
-
-  protected:
-
-    /**
-     * \brief Translate the stroke into a sequence.
-     * \return The sequence string made by the mouse.
-     *
-     * \note The points will be removed during this method.
-     */
-    QString translate(void);
-
-    /**
-     * \brief Adjust horizontal and vertical extremes.
-     * \param x The new horizontal extreme.
-     * \param y The new vertical extreme
-     */
-    void adjustExtremes(int x, int y);
+    void Start();
+    void Stop(bool Timeout = false);
+    bool Recording();
+    MythGestureEvent* GetGesture() const;
+    bool Record(const QPoint& Point, Qt::MouseButton Button);
 
   private:
+    Q_DISABLE_COPY(MythGesture)
 
-    bool   m_recording    {false};
-    int    m_minX         {10000};
-    int    m_maxX         {-1};
-    int    m_minY         {10000};
-    int    m_maxY         {-1};
-    size_t m_maxPoints    {10000};
-    size_t m_minPoints    {50};
-    size_t m_maxSequence  {20};
-    int    m_scaleRatio   {4};
-    float  m_binPercent   {0.07F};
-    MythGestureEvent::Gesture m_lastGesture {MythGestureEvent::MaxGesture};
+    bool    HasMinimumPoints() const;
+    QString Translate(bool Timeout);
+    void    AdjustExtremes(int X, int Y);
+
+    bool   m_recording    { false };
+    int    m_minX         { 10000 };
+    int    m_maxX         { -1    };
+    int    m_minY         { 10000 };
+    int    m_maxY         { -1    };
+    size_t m_maxPoints    { 10000 };
+    size_t m_minPoints    { 50    };
+    size_t m_maxSequence  { 20    };
+    int    m_scaleRatio   { 4     };
+    float  m_binPercent   { 0.07F };
+    MythGestureEvent::Gesture m_lastGesture { MythGestureEvent::Unknown };
     QList <QPoint> m_points;
-
-    MythGesturePrivate *p {nullptr}; // NOLINT(readability-identifier-naming)
+    QMutex m_lock;
+    static const std::map<QString, MythGestureEvent::Gesture> kSequences;
+    Qt::MouseButton m_lastButton { Qt::NoButton };
 };
 
-#endif /* MYTHGESTURE_H */
+#endif
 

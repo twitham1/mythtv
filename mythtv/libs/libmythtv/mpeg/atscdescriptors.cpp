@@ -2,15 +2,11 @@
 // Copyright (c) 2003-2004, Daniel Thor Kristjansson
 
 #include <algorithm>
-using namespace std;
 
 #include "atscdescriptors.h"
 #include "mythlogging.h"
 #include "iso639.h"
 #include "atsc_huffman.h"
-
-using namespace std;
-
 
 QString MultipleStringStructure::CompressionTypeString(uint i, uint j) const
 {
@@ -61,7 +57,7 @@ static uint maxPriority(const QMap<uint,uint> &langPrefs)
 {
     uint max_pri = 0;
     for (uint pref : qAsConst(langPrefs))
-        max_pri = max(max_pri, pref);
+        max_pri = std::max(max_pri, pref);
     return max_pri;
 }
 
@@ -74,8 +70,8 @@ uint MultipleStringStructure::GetIndexOfBestMatch(
     for (uint i = 0; i < StringCount(); i++)
     {
         QMap<uint,uint>::const_iterator it =
-            langPrefs.find(CanonicalLanguageKey(i));
-        if ((it != langPrefs.end()) && (*it > match_pri))
+            langPrefs.constFind(CanonicalLanguageKey(i));
+        if ((it != langPrefs.constEnd()) && (*it > match_pri))
         {
             match_idx = i;
             match_pri = *it;

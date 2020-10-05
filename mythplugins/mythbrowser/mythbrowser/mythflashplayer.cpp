@@ -17,8 +17,6 @@
 #include "webpage.h"
 #include "mythflashplayer.h"
 
-using namespace std;
-
 MythFlashPlayer::MythFlashPlayer(MythScreenStack *parent,
                          QStringList &urlList)
     : MythScreenType (parent, "mythflashplayer"),
@@ -29,7 +27,7 @@ MythFlashPlayer::MythFlashPlayer(MythScreenStack *parent,
     m_jumptime     = PlayGroup::GetSetting("Default", "jump", 10);
     QGuiApplication::setOverrideCursor(QCursor(Qt::BlankCursor));
     GetMythMainWindow()->PauseIdleTimer(true);
-    MythUIHelper::DisableScreensaver();
+    MythMainWindow::DisableScreensaver();
 }
 
 
@@ -44,14 +42,14 @@ MythFlashPlayer::~MythFlashPlayer()
         m_browser = nullptr;
     }
     GetMythMainWindow()->PauseIdleTimer(false);
-    MythUIHelper::RestoreScreensaver();
+    MythMainWindow::RestoreScreensaver();
 }
 
 bool MythFlashPlayer::Create(void)
 {
     if (!m_browser)
         m_browser = new MythUIWebBrowser(this, "mythflashplayer");
-    m_browser->SetArea(GetMythMainWindow()->GetUIScreenRect());
+    m_browser->SetArea(MythRect(GetMythMainWindow()->GetUIScreenRect()));
     m_browser->Init();
     m_browser->SetActive(true);
     m_browser->Show();

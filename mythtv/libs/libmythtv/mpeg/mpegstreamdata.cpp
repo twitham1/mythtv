@@ -2,7 +2,6 @@
 // Copyright (c) 2003-2004, Daniel Thor Kristjansson
 
 #include <algorithm> // for find & max
-using namespace std;
 
 // POSIX headers
 #include <sys/time.h> // for gettimeofday
@@ -140,6 +139,7 @@ void MPEGStreamData::Reset(int desiredProgram)
     m_pidsNotListening.clear();
     m_pidsWriting.clear();
     m_pidsAudio.clear();
+    m_pidsConditionalAccess.clear();
 
     m_pidVideoSingleProgram = m_pidPmtSingleProgram = 0xffffffff;
 
@@ -376,8 +376,8 @@ bool MPEGStreamData::CreatePATSingleProgram(
 
     AddListeningPID(m_pidPmtSingleProgram);
 
-    vector<uint> pnums;
-    vector<uint> pids;
+    std::vector<uint> pnums;
+    std::vector<uint> pids;
 
     pnums.push_back(1);
     pids.push_back(m_pidPmtSingleProgram);
@@ -414,7 +414,7 @@ static desc_list_t extract_atsc_desc(const tvct_vec_t &tvct,
 {
     desc_list_t desc;
 
-    vector<const VirtualChannelTable*> vct;
+    std::vector<const VirtualChannelTable*> vct;
 
     for (const auto *i : tvct)
         vct.push_back(i);
@@ -495,16 +495,16 @@ bool MPEGStreamData::CreatePMTSingleProgram(const ProgramMapTable &pmt)
         }
     }
 
-    vector<uint> pids;
-    vector<uint> types;
-    vector<desc_list_t> pdesc;
+    std::vector<uint> pids;
+    std::vector<uint> types;
+    std::vector<desc_list_t> pdesc;
 
     uint video_cnt = 0;
     uint audio_cnt = 0;
 
-    vector<uint> videoPIDs;
-    vector<uint> audioPIDs;
-    vector<uint> dataPIDs;
+    std::vector<uint> videoPIDs;
+    std::vector<uint> audioPIDs;
+    std::vector<uint> dataPIDs;
 
     for (uint i = 0; i < pmt.StreamCount(); i++)
     {
@@ -586,7 +586,10 @@ bool MPEGStreamData::CreatePMTSingleProgram(const ProgramMapTable &pmt)
     {
         ConditionalAccessDescriptor cad(i);
         if (cad.IsValid())
+        {
             AddListeningPID(cad.PID());
+            AddConditionalAccessPID(cad.PID());
+        }
     }
 
     m_pidsAudio.clear();
@@ -795,7 +798,10 @@ void MPEGStreamData::ProcessCAT(const ConditionalAccessTable *cat)
     {
         ConditionalAccessDescriptor cad(i);
         if (cad.IsValid())
+        {
             AddListeningPID(cad.PID());
+            AddConditionalAccessPID(cad.PID());
+        }
     }
 }
 
@@ -1046,7 +1052,9 @@ bool MPEGStreamData::ProcessTSPacket(const TSPacket& tspacket)
             listener->ProcessTSPacket(tspacket);
     }
 
-    if (IsListeningPID(tspacket.PID()) && tspacket.HasPayload())
+    if (tspacket.HasPayload() &&
+        IsListeningPID(tspacket.PID()) &&
+        !IsConditionalAccessPID(tspacket.PID()))
     {
         HandleTSTables(&tspacket);
     }
@@ -1072,6 +1080,12 @@ int MPEGStreamData::ResyncStream(const unsigned char *buffer, int curr_pos,
     }
 
     return pos;
+}
+
+bool MPEGStreamData::IsConditionalAccessPID(uint pid) const
+{
+    pid_map_t::const_iterator it = m_pidsConditionalAccess.find(pid);
+    return it != m_pidsConditionalAccess.end();
 }
 
 bool MPEGStreamData::IsListeningPID(uint pid) const
@@ -1108,13 +1122,13 @@ uint MPEGStreamData::GetPIDs(pid_map_t &pids) const
         pids[m_pidVideoSingleProgram] = kPIDPriorityHigh;
 
     for (auto it = m_pidsListening.cbegin(); it != m_pidsListening.cend(); ++it)
-        pids[it.key()] = max(pids[it.key()], *it);
+        pids[it.key()] = std::max(pids[it.key()], *it);
 
     for (auto it = m_pidsAudio.cbegin(); it != m_pidsAudio.cend(); ++it)
-        pids[it.key()] = max(pids[it.key()], *it);
+        pids[it.key()] = std::max(pids[it.key()], *it);
 
     for (auto it = m_pidsWriting.cbegin(); it != m_pidsWriting.cend(); ++it)
-        pids[it.key()] = max(pids[it.key()], *it);
+        pids[it.key()] = std::max(pids[it.key()], *it);
 
     return pids.size() - sz;
 }
@@ -1183,8 +1197,8 @@ bool MPEGStreamData::HasCachedAllPAT(uint tsid) const
 {
     QMutexLocker locker(&m_cacheLock);
 
-    pat_cache_t::const_iterator it = m_cachedPats.find(tsid << 8);
-    if (it == m_cachedPats.end())
+    pat_cache_t::const_iterator it = m_cachedPats.constFind(tsid << 8);
+    if (it == m_cachedPats.constEnd())
         return false;
 
     uint last_section = (*it)->LastSection();
@@ -1192,7 +1206,7 @@ bool MPEGStreamData::HasCachedAllPAT(uint tsid) const
         return true;
 
     for (uint i = 1; i <= last_section; i++)
-        if (m_cachedPats.find((tsid << 8) | i) == m_cachedPats.end())
+        if (m_cachedPats.constFind((tsid << 8) | i) == m_cachedPats.constEnd())
             return false;
 
     return true;
@@ -1219,8 +1233,8 @@ bool MPEGStreamData::HasCachedAllCAT(uint tsid) const
 {
     QMutexLocker locker(&m_cacheLock);
 
-    cat_cache_t::const_iterator it = m_cachedCats.find(tsid << 8);
-    if (it == m_cachedCats.end())
+    cat_cache_t::const_iterator it = m_cachedCats.constFind(tsid << 8);
+    if (it == m_cachedCats.constEnd())
         return false;
 
     uint last_section = (*it)->LastSection();
@@ -1228,7 +1242,7 @@ bool MPEGStreamData::HasCachedAllCAT(uint tsid) const
         return true;
 
     for (uint i = 1; i <= last_section; i++)
-        if (m_cachedCats.find((tsid << 8) | i) == m_cachedCats.end())
+        if (m_cachedCats.constFind((tsid << 8) | i) == m_cachedCats.constEnd())
             return false;
 
     return true;
@@ -1255,8 +1269,8 @@ bool MPEGStreamData::HasCachedAllPMT(uint pnum) const
 {
     QMutexLocker locker(&m_cacheLock);
 
-    pmt_cache_t::const_iterator it = m_cachedPmts.find(pnum << 8);
-    if (it == m_cachedPmts.end())
+    pmt_cache_t::const_iterator it = m_cachedPmts.constFind(pnum << 8);
+    if (it == m_cachedPmts.constEnd())
         return false;
 
     uint last_section = (*it)->LastSection();
@@ -1264,7 +1278,7 @@ bool MPEGStreamData::HasCachedAllPMT(uint pnum) const
         return true;
 
     for (uint i = 1; i <= last_section; i++)
-        if (m_cachedPmts.find((pnum << 8) | i) == m_cachedPmts.end())
+        if (m_cachedPmts.constFind((pnum << 8) | i) == m_cachedPmts.constEnd())
             return false;
 
     return true;
@@ -1316,8 +1330,8 @@ pat_const_ptr_t MPEGStreamData::GetCachedPAT(uint tsid, uint section_num) const
     ProgramAssociationTable *pat = nullptr;
 
     uint key = (tsid << 8) | section_num;
-    pat_cache_t::const_iterator it = m_cachedPats.find(key);
-    if (it != m_cachedPats.end())
+    pat_cache_t::const_iterator it = m_cachedPats.constFind(key);
+    if (it != m_cachedPats.constEnd())
         IncrementRefCnt(pat = *it);
 
     return pat;
@@ -1358,8 +1372,8 @@ cat_const_ptr_t MPEGStreamData::GetCachedCAT(uint tsid, uint section_num) const
     ConditionalAccessTable *cat = nullptr;
 
     uint key = (tsid << 8) | section_num;
-    cat_cache_t::const_iterator it = m_cachedCats.find(key);
-    if (it != m_cachedCats.end())
+    cat_cache_t::const_iterator it = m_cachedCats.constFind(key);
+    if (it != m_cachedCats.constEnd())
         IncrementRefCnt(cat = *it);
 
     return cat;
@@ -1401,8 +1415,8 @@ pmt_const_ptr_t MPEGStreamData::GetCachedPMT(
     ProgramMapTable *pmt = nullptr;
 
     uint key = (program_num << 8) | section_num;
-    pmt_cache_t::const_iterator it = m_cachedPmts.find(key);
-    if (it != m_cachedPmts.end())
+    pmt_cache_t::const_iterator it = m_cachedPmts.constFind(key);
+    if (it != m_cachedPmts.constEnd())
         IncrementRefCnt(pmt = *it);
 
     return pmt;
@@ -1411,9 +1425,9 @@ pmt_const_ptr_t MPEGStreamData::GetCachedPMT(
 pmt_vec_t MPEGStreamData::GetCachedPMTs(void) const
 {
     QMutexLocker locker(&m_cacheLock);
-    vector<const ProgramMapTable*> pmts;
+    std::vector<const ProgramMapTable*> pmts;
 
-    for (auto *pmt : m_cachedPmts)
+    for (auto *pmt : qAsConst(m_cachedPmts))
     {
         IncrementRefCnt(pmt);
         pmts.push_back(pmt);
@@ -1427,7 +1441,7 @@ pmt_map_t MPEGStreamData::GetCachedPMTMap(void) const
     QMutexLocker locker(&m_cacheLock);
     pmt_map_t pmts;
 
-    for (auto *pmt : m_cachedPmts)
+    for (auto *pmt : qAsConst(m_cachedPmts))
     {
         IncrementRefCnt(pmt);
         pmts[pmt->ProgramNumber()].push_back(pmt);
@@ -1801,8 +1815,10 @@ void MPEGStreamData::TestDecryption(const ProgramMapTable *pmt)
         if (!encrypted && !pmt->IsStreamEncrypted(i))
             continue;
 
-        bool is_vid = pmt->IsVideo(i, m_siStandard);
-        bool is_aud = pmt->IsAudio(i, m_siStandard);
+        const uint streamType = pmt->StreamType(i);
+        bool is_vid = StreamID::IsVideo(streamType);
+        bool is_aud = StreamID::IsAudio(streamType);
+
         if (is_vid || is_aud)
         {
             AddEncryptionTestPID(
@@ -1846,8 +1862,9 @@ static QString toString(CryptStatus status)
  */
 void MPEGStreamData::ProcessEncryptedPacket(const TSPacket& tspacket)
 {
-    QMutexLocker locker(&m_encryptionLock);
+    QMutexLocker encryptionLock(&m_encryptionLock);
 
+    std::map<uint,bool> pnumEncrypted;
     const uint pid = tspacket.PID();
     CryptInfo &info = m_encryptionPidToInfo[pid];
 
@@ -1902,7 +1919,7 @@ void MPEGStreamData::ProcessEncryptedPacket(const TSPacket& tspacket)
 
             if (enc_cnt[kEncEncrypted])
                 status = kEncEncrypted;
-            else if (enc_cnt[kEncDecrypted] >= min((size_t) 2, pids.size()))
+            else if (enc_cnt[kEncDecrypted] >= std::min((size_t) 2, pids.size()))
                 status = kEncDecrypted;
         }
 
@@ -1915,14 +1932,23 @@ void MPEGStreamData::ProcessEncryptedPacket(const TSPacket& tspacket)
         m_encryptionPnumToStatus[pnum] = status;
 
         bool encrypted = kEncUnknown == status || kEncEncrypted == status;
-        m_listenerLock.lock();
-        for (auto & listener : m_mpegListeners)
-            listener->HandleEncryptionStatus(pnum, encrypted);
-        m_listenerLock.unlock();
+        pnumEncrypted[pnum] = encrypted;
 
         if (kEncDecrypted == status)
             pnum_del_list.push_back(pnum);
     }
+
+    // Call HandleEncryptionStatus outside the m_encryptionLock
+    encryptionLock.unlock();
+    m_listenerLock.lock();
+    for (auto & pe : pnumEncrypted)
+    {
+        for (auto & listener : m_mpegListeners)
+        {
+            listener->HandleEncryptionStatus(pe.first, pe.second);
+        }
+    }
+    m_listenerLock.unlock();
 
     for (size_t i = 0; i < pnum_del_list.size(); i++)
         RemoveEncryptionTestPIDs(pnums[i]);

@@ -1,6 +1,6 @@
 // MythTV
 #include "mythcorecontext.h"
-#include "videocolourspace.h"
+#include "mythvideocolourspace.h"
 #include "mythvdpauhelper.h"
 #include "mythvdpauinterop.h"
 
@@ -22,8 +22,12 @@ MythOpenGLInterop::Type MythVDPAUInterop::GetInteropType(VideoFrameType Format)
     if (!context)
         return Unsupported;
 
-    if (context->hasExtension("GL_NV_vdpau_interop") && MythVDPAUHelper::HaveVDPAU())
-        return VDPAU;
+    if (MythVDPAUHelper::HaveVDPAU())
+    {
+        if (context->hasExtension("GL_NV_vdpau_interop"))
+            return VDPAU;
+        LOG(VB_GENERAL, LOG_WARNING, LOC + "GL_NV_vdpau_interop is not available");
+    }
     return Unsupported;
 }
 
@@ -109,7 +113,7 @@ bool MythVDPAUInterop::InitNV(AVVDPAUDeviceContext* DeviceContext)
     if (!DeviceContext || !m_context)
         return false;
 
-    if (m_initNV && m_finiNV && m_registerNV && m_accessNV && m_mapNV &&
+    if (m_initNV && m_finiNV && m_registerNV && m_accessNV && m_mapNV && m_unmapNV &&
         m_helper && m_helper->IsValid())
         return true;
 
@@ -119,11 +123,12 @@ bool MythVDPAUInterop::InitNV(AVVDPAUDeviceContext* DeviceContext)
     m_registerNV = reinterpret_cast<MYTH_VDPAUREGOUTSURFNV>(m_context->GetProcAddress("glVDPAURegisterOutputSurfaceNV"));
     m_accessNV   = reinterpret_cast<MYTH_VDPAUSURFACCESSNV>(m_context->GetProcAddress("glVDPAUSurfaceAccessNV"));
     m_mapNV      = reinterpret_cast<MYTH_VDPAUMAPSURFNV>(m_context->GetProcAddress("glVDPAUMapSurfacesNV"));
+    m_unmapNV    = reinterpret_cast<MYTH_VDPAUMAPSURFNV>(m_context->GetProcAddress("glVDPAUUnmapSurfacesNV"));
 
     delete m_helper;
     m_helper = nullptr;
 
-    if (m_initNV && m_finiNV && m_registerNV && m_accessNV && m_mapNV)
+    if (m_initNV && m_finiNV && m_registerNV && m_accessNV && m_mapNV && m_unmapNV)
     {
         m_helper = new MythVDPAUHelper(DeviceContext);
         if (m_helper->IsValid())
@@ -198,7 +203,6 @@ bool MythVDPAUInterop::InitVDPAU(AVVDPAUDeviceContext* DeviceContext, VdpVideoSu
             else
             {
                 m_accessNV(m_outputSurfaceReg, QOpenGLBuffer::ReadOnly);
-                m_mapNV(1, &m_outputSurfaceReg);
             }
         }
         return true;
@@ -215,7 +219,7 @@ bool MythVDPAUInterop::InitVDPAU(AVVDPAUDeviceContext* DeviceContext, VdpVideoSu
  * texture is RGB... We could use GL_NV_vdpau_interop2 to return raw YUV frames.
 */
 vector<MythVideoTexture*> MythVDPAUInterop::Acquire(MythRenderOpenGL *Context,
-                                                    VideoColourSpace *ColourSpace,
+                                                    MythVideoColourSpace *ColourSpace,
                                                     VideoFrame *Frame,
                                                     FrameScanType Scan)
 {
@@ -253,10 +257,10 @@ vector<MythVideoTexture*> MythVDPAUInterop::Acquire(MythRenderOpenGL *Context,
         return result;
 
     auto* buffer = reinterpret_cast<AVBufferRef*>(Frame->priv[1]);
-    if (!buffer || (buffer && !buffer->data))
+    if (!buffer || !buffer->data)
         return result;
     auto* frames = reinterpret_cast<AVHWFramesContext*>(buffer->data);
-    if (!frames || (frames && !frames->device_ctx))
+    if (!frames || !frames->device_ctx)
         return result;
     auto *devicecontext = reinterpret_cast<AVVDPAUDeviceContext*>(frames->device_ctx->hwctx);
     if (!devicecontext)
@@ -331,7 +335,7 @@ vector<MythVideoTexture*> MythVDPAUInterop::Acquire(MythRenderOpenGL *Context,
             if (m_helper->IsFeatureAvailable(VDP_VIDEO_MIXER_ATTRIBUTE_CSC_MATRIX))
             {
                 ColourSpace->SetSupportedAttributes(ALL_PICTURE_ATTRIBUTES);
-                connect(ColourSpace, &VideoColourSpace::Updated, this, &MythVDPAUInterop::UpdateColourSpace);
+                connect(ColourSpace, &MythVideoColourSpace::Updated, this, &MythVDPAUInterop::UpdateColourSpace);
             }
             else
             {
@@ -347,9 +351,11 @@ vector<MythVideoTexture*> MythVDPAUInterop::Acquire(MythRenderOpenGL *Context,
     }
 
     // Render surface
+    m_unmapNV(1, &m_outputSurfaceReg);
     m_helper->MixerRender(m_mixer, surface, m_outputSurface, Scan,
                           static_cast<int>(Frame->interlaced_reversed ? !Frame->top_field_first :
                           Frame->top_field_first), m_referenceFrames);
+    m_mapNV(1, &m_outputSurfaceReg);
     return m_openglTextures[DUMMY_INTEROP_ID];
 }
 

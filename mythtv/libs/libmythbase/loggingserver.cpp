@@ -13,8 +13,6 @@
 #include <QSocketNotifier>
 #include <iostream>
 
-using namespace std;
-
 #include "mythlogging.h"
 #include "logging.h"
 #include "loggingserver.h"
@@ -71,7 +69,7 @@ struct LoggerListItem {
 using  ClientMap = QMap<QString, LoggerListItem *>;
 
 using  ClientList = QList<QString>;
-using  RevClientMap = QMap<LoggerBase *, ClientList *>;
+using  RevClientMap = QHash<LoggerBase *, ClientList *>;
 
 static QMutex                       logClientMapMutex;
 static ClientMap                    logClientMap;
@@ -144,8 +142,8 @@ FileLogger *FileLogger::create(const QString& filename, QMutex *mutex)
 {
     QByteArray ba = filename.toLocal8Bit();
     const char *file = ba.constData();
-    FileLogger *logger =
-        dynamic_cast<FileLogger *>(loggerMap.value(filename, nullptr));
+    auto *logger =
+        qobject_cast<FileLogger *>(loggerMap.value(filename, nullptr));
 
     if (logger)
         return logger;
@@ -243,9 +241,7 @@ SyslogLogger::~SyslogLogger()
 
 SyslogLogger *SyslogLogger::create(QMutex *mutex, bool open)
 {
-    SyslogLogger *logger =
-        dynamic_cast<SyslogLogger *>(loggerMap.value("", nullptr));
-
+    auto *logger = qobject_cast<SyslogLogger *>(loggerMap.value("", nullptr));
     if (logger)
         return logger;
 
@@ -293,9 +289,7 @@ JournalLogger::~JournalLogger()
 
 JournalLogger *JournalLogger::create(QMutex *mutex)
 {
-    JournalLogger *logger =
-        dynamic_cast<JournalLogger *>(loggerMap.value("", nullptr));
-
+    auto *logger = qobject_cast<JournalLogger *>(loggerMap.value("", nullptr));
     if (logger)
         return logger;
 
@@ -365,8 +359,8 @@ DatabaseLogger *DatabaseLogger::create(const QString& table, QMutex *mutex)
 {
     QByteArray ba = table.toLocal8Bit();
     const char *tble = ba.constData();
-    DatabaseLogger *logger =
-        dynamic_cast<DatabaseLogger *>(loggerMap.value(table, nullptr));
+    auto *logger =
+        qobject_cast<DatabaseLogger *>(loggerMap.value(table, nullptr));
 
     if (logger)
         return logger;

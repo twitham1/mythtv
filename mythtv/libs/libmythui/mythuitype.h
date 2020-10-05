@@ -35,6 +35,8 @@ class MythUISpinBox;
 class MythUITextEdit;
 class MythUIProgressBar;
 
+using FocusInfoType = QMultiMap<int, MythUIType *>;
+
 /**
  * \defgroup MythUI MythTV User Interface Library
  *
@@ -91,7 +93,7 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
     void SetCanTakeFocus(bool set = true);
     void SetFocusOrder(int order);
 
-    bool IsEnabled(void) const { return m_Enabled; }
+    bool IsEnabled(void) const { return m_enabled; }
     void SetEnabled(bool enable);
 
     bool MoveToTop(void);
@@ -109,6 +111,7 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
     /// Convenience method, calls SetPosition(const MythPoint&)
     /// Override that instead to change functionality.
     void SetPosition(int x, int y);
+    void SetPosition(QPoint point);
     virtual void SetPosition(const MythPoint &point);
     virtual MythPoint GetPosition(void) const;
     virtual void SetSize(const QSize &size);
@@ -124,7 +127,7 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
     virtual MythRect GetArea(void) const;
     virtual MythRect GetFullArea(void) const;
     virtual void RecalculateArea(bool recurse = true);
-    void ExpandArea(const MythRect &rect);
+    void ExpandArea(const QRect &rect);
 
     virtual QRegion GetDirtyArea(void) const;
 
@@ -164,7 +167,7 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
     bool ContainsPoint(const QPoint &point) const;
 
     virtual MythPainter *GetPainter(void);
-    void SetPainter(MythPainter *painter) { m_Painter = painter; }
+    void SetPainter(MythPainter *painter) { m_painter = painter; }
 
     void SetCentre(UIEffects::Centre centre);
     void SetZoom(float zoom);
@@ -192,7 +195,6 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
 
   signals:
     void RequestUpdate();
-    void RequestUpdate(const QRect &);
     void RequestRegionUpdate(const QRect &);
     void TakingFocus();
     void LosingFocus();
@@ -208,7 +210,7 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
     virtual void DrawSelf(MythPainter *p, int xoffset, int yoffset,
                           int alphaMod, QRect clipRect);
 
-    void AddFocusableChildrenToList(QMap<int, MythUIType *> &focusList);
+    void AddFocusableChildrenToList(FocusInfoType &focusList);
     void HandleAlphaPulse();
     void HandleMovementPulse();
 
@@ -225,7 +227,7 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
     virtual void CreateCopy(MythUIType *parent);
     virtual void Finalize(void);
 
-    QList<MythUIType *> m_ChildrenList;
+    QList<MythUIType *> m_childrenList;
     QMap<QString, QString> m_dependsMap;
     // the number of dependencies is assumed to be small (1 or 2 elements on average)
     // so we use a QList as we want the element ordered in the order they were defined
@@ -233,42 +235,41 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
     QList< QPair<MythUIType *, bool> >m_dependsValue;
     QList<int> m_dependOperator;
 
-    bool         m_Visible         {true};
-    bool         m_HasFocus        {false};
-    bool         m_CanHaveFocus    {false};
-    bool         m_Enabled         {true};
-    bool         m_EnableInitiator {false};
-    bool         m_Initiator       {false};
-    bool         m_Vanish          {false};
-    bool         m_Vanished        {false};
-    bool         m_IsDependDefault {false};
-    QMap<MythUIType *, bool> m_ReverseDepend;
+    bool         m_visible         {true};
+    bool         m_hasFocus        {false};
+    bool         m_canHaveFocus    {false};
+    bool         m_enabled         {true};
+    bool         m_enableInitiator {false};
+    bool         m_initiator       {false};
+    bool         m_vanish          {false};
+    bool         m_vanished        {false};
+    bool         m_isDependDefault {false};
+    QMap<MythUIType *, bool> m_reverseDepend;
 
     int          m_focusOrder      {0};
 
-    MythRect     m_Area            {0,0,0,0};
-    MythRect     m_MinArea         {0,0,0,0};
-    MythPoint    m_MinSize;
-//  QSize        m_NormalSize;
+    MythRect     m_area            {0,0,0,0};
+    MythRect     m_minArea         {0,0,0,0};
+    MythPoint    m_minSize;
 
-    QRegion      m_DirtyRegion     {0,0,0,0};
-    bool         m_NeedsRedraw     {false};
+    QRegion      m_dirtyRegion     {0,0,0,0};
+    bool         m_needsRedraw     {false};
 
-    UIEffects    m_Effects;
+    UIEffects    m_effects;
 
-    int          m_AlphaChangeMode {0}; // 0 - none, 1 - once, 2 - cycle
-    int          m_AlphaChange     {0};
-    int          m_AlphaMin        {0};
-    int          m_AlphaMax        {255};
+    int          m_alphaChangeMode {0}; // 0 - none, 1 - once, 2 - cycle
+    int          m_alphaChange     {0};
+    int          m_alphaMin        {0};
+    int          m_alphaMax        {255};
 
-    bool         m_Moving          {false};
-    QPoint       m_XYDestination   {0,0};
-    QPoint       m_XYSpeed         {0,0};
+    bool         m_moving          {false};
+    QPoint       m_xyDestination   {0,0};
+    QPoint       m_xySpeed         {0,0};
 
-    FontMap     *m_Fonts           {nullptr};
+    FontMap     *m_fonts           {nullptr};
 
-    MythUIType  *m_Parent          {nullptr};
-    MythPainter *m_Painter         {nullptr};
+    MythUIType  *m_parent          {nullptr};
+    MythPainter *m_painter         {nullptr};
 
     QList<MythUIAnimation*> m_animations;
     QString      m_helptext;
@@ -278,7 +279,7 @@ class MUI_PUBLIC MythUIType : public QObject, public XMLParseBase
 
     bool         m_deferload       {false};
 
-    QColor       m_BorderColor     {Qt::black};
+    QColor       m_borderColor     {Qt::black};
 
     friend class XMLParseBase;
 };

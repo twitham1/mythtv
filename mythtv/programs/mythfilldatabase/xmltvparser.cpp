@@ -205,7 +205,7 @@ bool XMLTVParser::parseFile(
 
     QXmlStreamReader xml(&f);
     QUrl baseUrl;
-    QUrl sourceUrl;
+//  QUrl sourceUrl;
     QString aggregatedTitle;
     QString aggregatedDesc;
     bool haveReadTV = false;
@@ -215,7 +215,7 @@ bool XMLTVParser::parseFile(
         {
             if (xml.name() == "tv")
             {
-                sourceUrl = QUrl(xml.attributes().value("source-info-url").toString());
+//              sourceUrl = QUrl(xml.attributes().value("source-info-url").toString());
                 baseUrl = QUrl(xml.attributes().value("source-data-url").toString());
                 haveReadTV = true;
             }
@@ -385,7 +385,7 @@ bool XMLTVParser::parseFile(
                     {
                         // Movie production year
                         QString date = xml.readElementText(QXmlStreamReader::SkipChildElements);
-                        pginfo->m_airdate = date.left(4).toUInt();
+                        pginfo->m_airdate = date.leftRef(4).toUInt();
                     }
                     else if (xml.name() == "star-rating")
                     {
@@ -467,7 +467,7 @@ bool XMLTVParser::parseFile(
                     {
                         pginfo->m_previouslyshown = true;
                         QString prevdate = xml.attributes().value( "start").toString();
-                        if (!prevdate.isEmpty())
+                        if ((!prevdate.isEmpty()) && (pginfo->m_originalairdate.isNull()))
                         {
                             QDateTime date;
                             fromXMLTVDate(prevdate, date);
@@ -634,6 +634,29 @@ bool XMLTVParser::parseFile(
                                 QString inetref(QString ("ttvdb.py_") + inetrefRaw.section('/',1,1).trimmed());
                                 pginfo->m_inetref = inetref;
                                 // ProgInfo does not have a collectionref, so we don't set any
+                            }
+                        }
+                        else if (system == "schedulesdirect.org")
+                        {
+                            QString details(xml.readElementText(QXmlStreamReader::SkipChildElements));
+                            if (details.startsWith(QString("originalAirDate/")))
+                            {
+                                QString value(details.section('/', 1, 1).trimmed());
+                                QDateTime datetime;
+                                fromXMLTVDate(value, datetime);
+                                pginfo->m_originalairdate = datetime.date();
+                            }
+                            else if (details.startsWith(QString("newEpisode/")))
+                            {
+                                QString value(details.section('/', 1, 1).trimmed());
+                                if (value == QString("true"))
+                                {
+                                    pginfo->m_previouslyshown = false;
+                                }
+                                else if (value == QString("false"))
+                                {
+                                    pginfo->m_previouslyshown = true;
+                                }
                             }
                         }
                     }//episode-num

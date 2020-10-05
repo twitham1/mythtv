@@ -5,7 +5,7 @@
 
 // MythTV headers
 #include "mythcorecontext.h"
-#include "mythplayer.h"
+#include "mythcommflagplayer.h"
 #include "libavutil/frame.h"
 
 // Commercial Flagging headers
@@ -72,12 +72,12 @@ void ClassicLogoDetector::deleteLater(void)
     LogoDetectorBase::deleteLater();
 }
 
-bool ClassicLogoDetector::searchForLogo(MythPlayer* player)
+bool ClassicLogoDetector::searchForLogo(MythCommFlagPlayer *player)
 {
     int seekIncrement =
         (int)(m_commDetectLogoSampleSpacing * player->GetFrameRate());
     int maxLoops = m_commDetectLogoSamplesNeeded;
-    int edgeDiffs[] = {5, 7, 10, 15, 20, 30, 40, 50, 60, 0 };
+    const std::array<const int,9> edgeDiffs {5, 7, 10, 15, 20, 30, 40, 50, 60 };
 
 
     LOG(VB_COMMFLAG, LOG_INFO, "Searching for Station Logo");
@@ -96,13 +96,13 @@ bool ClassicLogoDetector::searchForLogo(MythPlayer* player)
     // This should improve logo detection for SD video.
     int minPixelsInMask = 50 * (m_width*m_height) / (1280*720 / 16);
 
-    for (uint i = 0; edgeDiffs[i] != 0 && !m_logoInfoAvailable; i++)
+    for (uint edgediff : edgeDiffs)
     {
         int pixelsInMask = 0;
 
         LOG(VB_COMMFLAG, LOG_INFO,
             QString("Trying with edgeDiff == %1, minPixelsInMask=%2")
-            .arg(edgeDiffs[i]).arg(minPixelsInMask));
+            .arg(edgediff).arg(minPixelsInMask));
 
         memset(edgeCounts, 0, sizeof(EdgeMaskEntry) * m_width * m_height);
         memset(m_edgeMask, 0, sizeof(EdgeMaskEntry) * m_width * m_height);
@@ -128,7 +128,7 @@ bool ClassicLogoDetector::searchForLogo(MythPlayer* player)
             if (!m_commDetector->m_fullSpeed)
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-            DetectEdges(vf, edgeCounts, edgeDiffs[i]);
+            DetectEdges(vf, edgeCounts, edgediff);
 
             seekFrame += seekIncrement;
             loops++;
@@ -237,7 +237,7 @@ bool ClassicLogoDetector::searchForLogo(MythPlayer* player)
             (pixelsInMask > minPixelsInMask))
         {
             m_logoInfoAvailable = true;
-            m_logoEdgeDiff = edgeDiffs[i];
+            m_logoEdgeDiff = edgediff;
 
             LOG(VB_COMMFLAG, LOG_INFO,
                 QString("Using Logo area: topleft (%1,%2), "
@@ -245,17 +245,16 @@ bool ClassicLogoDetector::searchForLogo(MythPlayer* player)
                     .arg(m_logoMinX).arg(m_logoMinY)
                     .arg(m_logoMaxX).arg(m_logoMaxY)
                     .arg(pixelsInMask));
+            break;
         }
-        else
-        {
-            LOG(VB_COMMFLAG, LOG_INFO,
-                QString("Rejecting Logo area: topleft (%1,%2), "
-                        "bottomright (%3,%4), pixelsInMask (%5). "
-                        "Not within specified limits.")
-                    .arg(m_logoMinX).arg(m_logoMinY)
-                    .arg(m_logoMaxX).arg(m_logoMaxY)
-                    .arg(pixelsInMask));
-        }
+
+        LOG(VB_COMMFLAG, LOG_INFO,
+            QString("Rejecting Logo area: topleft (%1,%2), "
+                    "bottomright (%3,%4), pixelsInMask (%5). "
+                    "Not within specified limits.")
+            .arg(m_logoMinX).arg(m_logoMinY)
+            .arg(m_logoMaxX).arg(m_logoMaxY)
+            .arg(pixelsInMask));
     }
 
     delete [] edgeCounts;
@@ -314,49 +313,49 @@ void ClassicLogoDetector::SetLogoMaskArea()
 void ClassicLogoDetector::DumpLogo(bool fromCurrentFrame,
     const unsigned char* framePtr)
 {
-    char scrPixels[] = " .oxX";
+    std::string scrPixels {" .oxX"};
 
     if (!m_logoInfoAvailable)
         return;
 
-    cerr << "\nLogo Data ";
+    std::cerr << "\nLogo Data ";
     if (fromCurrentFrame)
-        cerr << "from current frame\n";
+        std::cerr << "from current frame\n";
 
-    cerr << "\n     ";
+    std::cerr << "\n     ";
 
     for(unsigned int x = m_logoMinX - 2; x <= (m_logoMaxX + 2); x++)
-        cerr << (x % 10);
-    cerr << "\n";
+        std::cerr << (x % 10);
+    std::cerr << "\n";
 
     for(unsigned int y = m_logoMinY - 2; y <= (m_logoMaxY + 2); y++)
     {
         QString tmp = QString("%1: ").arg(y, 3);
         QString ba = tmp.toLatin1();
-        cerr << ba.constData();
+        std::cerr << ba.constData();
         for(unsigned int x = m_logoMinX - 2; x <= (m_logoMaxX + 2); x++)
         {
             if (fromCurrentFrame)
             {
-                cerr << scrPixels[framePtr[y * m_width + x] / 50];
+                std::cerr << scrPixels[framePtr[y * m_width + x] / 50];
             }
             else
             {
                 switch (m_logoMask[y * m_width + x])
                 {
                         case 0:
-                        case 2: cerr << " ";
+                        case 2: std::cerr << " ";
                         break;
-                        case 1: cerr << "*";
+                        case 1: std::cerr << "*";
                         break;
-                        case 3: cerr << ".";
+                        case 3: std::cerr << ".";
                         break;
                 }
             }
         }
-        cerr << "\n";
+        std::cerr << "\n";
     }
-    cerr.flush();
+    std::cerr.flush();
 }
 
 

@@ -43,7 +43,7 @@ class MHLink : public MHIngredient
     void Initialise(MHParseNode *p, MHEngine *engine) override; // MHIngredient
     void PrintMe(FILE *fd, int nTabs) const override; // MHIngredient
     // Look up the event type.  Returns zero if it doesn't match.
-    static int GetEventType(const char *str);
+    static int GetEventType(const QString& str);
     // Print an event type.
     static QString EventTypeToString(enum EventType ev);
 
@@ -57,10 +57,10 @@ class MHLink : public MHIngredient
     virtual void MatchEvent(const MHObjectRef &sourceRef, enum EventType ev, const MHUnion &evData, MHEngine *engine);
 
   protected:
-    MHObjectRef m_EventSource;
+    MHObjectRef m_eventSource;
     enum EventType m_nEventType {EventIsAvailable};
-    MHUnion m_EventData;
-    MHActionSequence m_LinkEffect;
+    MHUnion m_eventData;
+    MHActionSequence m_linkEffect;
 };
 
 // Actions.

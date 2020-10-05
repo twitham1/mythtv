@@ -8,17 +8,14 @@
 bool DTVParamHelper::ParseParam(const QString &symbol, int &value,
                                 const DTVParamHelperVec &table)
 {
-    for (const auto & item : table)
-    {
-        if (item.symbol == symbol) //.left(p->symbol.length()))
-        {
-            //symbol = symbol.mid(p->symbol.length());
-            value = item.value;
-            return true;
-        }
-    }
+    auto it = std::find_if(table.cbegin(), table.cend(),
+                           [symbol](const auto& item) -> bool
+                               {return item.symbol == symbol;});
+    if (it == table.cend())
+        return false;
 
-    return false;
+    value = it->value;
+    return true;
 }
 
 QString DTVParamHelper::toString(const DTVParamStringVec &strings, int index)
@@ -68,8 +65,8 @@ void DTVTunerType::initStr(void)
 QString DTVTunerType::toString(int _value)
 {
     QMutexLocker locker(&dtv_tt_canonical_str_lock);
-    QMap<int,QString>::const_iterator it = dtv_tt_canonical_str.find(_value);
-    if (it != dtv_tt_canonical_str.end())
+    QMap<int,QString>::const_iterator it = dtv_tt_canonical_str.constFind(_value);
+    if (it != dtv_tt_canonical_str.constEnd())
         return *it;
     return dtv_tt_canonical_str[kTunerTypeUnknown];
 }

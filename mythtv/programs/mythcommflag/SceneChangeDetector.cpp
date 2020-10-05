@@ -34,14 +34,14 @@ void
 scenechange_data_init(SceneChangeDetector::SceneChangeData *scdata,
         const HistogramAnalyzer::Histogram *hh)
 {
-    unsigned int    ncolors = sizeof(*hh)/sizeof((*hh)[0]);
+    unsigned int    ncolors = hh->size();
 
     for (unsigned int ii = 0; ii < ncolors; ii++)
     {
         (*scdata)[ii].color = ii;
         (*scdata)[ii].frequency = (*hh)[ii];
     }
-    qsort(*scdata, sizeof(*scdata)/sizeof((*scdata)[0]), sizeof((*scdata)[0]),
+    qsort(scdata->data(), scdata->size(), sizeof(SceneChangeDetector::scenechange_data),
             scenechange_data_sort_desc_frequency);
 }
 

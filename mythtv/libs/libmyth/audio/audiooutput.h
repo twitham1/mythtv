@@ -50,7 +50,7 @@ class MPUBLIC AudioOutput : public VolumeBase, public OutputListeners
     static void Cleanup(void);
     static ADCVect* GetOutputList(void);
     static AudioDeviceConfig* GetAudioDeviceConfig(
-        QString &name, QString &desc, bool willsuspendpa = false);
+        QString &name, const QString &desc, bool willsuspendpa = false);
 
     // opens one of the concrete subclasses
     static AudioOutput *OpenAudio(
@@ -152,7 +152,7 @@ class MPUBLIC AudioOutput : public VolumeBase, public OutputListeners
     //  Only really used by the AudioOutputNULL object
     virtual void bufferOutputData(bool y) = 0;
     virtual int readOutputData(unsigned char *read_buffer,
-                               int max_length) = 0;
+                               size_t max_length) = 0;
 
     virtual bool IsUpmixing(void)   { return false; }
     virtual bool ToggleUpmix(void)  { return false; }

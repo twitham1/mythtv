@@ -29,8 +29,6 @@
 #include "rsseditor.h"
 #include "searcheditor.h"
 
-using namespace std;
-
 // ---------------------------------------------------
 
 NetSearch::NetSearch(MythScreenStack *parent, const char *name)
@@ -372,7 +370,7 @@ void NetSearch::SearchFinished(void)
     m_nextPageToken = item->nextPageToken();
     m_prevPageToken = item->prevPageToken();
 
-    if (returned <= 0)
+    if (returned == 0)
         return;
 
     m_siteList->GetItemAt(m_currentGrabber)->
@@ -386,7 +384,7 @@ void NetSearch::SearchFinished(void)
         if (searchresults % returned != 0)    // Partial page?
             m_maxpage++;
     }
-    if (m_pageText && m_maxpage > 0 && m_pagenum > 0 && returned > 0)
+    if (m_pageText && m_maxpage > 0 && m_pagenum > 0)
     {
         m_pageText->SetText(QString("%1 / %2")
                         .arg(QString::number(m_pagenum))
