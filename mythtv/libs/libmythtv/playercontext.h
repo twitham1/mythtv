@@ -12,6 +12,7 @@ using namespace std;
 #include <QHash>
 #include <QRect>
 #include <QObject>
+#include <QDateTime>
 
 // MythTV headers
 #include "videoouttypes.h"
@@ -155,6 +156,7 @@ class MTV_PUBLIC PlayerContext
     RingBuffer         *m_buffer             {nullptr};
     ProgramInfo        *m_playingInfo        {nullptr}; ///< Currently playing info
     long long           m_playingLen         {0};  ///< Initial CalculateLength()
+    QDateTime           m_playingRecStart;
     bool                m_nohardwaredecoders {false}; // < Disable use of VDPAU decoding
     int                 m_lastCardid         {-1}; ///< CardID of current/last recorder
     /// 0 == normal, +1 == fast forward, -1 == rewind

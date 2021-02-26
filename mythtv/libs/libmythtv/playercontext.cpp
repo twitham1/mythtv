@@ -30,6 +30,7 @@ const uint PlayerContext::kMaxChannelHistory = 30;
 PlayerContext::PlayerContext(QString inUseID) :
     m_recUsage(std::move(inUseID))
 {
+    m_playingRecStart = QDateTime();
     m_lastSignalMsgTime.start();
     m_lastSignalMsgTime.addMSecs(-2 * (int)kSMExitTimeout);
 }
@@ -854,6 +855,7 @@ void PlayerContext::SetPlayingInfo(const ProgramInfo *info)
         if (!ignoreDB)
             m_playingInfo->MarkAsInUse(true, m_recUsage);
         m_playingLen = m_playingInfo->GetSecondsInRecording();
+        m_playingRecStart = m_playingInfo->GetRecordingStartTime();
     }
 }
 
