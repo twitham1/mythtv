@@ -5033,7 +5033,7 @@ void MythPlayer::calcSliderPos(osdInfo &info, bool paddedFields)
         int sbmins = (secsbehind - sbhours * 3600) / 60;
         int sbsecs = (secsbehind - sbhours * 3600 - sbmins * 60);
 
-        QDateTime wallclock = m_playerCtx->m_playingRecStart.addSecs(secsplayed);
+        QDateTime recordedtime = m_playerCtx->m_playingRecStart.addSecs(secsplayed);
         QString text1;
         QString text2;
         QString text3;
@@ -5090,11 +5090,13 @@ void MythPlayer::calcSliderPos(osdInfo &info, bool paddedFields)
 
         QString desc = stillFrame ? tr("Still Frame") :
                                     tr("%1 of %2").arg(text1).arg(text2);
+	QString dtformat = gCoreContext->GetSetting("DateFormat", "ddd MMMM d yyyy")
+	  + ", " + gCoreContext->GetSetting("TimeFormat", "hh:mm");
 
         info.text[relPrefix + "description"] = desc;
         info.text[relPrefix + "playedtime"] = text1;
         info.text[relPrefix + "totaltime"] = text2;
-        info.text[relPrefix + "wallclocktime"] = wallclock.toLocalTime().toString("ddd MMM d yyyy, hh:mm:ss");
+        info.text[relPrefix + "recordedtime"] = recordedtime.toLocalTime().toString(dtformat);
         info.text[relPrefix + "remainingtime"] = islive ? QString() : text3;
         info.text[relPrefix + "behindtime"] = islive ? text3 : QString();
     }
