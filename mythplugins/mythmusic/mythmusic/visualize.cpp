@@ -182,6 +182,7 @@ bool StereoScope::process( VisualNode *node )
 
     if (node)
     {
+        m_offset = node->m_offset.count(); // make available to ::draw below
         double index = 0;
         double const step = (double)SAMPLES_DEFAULT_SIZE / m_size.width();
         for ( int i = 0; i < m_size.width(); i++)
@@ -386,6 +387,27 @@ bool StereoScope::draw( QPainter *p, const QColor &back )
                  i,
                  (int)(adjHeight + m_magnitudes[i + m_size.width()]));
     }
+
+    // show the track "progress" by twitham@sbcglobal.net 2022/12
+
+    // TODO fix for radio, see musiccommon.cpp updateProgressBar
+
+    unsigned long total = 1;
+    MusicMetadata *meta = gPlayer->getCurrentMetadata();
+    if (meta)
+      total = meta->Length().count();
+    p->setPen(Qt::red);
+    if (total < 1)
+      total = 1;
+    unsigned long x = m_size.width() * m_offset / total; // m_offset set by ::process above
+    p->drawLine(x, 0, x, m_size.height());
+    // LOG(VB_GENERAL, LOG_INFO, QString("SS : now=%1 total=%2").arg(m_offset).arg(total));
+
+    // QFont font = QApplication::font();
+    // font.setPixelSize(20);
+    // p->setFont(font);
+    // p->drawText(0, 0, m_size.width(), m_size.height(), Qt::AlignVCenter | Qt::AlignHCenter | Qt::TextWordWrap,
+    // 		QString(">%1/%2=%3<").arg(m_offset).arg(total).arg(x);
 
     return true;
 }

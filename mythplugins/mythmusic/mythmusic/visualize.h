@@ -114,7 +114,7 @@ class VisFactory
 };
 
 #define RUBBERBAND false
-#define TWOCOLOUR 0
+#define TWOCOLOUR 1
 
 class StereoScope : public VisualBase
 {
@@ -135,6 +135,7 @@ class StereoScope : public VisualBase
     QSize          m_size;
     bool const     m_rubberband  {RUBBERBAND};
     double const   m_falloff     {1.0};
+    unsigned long  m_offset      {0};
 };
 
 class MonoScope : public StereoScope
