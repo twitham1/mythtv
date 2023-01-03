@@ -135,7 +135,6 @@ class StereoScope : public VisualBase
     QSize          m_size;
     bool const     m_rubberband  {RUBBERBAND};
     double const   m_falloff     {1.0};
-    unsigned long  m_offset      {0};
 };
 
 class MonoScope : public StereoScope
@@ -146,6 +145,21 @@ class MonoScope : public StereoScope
 
     bool process( VisualNode *node ) override; // StereoScope
     bool draw( QPainter *p, const QColor &back ) override; // StereoScope
+};
+
+// added by twitham@sbcglobal.net, 2023/01
+class WaveForm : public MonoScope
+{
+    public:
+    WaveForm() = default;
+    ~WaveForm() override = default;
+
+    bool process( VisualNode *node ) override; // MonoScope
+    bool draw( QPainter *p, const QColor &back ) override; // MonoScope
+
+  protected:
+    unsigned long  m_offset      {0};
+    short *m_right {nullptr};
 };
 
 class LogScale

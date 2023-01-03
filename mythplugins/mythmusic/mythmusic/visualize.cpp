@@ -182,7 +182,6 @@ bool StereoScope::process( VisualNode *node )
 
     if (node)
     {
-        m_offset = node->m_offset.count(); // make available to ::draw below
         double index = 0;
         double const step = (double)SAMPLES_DEFAULT_SIZE / m_size.width();
         for ( int i = 0; i < m_size.width(); i++)
@@ -388,27 +387,6 @@ bool StereoScope::draw( QPainter *p, const QColor &back )
                  (int)(adjHeight + m_magnitudes[i + m_size.width()]));
     }
 
-    // show the track "progress" by twitham@sbcglobal.net 2022/12
-
-    // TODO fix for radio, see musiccommon.cpp updateProgressBar
-
-    unsigned long total = 1;
-    MusicMetadata *meta = gPlayer->getCurrentMetadata();
-    if (meta)
-      total = meta->Length().count();
-    p->setPen(Qt::red);
-    if (total < 1)
-      total = 1;
-    unsigned long x = m_size.width() * m_offset / total; // m_offset set by ::process above
-    p->drawLine(x, 0, x, m_size.height());
-    // LOG(VB_GENERAL, LOG_INFO, QString("SS : now=%1 total=%2").arg(m_offset).arg(total));
-
-    // QFont font = QApplication::font();
-    // font.setPixelSize(20);
-    // p->setFont(font);
-    // p->drawText(0, 0, m_size.width(), m_size.height(), Qt::AlignVCenter | Qt::AlignHCenter | Qt::TextWordWrap,
-    // 		QString(">%1/%2=%3<").arg(m_offset).arg(total).arg(x);
-
     return true;
 }
 
@@ -455,7 +433,8 @@ bool MonoScope::process( VisualNode *node )
             for (auto s = (unsigned long)index; s < indexTo && s < node->m_length; s++)
             {
                 double tmp = ( static_cast<double>(node->m_left[s]) +
-                               (node->m_right ? static_cast<double>(node->m_right[s]) : 0.0) *
+                               (node->m_right ? static_cast<double>(node->m_right[s])
+                                : static_cast<double>(node->m_left[s])) *
                                ( static_cast<double>(m_size.height()) / 2.0 ) ) / 65536.0;
                 if (tmp > 0)
                 {
@@ -512,8 +491,8 @@ bool MonoScope::draw( QPainter *p, const QColor &back )
 #if TWOCOLOUR
         double r, g, b, per;
 
-        per = double( m_magnitudes[ i ] ) /
-              double( m_size.height() / 4 );
+        per = ( static_cast<double>(m_magnitudes[i]) * 2.0 ) /
+              ( static_cast<double>(m_size.height()) / 4.0 );
         if (per < 0.0)
             per = -per;
         if (per > 1.0)
@@ -553,6 +532,54 @@ bool MonoScope::draw( QPainter *p, const QColor &back )
                      i,
                      (int)(adjHeight + m_magnitudes[ i ] ));
     }
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// WaveForm by twitham@sbcglobal.net, 2022/01
+
+bool WaveForm::process( VisualNode *node )
+{
+    if (node)
+    {
+        m_offset = node->m_offset.count(); // make available to ::draw below
+        m_right = node->m_right;
+    }
+    if (m_right)
+      return StereoScope::process(node);
+    else
+      return MonoScope::process(node);
+}
+
+bool WaveForm::draw( QPainter *p, const QColor &back )
+{
+    // show the track "progress" by twitham@sbcglobal.net 2022/12
+
+    // TODO fix for radio, see musiccommon.cpp updateProgressBar
+
+    unsigned long total = 1;
+    MusicMetadata *meta = gPlayer->getCurrentMetadata();
+    if (m_right)
+      StereoScope::draw(p, back);
+    else
+      MonoScope::draw(p, back);
+
+    if (meta)
+      total = meta->Length().count();
+    p->setPen(Qt::red);
+    if (total < 1)
+      total = 1;
+    unsigned long x = m_size.width() * m_offset / total; // m_offset set by ::process above
+    p->drawLine(x, 0, x, m_size.height());
+
+    // LOG(VB_GENERAL, LOG_INFO, QString("SS : now=%1 total=%2").arg(m_offset).arg(total));
+
+    // QFont font = QApplication::font();
+    // font.setPixelSize(20);
+    // p->setFont(font);
+    // p->drawText(0, 0, m_size.width(), m_size.height(), Qt::AlignVCenter | Qt::AlignHCenter | Qt::TextWordWrap,
+    // 		QString(">%1/%2=%3<").arg(m_offset).arg(total).arg(x);
 
     return true;
 }
@@ -607,6 +634,31 @@ static class MonoScopeFactory : public VisFactory
         return new MonoScope();
     }
 }MonoScopeFactory;
+
+///////////////////////////////////////////////////////////////////////////////
+// WaveFormFactory
+
+static class WaveFormFactory : public VisFactory
+{
+  public:
+    const QString &name(void) const override // VisFactory
+    {
+        static QString s_name = QCoreApplication::translate("Visualizers",
+                                                            "WaveForm");
+        return s_name;
+    }
+
+    uint plugins(QStringList *list) const override // VisFactory
+    {
+        *list << name();
+        return 1;
+    }
+
+    VisualBase *create(MainVisual */*parent*/, const QString &/*pluginName*/) const override // VisFactory
+    {
+        return new WaveForm();
+    }
+}WaveFormFactory;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Spectrum
