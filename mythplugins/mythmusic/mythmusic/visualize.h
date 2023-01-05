@@ -148,18 +148,39 @@ class MonoScope : public StereoScope
 };
 
 // added by twitham@sbcglobal.net, 2023/01
+
+#define WF_AUDIO_SIZE 4096
+#define WF_WIDTH 1920
+#define WF_HEIGHT 1080
+
 class WaveForm : public MonoScope
 {
-    public:
-    WaveForm() = default;
-    ~WaveForm() override = default;
+public:
+  WaveForm() = default;
+  ~WaveForm() override = default;
 
-    bool process( VisualNode *node ) override; // MonoScope
-    bool draw( QPainter *p, const QColor &back ) override; // MonoScope
+  unsigned long getDesiredSamples(void) override;
+  bool processUndisplayed(VisualNode *node) override;
+  bool process( VisualNode *node ) override;
+  bool draw( QPainter *p, const QColor &back ) override;
 
-  protected:
-    unsigned long  m_offset      {0};
-    short *m_right {nullptr};
+protected:
+  bool process_all_types(VisualNode *node, bool displayed);
+  void reset(void);
+  unsigned long m_offset      {0};
+  unsigned long m_offsetProcessed  {0};
+  short *m_right {nullptr};
+  QImage m_image;
+  MusicMetadata *m_currentMetadata {nullptr};
+  unsigned long m_length {300000};
+  unsigned int m_perpixel {0};
+  unsigned int m_position {0};
+  short int m_minl {0};
+  short int m_maxl {0};
+  unsigned long m_sqrl {0};
+  short int m_minr {0};
+  short int m_maxr {0};
+  unsigned long m_sqrr {0};
 };
 
 class LogScale
