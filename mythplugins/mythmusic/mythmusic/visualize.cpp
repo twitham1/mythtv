@@ -543,8 +543,6 @@ bool MonoScope::draw( QPainter *p, const QColor &back )
 ///////////////////////////////////////////////////////////////////////////////
 // WaveForm by twitham@sbcglobal.net, 2023/01
 
-// TODO!!! fix radio stream crash
-
 WaveForm::~WaveForm()
 {
   saveload(nullptr);
@@ -576,13 +574,19 @@ void WaveForm::saveload(MusicMetadata *meta)
       if (!m_image.load(filename))
 	LOG(VB_GENERAL, LOG_WARNING, QString("WF loading %1 failed, recreating").arg(filename));
       m_duration = stream ? 60000 : meta->Length().count(); // millisecs
-      m_perpixel = m_duration * 44.1 / WF_WIDTH; // fix this to sample frequency !!!!!
     }
   if (m_image.isNull())
     {
       m_image = QImage(WF_WIDTH, WF_HEIGHT, QImage::Format_RGB32);
       m_image.fill(qRgb(0, 0, 0));
     }
+  m_minl = 0;		// drop last pixel, prepare for first
+  m_maxl = 0;
+  m_sqrl = 0;
+  m_minr = 0;
+  m_maxr = 0;
+  m_sqrr = 0;
+  m_position = 0;
 }
 
 unsigned long WaveForm::getDesiredSamples(void)
@@ -612,13 +616,24 @@ bool WaveForm::process_all_types(VisualNode *node, bool displayed)
       m_offset = node->m_offset.count() % m_duration; // make available to ::draw below
       m_right = node->m_right;
       uint n = node->m_length;
-      // LOG(VB_GENERAL, LOG_INFO, QString("WF offset is %1 of %2, %3").arg(m_offset).arg(m_duration).arg(n));
-      LOG(VB_GENERAL, LOG_DEBUG, QString("WF process %1 samples, display=%2").arg(n).arg(displayed));
+      LOG(VB_GENERAL, LOG_DEBUG, QString("WF process %1 samples at %2, display=%2").
+	  arg(n).arg(m_offset).arg(displayed));
       for (uint i = 0; i < n; i++)
 	{
-	  if (m_position++ > m_perpixel) // draw one full pixel of min/max/rms
+	  short int val = node->m_left[i];
+	  if (val > m_maxl) m_maxl = val;
+	  if (val < m_minl) m_minl = val;
+	  m_sqrl += val * val;
+	  if (m_right) {
+	    val = node->m_right[i];
+	    if (val > m_maxr) m_maxr = val;
+	    if (val < m_minr) m_minr = val;
+	    m_sqrr += val * val;
+	  }
+	  uint x = WF_WIDTH * m_offset / m_duration;
+	  m_position++;
+	  if (x != m_lastx)	// draw one finished pixel of min/max/rms
 	    {
-	      int x = WF_WIDTH * m_offset / m_duration;
 	      int h = WF_HEIGHT / 4;  // amplitude above or below zero
 	      int y = WF_HEIGHT / 4;  // left zero line
 	      int yr = WF_HEIGHT * 3 / 4; // right  zero line
@@ -638,10 +653,10 @@ bool WaveForm::process_all_types(VisualNode *node, bool displayed)
 
 	      // painter.setPen(qRgb(100, 100, 220)); // RMS
 	      painter.setPen(qRgb(150, 20, 20)); // RMS
-	      int rmsy = sqrt(m_sqrl / m_perpixel) * y / 32768;
+	      int rmsy = sqrt(m_sqrl / m_position) * y / 32768;
 	      painter.drawLine(x, y - rmsy, x, y + rmsy);
 	      if (m_right) {
-		rmsy = sqrt(m_sqrr / m_perpixel) * y / 32768;
+		rmsy = sqrt(m_sqrr / m_position) * y / 32768;
 		painter.drawLine(x, yr - rmsy, x, yr + rmsy);
 	      }
 	      m_minl = 0;		// start over for next pixel
@@ -652,16 +667,7 @@ bool WaveForm::process_all_types(VisualNode *node, bool displayed)
 	      m_sqrr = 0;
 	      m_position = 0;
 	    }
-	  short int val = node->m_left[i];
-	  if (val > m_maxl) m_maxl = val;
-	  if (val < m_minl) m_minl = val;
-	  m_sqrl += val * val;
-	  if (m_right) {
-	    val = node->m_right[i];
-	    if (val > m_maxr) m_maxr = val;
-	    if (val < m_minr) m_minr = val;
-	    m_sqrr += val * val;
-	  }
+	  m_lastx = x;
 	}
     }
   // return m_right ? StereoScope::process(node) : MonoScope::process(node);
@@ -670,9 +676,6 @@ bool WaveForm::process_all_types(VisualNode *node, bool displayed)
 
 bool WaveForm::draw( QPainter *p, const QColor &back )
 {
-    // TODO fix for radio, see musiccommon.cpp updateProgressBar
-
-    // p->fillRect(0, 0, m_size.width(), m_size.height(), back);
     p->fillRect(0, 0, 0, 0, back); // no clearing, here to suppress warning
     p->drawImage(0, 0,
 		 m_image.scaled(m_size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
@@ -684,7 +687,7 @@ bool WaveForm::draw( QPainter *p, const QColor &back )
     unsigned int x = m_size.width() * m_offset / m_duration; // m_offset set by ::process above
     p->drawLine(x, 0, x, m_size.height());
 
-    // LOG(VB_GENERAL, LOG_INFO, QString("WF draw : offset=%1/length=%2, pp=%3").arg(m_offset).arg(m_duration).arg(m_perpixel));
+    // LOG(VB_GENERAL, LOG_INFO, QString("WF draw : offset=%1/length=%2, pp=%3").arg(m_offset).arg(m_duration).arg(m_lastx));
 
     // QFont font = QApplication::font();
     // font.setPixelSize(20);
