@@ -550,31 +550,34 @@ WaveForm::~WaveForm()
   saveload(nullptr);
 }
 
-// cache current image, if any, before loading cache of given metadata
+// cache current track, if any, before loading cache of given track
 void WaveForm::saveload(MusicMetadata *meta)
 {
   QString cache = GetConfDir() + "/MythMusic/WaveForm";
   QString filename;
-  if (m_currentMetadata) {	// cache work in progress for next time
-    QDir dir(cache);
-    if (!dir.exists())
-      {
-	dir.mkdir(cache);
-      }
-    filename = QString("%1/%2.png").arg(cache).arg(m_currentMetadata->ID());
-    LOG(VB_GENERAL, LOG_INFO, QString("WF saving to %1").arg(filename));
-    if (!m_image.save(filename))
-      LOG(VB_GENERAL, LOG_ERR, QString("WF saving to %1 failed: " + ENO).arg(filename));
-  }
-  if (meta) {			// load previous work from cache
-    filename = QString("%1/%2.png").arg(cache).arg(meta->ID());
-    LOG(VB_GENERAL, LOG_INFO, QString("WF loading from %1").arg(filename));
-    if (!m_image.load(filename))
-      LOG(VB_GENERAL, LOG_WARNING, QString("WF loading %1 failed, recreating").arg(filename));
-    m_currentMetadata = meta;
-    m_duration = meta->Length().count(); // + 1000;
-    m_perpixel = m_duration * 44.1 / WF_WIDTH; // fix this to sample frequency !!!!!
-  }
+  int stream = gPlayer->getPlayMode() == MusicPlayer::PLAYMODE_RADIO;
+  if (m_currentMetadata)       // cache work in progress for next time
+    {
+      QDir dir(cache);
+      if (!dir.exists())
+	{
+	  dir.mkdir(cache);
+	}
+      filename = QString("%1/%2.png").arg(cache).arg(stream ? 0 : m_currentMetadata->ID());
+      LOG(VB_GENERAL, LOG_INFO, QString("WF saving to %1").arg(filename));
+      if (!m_image.save(filename))
+	LOG(VB_GENERAL, LOG_ERR, QString("WF saving to %1 failed: " + ENO).arg(filename));
+    }
+  m_currentMetadata = meta;
+  if (meta)			// load previous work from cache
+    {
+      filename = QString("%1/%2.png").arg(cache).arg(stream ? 0 : meta->ID());
+      LOG(VB_GENERAL, LOG_INFO, QString("WF loading from %1").arg(filename));
+      if (!m_image.load(filename))
+	LOG(VB_GENERAL, LOG_WARNING, QString("WF loading %1 failed, recreating").arg(filename));
+      m_duration = stream ? 60000 : meta->Length().count(); // millisecs
+      m_perpixel = m_duration * 44.1 / WF_WIDTH; // fix this to sample frequency !!!!!
+    }
   if (m_image.isNull())
     {
       m_image = QImage(WF_WIDTH, WF_HEIGHT, QImage::Format_RGB32);
@@ -604,16 +607,12 @@ bool WaveForm::process_all_types(VisualNode *node, bool displayed)
     {
       saveload(meta);
     }
-  // if (m_image.isNull())
-  //   {
-  //     m_image = QImage(WF_WIDTH, WF_HEIGHT, QImage::Format_RGB32);
-  //     m_image.fill(qRgb(0, 0, 0));
-  //   }
   if (node && !m_image.isNull())
     {
-      m_offset = node->m_offset.count(); // make available to ::draw below
+      m_offset = node->m_offset.count() % m_duration; // make available to ::draw below
       m_right = node->m_right;
       uint n = node->m_length;
+      // LOG(VB_GENERAL, LOG_INFO, QString("WF offset is %1 of %2, %3").arg(m_offset).arg(m_duration).arg(n));
       LOG(VB_GENERAL, LOG_DEBUG, QString("WF process %1 samples, display=%2").arg(n).arg(displayed));
       for (uint i = 0; i < n; i++)
 	{

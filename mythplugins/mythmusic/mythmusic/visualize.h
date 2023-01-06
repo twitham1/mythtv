@@ -168,7 +168,6 @@ protected:
   bool process_all_types(VisualNode *node, bool displayed);
   void saveload(MusicMetadata *meta);
   unsigned long m_offset      {0};
-  unsigned long m_offsetProcessed  {0};
   short *m_right {nullptr};
   QImage m_image;
   MusicMetadata *m_currentMetadata {nullptr};
