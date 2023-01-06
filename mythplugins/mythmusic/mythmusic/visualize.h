@@ -157,7 +157,7 @@ class WaveForm : public MonoScope
 {
 public:
   WaveForm() = default;
-  ~WaveForm() override = default;
+  ~WaveForm() override;
 
   unsigned long getDesiredSamples(void) override;
   bool processUndisplayed(VisualNode *node) override;
@@ -166,15 +166,15 @@ public:
 
 protected:
   bool process_all_types(VisualNode *node, bool displayed);
-  void reset(void);
+  void saveload(MusicMetadata *meta);
   unsigned long m_offset      {0};
   unsigned long m_offsetProcessed  {0};
   short *m_right {nullptr};
   QImage m_image;
   MusicMetadata *m_currentMetadata {nullptr};
-  unsigned long m_length {300000};
-  unsigned int m_perpixel {0};
-  unsigned int m_position {0};
+  unsigned long m_duration {300000};
+  unsigned int m_perpixel {156}; // 300000 ms / 1920
+  unsigned int m_position {0};	 // location inside pixel
   short int m_minl {0};
   short int m_maxl {0};
   unsigned long m_sqrl {0};
