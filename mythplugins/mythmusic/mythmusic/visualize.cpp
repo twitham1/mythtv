@@ -541,7 +541,7 @@ bool MonoScope::draw( QPainter *p, const QColor &back )
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// WaveForm by twitham@sbcglobal.net, 2023/01
+// WaveForm - see whole track - by twitham@sbcglobal.net, 2023/01
 
 WaveForm::~WaveForm()
 {
@@ -587,6 +587,8 @@ void WaveForm::saveload(MusicMetadata *meta)
   m_maxr = 0;
   m_sqrr = 0;
   m_position = 0;
+  m_font = QApplication::font();
+  m_font.setPointSize(14);
 }
 
 unsigned long WaveForm::getDesiredSamples(void)
@@ -687,15 +689,29 @@ bool WaveForm::draw( QPainter *p, const QColor &back )
     unsigned int x = m_size.width() * m_offset / m_duration; // m_offset set by ::process above
     p->drawLine(x, 0, x, m_size.height());
 
-    // LOG(VB_GENERAL, LOG_INFO, QString("WF draw : offset=%1/length=%2, pp=%3").arg(m_offset).arg(m_duration).arg(m_lastx));
-
-    // QFont font = QApplication::font();
-    // font.setPixelSize(20);
-    // p->setFont(font);
-    // p->drawText(0, 0, m_size.width(), m_size.height(), Qt::AlignVCenter | Qt::AlignHCenter | Qt::TextWordWrap,
-    // 		QString(">%1/%2=%3<").arg(m_offset).arg(total).arg(x);
-
+    if (m_size.width() > 500) {
+      p->setPen(Qt::white);
+      p->setFont(m_font);
+      p->drawText(0, 0, m_size.width(), m_size.height(),
+		  Qt::AlignVCenter | Qt::AlignHCenter | Qt::TextWordWrap,
+		  QString("%1:%2 / %3:%4   %5 ms/pixel   %6 pixels/s")
+		  .arg(m_offset / 1000 / 60).arg(m_offset / 1000 % 60, 2, 10, QChar('0'))
+		  .arg(m_duration / 1000 / 60).arg(m_duration / 1000 % 60, 2, 10, QChar('0'))
+		  .arg(1.0 * m_duration / WF_WIDTH, 0, 'f', 1).arg(1000.0 * WF_WIDTH / m_duration, 0, 'f', 1));
+    }
     return true;
+}
+
+void WaveForm::handleKeyPress(const QString &action)
+{
+  LOG(VB_GENERAL, LOG_INFO, QString("WF keypress = %1").arg(action));
+
+  // I'd like to toggle overlay text upon key hit, but mythfrontend
+  // doesn't appear to call this.
+  
+  if (action == "SELECT")
+    {
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -145,9 +145,11 @@ class MonoScope : public StereoScope
 
     bool process( VisualNode *node ) override; // StereoScope
     bool draw( QPainter *p, const QColor &back ) override; // StereoScope
+    void handleKeyPress(const QString &action) override // VisualBase
+        {(void) action;}
 };
 
-// WaveForm by twitham@sbcglobal.net, 2023/01
+// WaveForm - see whole track - by twitham@sbcglobal.net, 2023/01
 
 #define WF_AUDIO_SIZE 4096     // maximum samples to process at a time
 #define WF_WIDTH 1920	// image cache size, will scale to any display
@@ -163,12 +165,14 @@ public:
   bool processUndisplayed(VisualNode *node) override;
   bool process( VisualNode *node ) override;
   bool draw( QPainter *p, const QColor &back ) override;
+  void handleKeyPress(const QString &action) override;
 
 protected:
   bool process_all_types(VisualNode *node, bool displayed);
   void saveload(MusicMetadata *meta);
   unsigned long m_offset       {0};
   short         *m_right {nullptr};
+  QFont		m_font;		// optional text overlay
   QImage        m_image;	// picture of full track
   MusicMetadata *m_currentMetadata {nullptr};
   unsigned long m_duration {60000};
