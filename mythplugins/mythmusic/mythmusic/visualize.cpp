@@ -545,50 +545,50 @@ bool MonoScope::draw( QPainter *p, const QColor &back )
 
 WaveForm::~WaveForm()
 {
-  saveload(nullptr);
+    saveload(nullptr);
 }
 
 // cache current track, if any, before loading cache of given track
 void WaveForm::saveload(MusicMetadata *meta)
 {
-  QString cache = GetConfDir() + "/MythMusic/WaveForm";
-  QString filename;
-  int stream = gPlayer->getPlayMode() == MusicPlayer::PLAYMODE_RADIO;
-  if (m_currentMetadata)       // cache work in progress for next time
+    QString cache = GetConfDir() + "/MythMusic/WaveForm";
+    QString filename;
+    int stream = gPlayer->getPlayMode() == MusicPlayer::PLAYMODE_RADIO;
+    if (m_currentMetadata)       // cache work in progress for next time
     {
-      QDir dir(cache);
-      if (!dir.exists())
+	QDir dir(cache);
+	if (!dir.exists())
 	{
-	  dir.mkdir(cache);
+	    dir.mkdir(cache);
 	}
-      filename = QString("%1/%2.png").arg(cache).arg(stream ? 0 : m_currentMetadata->ID());
-      LOG(VB_GENERAL, LOG_INFO, QString("WF saving to %1").arg(filename));
-      if (!m_image.save(filename))
-	LOG(VB_GENERAL, LOG_ERR, QString("WF saving to %1 failed: " + ENO).arg(filename));
+	filename = QString("%1/%2.png").arg(cache).arg(stream ? 0 : m_currentMetadata->ID());
+	LOG(VB_GENERAL, LOG_INFO, QString("WF saving to %1").arg(filename));
+	if (!m_image.save(filename))
+	    LOG(VB_GENERAL, LOG_ERR, QString("WF saving to %1 failed: " + ENO).arg(filename));
     }
-  m_currentMetadata = meta;
-  if (meta)			// load previous work from cache
+    m_currentMetadata = meta;
+    if (meta)			// load previous work from cache
     {
-      filename = QString("%1/%2.png").arg(cache).arg(stream ? 0 : meta->ID());
-      LOG(VB_GENERAL, LOG_INFO, QString("WF loading from %1").arg(filename));
-      if (!m_image.load(filename))
-	LOG(VB_GENERAL, LOG_WARNING, QString("WF loading %1 failed, recreating").arg(filename));
-      m_duration = stream ? 60000 : meta->Length().count(); // millisecs
+	filename = QString("%1/%2.png").arg(cache).arg(stream ? 0 : meta->ID());
+	LOG(VB_GENERAL, LOG_INFO, QString("WF loading from %1").arg(filename));
+	if (!m_image.load(filename))
+	    LOG(VB_GENERAL, LOG_WARNING, QString("WF loading %1 failed, recreating").arg(filename));
+	m_duration = stream ? 60000 : meta->Length().count(); // millisecs
     }
-  if (m_image.isNull())
+    if (m_image.isNull())
     {
-      m_image = QImage(WF_WIDTH, WF_HEIGHT, QImage::Format_RGB32);
-      m_image.fill(qRgb(0, 0, 0));
+	m_image = QImage(WF_WIDTH, WF_HEIGHT, QImage::Format_RGB32);
+	m_image.fill(qRgb(0, 0, 0));
     }
-  m_minl = 0;		// drop last pixel, prepare for first
-  m_maxl = 0;
-  m_sqrl = 0;
-  m_minr = 0;
-  m_maxr = 0;
-  m_sqrr = 0;
-  m_position = 0;
-  m_font = QApplication::font();
-  m_font.setPointSize(14);
+    m_minl = 0;		// drop last pixel, prepare for first
+    m_maxl = 0;
+    m_sqrl = 0;
+    m_minr = 0;
+    m_maxr = 0;
+    m_sqrr = 0;
+    m_position = 0;
+    m_font = QApplication::font();
+    m_font.setPointSize(14);
 }
 
 unsigned long WaveForm::getDesiredSamples(void)
@@ -598,82 +598,82 @@ unsigned long WaveForm::getDesiredSamples(void)
 
 bool WaveForm::processUndisplayed(VisualNode *node)
 {
-  return process_all_types(node, false);
+    return process_all_types(node, false);
 }
 
 bool WaveForm::process(VisualNode *node)
 {
-  return process_all_types(node, true);
+    return process_all_types(node, true);
 }
 
 bool WaveForm::process_all_types(VisualNode *node, bool displayed)
 {
-  MusicMetadata *meta = gPlayer->getCurrentMetadata();
-  if (meta && meta != m_currentMetadata)
+    MusicMetadata *meta = gPlayer->getCurrentMetadata();
+    if (meta && meta != m_currentMetadata)
     {
-      saveload(meta);
+	saveload(meta);
     }
-  if (node && !m_image.isNull())
+    if (node && !m_image.isNull())
     {
-      m_offset = node->m_offset.count() % m_duration; // make available to ::draw below
-      m_right = node->m_right;
-      uint n = node->m_length;
-      LOG(VB_GENERAL, LOG_DEBUG, QString("WF process %1 samples at %2, display=%2").
-	  arg(n).arg(m_offset).arg(displayed));
-      for (uint i = 0; i < n; i++)
+	m_offset = node->m_offset.count() % m_duration; // make available to ::draw below
+	m_right = node->m_right;
+	uint n = node->m_length;
+	LOG(VB_GENERAL, LOG_DEBUG, QString("WF process %1 samples at %2, display=%2").
+	    arg(n).arg(m_offset).arg(displayed));
+	for (uint i = 0; i < n; i++)
 	{
-	  short int val = node->m_left[i];
-	  if (val > m_maxl) m_maxl = val;
-	  if (val < m_minl) m_minl = val;
-	  m_sqrl += val * val;
-	  if (m_right) {
-	    val = node->m_right[i];
-	    if (val > m_maxr) m_maxr = val;
-	    if (val < m_minr) m_minr = val;
-	    m_sqrr += val * val;
-	  }
-	  uint x = WF_WIDTH * m_offset / m_duration;
-	  m_position++;
-	  if (x != m_lastx)	// draw one finished pixel of min/max/rms
-	    {
-	      int h = WF_HEIGHT / 4;  // amplitude above or below zero
-	      int y = WF_HEIGHT / 4;  // left zero line
-	      int yr = WF_HEIGHT * 3 / 4; // right  zero line
-	      if (!m_right) y = yr; // drop full time below now time of StereoScope
-	      LOG(VB_GENERAL, LOG_DEBUG, QString("WF painting at %1,%2/%3").arg(x).arg(y).arg(yr));
-	      QPainter painter(&m_image);
-
-	      painter.setPen(qRgb(0, 0, 0)); // clear prior content
-	      painter.drawLine(x, 0, x, WF_HEIGHT);
-
-	      // Audacity uses 50,50,200 and 100,100,220 - I'm going
-	      // darker to better contrast the SteroScope overlay
-	      painter.setPen(qRgb(30, 30, 150)); // peak-to-peak
-	      painter.drawLine(x, y - h * m_maxl / 32768, x, y - h * m_minl / 32768);
-	      if (m_right)
-		painter.drawLine(x, yr - h * m_maxr / 32768, x, yr - h * m_minr / 32768);
-
-	      // painter.setPen(qRgb(100, 100, 220)); // RMS
-	      painter.setPen(qRgb(150, 20, 20)); // RMS
-	      int rmsy = sqrt(m_sqrl / m_position) * y / 32768;
-	      painter.drawLine(x, y - rmsy, x, y + rmsy);
-	      if (m_right) {
-		rmsy = sqrt(m_sqrr / m_position) * y / 32768;
-		painter.drawLine(x, yr - rmsy, x, yr + rmsy);
-	      }
-	      m_minl = 0;		// start over for next pixel
-	      m_maxl = 0;
-	      m_sqrl = 0;
-	      m_minr = 0;
-	      m_maxr = 0;
-	      m_sqrr = 0;
-	      m_position = 0;
+	    short int val = node->m_left[i];
+	    if (val > m_maxl) m_maxl = val;
+	    if (val < m_minl) m_minl = val;
+	    m_sqrl += val * val;
+	    if (m_right) {
+		val = node->m_right[i];
+		if (val > m_maxr) m_maxr = val;
+		if (val < m_minr) m_minr = val;
+		m_sqrr += val * val;
 	    }
-	  m_lastx = x;
+	    uint x = WF_WIDTH * m_offset / m_duration;
+	    m_position++;
+	    if (x != m_lastx)	// draw one finished pixel of min/max/rms
+	    {
+		int h = WF_HEIGHT / 4;  // amplitude above or below zero
+		int y = WF_HEIGHT / 4;  // left zero line
+		int yr = WF_HEIGHT * 3 / 4; // right  zero line
+		if (!m_right) y = yr; // drop full time below now time of StereoScope
+		LOG(VB_GENERAL, LOG_DEBUG, QString("WF painting at %1,%2/%3").arg(x).arg(y).arg(yr));
+		QPainter painter(&m_image);
+
+		painter.setPen(qRgb(0, 0, 0)); // clear prior content
+		painter.drawLine(x, 0, x, WF_HEIGHT);
+
+		// Audacity uses 50,50,200 and 100,100,220 - I'm going
+		// darker to better contrast the SteroScope overlay
+		painter.setPen(qRgb(30, 30, 150)); // peak-to-peak
+		painter.drawLine(x, y - h * m_maxl / 32768, x, y - h * m_minl / 32768);
+		if (m_right)
+		    painter.drawLine(x, yr - h * m_maxr / 32768, x, yr - h * m_minr / 32768);
+
+		// painter.setPen(qRgb(100, 100, 220)); // RMS
+		painter.setPen(qRgb(150, 20, 20)); // RMS
+		int rmsy = sqrt(m_sqrl / m_position) * y / 32768;
+		painter.drawLine(x, y - rmsy, x, y + rmsy);
+		if (m_right) {
+		    rmsy = sqrt(m_sqrr / m_position) * y / 32768;
+		    painter.drawLine(x, yr - rmsy, x, yr + rmsy);
+		}
+		m_minl = 0;		// start over for next pixel
+		m_maxl = 0;
+		m_sqrl = 0;
+		m_minr = 0;
+		m_maxr = 0;
+		m_sqrr = 0;
+		m_position = 0;
+	    }
+	    m_lastx = x;
 	}
     }
-  // return m_right ? StereoScope::process(node) : MonoScope::process(node);
-  return StereoScope::process(node);
+    // return m_right ? StereoScope::process(node) : MonoScope::process(node);
+    return StereoScope::process(node);
 }
 
 bool WaveForm::draw( QPainter *p, const QColor &back )
@@ -689,27 +689,28 @@ bool WaveForm::draw( QPainter *p, const QColor &back )
     unsigned int x = m_size.width() * m_offset / m_duration; // m_offset set by ::process above
     p->drawLine(x, 0, x, m_size.height());
 
-    if (m_size.width() > 500) {
-      p->setPen(Qt::white);
-      p->setFont(m_font);
-      p->drawText(0, 0, m_size.width(), m_size.height(),
-		  Qt::AlignVCenter | Qt::AlignHCenter | Qt::TextWordWrap,
-		  QString("%1:%2 / %3:%4   %5 ms/pixel   %6 pixels/s")
-		  .arg(m_offset / 1000 / 60).arg(m_offset / 1000 % 60, 2, 10, QChar('0'))
-		  .arg(m_duration / 1000 / 60).arg(m_duration / 1000 % 60, 2, 10, QChar('0'))
-		  .arg(1.0 * m_duration / WF_WIDTH, 0, 'f', 1).arg(1000.0 * WF_WIDTH / m_duration, 0, 'f', 1));
+    if (m_size.width() > 500)
+    {
+	p->setPen(Qt::white);
+	p->setFont(m_font);
+	p->drawText(0, 0, m_size.width(), m_size.height(),
+		    Qt::AlignVCenter | Qt::AlignHCenter | Qt::TextWordWrap,
+		    QString("%1:%2 / %3:%4   %5 ms/pixel   %6 pixels/s")
+		    .arg(m_offset / 1000 / 60).arg(m_offset / 1000 % 60, 2, 10, QChar('0'))
+		    .arg(m_duration / 1000 / 60).arg(m_duration / 1000 % 60, 2, 10, QChar('0'))
+		    .arg(1.0 * m_duration / WF_WIDTH, 0, 'f', 1).arg(1000.0 * WF_WIDTH / m_duration, 0, 'f', 1));
     }
     return true;
 }
 
 void WaveForm::handleKeyPress(const QString &action)
 {
-  LOG(VB_GENERAL, LOG_INFO, QString("WF keypress = %1").arg(action));
+    LOG(VB_GENERAL, LOG_INFO, QString("WF keypress = %1").arg(action));
 
-  // I'd like to toggle overlay text upon key hit, but mythfrontend
-  // doesn't appear to call this.
+    // I'd like to toggle overlay text upon certain key hit, but
+    // mythfrontend doesn't appear to call this.  Bug?
   
-  if (action == "SELECT")
+    if (action == "SELECT")
     {
     }
 }
