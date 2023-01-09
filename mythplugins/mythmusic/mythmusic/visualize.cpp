@@ -614,7 +614,7 @@ bool WaveForm::process(VisualNode *node)
 {
     // After 2023/01 bugfix above, processUndisplayed already
     // processed this node too!  If that is ever changed in
-    // mainvisual.cpp, then this might need adjusted too.  To test,
+    // mainvisual.cpp, then this might need adjusted.  To test,
     // uncomment the following line and see --loglevel debug
 
     // return process_all_types(node, true);
@@ -695,13 +695,14 @@ bool WaveForm::process_all_types(VisualNode *node, bool displayed)
 bool WaveForm::draw( QPainter *p, const QColor &back )
 {
     p->fillRect(0, 0, 0, 0, back); // no clearing, here to suppress warning
-    p->drawImage(0, 0,
-		 m_image.scaled(m_size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+    if (!m_image.isNull())
+	p->drawImage(0, 0,
+		     m_image.scaled(m_size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
 
     // m_right ? StereoScope::draw(p, Qt::green) : MonoScope::draw(p, Qt::green);
     StereoScope::draw(p, Qt::green); // green == no clearing!
 
-    p->setPen(Qt::green);
+    p->setPen(Qt::yellow);
     unsigned int x = m_size.width() * m_offset / m_duration; // m_offset set by ::process above
     p->drawLine(x, 0, x, m_size.height());
 
@@ -1310,9 +1311,11 @@ bool Piano::processUndisplayed(VisualNode *node)
 bool Piano::process(VisualNode *node)
 {
     //LOG(VB_GENERAL, LOG_DEBUG, QString("Piano : Processing node for DISPLAY"));
-//    return process_all_types(node, true);
-    process_all_types(node, true);
-    return false;
+
+    // See WaveForm::process* above
+    // return process_all_types(node, true);
+
+    return node ? false : false;
 }
 
 bool Piano::process_all_types(VisualNode *node, bool /*this_will_be_displayed*/)

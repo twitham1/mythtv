@@ -129,7 +129,7 @@ class StereoScope : public VisualBase
         {(void) action;}
 
   protected:
-    QColor         m_startColor  {Qt::green};
+    QColor         m_startColor  {Qt::yellow};
     QColor         m_targetColor {Qt::red};
     std::vector<double> m_magnitudes  {};
     QSize          m_size;
