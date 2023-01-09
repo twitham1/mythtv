@@ -599,15 +599,23 @@ unsigned long WaveForm::getDesiredSamples(void)
 
 bool WaveForm::processUndisplayed(VisualNode *node)
 {
-    // in 2023/01 (v32) this is also called for displayed nodes!
+    // In 2023/01, v32 had a bug in mainvisual.cpp that this never
+    // received any nodes. Once I fixed that:
+
+    // <      m_vis->processUndisplayed(node);
+    // >      m_vis->processUndisplayed(m_nodes.first());
+
+    // now this receives *all* nodes.
 
     return process_all_types(node, false);
 }
 
 bool WaveForm::process(VisualNode *node)
 {
-    // in 2023/01 processUndisplayed already processed this node too!
-    // to test, uncomment the following line and see --loglevel debug
+    // After 2023/01 bugfix above, processUndisplayed already
+    // processed this node too!  If that is ever changed in
+    // mainvisual.cpp, then this might need adjusted too.  To test,
+    // uncomment the following line and see --loglevel debug
 
     // return process_all_types(node, true);
     return node ? false : false;
@@ -711,11 +719,11 @@ bool WaveForm::draw( QPainter *p, const QColor &back )
 	// p->drawText(text, Qt::AlignTop | Qt::AlignHCenter, // or Qt::AlignVCenter
 	// 	    QString("%1").arg(m_position, 6));
 	p->drawText(text, Qt::AlignBottom | Qt::AlignLeft,
-		    QString("%1 ms/pixel")
-		    .arg(1.0 * m_duration / WF_WIDTH, 0, 'f', 1));
-	p->drawText(text, Qt::AlignBottom | Qt::AlignRight,
 		    QString("%1 pixels/s")
 		    .arg(1000.0 * WF_WIDTH / m_duration, 0, 'f', 1));
+	p->drawText(text, Qt::AlignBottom | Qt::AlignRight,
+		    QString("%1 ms/pixel")
+		    .arg(1.0 * m_duration / WF_WIDTH, 0, 'f', 1));
     }
     return true;
 }

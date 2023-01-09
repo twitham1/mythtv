@@ -145,8 +145,6 @@ class MonoScope : public StereoScope
 
     bool process( VisualNode *node ) override; // StereoScope
     bool draw( QPainter *p, const QColor &back ) override; // StereoScope
-    void handleKeyPress(const QString &action) override // VisualBase
-        {(void) action;}
 };
 
 // WaveForm - see whole track - by twitham@sbcglobal.net, 2023/01
