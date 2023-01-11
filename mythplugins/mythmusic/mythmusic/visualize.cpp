@@ -342,9 +342,9 @@ bool StereoScope::draw( QPainter *p, const QColor &back )
 #endif
     double adjHeight = static_cast<double>(m_size.height()) / 4.0;
     p->drawLine( i - 1,
-                 (int)(adjHeight + m_magnitudes[i - 1]),
+                 (int)(adjHeight - m_magnitudes[i - 1]),
                  i,
-                 (int)(adjHeight + m_magnitudes[i]));
+                 (int)(adjHeight - m_magnitudes[i]));
 
 #if TWOCOLOUR
     // right
@@ -385,9 +385,9 @@ bool StereoScope::draw( QPainter *p, const QColor &back )
 #endif
     adjHeight = static_cast<double>(m_size.height()) * 3.0 / 4.0;
     p->drawLine( i - 1,
-                 (int)(adjHeight + m_magnitudes[i + m_size.width() - 1]),
+                 (int)(adjHeight - m_magnitudes[i + m_size.width() - 1]),
                  i,
-                 (int)(adjHeight + m_magnitudes[i + m_size.width()]));
+                 (int)(adjHeight - m_magnitudes[i + m_size.width()]));
     }
 
     return true;
@@ -532,9 +532,9 @@ bool MonoScope::draw( QPainter *p, const QColor &back )
 #endif
         double adjHeight = static_cast<double>(m_size.height()) / 2.0;
         p->drawLine( i - 1,
-                     (int)(adjHeight + m_magnitudes[ i - 1 ]),
+                     (int)(adjHeight - m_magnitudes[ i - 1 ]),
                      i,
-                     (int)(adjHeight + m_magnitudes[ i ] ));
+                     (int)(adjHeight - m_magnitudes[ i ] ));
     }
 
     return true;
