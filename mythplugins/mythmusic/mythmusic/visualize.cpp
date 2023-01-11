@@ -573,6 +573,8 @@ void WaveForm::saveload(MusicMetadata *meta)
 	LOG(VB_GENERAL, LOG_INFO, QString("WF loading from %1").arg(filename));
 	if (!m_image.load(filename))
 	    LOG(VB_GENERAL, LOG_WARNING, QString("WF loading %1 failed, recreating").arg(filename));
+	// 60 seconds skips pixels with < 44100 streams like 22050,
+	// but this is now compensated for by drawing wider "pixels"
 	m_duration = stream ? 60000 : meta->Length().count(); // millisecs
     }
     if (m_image.isNull())
@@ -587,6 +589,7 @@ void WaveForm::saveload(MusicMetadata *meta)
     m_maxr = 0;
     m_sqrr = 0;
     m_position = 0;
+    m_lastx = WF_WIDTH;
     m_font = QApplication::font();
     // m_font.setPointSize(14);
     m_font.setPixelSize(20);	// small to be mostly unnoticed
@@ -635,7 +638,11 @@ bool WaveForm::process_all_types(VisualNode *node, bool displayed)
 	uint n = node->m_length;
 	LOG(VB_GENERAL, LOG_DEBUG, QString("WF process %1 samples at %2, display=%3").
 	    arg(n).arg(m_offset).arg(displayed));
-	for (uint i = 0; i < n; i++)
+
+// TODO: interpolate timestamps to process correct samples per pixel
+// rather than fitting all we get in 1 or more pixels
+
+	for (uint i = 0; i < n; i++) // find min/max and sum of squares
 	{
 	    short int val = node->m_left[i];
 	    if (val > m_maxl) m_maxl = val;
@@ -649,43 +656,55 @@ bool WaveForm::process_all_types(VisualNode *node, bool displayed)
 	    }
 	    m_position++;
 	}
-	uint x = WF_WIDTH * m_offset / m_duration;
-	if (x != m_lastx)	// draw one finished pixel of min/max/rms
+	uint xx = WF_WIDTH * m_offset / m_duration;
+	if (xx != m_lastx)   // draw one finished pixel of min/max/rms
 	{
-	    m_lastx = x;
+	    if (m_lastx > xx - 1) // right to left wrap
+		m_lastx = xx - 1;
 	    int h = WF_HEIGHT / 4;  // amplitude above or below zero
 	    int y = WF_HEIGHT / 4;  // left zero line
 	    int yr = WF_HEIGHT * 3 / 4; // right  zero line
-	    if (!m_right) y = yr; // drop full time below now time of StereoScope
-	    LOG(VB_GENERAL, LOG_DEBUG, QString("WF painting at %1,%2/%3").arg(x).arg(y).arg(yr));
-	    QPainter painter(&m_image);
+	    if (!m_right)
+		y = yr;	// mono - drop full waveform below StereoScope now time
 
-	    painter.setPen(qRgb(0, 0, 0)); // clear prior content
-	    painter.drawLine(x, 0, x, WF_HEIGHT);
+	    // This "loop" runs only once except for short tracks or
+	    // low sample rates that need some of the virtual "pixels"
+	    // to be drawn wider with more actual pixels.  I'd rather
+	    // duplicate the vertical lines than draw rectangles since
+	    // lines are the more common case. -twitham
 
-	    // Audacity uses 50,50,200 and 100,100,220 - I'm going
-	    // darker to better contrast the SteroScope overlay
-	    painter.setPen(qRgb(30, 30, 150)); // peak-to-peak
-	    painter.drawLine(x, y - h * m_maxl / 32768, x, y - h * m_minl / 32768);
-	    if (m_right)
-		painter.drawLine(x, yr - h * m_maxr / 32768, x, yr - h * m_minr / 32768);
+	    for (uint x = m_lastx + 1; x <= xx; x++) {
+		LOG(VB_GENERAL, LOG_DEBUG, QString("WF painting at %1,%2/%3").arg(x).arg(y).arg(yr));
+		QPainter painter(&m_image);
 
-	    // painter.setPen(qRgb(100, 100, 220)); // RMS
-	    painter.setPen(qRgb(150, 20, 20)); // RMS
-	    int rmsl = sqrt(m_sqrl / m_position) * y / 32768;
-	    painter.drawLine(x, y - rmsl, x, y + rmsl);
-	    if (m_right) {
-		int rmsr = sqrt(m_sqrr / m_position) * y / 32768;
-		painter.drawLine(x, yr - rmsr, x, yr + rmsr);
-		painter.drawLine(x, WF_HEIGHT / 2, x, WF_HEIGHT / 2 - rmsl + rmsr);
+		painter.setPen(qRgb(0, 0, 0)); // clear prior content
+		painter.drawLine(x, 0, x, WF_HEIGHT);
+
+		// Audacity uses 50,50,200 and 100,100,220 - I'm going
+		// darker to better contrast the SteroScope overlay
+		painter.setPen(qRgb(25, 25, 150)); // peak-to-peak
+		painter.drawLine(x, y - h * m_maxl / 32768, x, y - h * m_minl / 32768);
+		if (m_right)
+		    painter.drawLine(x, yr - h * m_maxr / 32768, x, yr - h * m_minr / 32768);
+
+		// painter.setPen(qRgb(100, 100, 220)); // RMS
+		painter.setPen(qRgb(150, 25, 25)); // RMS
+		int rmsl = sqrt(m_sqrl / m_position) * y / 32768;
+		painter.drawLine(x, y - rmsl, x, y + rmsl);
+		if (m_right) {
+		    int rmsr = sqrt(m_sqrr / m_position) * y / 32768;
+		    painter.drawLine(x, yr - rmsr, x, yr + rmsr);
+		    painter.drawLine(x, WF_HEIGHT / 2, x, WF_HEIGHT / 2 - rmsl + rmsr);
+		}
 	    }
-	    m_minl = 0;		// start over for next pixel
+	    m_minl = 0;		// reset metrics for next pixel
 	    m_maxl = 0;
 	    m_sqrl = 0;
 	    m_minr = 0;
 	    m_maxr = 0;
 	    m_sqrr = 0;
 	    m_position = 0;
+	    m_lastx = xx;
 	}
     }
     // return m_right ? StereoScope::process(node) : MonoScope::process(node);
