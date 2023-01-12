@@ -150,7 +150,7 @@ class MonoScope : public StereoScope
 // WaveForm - see whole track - by twitham@sbcglobal.net, 2023/01
 
 #define WF_AUDIO_SIZE 4096     // maximum samples to process at a time
-#define WF_WIDTH 1920	// image cache size, will scale to any display
+#define WF_WIDTH 1920   // image cache size, will scale to any display
 #define WF_HEIGHT 1080
 
 class WaveForm : public MonoScope
@@ -170,17 +170,17 @@ protected:
     void saveload(MusicMetadata *meta);
     unsigned long m_offset {0}; // pass from process to draw
     short         *m_right {nullptr};
-    QFont         m_font;	// optional text overlay
+    QFont         m_font;       // optional text overlay
     bool          m_showtext {1};
-    QImage        m_image;	// picture of full track
+    QImage        m_image;      // picture of full track
     MusicMetadata *m_currentMetadata {nullptr};
     unsigned long m_duration {60000};
     unsigned int  m_lastx    {0}; // pixel tracker
     unsigned int  m_position {0}; // location inside pixel
-    short int     m_minl {0};	  // left range
+    short int     m_minl {0};     // left range
     short int     m_maxl {0};
-    unsigned long m_sqrl {0};	// sum of squares, for RMS
-    short int     m_minr {0};	// right range
+    unsigned long m_sqrl {0};   // sum of squares, for RMS
+    short int     m_minr {0};   // right range
     short int     m_maxr {0};
     unsigned long m_sqrr {0};
 };
