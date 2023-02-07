@@ -597,8 +597,7 @@ void WaveForm::saveload(MusicMetadata *meta)
     m_position = 0;
     m_lastx = WF_WIDTH;
     m_font = QApplication::font();
-// m_font.setPointSize(14);
-    m_font.setPixelSize(20);    // small to be mostly unnoticed
+    m_font.setPixelSize(m_size.height()/54); // small to be mostly unnoticed
 }
 
 unsigned long WaveForm::getDesiredSamples(void)
