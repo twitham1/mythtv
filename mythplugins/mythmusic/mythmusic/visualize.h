@@ -198,6 +198,8 @@ class LogScale
 
 class Spectrogram : public VisualBase
 {
+    static constexpr int kSGAudioSize { 4096 };
+
   public:
     Spectrogram();
     ~Spectrogram() override;
