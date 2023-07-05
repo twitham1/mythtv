@@ -1273,19 +1273,19 @@ Spectrum::Spectrum()
 {
     LOG(VB_GENERAL, LOG_INFO, QString("Spectrum : Being Initialised"));
 
-    m_fps = 40;
+    m_fps = 40;         // getting 1152 samples / 44100 = 38.28125 fps
 
-    m_dftL = static_cast<FFTComplex*>(av_malloc(sizeof(FFTComplex) * FFTW_N));
-    m_dftR = static_cast<FFTComplex*>(av_malloc(sizeof(FFTComplex) * FFTW_N));
+    m_dftL = static_cast<FFTSample*>(av_malloc(sizeof(FFTSample) * m_fftlen));
+    m_dftR = static_cast<FFTSample*>(av_malloc(sizeof(FFTSample) * m_fftlen));
 
-    m_fftContextForward = av_fft_init(std::log2(FFTW_N), 0);
+    m_rdftContext = av_rdft_init(std::log2(m_fftlen), DFT_R2C);
 }
 
 Spectrum::~Spectrum()
 {
     av_freep(&m_dftL);
     av_freep(&m_dftR);
-    av_fft_end(m_fftContextForward);
+    av_rdft_end(m_rdftContext);
 }
 
 void Spectrum::resize(const QSize &newsize)
@@ -1304,6 +1304,8 @@ void Spectrum::resize(const QSize &newsize)
         m_analyzerBarWidth = 6;
 
     m_scale.setMax(FFTW_N/2, m_size.width() / m_analyzerBarWidth, 44100/2);
+    m_sigL.resize(m_fftlen);
+    m_sigR.resize(m_fftlen);
 
     m_rects.resize( m_scale.range() );
     int w = 0;
@@ -1334,54 +1336,67 @@ bool Spectrum::process(VisualNode */*node*/)
 
 bool Spectrum::processUndisplayed(VisualNode *node)
 {
-    // Take a bunch of data in *node
-    // and break it down into spectrum
-    // values
-    bool allZero = true;
+    // copied from Spectrogram for better FFT window
+    
+    if (node)     // shift previous samples left, then append new node
+    {
+        int i = node->m_length;
+        // LOG(VB_PLAYBACK, LOG_DEBUG, QString("SG got %1 samples").arg(i));
+        (i <= m_fftlen) || (i = m_fftlen);
+        int start = m_fftlen - i;
+        float mult = 0.8F;      // decay older sound by this much
+        for (int k = 0; k < start; k++)
+        {
+            if (k > start - i)  // prior set ramps from mult to 1.0
+            {
+                mult = mult + (1 - mult) * (1 - (start - k) / (start - i));
+            }
+            m_sigL[k] = mult * m_sigL[i + k];
+            m_sigR[k] = mult * m_sigR[i + k];
+        }
+        for (uint k = 0; k < node->m_length; k++) // append current samples
+        {
+            m_sigL[start + k] = node->m_left[k] / 32768.; // +/- 1 peak-to-peak
+            if (node->m_right)
+                m_sigR[start + k] = node->m_right[k] / 32768.;
+        }
+        int end = m_fftlen / 40; // ramp window ends down to zero crossing
+        for (int k = 0; k < m_fftlen; k++)
+        {
+            mult = k < end ? k / end : k > m_fftlen - end ?
+                (m_fftlen - k) / end : 1;
+            m_dftL[k] = m_sigL[k] * mult;
+            m_dftR[k] = m_sigR[k] * mult;
+        }
+    }
+    av_rdft_calc(m_rdftContext, m_dftL); // run the real FFT!
+    av_rdft_calc(m_rdftContext, m_dftR);
 
     uint i = 0;
     long w = 0;
     QRect *rectsp = m_rects.data();
-    double *magnitudesp = m_magnitudes.data();
+    float *magnitudesp = m_magnitudes.data();
 
-    if (node)
-    {
-        i = node->m_length;
-        if (i > FFTW_N)
-            i = FFTW_N;
-        for (unsigned long k = 0; k < node->m_length; k++)
-        {
-            m_dftL[k] = (FFTComplex){ .re = (FFTSample)node->m_left[k], .im = 0 };
-            if (node->m_right)
-                m_dftR[k] = (FFTComplex){ .re = (FFTSample)node->m_right[k], .im = 0 };
-        }
-    }
-
-    for (auto k = i; k < FFTW_N; k++)
-    {
-        m_dftL[k] = (FFTComplex){ .re = 0, .im = 0 };
-        m_dftR[k] = (FFTComplex){ .re = 0, .im = 0 };
-    }
-    av_fft_permute(m_fftContextForward, m_dftL);
-    av_fft_calc(m_fftContextForward, m_dftL);
-
-    av_fft_permute(m_fftContextForward, m_dftR);
-    av_fft_calc(m_fftContextForward, m_dftR);
-
-    long index = 1;
+    int index = 1;              // frequency index of this pixel
+    int prev = 0;               // frequency index of previous pixel
 
     for (i = 0; (int)i < m_rects.size(); i++, w += m_analyzerBarWidth)
     {
-        // The 1D output is Hermitian symmetric (Yk = Yn-k) so Yn = Y0 etc.
-        // The dft_r2c_1d plan doesn't output these redundant values
-        // and furthermore they're not allocated in the ctor
-        double tmp = 2 * sq(m_dftL[index].re);
-        double magL = (tmp > 1.) ? (log(tmp) - 22.0) * m_scaleFactor : 0.;
+        float magL = 0;         // modified from Spectrogram
+        float magR = 0;
+        float tmp = 0;
+        for (auto j = prev + 1; j <= index; j++) // log scale!
+        {    // for the freqency bins of this pixel, find peak or mean
+            tmp = sq(m_dftL[2 * j]) + sq(m_dftL[2 * j + 1]);
+            magL  = tmp > magL  ? tmp : magL;
+            tmp = sq(m_dftR[2 * j]) + sq(m_dftR[2 * j + 1]);
+            magR = tmp > magL ? tmp : magR;
+        }
+        float adjHeight = m_size.height() / 2 / 45;
+        magL = 10 * log10(magL) * adjHeight;
+        magR = 10 * log10(magR) * adjHeight;
 
-        tmp = 2 * sq(m_dftR[index].re);
-        double magR = (tmp > 1.) ? (log(tmp) - 22.0) * m_scaleFactor : 0.;
-
-        double adjHeight = static_cast<double>(m_size.height()) / 2.0;
+        adjHeight = m_size.height() / 2.0;
         if (magL > adjHeight)
         {
             magL = adjHeight;
@@ -1395,9 +1410,9 @@ bool Spectrum::processUndisplayed(VisualNode *node)
             }
             magL = tmp;
         }
-        if (magL < 1.)
+        if (magL < 1)
         {
-            magL = 1.;
+            magL = 1;
         }
 
         if (magR > adjHeight)
@@ -1413,14 +1428,9 @@ bool Spectrum::processUndisplayed(VisualNode *node)
             }
             magR = tmp;
         }
-        if (magR < 1.)
+        if (magR < 1)
         {
-            magR = 1.;
-        }
-
-        if (magR != 1 || magL != 1)
-        {
-            allZero = false;
+            magR = 1;
         }
 
         magnitudesp[i] = magL;
@@ -1428,10 +1438,11 @@ bool Spectrum::processUndisplayed(VisualNode *node)
         rectsp[i].setTop( m_size.height() / 2 - int( magL ) );
         rectsp[i].setBottom( m_size.height() / 2 + int( magR ) );
 
-        index = m_scale[i];
+        prev = index;           // next pixel is FFT bins from here
+        index = m_scale[i];     // to the next bin by LOG scale
+        (prev < index) || (prev = index -1);
     }
 
-    Q_UNUSED(allZero);
     return false;
 }
 
