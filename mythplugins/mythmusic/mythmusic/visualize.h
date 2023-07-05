@@ -228,6 +228,7 @@ class Spectrogram : public VisualBase
 
     unsigned long getDesiredSamples(void) override;
     void resize(const QSize &size) override; // VisualBase
+    void FFT(VisualNode *node);
     bool processUndisplayed(VisualNode *node) override;
     bool process( VisualNode *node ) override;
     bool draw(QPainter *p, const QColor &back = Qt::black) override;
@@ -284,19 +285,22 @@ class Spectrum : public VisualBase
     QColor             m_startColor       {Qt::blue};
     QColor             m_targetColor      {Qt::red};
     QVector<QRect>     m_rects;
-    QVector<double>    m_magnitudes;
+    QVector<float>     m_magnitudes;
     QSize              m_size;
     MelScale           m_scale;
 
     // Setup the "magical" audio data transformations
     // provided by the Fast Fourier Transforms library
     double             m_scaleFactor      {2.0};
-    double             m_falloff          {10.0};
+    float              m_falloff          {10.0};
     int                m_analyzerBarWidth {6};
 
-    FFTComplex*        m_dftL              { nullptr };
-    FFTComplex*        m_dftR              { nullptr };
-    FFTContext*        m_fftContextForward { nullptr };
+    int            m_fftlen {16 * 1024}; // window width
+    QVector<float> m_sigL;               // decaying signal window
+    QVector<float> m_sigR;
+    FFTSample*     m_dftL { nullptr }; // real in, complex out
+    FFTSample*     m_dftR { nullptr };
+    RDFTContext*   m_rdftContext { nullptr };
 };
 
 class Squares : public Spectrum
