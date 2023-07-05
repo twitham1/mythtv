@@ -37,7 +37,7 @@
 #include "musicplayer.h"
 #include "visualize.h"
 
-static constexpr int FFTW_N { 512 };
+static constexpr int FFTW_N { 16 * 1024 };
 // static_assert(FFTW_N==SAMPLES_DEFAULT_SIZE)
 
 
@@ -172,6 +172,9 @@ void MelScale::setMax(int maxscale, int maxrange, int maxfreq)
 {
     if (maxscale == 0 || maxrange == 0 || maxfreq == 0)
         return;
+
+    m_s = maxscale;
+    m_r = maxrange;
 
     m_indices.clear();
     m_indices.resize(maxrange, 0);
@@ -1270,7 +1273,7 @@ Spectrum::Spectrum()
 {
     LOG(VB_GENERAL, LOG_INFO, QString("Spectrum : Being Initialised"));
 
-    m_fps = 15;
+    m_fps = 40;
 
     m_dftL = static_cast<FFTComplex*>(av_malloc(sizeof(FFTComplex) * FFTW_N));
     m_dftR = static_cast<FFTComplex*>(av_malloc(sizeof(FFTComplex) * FFTW_N));
@@ -1295,12 +1298,12 @@ void Spectrum::resize(const QSize &newsize)
 
     m_size = newsize;
 
-    m_analyzerBarWidth = m_size.width() / 64;
+    m_analyzerBarWidth = m_size.width() / 128;
 
     if (m_analyzerBarWidth < 6)
         m_analyzerBarWidth = 6;
 
-    m_scale.setMax(192, m_size.width() / m_analyzerBarWidth);
+    m_scale.setMax(FFTW_N/2, m_size.width() / m_analyzerBarWidth, 44100/2);
 
     m_rects.resize( m_scale.range() );
     int w = 0;
@@ -1324,7 +1327,12 @@ void Spectrum::resize(const QSize &newsize)
 // this moved up to Spectrogram so both can use it
 // template<typename T> T sq(T a) { return a*a; };
 
-bool Spectrum::process(VisualNode *node)
+bool Spectrum::process(VisualNode */*node*/)
+{
+    return false;
+}
+
+bool Spectrum::processUndisplayed(VisualNode *node)
 {
     // Take a bunch of data in *node
     // and break it down into spectrum
@@ -1352,7 +1360,7 @@ bool Spectrum::process(VisualNode *node)
     for (auto k = i; k < FFTW_N; k++)
     {
         m_dftL[k] = (FFTComplex){ .re = 0, .im = 0 };
-        m_dftL[k] = (FFTComplex){ .re = 0, .im = 0 };
+        m_dftR[k] = (FFTComplex){ .re = 0, .im = 0 };
     }
     av_fft_permute(m_fftContextForward, m_dftL);
     av_fft_calc(m_fftContextForward, m_dftL);
