@@ -1325,7 +1325,7 @@ void Spectrum::resize(const QSize &newsize)
     }
 
     m_scaleFactor = ( static_cast<double>(m_size.height()) / 2.0 ) /
-                    log( static_cast<double>(FFTW_N) );
+                    log( static_cast<double>(m_fftlen) );
 }
 
 // this moved up to Spectrogram so both can use it
@@ -1393,9 +1393,9 @@ bool Spectrum::processUndisplayed(VisualNode *node)
             tmp = sq(m_dftL[2 * j]) + sq(m_dftL[2 * j + 1]);
             magL  = tmp > magL  ? tmp : magL;
             tmp = sq(m_dftR[2 * j]) + sq(m_dftR[2 * j + 1]);
-            magR = tmp > magL ? tmp : magR;
+            magR = tmp > magR ? tmp : magR;
         }
-        float adjHeight = m_size.height() / 2 / 45;
+        float adjHeight = m_size.height() / 2 / 42;
         magL = 10 * log10(magL) * adjHeight;
         magR = 10 * log10(magR) * adjHeight;
 
