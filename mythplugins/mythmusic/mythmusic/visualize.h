@@ -284,7 +284,8 @@ class Spectrum : public VisualBase
 
     QColor             m_startColor       {Qt::blue};
     QColor             m_targetColor      {Qt::red};
-    QVector<QRect>     m_rects;
+    QVector<QRect>     m_rectsL;
+    QVector<QRect>     m_rectsR;
     QVector<float>     m_magnitudes;
     QSize              m_size;
     MelScale           m_scale;

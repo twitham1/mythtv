@@ -1307,12 +1307,14 @@ void Spectrum::resize(const QSize &newsize)
     m_sigL.resize(m_fftlen);
     m_sigR.resize(m_fftlen);
 
-    m_rects.resize( m_scale.range() );
+    m_rectsL.resize( m_scale.range() );
+    m_rectsR.resize( m_scale.range() );
     int w = 0;
     // NOLINTNEXTLINE(modernize-loop-convert)
-    for (uint i = 0; i < (uint)m_rects.size(); i++, w += m_analyzerBarWidth)
+    for (uint i = 0; i < (uint)m_rectsL.size(); i++, w += m_analyzerBarWidth)
     {
-        m_rects[i].setRect(w, m_size.height() / 2, m_analyzerBarWidth - 1, 1);
+        m_rectsL[i].setRect(w, m_size.height() / 2, m_analyzerBarWidth - 1, 1);
+        m_rectsR[i].setRect(w, m_size.height() / 2, m_analyzerBarWidth - 1, 1);
     }
 
     m_magnitudes.resize( m_scale.range() * 2 );
@@ -1374,13 +1376,14 @@ bool Spectrum::processUndisplayed(VisualNode *node)
 
     uint i = 0;
     long w = 0;
-    QRect *rectsp = m_rects.data();
+    QRect *rectspL = m_rectsL.data();
+    QRect *rectspR = m_rectsR.data();
     float *magnitudesp = m_magnitudes.data();
 
     int index = 1;              // frequency index of this pixel
     int prev = 0;               // frequency index of previous pixel
 
-    for (i = 0; (int)i < m_rects.size(); i++, w += m_analyzerBarWidth)
+    for (i = 0; (int)i < m_rectsL.size(); i++, w += m_analyzerBarWidth)
     {
         float magL = 0;         // modified from Spectrogram
         float magR = 0;
@@ -1435,8 +1438,8 @@ bool Spectrum::processUndisplayed(VisualNode *node)
 
         magnitudesp[i] = magL;
         magnitudesp[i + m_scale.range()] = magR;
-        rectsp[i].setTop( m_size.height() / 2 - int( magL ) );
-        rectsp[i].setBottom( m_size.height() / 2 + int( magR ) );
+        rectspL[i].setTop( m_size.height() / 2 - int( magL ) );
+        rectspR[i].setBottom( m_size.height() / 2 + int( magR ) );
 
         prev = index;           // next pixel is FFT bins from here
         index = m_scale[i];     // to the next bin by LOG scale
@@ -1463,12 +1466,13 @@ bool Spectrum::draw(QPainter *p, const QColor &back)
     // just uses some Qt methods to draw on a pixmap.
     // MainVisual then bitblts that onto the screen.
 
-    QRect *rectsp = m_rects.data();
+    QRect *rectspL = m_rectsL.data();
+    QRect *rectspR = m_rectsR.data();
 
     p->fillRect(0, 0, m_size.width(), m_size.height(), back);
-    for (uint i = 0; i < (uint)m_rects.size(); i++)
+    for (uint i = 0; i < (uint)m_rectsL.size(); i++)
     {
-        double per = double( rectsp[i].height() - 2 ) / double( m_size.height() );
+        double per = ( rectspL[i].height() - 2. ) / (m_size.height() / 2.);
 
         per = clamp(per, 1.0, 0.0);
 
@@ -1483,8 +1487,26 @@ bool Spectrum::draw(QPainter *p, const QColor &back)
         g = clamp(g, 255.0, 0.0);
         b = clamp(b, 255.0, 0.0);
 
-        if(rectsp[i].height() > 4)
-            p->fillRect(rectsp[i], QColor(int(r), int(g), int(b)));
+        if(rectspL[i].height() > 4)
+            p->fillRect(rectspL[i], QColor(int(r), int(g), int(b)));
+
+        per = ( rectspR[i].height() - 2. ) / (m_size.height() / 2.);
+
+        per = clamp(per, 1.0, 0.0);
+
+        r = m_startColor.red() +
+            (m_targetColor.red() - m_startColor.red()) * (per * per);
+        g = m_startColor.green() +
+            (m_targetColor.green() - m_startColor.green()) * (per * per);
+        b = m_startColor.blue() +
+            (m_targetColor.blue() - m_startColor.blue()) * (per * per);
+
+        r = clamp(r, 255.0, 0.0);
+        g = clamp(g, 255.0, 0.0);
+        b = clamp(b, 255.0, 0.0);
+
+        if(rectspR[i].height() > 4)
+            p->fillRect(rectspR[i], QColor(int(r), int(g), int(b)));
     }
 
     return true;
@@ -1531,7 +1553,7 @@ void Squares::resize (const QSize &newsize) {
 void Squares::drawRect(QPainter *p, QRect *rect, int i, int c, int w, int h)
 {
     double per = NAN;
-    int correction = (m_actualSize.width() % m_rects.size ()) / 2;
+    int correction = (m_actualSize.width() % m_rectsL.size ());
     int x = ((i / 2) * w) + correction;
     int y = 0;
 
@@ -1565,12 +1587,15 @@ void Squares::drawRect(QPainter *p, QRect *rect, int i, int c, int w, int h)
 bool Squares::draw(QPainter *p, const QColor &back)
 {
     p->fillRect (0, 0, m_actualSize.width(), m_actualSize.height(), back);
-    int w = m_actualSize.width() / (m_rects.size() / 2);
+    int w = m_actualSize.width() / (m_rectsL.size() / 2);
     int h = w;
     int center = m_actualSize.height() / 2;
 
-    QRect *rectsp = m_rects.data();
-    for (uint i = 0; i < (uint)m_rects.size(); i++)
+    QRect *rectsp = m_rectsL.data();
+    for (uint i = 0; i < (uint)m_rectsL.size() * 2; i += 2)
+        drawRect(p, &(rectsp[i]), i, center, w, h);
+    rectsp = m_rectsR.data();
+    for (uint i = 1; i < (uint)m_rectsR.size() * 2 + 1; i += 2)
         drawRect(p, &(rectsp[i]), i, center, w, h);
 
     return true;
