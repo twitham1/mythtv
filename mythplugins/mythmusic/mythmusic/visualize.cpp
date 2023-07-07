@@ -37,10 +37,6 @@
 #include "musicplayer.h"
 #include "visualize.h"
 
-static constexpr int FFTW_N { 16 * 1024 };
-// static_assert(FFTW_N==SAMPLES_DEFAULT_SIZE)
-
-
 VisFactory* VisFactory::g_pVisFactories = nullptr;
 
 VisualBase::VisualBase(bool screensaverenable)
@@ -1303,7 +1299,7 @@ void Spectrum::resize(const QSize &newsize)
     if (m_analyzerBarWidth < 6)
         m_analyzerBarWidth = 6;
 
-    m_scale.setMax(FFTW_N/2, m_size.width() / m_analyzerBarWidth, 44100/2);
+    m_scale.setMax(m_fftlen/2, m_size.width() / m_analyzerBarWidth, 44100/2);
     m_sigL.resize(m_fftlen);
     m_sigR.resize(m_fftlen);
 
@@ -1324,8 +1320,7 @@ void Spectrum::resize(const QSize &newsize)
         m_magnitudes[os] = 0.0;
     }
 
-    m_scaleFactor = ( static_cast<double>(m_size.height()) / 2.0 ) /
-                    log( static_cast<double>(m_fftlen) );
+    m_scaleFactor = m_size.height() / 2 / 42;
 }
 
 // this moved up to Spectrogram so both can use it
@@ -1382,6 +1377,7 @@ bool Spectrum::processUndisplayed(VisualNode *node)
 
     int index = 1;              // frequency index of this pixel
     int prev = 0;               // frequency index of previous pixel
+    float adjHeight = m_size.height() / 2.0;
 
     for (i = 0; (int)i < m_rectsL.size(); i++, w += m_analyzerBarWidth)
     {
@@ -1395,11 +1391,9 @@ bool Spectrum::processUndisplayed(VisualNode *node)
             tmp = sq(m_dftR[2 * j]) + sq(m_dftR[2 * j + 1]);
             magR = tmp > magR ? tmp : magR;
         }
-        float adjHeight = m_size.height() / 2 / 42;
-        magL = 10 * log10(magL) * adjHeight;
-        magR = 10 * log10(magR) * adjHeight;
+        magL = 10 * log10(magL) * m_scaleFactor;
+        magR = 10 * log10(magR) * m_scaleFactor;
 
-        adjHeight = m_size.height() / 2.0;
         if (magL > adjHeight)
         {
             magL = adjHeight;
