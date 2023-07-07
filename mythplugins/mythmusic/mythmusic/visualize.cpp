@@ -1245,7 +1245,7 @@ static class SpectrumDetailFactory : public VisFactory
     const QString &name(void) const override // VisFactory
     {
         static QString s_name = QCoreApplication::translate("Visualizers",
-                                                            "SpectrumDetail");
+                                                            "Spectrum");
         return s_name;
     }
 
@@ -1512,7 +1512,7 @@ static class SpectrumFactory : public VisFactory
     const QString &name(void) const override // VisFactory
     {
         static QString s_name = QCoreApplication::translate("Visualizers",
-                                                            "Spectrum");
+                                                            "SpectrumBars");
         return s_name;
     }
 
