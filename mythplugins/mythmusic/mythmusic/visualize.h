@@ -290,7 +290,7 @@ class Spectrum : public VisualBase
 
     // Setup the "magical" audio data transformations
     // provided by the Fast Fourier Transforms library
-    double             m_scaleFactor      {2.0};
+    float              m_scaleFactor      {2.0};
     float              m_falloff          {10.0};
     int                m_analyzerBarWidth {6};
 
