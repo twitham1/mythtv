@@ -522,7 +522,7 @@ void MythMainWindow::DoRemoteScreenShot(const QString& Filename, int Width, int 
     args << QString::number(Width);
     args << QString::number(Height);
     args << Filename;
-    MythEvent me(MythEvent::kMythEventMessage, ACTION_SCREENSHOT, args);
+    MythEvent me(MythEvent::MythEventMessage, ACTION_SCREENSHOT, args);
     QCoreApplication::sendEvent(this, &me);
 }
 
@@ -1979,7 +1979,7 @@ void MythMainWindow::customEvent(QEvent* Event)
     {
         MythUDP::EnableUDPListener(true);
     }
-    else if (Event->type() == MythEvent::kMythEventMessage)
+    else if (Event->type() == MythEvent::MythEventMessage)
     {
         auto * event = dynamic_cast<MythEvent *>(Event);
         if (event == nullptr)
@@ -2065,7 +2065,7 @@ void MythMainWindow::customEvent(QEvent* Event)
             gCoreContext->AllowShutdown();
         }
     }
-    else if (Event->type() == MythEvent::kMythUserMessage)
+    else if (Event->type() == MythEvent::MythUserMessage)
     {
         if (auto * event = dynamic_cast<MythEvent *>(Event); event != nullptr)
             if (const QString& message = event->Message(); !message.isEmpty())

@@ -13,17 +13,17 @@
 
 class QObject;
 
-const QEvent::Type OutputEvent::kPlaying =
+const QEvent::Type OutputEvent::Playing =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type OutputEvent::kBuffering =
+const QEvent::Type OutputEvent::Buffering =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type OutputEvent::kInfo =
+const QEvent::Type OutputEvent::Info =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type OutputEvent::kPaused =
+const QEvent::Type OutputEvent::Paused =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type OutputEvent::kStopped =
+const QEvent::Type OutputEvent::Stopped =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type OutputEvent::kError =
+const QEvent::Type OutputEvent::Error =
     (QEvent::Type) QEvent::registerEventType();
 
 void OutputListeners::error(const QString &e)

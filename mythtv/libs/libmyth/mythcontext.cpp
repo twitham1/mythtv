@@ -1382,7 +1382,7 @@ bool MythContextPrivate::UPnPconnect(const DeviceLocation *backend,
 
 bool MythContextPrivate::event(QEvent *e)
 {
-    if (e->type() == MythEvent::kMythEventMessage)
+    if (e->type() == MythEvent::MythEventMessage)
     {
         if (m_disableeventpopup)
             return true;

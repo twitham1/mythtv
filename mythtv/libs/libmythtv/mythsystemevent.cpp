@@ -258,7 +258,7 @@ QString MythSystemEventHandler::EventNameToSetting(const QString &name)
  */
 void MythSystemEventHandler::customEvent(QEvent *e)
 {
-    if (e->type() == MythEvent::kMythEventMessage)
+    if (e->type() == MythEvent::MythEventMessage)
     {
         auto *me = dynamic_cast<MythEvent *>(e);
         if (me == nullptr)

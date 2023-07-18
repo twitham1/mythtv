@@ -1180,7 +1180,7 @@ void MusicCommon::customEvent(QEvent *event)
 {
     QString statusString;
 
-    if (event->type() == OutputEvent::kPlaying)
+    if (event->type() == OutputEvent::Playing)
     {
         MusicMetadata *curMeta = gPlayer->getCurrentMetadata();
         if (curMeta)
@@ -1213,11 +1213,11 @@ void MusicCommon::customEvent(QEvent *event)
             updateVolume();
         }
     }
-    else if (event->type() == OutputEvent::kBuffering)
+    else if (event->type() == OutputEvent::Buffering)
     {
         statusString = tr("Buffering stream.");
     }
-    else if (event->type() == OutputEvent::kPaused)
+    else if (event->type() == OutputEvent::Paused)
     {
         statusString = tr("Stream paused.");
 
@@ -1240,7 +1240,7 @@ void MusicCommon::customEvent(QEvent *event)
             }
         }
     }
-    else if (event->type() == OutputEvent::kInfo)
+    else if (event->type() == OutputEvent::Info)
     {
 
         auto *oe = dynamic_cast<OutputEvent *>(event);
@@ -1310,7 +1310,7 @@ void MusicCommon::customEvent(QEvent *event)
         // TODO only need to update the playlist times here
         updatePlaylistStats();
     }
-    else if (event->type() == OutputEvent::kStopped)
+    else if (event->type() == OutputEvent::Stopped)
     {
         statusString = tr("Stream stopped.");
         if (m_stopButton)
@@ -1555,7 +1555,7 @@ void MusicCommon::customEvent(QEvent *event)
             }
         }
     }
-    else if (event->type() == MusicPlayerEvent::kTrackChangeEvent)
+    else if (event->type() == MusicPlayerEvent::TrackChangeEvent)
     {
         auto *mpe = dynamic_cast<MusicPlayerEvent *>(event);
 
@@ -1604,11 +1604,11 @@ void MusicCommon::customEvent(QEvent *event)
         updatePlaylistStats();
         updateTrackInfo(gPlayer->getCurrentMetadata());
     }
-    else if (event->type() == MusicPlayerEvent::kVolumeChangeEvent)
+    else if (event->type() == MusicPlayerEvent::VolumeChangeEvent)
     {
         updateVolume();
     }
-    else if (event->type() == MusicPlayerEvent::kTrackRemovedEvent)
+    else if (event->type() == MusicPlayerEvent::TrackRemovedEvent)
     {
         auto *mpe = dynamic_cast<MusicPlayerEvent *>(event);
 
@@ -1651,7 +1651,7 @@ void MusicCommon::customEvent(QEvent *event)
         if (m_noTracksText && gPlayer->getCurrentPlaylist())
             m_noTracksText->SetVisible((gPlayer->getCurrentPlaylist()->getTrackCount() == 0));
     }
-    else if (event->type() == MusicPlayerEvent::kTrackAddedEvent)
+    else if (event->type() == MusicPlayerEvent::TrackAddedEvent)
     {
         auto *mpe = dynamic_cast<MusicPlayerEvent *>(event);
 
@@ -1710,14 +1710,14 @@ void MusicCommon::customEvent(QEvent *event)
         updatePlaylistStats();
         updateTrackInfo(gPlayer->getCurrentMetadata());
     }
-    else if (event->type() == MusicPlayerEvent::kAllTracksRemovedEvent)
+    else if (event->type() == MusicPlayerEvent::AllTracksRemovedEvent)
     {
         updateUIPlaylist();
         updatePlaylistStats();
         updateTrackInfo(nullptr);
     }
-    else if (event->type() == MusicPlayerEvent::kMetadataChangedEvent ||
-             event->type() == MusicPlayerEvent::kTrackStatsChangedEvent)
+    else if (event->type() == MusicPlayerEvent::MetadataChangedEvent ||
+             event->type() == MusicPlayerEvent::TrackStatsChangedEvent)
     {
         auto *mpe = dynamic_cast<MusicPlayerEvent *>(event);
 
@@ -1767,7 +1767,7 @@ void MusicCommon::customEvent(QEvent *event)
         if (gPlayer->getNextMetadata() && trackID == gPlayer->getNextMetadata()->ID())
             updateTrackInfo(gPlayer->getCurrentMetadata());
     }
-    else if (event->type() == MusicPlayerEvent::kAlbumArtChangedEvent)
+    else if (event->type() == MusicPlayerEvent::AlbumArtChangedEvent)
     {
         auto *mpe = dynamic_cast<MusicPlayerEvent *>(event);
 
@@ -1806,7 +1806,7 @@ void MusicCommon::customEvent(QEvent *event)
         if (gPlayer->getCurrentMetadata() && trackID == gPlayer->getCurrentMetadata()->ID())
             updateTrackInfo(gPlayer->getCurrentMetadata());
     }
-    else if (event->type() == MusicPlayerEvent::kTrackUnavailableEvent)
+    else if (event->type() == MusicPlayerEvent::TrackUnavailableEvent)
     {
         auto *mpe = dynamic_cast<MusicPlayerEvent *>(event);
 

@@ -60,7 +60,7 @@ class CdDecoder : public Decoder
     static QRecursiveMutex& getCdioMutex();
 #endif
 
-    DecoderEvent::Type m_stat        {DecoderEvent::kError};
+    DecoderEvent::Type m_stat        {DecoderEvent::Error};
     char              *m_outputBuf   {nullptr};
     std::size_t        m_outputAt    {0};
 

@@ -36,13 +36,13 @@
 
 void ChannelScannerCLI::HandleEvent(const ScannerEvent *scanEvent)
 {
-    if ((scanEvent->type() == ScannerEvent::kScanComplete) ||
-        (scanEvent->type() == ScannerEvent::kScanShutdown) ||
-        (scanEvent->type() == ScannerEvent::kScanErrored))
+    if ((scanEvent->type() == ScannerEvent::ScanComplete) ||
+        (scanEvent->type() == ScannerEvent::ScanShutdown) ||
+        (scanEvent->type() == ScannerEvent::ScanErrored))
     {
         std::cout<<std::endl;
 
-        if (scanEvent->type() == ScannerEvent::kScanShutdown)
+        if (scanEvent->type() == ScannerEvent::ScanShutdown)
             std::cerr<<"HandleEvent(void) -- scan shutdown"<<std::endl;
         else
             std::cerr<<"HandleEvent(void) -- scan complete"<<std::endl;
@@ -56,7 +56,7 @@ void ChannelScannerCLI::HandleEvent(const ScannerEvent *scanEvent)
 
         Teardown();
 
-        if (scanEvent->type() == ScannerEvent::kScanErrored)
+        if (scanEvent->type() == ScannerEvent::ScanErrored)
         {
             QString error = scanEvent->strValue();
             InformUser(error);
@@ -67,15 +67,15 @@ void ChannelScannerCLI::HandleEvent(const ScannerEvent *scanEvent)
         m_done = true;
         QCoreApplication::exit(0);
     }
-    else if (scanEvent->type() == ScannerEvent::kAppendTextToLog)
+    else if (scanEvent->type() == ScannerEvent::AppendTextToLog)
         m_statusLastLog = scanEvent->strValue();
-    else if (scanEvent->type() == ScannerEvent::kSetStatusText)
+    else if (scanEvent->type() == ScannerEvent::SetStatusText)
         m_statusText = scanEvent->strValue();
-    else if (scanEvent->type() == ScannerEvent::kSetPercentComplete)
+    else if (scanEvent->type() == ScannerEvent::SetPercentComplete)
         m_statusComplete = scanEvent->intValue();
-    else if (scanEvent->type() == ScannerEvent::kSetStatusSignalLock)
+    else if (scanEvent->type() == ScannerEvent::SetStatusSignalLock)
         m_statusLock = scanEvent->boolValue();
-    else if (scanEvent->type() == ScannerEvent::kSetStatusSignalToNoise)
+    else if (scanEvent->type() == ScannerEvent::SetStatusSignalToNoise)
         m_statusSnr = scanEvent->intValue() / 65535.0;
 #if 0 // THESE_ARE_CURRENTLY_IGNORED
     else if (scanEvent->type() == ScannerEvent::SetStatusTitleText)
@@ -128,7 +128,7 @@ void ChannelScannerCLI::InformUser(const QString &error)
     {
         LOG(VB_GENERAL, LOG_ERR, LOC + error);
     }
-    post_event(m_scanMonitor, ScannerEvent::kScanComplete, 0);
+    post_event(m_scanMonitor, ScannerEvent::ScanComplete, 0);
 }
 
 void ChannelScannerCLI::Process(const ScanDTVTransportList &_transports)

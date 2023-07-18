@@ -2940,8 +2940,8 @@ bool TV::eventFilter(QObject* Object, QEvent* Event)
     if (MythGestureEvent::kEventType == Event->type())
         return m_ignoreKeyPresses ? false : event(Event);
 
-    if (Event->type() == MythEvent::kMythEventMessage ||
-        Event->type() == MythEvent::kMythUserMessage  ||
+    if (Event->type() == MythEvent::MythEventMessage ||
+        Event->type() == MythEvent::MythUserMessage  ||
         Event->type() == MythEvent::kUpdateTvProgressEventType ||
         Event->type() == MythMediaEvent::kEventType)
     {
@@ -7140,7 +7140,7 @@ void TV::customEvent(QEvent *Event)
         return;
     }
 
-    if (Event->type() == MythEvent::kMythUserMessage)
+    if (Event->type() == MythEvent::MythUserMessage)
     {
         auto *me = dynamic_cast<MythEvent*>(Event);
         if (me == nullptr)
@@ -7220,7 +7220,7 @@ void TV::customEvent(QEvent *Event)
         return;
     }
 
-    if (Event->type() != MythEvent::kMythEventMessage)
+    if (Event->type() != MythEvent::MythEventMessage)
         return;
 
     uint cardnum   = 0;

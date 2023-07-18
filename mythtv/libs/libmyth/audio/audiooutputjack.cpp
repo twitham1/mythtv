@@ -229,7 +229,7 @@ void AudioOutputJACK::CloseDevice()
     }
 
     VBAUDIO("Jack: Stop Event");
-    OutputEvent e(OutputEvent::kStopped);
+    OutputEvent e(OutputEvent::Stopped);
     dispatch(e);
 }
 
@@ -383,7 +383,7 @@ int AudioOutputJACK::JackCallback(jack_nframes_t nframes)
         if (!m_actuallyPaused)
         {
             VBAUDIO("JackCallback: audio paused");
-            OutputEvent e(OutputEvent::kPaused);
+            OutputEvent e(OutputEvent::Paused);
             dispatch(e);
             m_wasPaused = true;
         }
@@ -395,7 +395,7 @@ int AudioOutputJACK::JackCallback(jack_nframes_t nframes)
         if (m_wasPaused)
         {
             VBAUDIO("JackCallback: Play Event");
-            OutputEvent e(OutputEvent::kPlaying);
+            OutputEvent e(OutputEvent::Playing);
             dispatch(e);
             m_wasPaused = false;
         }

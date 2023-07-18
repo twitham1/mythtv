@@ -35,29 +35,29 @@
 // Qt headers
 #include <QCoreApplication>
 
-const QEvent::Type ScannerEvent::kScanComplete =
+const QEvent::Type ScannerEvent::ScanComplete =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kScanShutdown =
+const QEvent::Type ScannerEvent::ScanShutdown =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kScanErrored =
+const QEvent::Type ScannerEvent::ScanErrored =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kAppendTextToLog =
+const QEvent::Type ScannerEvent::AppendTextToLog =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kSetStatusText =
+const QEvent::Type ScannerEvent::SetStatusText =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kSetStatusTitleText =
+const QEvent::Type ScannerEvent::SetStatusTitleText =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kSetPercentComplete =
+const QEvent::Type ScannerEvent::SetPercentComplete =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kSetStatusRotorPosition =
+const QEvent::Type ScannerEvent::SetStatusRotorPosition =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kSetStatusSignalToNoise =
+const QEvent::Type ScannerEvent::SetStatusSignalToNoise =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kSetStatusSignalStrength =
+const QEvent::Type ScannerEvent::SetStatusSignalStrength =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kSetStatusSignalLock =
+const QEvent::Type ScannerEvent::SetStatusSignalLock =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type ScannerEvent::kSetStatusChannelTuned =
+const QEvent::Type ScannerEvent::SetStatusChannelTuned =
     (QEvent::Type) QEvent::registerEventType();
 
 /// Percentage to set to after the transports have been scanned
@@ -97,18 +97,18 @@ void ScanMonitor::deleteLater(void)
 
 void ScanMonitor::ScanComplete(void)
 {
-    post_event(this, ScannerEvent::kScanComplete, 0);
+    post_event(this, ScannerEvent::ScanComplete, 0);
 }
 
 void ScanMonitor::ScanPercentComplete(int pct)
 {
     int tmp = TRANSPORT_PCT + ((100 - TRANSPORT_PCT) * pct)/100;
-    post_event(this, ScannerEvent::kSetPercentComplete, tmp);
+    post_event(this, ScannerEvent::SetPercentComplete, tmp);
 }
 
 void ScanMonitor::ScanAppendTextToLog(const QString &status)
 {
-    post_event(this, ScannerEvent::kAppendTextToLog, status);
+    post_event(this, ScannerEvent::AppendTextToLog, status);
 }
 
 void ScanMonitor::ScanUpdateStatusText(const QString &status)
@@ -117,44 +117,44 @@ void ScanMonitor::ScanUpdateStatusText(const QString &status)
     if (!status.isEmpty())
         msg = QString("%1 %2").arg(msg, status);
 
-    post_event(this, ScannerEvent::kSetStatusText, msg);
+    post_event(this, ScannerEvent::SetStatusText, msg);
 }
 
 void ScanMonitor::ScanUpdateStatusTitleText(const QString &status)
 {
-    post_event(this, ScannerEvent::kSetStatusTitleText, status);
+    post_event(this, ScannerEvent::SetStatusTitleText, status);
 }
 
 void ScanMonitor::ScanErrored(const QString &error)
 {
-    post_event(this, ScannerEvent::kScanErrored, error);
+    post_event(this, ScannerEvent::ScanErrored, error);
 }
 
 void ScanMonitor::StatusRotorPosition(const SignalMonitorValue &val)
 {
-    post_event(this, ScannerEvent::kSetStatusRotorPosition,
+    post_event(this, ScannerEvent::SetStatusRotorPosition,
                val.GetNormalizedValue(0, 65535));
 }
 
 void ScanMonitor::StatusSignalLock(const SignalMonitorValue &val)
 {
-    post_event(this, ScannerEvent::kSetStatusSignalLock, val.GetValue());
+    post_event(this, ScannerEvent::SetStatusSignalLock, val.GetValue());
 }
 
 void ScanMonitor::StatusChannelTuned(const SignalMonitorValue &val)
 {
-    post_event(this, ScannerEvent::kSetStatusChannelTuned, val.GetValue());
+    post_event(this, ScannerEvent::SetStatusChannelTuned, val.GetValue());
 }
 
 void ScanMonitor::StatusSignalToNoise(const SignalMonitorValue &val)
 {
-    post_event(this, ScannerEvent::kSetStatusSignalToNoise,
+    post_event(this, ScannerEvent::SetStatusSignalToNoise,
                val.GetNormalizedValue(0, 65535));
 }
 
 void ScanMonitor::StatusSignalStrength(const SignalMonitorValue &val)
 {
-    post_event(this, ScannerEvent::kSetStatusSignalStrength,
+    post_event(this, ScannerEvent::SetStatusSignalStrength,
                val.GetNormalizedValue(0, 65535));
 }
 

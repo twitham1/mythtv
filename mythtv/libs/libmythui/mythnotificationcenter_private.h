@@ -213,7 +213,7 @@ public:
     bool                        m_created         {false};
     uint32_t                    m_content         {kNone};
     uint32_t                    m_update          {(uint32_t)kAll};
-    MythNotification::Type      m_type            {MythNotification::kNew};
+    MythNotification::Type      m_type            {MythNotification::New};
     MythUIImage                *m_artworkImage    {nullptr};
     MythUIText                 *m_titleText       {nullptr};
     MythUIText                 *m_originText      {nullptr};

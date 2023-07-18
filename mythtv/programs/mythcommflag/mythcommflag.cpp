@@ -328,7 +328,7 @@ static void commDetectorGotNewCommercialBreakList(void)
 
 static void incomingCustomEvent(QEvent* e)
 {
-    if (e->type() == MythEvent::kMythEventMessage)
+    if (e->type() == MythEvent::MythEventMessage)
     {
         auto *me = dynamic_cast<MythEvent *>(e);
         if (me == nullptr)

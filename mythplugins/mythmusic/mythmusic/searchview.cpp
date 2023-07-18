@@ -82,8 +82,8 @@ void SearchView::customEvent(QEvent *event)
 {
     bool handled = false;
 
-    if (event->type() == MusicPlayerEvent::kTrackRemovedEvent ||
-        event->type() == MusicPlayerEvent::kTrackAddedEvent)
+    if (event->type() == MusicPlayerEvent::TrackRemovedEvent ||
+        event->type() == MusicPlayerEvent::TrackAddedEvent)
     {
         auto *mpe = dynamic_cast<MusicPlayerEvent *>(event);
 
@@ -113,7 +113,7 @@ void SearchView::customEvent(QEvent *event)
         {
             m_playTrack = false;
 
-            if (event->type() == MusicPlayerEvent::kTrackAddedEvent)
+            if (event->type() == MusicPlayerEvent::TrackAddedEvent)
             {
                 // make the added track current and play it
                 m_currentPlaylist->SetItemCurrent(m_currentPlaylist->GetCount() - 1);
@@ -121,7 +121,7 @@ void SearchView::customEvent(QEvent *event)
             }
         }
     }
-    else if (event->type() == MusicPlayerEvent::kAllTracksRemovedEvent)
+    else if (event->type() == MusicPlayerEvent::AllTracksRemovedEvent)
     {
         for (int x = 0; x < m_tracksList->GetCount(); x++)
         {
@@ -130,7 +130,7 @@ void SearchView::customEvent(QEvent *event)
                 item->DisplayState("off", "selectedstate");
         }
     }
-    else if (event->type() == MusicPlayerEvent::kMetadataChangedEvent)
+    else if (event->type() == MusicPlayerEvent::MetadataChangedEvent)
     {
         auto *mpe = dynamic_cast<MusicPlayerEvent *>(event);
 

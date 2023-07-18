@@ -1658,7 +1658,7 @@ void AudioOutputBase::OutputAudioLoop(void)
             if (!m_actuallyPaused)
             {
                 VBAUDIO("OutputAudioLoop: audio paused");
-                OutputEvent e(OutputEvent::kPaused);
+                OutputEvent e(OutputEvent::Paused);
                 dispatch(e);
                 m_wasPaused = true;
             }
@@ -1673,7 +1673,7 @@ void AudioOutputBase::OutputAudioLoop(void)
         if (m_wasPaused)
         {
             VBAUDIO("OutputAudioLoop: Play Event");
-            OutputEvent e(OutputEvent::kPlaying);
+            OutputEvent e(OutputEvent::Playing);
             dispatch(e);
             m_wasPaused = false;
         }
@@ -1723,7 +1723,7 @@ void AudioOutputBase::OutputAudioLoop(void)
     delete[] zeros;
     delete[] fragment;
     VBAUDIO("OutputAudioLoop: Stop Event");
-    OutputEvent e(OutputEvent::kStopped);
+    OutputEvent e(OutputEvent::Stopped);
     dispatch(e);
 }
 

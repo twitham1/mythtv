@@ -53,8 +53,8 @@ bool VisualizerView::Create(void)
 
 void VisualizerView::customEvent(QEvent *event)
 {
-    if (event->type() == MusicPlayerEvent::kTrackChangeEvent ||
-        event->type() == MusicPlayerEvent::kPlayedTracksChangedEvent)
+    if (event->type() == MusicPlayerEvent::TrackChangeEvent ||
+        event->type() == MusicPlayerEvent::PlayedTracksChangedEvent)
         showTrackInfoPopup();
 
     MusicCommon::customEvent(event);

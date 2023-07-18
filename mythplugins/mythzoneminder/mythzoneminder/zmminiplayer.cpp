@@ -69,7 +69,7 @@ bool ZMMiniPlayer::Create(void)
 
 void ZMMiniPlayer::customEvent (QEvent* event)
 {
-    if (event->type() == MythEvent::kMythEventMessage)
+    if (event->type() == MythEvent::MythEventMessage)
     {
         auto *me = dynamic_cast<MythEvent*>(event);
         if (!me)

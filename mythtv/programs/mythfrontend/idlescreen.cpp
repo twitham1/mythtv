@@ -244,7 +244,7 @@ bool IdleScreen::keyPressEvent(QKeyEvent* event)
 
 void IdleScreen::customEvent(QEvent* event)
 {
-    if (event->type() == MythEvent::kMythEventMessage)
+    if (event->type() == MythEvent::MythEventMessage)
     {
         auto *me = dynamic_cast<MythEvent *>(event);
         if (me == nullptr)

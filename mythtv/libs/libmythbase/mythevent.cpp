@@ -1,9 +1,9 @@
 #include "mythevent.h"
 #include "mythlogging.h"
 
-const QEvent::Type MythEvent::kMythEventMessage =
+const QEvent::Type MythEvent::MythEventMessage =
     (QEvent::Type) QEvent::registerEventType();
-const QEvent::Type MythEvent::kMythUserMessage =
+const QEvent::Type MythEvent::MythUserMessage =
     (QEvent::Type) QEvent::registerEventType();
 const QEvent::Type MythEvent::kUpdateTvProgressEventType =
     (QEvent::Type) QEvent::registerEventType();

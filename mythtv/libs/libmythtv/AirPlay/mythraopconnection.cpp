@@ -1897,12 +1897,12 @@ void MythRAOPConnection::SendNotification(bool update)
 
     if (!update || !m_firstSend)
     {
-        n = new MythMediaNotification(MythNotification::kNew,
+        n = new MythMediaNotification(MythNotification::New,
                                       image, m_dmap, duration, position);
     }
     else
     {
-        n = new MythPlaybackNotification(MythNotification::kUpdate,
+        n = new MythPlaybackNotification(MythNotification::Update,
                                          duration, position);
     }
     n->SetId(m_id);
