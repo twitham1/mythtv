@@ -200,10 +200,10 @@ bool TrackInfoPopup::keyPressEvent(QKeyEvent *event)
         QString action = actions[i];
 
         if (action == "INFO")
-	{
+        {
             showTrackInfo(gPlayer->getCurrentMetadata());
-	    handled = true;
-	}
+            handled = true;
+        }
         else
             handled = false;
     }
