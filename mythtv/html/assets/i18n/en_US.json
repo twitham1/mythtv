@@ -8,6 +8,11 @@
         "default": "Default",
         "delete": "Delete",
         "failed": "Failed",
+        "filter": {
+            "contains": "Contains",
+            "equals": "Exact Match",
+            "startswith": "Starts With"
+        },
         "help": "Help",
         "instructions": "Instructions",
         "loading": "Loading",
@@ -41,9 +46,13 @@
             "alreadydel": "Already Deleted",
             "canundel": "You can reverse this by using Undelete.",
             "channel": "Channel",
+            "delete_details": "This will delete the Recording Rule",
+            "delete_rule": "Delete Recording Rule",
             "description": "Description",
+            "download": "Download Recording",
             "duration": "Duration",
             "edit_metadata": "Edit Metadata",
+            "edit_rule": "Edit Recording Rule",
             "episode": "Episode",
             "file_size": "File Size",
             "filter": "Filter",
@@ -63,9 +72,12 @@
             "mnu_updatemeta": "Update Metadata",
             "mnu_updaterecrule": "Update Record Rule",
             "orig_airdate": "Orig Airdate",
+            "override_rule": "Add or Edit Override Rule",
             "recgrp": "Rec Grp",
             "seas_ep": "Seas Ep",
             "season": "Season",
+            "stop_details": "This will Stop Recording",
+            "stop_recording": "Stop Recording",
             "subtitle": "Subtitle",
             "title": "Title"
         },
@@ -181,6 +193,9 @@
                 "minute": "Minute",
                 "minutes": "Minutes",
                 "myth_drive": "MythTV Drive",
+                "mythfill_last": "Last mythfilldatabase run started on {{GuideStart}} and ended on {{GuideEnd}}, {{GuideStatus}}",
+                "mythfill_next": "Suggested next mythfilldatabase run {{GuideNext}}.",
+                "mythfill_until": "There's guide data until {{GuideThru}} ({{GuideDays}} days).",
                 "none": "No Machine Info available",
                 "space_after_expire": "Space Available after Auto-expire",
                 "space_deleted": "Space Used by Deleted Recordings",
@@ -191,6 +206,7 @@
                 "title": "Machine Info",
                 "total_space": "Total Space"
             },
+            "misc_title": "Miscellaneous",
             "no_encoders": "Backend has no encoders",
             "schedule_none": "Nothing scheduled to record",
             "schedule_text": "The next {{ length }} show(s) that are scheduled for recording.",
@@ -200,11 +216,13 @@
             "date": "Date",
             "encoder": "Encoder",
             "heading": "Upcoming",
-            "showall": "Show All",
+            "recrule": "Recording Rule",
+            "showall": "All Status Values",
             "status": "Status",
             "time": "Time"
         },
         "videos": {
+            "download": "Download Video",
             "heading": "Videos",
             "releasedate": "Release Date"
         }
@@ -243,8 +261,10 @@
         "backendSetup": "Backend Setup",
         "changeLanguage": "Change Language",
         "dashboard": "Dashboard",
+        "hide": "Hide top Banner",
         "login": "Log In",
         "mainheading": "MythTV Backend",
+        "show": "Show top Banner",
         "switchServer": "Switch Server",
         "switchTheme": "Switch Theme",
         "testbed": "Testbed",
@@ -347,6 +367,7 @@
         "weekHeader": "Wk"
     },
     "recrule": {
+        "DonotRecord": "Do not Record",
         "NotRecording": "Not Recording",
         "OverrideRecording": "Override Recording",
         "RecordAll": "Record All",
@@ -622,6 +643,7 @@
             "delete_source_details": "This will delete all channels from source: {{Source}}",
             "delete_this": "Delete Channel",
             "deletechan": "Delete Channel",
+            "editchan": "Edit Channel",
             "eit_desc": "If enabled, guide information for this channel will be updated using 'Over-the-Air' program listings.",
             "eit_label": "Use On Air Guide",
             "format_desc": "If this channel uses a format other than TV Format in the General Backend Setup screen, set it here.",
@@ -641,7 +663,6 @@
             "timeoffset_label": "Listings Time Offset",
             "title": "Channel Editor",
             "unassigned": "(Unassigned)",
-            "updatechan": "Update Channel",
             "visible": "Visible",
             "visible_desc": "If set to Always Visible or Visible, the channel will be visible in the EPG.  Set to Always Visible or Never Visible to prevent MythTV and other utilities from automatically managing the value for this channel..",
             "visible_label": "Visibility",
@@ -983,7 +1004,8 @@
             "restart_desc": "Recordings are disabled until you restart",
             "restart_label": "Restart Backend",
             "restarting": "Restarting Backend",
-            "slave_instructions": "This appears to be a slave backend. If it is intended as a slave backend, please disable scheduling on the msster backend while running slave backend setup.",
+            "slave_enabled": "Updates are always enabled on a slave backend.",
+            "slave_instructions": "This appears to be a slave backend. If it is intended as a slave backend, please disable scheduling on the master backend while running slave backend setup.",
             "slave_warning": "If this is not intended as a slave backend, please go to Setup, General, Host Address Backend Setup, and select \"This server is the Master Backend\" or else set the correct custom identifier on the Database Setup page. Save and Restart the backend,",
             "title": "MythTV Setup",
             "upcomingrec": "Next upcoming recording: {{Title}} at {{StartTime}}. Status: {{Status}}"
@@ -1207,6 +1229,11 @@
         "databaseSchemaUnknown": "Database schema version is unknown",
         "databaseSetup": "Database Setup",
         "dbname_help": "The name of the database. This is usually 'mythconverg'.",
+        "dbsetup": {
+            "havedb": "Have '{{Name}}' database",
+            "havenotdb": "Do not have '{{Name}}' database",
+            "schemaver": "Database schema version is {{SchemaVersion}}"
+        },
         "done": "Done",
         "enterDBLoginDetails": "Enter the database login details",
         "ignoremessages": "Ignore messages that say \"Unable to load 'xxxxx' as time zone. Skipping it.\"",
