@@ -1354,9 +1354,8 @@ void MusicCommon::customEvent(QEvent *event)
             if (resulttext == tr("Fullscreen Visualizer"))
                 switchView(MV_VISUALIZER);
             else if (resulttext == tr("Playlist Editor") ||
-                     resulttext == tr("Play Now"))
+                     resulttext == tr("Browse Music Library"))
             {
-                gPlayer->inPlayNow(resulttext == tr("Play Now"));
                 if (gCoreContext->GetSetting("MusicPlaylistEditorView", "tree") ==  "tree")
                     switchView(MV_PLAYLISTEDITORTREE);
                 else
@@ -1532,7 +1531,7 @@ void MusicCommon::customEvent(QEvent *event)
                 doUpdatePlaylist();
             }
             else if (resulttext == tr("Play Now"))
-            {               // cancel shuffles and repeats to play now
+            {     // cancel shuffles and repeats to play only this now
                 gPlayer->setShuffleMode(MusicPlayer::SHUFFLE_OFF);
                 updateShuffleMode();
                 gPlayer->setRepeatMode(MusicPlayer::REPEAT_OFF);
@@ -1541,6 +1540,10 @@ void MusicCommon::customEvent(QEvent *event)
                 m_playlistOptions.playPLOption = PL_FIRSTNEW;
                 doUpdatePlaylist();
             }
+            else if (resulttext == tr("Prefer Play Now"))
+		gPlayer->setPlayNow(true);
+            else if (resulttext == tr("Prefer Add Tracks"))
+                gPlayer->setPlayNow(false);
         }
         else if (resultid == "visualizermenu")
         {
@@ -2218,8 +2221,9 @@ MythMenu* MusicCommon::createMainMenu(void)
     }
     else if (m_currentView == MV_PLAYLIST)
     {
-        menu->AddItem(MusicCommon::tr("Play Now"));
-        menu->AddItem(MusicCommon::tr("Playlist Editor"));
+        menu->AddItem(tr("Playlist Editor"));
+	// this might be easier for new users to understand:
+        // menu->AddItem(tr("Browse Music Library"));
     }
 
     QStringList screenList;
@@ -2425,17 +2429,20 @@ MythMenu* MusicCommon::createPlaylistOptionsMenu(void)
 
     auto *menu = new MythMenu(label, this, "playlistoptionsmenu");
 
-    if (gPlayer->getInPlayNow())
+    if (gPlayer->getPlayNow())
     {
         menu->AddItem(tr("Play Now"));
         menu->AddItem(tr("Add Tracks"));
+        menu->AddItem(tr("Replace Tracks"));
+        menu->AddItem(tr("Prefer Add Tracks"));
     }
     else
     {
         menu->AddItem(tr("Add Tracks"));
         menu->AddItem(tr("Play Now"));
+        menu->AddItem(tr("Replace Tracks"));
+        menu->AddItem(tr("Prefer Play Now"));
     }
-    menu->AddItem(tr("Replace Tracks"));
 
     return menu;
 }
