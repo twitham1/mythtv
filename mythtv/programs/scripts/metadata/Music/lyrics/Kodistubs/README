@@ -1,5 +1,8 @@
-Tiny portion of Kodistubs to translate CU LRC to MythTV.  If CU LRC
-ever refers to other functions, simply copy them in here from original
-Kodistubs and update where needed. -twitham@sbcglobal.net, 2024/01
+This is a tiny portion of Kodistubs to translate CU LRC to MythTV.
 
-	origin: https://github.com/romanvm/Kodistubs.git
+If CU LRC ever refers to other functions, simply copy them in here
+from original Kodistubs and update as needed.
+
+	-twitham@sbcglobal.net, 2024/01
+
+source:		https://github.com/romanvm/Kodistubs

@@ -8,6 +8,7 @@ use Getopt::Long;
 use File::Basename;
 use Time::HiRes qw(gettimeofday tv_interval);
 
+my $begin = [gettimeofday];
 my($name, $path, $suffix) = fileparse($0);
 
 my @opt = qw(k|keepgoing v|version t|test s|search d|debug
@@ -45,5 +46,6 @@ for (sort { $py{$a} <=> $py{$b} } keys %py) {
     $found{$_} and ($opt{k} or last);
 }
 for (sort { $py{$a} <=> $py{$b} } keys %found) {
-    warn "$py{$_}\t$sync{$_}\t$_\t$found{$_}\t$time{$_}\n";
+    warn "$py{$_}\t$sync{$_}\t$found{$_}\t$time{$_}\t$_\n";
 }
+warn "TOTAL seconds elapsed\t", tv_interval($begin, [gettimeofday]), "\n";
